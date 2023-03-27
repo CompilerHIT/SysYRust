@@ -3,12 +3,12 @@
     实现指令： 
             伪指令：li, la, mv, bz, j, ret, neg, call ...
             op2(2 operand), op1(1 operand),
-            lw, sw, addi,
+            ld, sd, addi,
             slli: 优化muli, srli: 优化divi,
             bz: beqz, bnez, blez, bgez, bltz, bgtz
             j
-    注：只支持生成lw、sw指令，因为sysy只有int与float型而没有long型
-
+    注：只支持生成lw、sw指令，因为sysy只有int与float型而没有long型 
+        =>> 很粗暴的对l/s指令使用ld, sd
 */
 
 // FIXME: divi使用srli替代
@@ -101,7 +101,7 @@ impl<'f> AsmBuilder<'f> {
 
     pub fn divi(&mut self, dest: &str, opr: &str, imm: i32) -> Result<()> {
         if imm == 0 {
-            // TODO: 待修改为警告宏，而非panic
+            // TODO: 待修改为Error，而非panic？
             panic!("error imm")
         } else if imm > 0 && (imm & (imm - 1)) == 0 {
             // TODO: 待修改为用srli代替
@@ -118,21 +118,21 @@ impl<'f> AsmBuilder<'f> {
         }
     }
 
-    pub fn sw(&mut self, src: &str, addr: &str, offset: i32) -> Result<()> {
+    pub fn sd(&mut self, src: &str, addr: &str, offset: i32) -> Result<()> {
         if (-2048..=2047).contains(&offset) {
-            writeln!(self.f, "  sw {src}, {offset}({addr})")
+            writeln!(self.f, "  sd {src}, {offset}({addr})")
         } else {
             self.addi(self.temp, addr, offset)?;
-            writeln!(self.f, "  sw {src}, 0({})", self.temp)
+            writeln!(self.f, "  sd {src}, 0({})", self.temp)
         }
     }
 
-    pub fn lw(&mut self, dest: &str, addr: &str, offset: i32) -> Result<()> {
+    pub fn ld(&mut self, dest: &str, addr: &str, offset: i32) -> Result<()> {
         if (-2048..=2047).contains(&offset) {
-            writeln!(self.f, "  lw {dest}, {offset}({addr})")
+            writeln!(self.f, "  ld {dest}, {offset}({addr})")
         } else {
             self.addi(self.temp, addr, offset)?;
-            writeln!(self.f, "  lw {dest}, 0({})", self.temp)
+            writeln!(self.f, "  ld {dest}, 0({})", self.temp)
         }
     }
 
@@ -145,30 +145,30 @@ impl<'f> AsmBuilder<'f> {
     }
 
     //TODO: for function
-    pub fn prologue(&mut self, func_name: &str, info: &FunctionInfo) -> Result<()> {
-        // declaration
-        writeln!(self.f, "  .text")?;
-        writeln!(self.f, "  .globl {}", &func_name[1..])?;
-        writeln!(self.f, "{}:", &func_name[1..])?;
-        // prologue
-        let offset = info.sp_offset() as i32;
-        if offset != 0 {
-            self.addi("sp", "sp", -offset)?;
-            if !info.is_leaf() {
-                self.sw("ra", "sp", offset - 4)?;
-            }
-        }
-        Ok(())
-    }
+    // pub fn prologue(&mut self, func_name: &str, info: &FunctionInfo) -> Result<()> {
+    //     // declaration
+    //     writeln!(self.f, "  .text")?;
+    //     writeln!(self.f, "  .globl {}", &func_name[1..])?;
+    //     writeln!(self.f, "{}:", &func_name[1..])?;
+    //     // prologue
+    //     let offset = info.sp_offset() as i32;
+    //     if offset != 0 {
+    //         self.addi("sp", "sp", -offset)?;
+    //         if !info.is_leaf() {
+    //             self.sd("ra", "sp", offset - 8)?;
+    //         }
+    //     }
+    //     Ok(())
+    // }
 
-    pub fn epilogue(&mut self, info: &FunctionInfo) -> Result<()> {
-        let offset = info.sp_offset() as i32;
-        if offset != 0 {
-            if !info.is_leaf() {
-                self.lw("ra", "sp", offset - 4)?;
-            }
-            self.addi("sp", "sp", offset)?;
-        }
-        writeln!(self.f, "  ret")
-    }
+    // pub fn epilogue(&mut self, info: &FunctionInfo) -> Result<()> {
+    //     let offset = info.sp_offset() as i32;
+    //     if offset != 0 {
+    //         if !info.is_leaf() {
+    //             self.ld("ra", "sp", offset - 8)?;
+    //         }
+    //         self.addi("sp", "sp", offset)?;
+    //     }
+    //     writeln!(self.f, "  ret")
+    // }
 }
