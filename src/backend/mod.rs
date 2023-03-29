@@ -1,2 +1,2 @@
-mod codegen;
+mod builder;
 mod instrs;
