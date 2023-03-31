@@ -1,5 +1,15 @@
 use std::fs::File;
 use std::io::Result;
+use crate::backend::operand::*;
+
+// TODO: IReg or FReg, IImm or FImm
+#[derive(Clone, Copy)]
+enum Operand {
+    Addr(Addr),
+    Imm(IImm),
+    IReg(IReg)
+}
+
 // trait for instructs for asm
 trait GenerateToAsm {
     type Target;
@@ -7,16 +17,11 @@ trait GenerateToAsm {
 }
 
 struct Unary {
-    
+    dst: Operand,
+    src: Operand
 }
 
-// TODO: IReg or FReg, IImm or FImm
-#[derive(Clone, Copy)]
-enum Value {
-    Addr,
-    Imm,
-    Reg
-}
+
 
 
 //TODO:浮点数运算
@@ -49,8 +54,9 @@ enum CmpOp {
 
 struct Binary {
     op: BinaryOp,
-    lhs: Value,
-    rhs: Value
+    dst: Operand,
+    lhs: Operand,
+    rhs: Operand
 }
 
 impl Binary {
@@ -60,16 +66,16 @@ impl Binary {
     fn get_mr_op(&mut self) -> &mut BinaryOp {
         &mut self.op
     }
-    fn get_lhs(&self) -> Value {
+    fn get_lhs(&self) -> Operand {
         self.lhs
     }
-    fn get_mr_lhs(&mut self) -> &mut Value {
+    fn get_mr_lhs(&mut self) -> &mut Operand {
         &mut self.lhs
     }
-    fn get_rhs(&self) -> Value {
+    fn get_rhs(&self) -> Operand {
         self.rhs
     }
-    fn get_mr_rhs(&mut self) -> &mut Value {
+    fn get_mr_rhs(&mut self) -> &mut Operand {
         &mut self.rhs
     }
 }
@@ -99,7 +105,7 @@ pub struct Call {
     // func_name: String,
     // param_cnt: usize,
     // float_param_cnt: usize,
-    args: Vec<Value>,
+    args: Vec<Operand>,
 }
 
 pub struct Return {
