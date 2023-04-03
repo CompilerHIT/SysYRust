@@ -2,21 +2,24 @@ use std::fs::File;
 use std::io::Result;
 use crate::backend::operand::*;
 
-// TODO: IReg or FReg, IImm or FImm
+use super::structs;
+
 #[derive(Clone, Copy)]
 enum Operand {
     Addr(Addr),
-    Imm(IImm),
-    IReg(IReg)
+    IImm(IImm),
+    FImm(FImm),
+    Reg(Reg)
 }
 
 // trait for instructs for asm
-trait GenerateToAsm {
-    type Target;
-    fn generate(&self, f: &mut File) -> Result<Self::Target>;
+pub trait Instrs {
+    fn generate(&self, f: &mut File) -> String {
+        String::from("todo")
+    }
 }
 
-struct Unary {
+pub struct Unary {
     dst: Operand,
     src: Operand
 }
@@ -52,7 +55,7 @@ enum CmpOp {
     Le,
 }
 
-struct Binary {
+pub struct Binary {
     op: BinaryOp,
     dst: Operand,
     lhs: Operand,
@@ -127,3 +130,11 @@ pub struct FToI {
 pub struct IToF {
     
 }
+
+impl Instrs for Binary {}
+impl Instrs for Call {}
+impl Instrs for Return {}
+impl Instrs for Load {}
+impl Instrs for Store {}
+impl Instrs for FToI {}
+impl Instrs for IToF {}
