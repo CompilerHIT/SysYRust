@@ -1,12 +1,14 @@
 use super::{instruction::Instruction, value::Value};
+use std::cell::RefCell;
 use std::rc::Rc;
 
 pub struct BasicBlock {
     value: Value,
-    instruction: Vec<Rc<Instruction>>,
+    instruction: Vec<Rc<RefCell<Instruction>>>,
 }
 
 impl BasicBlock {
+    /// 构造一个空的BisicBlock
     pub fn make_basicblock(name: String) -> BasicBlock {
         let value = Value::make_value(name, super::ir_type::IrType::BBlock);
         BasicBlock {
@@ -15,11 +17,8 @@ impl BasicBlock {
         }
     }
 
-    pub fn insert(&mut self, inst: Rc<Instruction>, index: usize) {
+    /// 在index处插入一条指令
+    pub fn insert(&mut self, inst: Rc<RefCell<Instruction>>, index: usize) {
         self.instruction.insert(index, inst);
-    }
-
-    pub fn get_inst(&mut self, index: usize) -> &mut Rc<Instruction> {
-        &mut self.instruction[index]
     }
 }

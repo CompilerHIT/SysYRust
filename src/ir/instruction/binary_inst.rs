@@ -1,6 +1,8 @@
 use super::super::instruction::Instruction;
 use super::super::ir_type::IrType;
 use crate::ir::user::User;
+use std::borrow::BorrowMut;
+use std::cell::RefCell;
 use std::rc::Rc;
 
 pub enum Operator {
@@ -13,7 +15,7 @@ pub enum Operator {
 pub struct BinaryOpInst {
     user: User,
     operator: Operator,
-    operand: Vec<Rc<Instruction>>,
+    operand: Vec<Rc<RefCell<Instruction>>>,
 }
 
 impl BinaryOpInst {
@@ -21,33 +23,45 @@ impl BinaryOpInst {
         name: String,
         ir_type: IrType,
         operator: Operator,
-        operand: Vec<Rc<Instruction>>,
-    ) -> Rc<BinaryOpInst> {
+        operand: Vec<Rc<RefCell<Instruction>>>,
+    ) -> Rc<RefCell<BinaryOpInst>> {
         let user = User::make_user(name, ir_type);
-        Rc::new(BinaryOpInst {
+        Rc::new(RefCell::new(BinaryOpInst {
             user,
             operator,
             operand,
-        })
+        }))
     }
 
     /// 构造一个加指令
-    pub fn make_add_inst(name: String, operand: Vec<Rc<Instruction>>) -> Rc<BinaryOpInst> {
+    pub fn make_add_inst(
+        name: String,
+        operand: Vec<Rc<RefCell<Instruction>>>,
+    ) -> Rc<RefCell<BinaryOpInst>> {
         Self::make_binary_op_inst(name, IrType::Int, Operator::Add, operand)
     }
 
     /// 构造一个加指令
-    pub fn make_sub_inst(name: String, operand: Vec<Rc<Instruction>>) -> Rc<BinaryOpInst> {
+    pub fn make_sub_inst(
+        name: String,
+        operand: Vec<Rc<RefCell<Instruction>>>,
+    ) -> Rc<RefCell<BinaryOpInst>> {
         Self::make_binary_op_inst(name, IrType::Int, Operator::Sub, operand)
     }
 
     /// 构造一个加指令
-    pub fn make_mul_inst(name: String, operand: Vec<Rc<Instruction>>) -> Rc<BinaryOpInst> {
+    pub fn make_mul_inst(
+        name: String,
+        operand: Vec<Rc<RefCell<Instruction>>>,
+    ) -> Rc<RefCell<BinaryOpInst>> {
         Self::make_binary_op_inst(name, IrType::Int, Operator::Mul, operand)
     }
 
     /// 构造一个加指令
-    pub fn make_div_inst(name: String, operand: Vec<Rc<Instruction>>) -> Rc<BinaryOpInst> {
+    pub fn make_div_inst(
+        name: String,
+        operand: Vec<Rc<RefCell<Instruction>>>,
+    ) -> Rc<RefCell<BinaryOpInst>> {
         Self::make_binary_op_inst(name, IrType::Int, Operator::Div, operand)
     }
 
@@ -60,17 +74,15 @@ impl BinaryOpInst {
     }
 
     /// 获得左操作数
-    pub fn get_lhs(&mut self) -> &mut Instruction {
-        let op = &mut self.operand[0];
-        Rc::get_mut(op).unwrap()
+    pub fn get_lhs(&mut self) -> Rc<RefCell<Instruction>> {
+        self.operand[0].clone()
     }
 
     /// 获得右操作数
     ///
     /// # Panics
     /// 右操作数不存在，是空指针
-    pub fn get_rhs(&mut self) -> &mut Instruction {
-        let op = &mut self.operand[1];
-        Rc::get_mut(op).unwrap()
+    pub fn get_rhs(&mut self) -> Rc<RefCell<Instruction>> {
+        self.operand[1].clone()
     }
 }
