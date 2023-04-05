@@ -5,7 +5,6 @@ use std::rc::Rc;
 
 pub struct BranchInst {
     user: User,
-    cond: Option<Rc<RefCell<Instruction>>>,
     next_bb: Vec<Rc<RefCell<BasicBlock>>>,
 }
 
@@ -15,11 +14,16 @@ impl BranchInst {
         cond: Option<Rc<RefCell<Instruction>>>,
         next_bb: Vec<Rc<RefCell<BasicBlock>>>,
     ) -> Rc<RefCell<BranchInst>> {
-        Rc::new(RefCell::new(BranchInst {
-            user: User::make_user(name, IrType::Void),
-            cond,
-            next_bb,
-        }))
+        match cond {
+            Some(r) => Rc::new(RefCell::new(BranchInst {
+                user: User::make_user(name, IrType::Void, vec![r]),
+                next_bb,
+            })),
+            None => Rc::new(RefCell::new(BranchInst {
+                user: User::make_user(name, IrType::Void, vec![]),
+                next_bb,
+            })),
+        }
     }
 
     pub fn make_cond_br(

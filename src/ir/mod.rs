@@ -1,7 +1,9 @@
 //! src/ir/mod.rs
 mod basicblock;
+mod function;
 mod instruction;
 mod ir_type;
+mod parameter;
 mod user;
 mod value;
 
