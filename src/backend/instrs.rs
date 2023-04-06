@@ -1,10 +1,9 @@
+use std::collections::HashSet;
 use std::fs::File;
-use std::io::Result;
 use crate::backend::operand::*;
 
-use super::structs;
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq)]
 enum Operand {
     Addr(Addr),
     IImm(IImm),
@@ -14,17 +13,15 @@ enum Operand {
 
 // trait for instructs for asm
 pub trait Instrs {
+    fn create_reg_use(&self) -> HashSet<Reg>;
+    fn create_reg_def(&self) -> HashSet<Reg>;
+    // fn replace_value() {}
+    // fn replace_def_value() {}
+    // fn replace_use_value() {}
     fn generate(&self, f: &mut File) -> String {
         String::from("todo")
     }
 }
-
-pub struct Unary {
-    dst: Operand,
-    src: Operand
-}
-
-
 
 
 //TODO:浮点数运算
@@ -57,7 +54,7 @@ enum CmpOp {
 
 pub struct Binary {
     op: BinaryOp,
-    dst: Operand,
+    dst: Reg,
     lhs: Operand,
     rhs: Operand
 }
@@ -81,17 +78,12 @@ impl Binary {
     fn get_mr_rhs(&mut self) -> &mut Operand {
         &mut self.rhs
     }
-}
-
-trait RegCond {
-    fn reg_use() {}
-    fn reg_def() {}
-}
-
-trait ReplaceInst {
-    fn replace_value() {}
-    fn replace_def_value() {}
-    fn replace_use_value() {}
+    fn get_dst(&self) -> Reg {
+        self.dst
+    }
+    fn get_mr_dst(&mut self) -> &mut Reg {
+        &mut self.dst
+    }
 }
 
 //TODO:
@@ -123,6 +115,34 @@ pub struct Store {
 
 }
 
+pub struct MvReg {
+    dst: Reg,
+    src: Reg
+}
+
+pub struct MvIImm {
+    dst: Reg,
+    src: IImm
+}
+
+pub struct MvFImm {
+    dst: Reg,
+    src: FImm
+}
+
+pub struct Bz {
+    Cond: CmpOp,
+    src: Reg,
+    label: Operand
+}
+
+pub struct IUnary {
+    src: IImm
+}
+pub struct FUnary {
+    src: FImm
+}
+
 pub struct FToI {
 
 }
@@ -131,10 +151,36 @@ pub struct IToF {
     
 }
 
-impl Instrs for Binary {}
-impl Instrs for Call {}
-impl Instrs for Return {}
-impl Instrs for Load {}
-impl Instrs for Store {}
-impl Instrs for FToI {}
-impl Instrs for IToF {}
+
+impl Instrs for Binary {
+    fn create_reg_def(&self) -> HashSet<Reg> {
+        let mut set: HashSet<Reg> = HashSet::new();
+        set.insert(self.get_dst());
+        set
+    }
+    fn create_reg_use(&self) -> HashSet<Reg> {
+        let mut set: HashSet<Reg> = HashSet::new();
+        let lhs = self.get_lhs();
+        let rhs = self.get_rhs();
+        match lhs {
+            Operand::Reg(reg) => {
+                set.insert(reg);
+            }
+            _ => {}
+        }
+        match rhs {
+            Operand::Reg(reg) => {
+                set.insert(reg);
+            }
+            _ => {}
+        }
+        set.insert(self.get_dst());
+        set
+    }
+}
+// impl Instrs for Call {}
+// impl Instrs for Return {}
+// impl Instrs for Load {}
+// impl Instrs for Store {}
+// impl Instrs for FToI {}
+// impl Instrs for IToF {}
