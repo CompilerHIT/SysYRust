@@ -1,6 +1,7 @@
 use super::super::instruction::Instruction;
 use super::super::ir_type::IrType;
 use crate::ir::user::User;
+use std::cell::{RefCell, RefMut};
 use std::rc::Rc;
 
 pub enum Operator {
@@ -13,7 +14,6 @@ pub enum Operator {
 pub struct BinaryOpInst {
     user: User,
     operator: Operator,
-    operand: Vec<Rc<Instruction>>,
 }
 
 impl BinaryOpInst {
@@ -21,34 +21,47 @@ impl BinaryOpInst {
         name: String,
         ir_type: IrType,
         operator: Operator,
-        operand: Vec<Rc<Instruction>>,
-    ) -> Rc<BinaryOpInst> {
-        let user = User::make_user(name, ir_type);
-        Rc::new(BinaryOpInst {
-            user,
-            operator,
-            operand,
-        })
+        lhs: Rc<RefCell<Instruction>>,
+        rhs: Rc<RefCell<Instruction>>,
+    ) -> Rc<RefCell<BinaryOpInst>> {
+        let user = User::make_user(name, ir_type, vec![lhs, rhs]);
+        Rc::new(RefCell::new(BinaryOpInst { user, operator }))
     }
 
     /// 构造一个加指令
-    pub fn make_add_inst(name: String, operand: Vec<Rc<Instruction>>) -> Rc<BinaryOpInst> {
-        Self::make_binary_op_inst(name, IrType::Int, Operator::Add, operand)
+    pub fn make_add_inst(
+        name: String,
+        lhs: Rc<RefCell<Instruction>>,
+        rhs: Rc<RefCell<Instruction>>,
+    ) -> Rc<RefCell<BinaryOpInst>> {
+        Self::make_binary_op_inst(name, IrType::Int, Operator::Add, lhs, rhs)
     }
 
     /// 构造一个加指令
-    pub fn make_sub_inst(name: String, operand: Vec<Rc<Instruction>>) -> Rc<BinaryOpInst> {
-        Self::make_binary_op_inst(name, IrType::Int, Operator::Sub, operand)
+    pub fn make_sub_inst(
+        name: String,
+        lhs: Rc<RefCell<Instruction>>,
+        rhs: Rc<RefCell<Instruction>>,
+    ) -> Rc<RefCell<BinaryOpInst>> {
+        Self::make_binary_op_inst(name, IrType::Int, Operator::Sub, lhs, rhs)
     }
 
     /// 构造一个加指令
-    pub fn make_mul_inst(name: String, operand: Vec<Rc<Instruction>>) -> Rc<BinaryOpInst> {
-        Self::make_binary_op_inst(name, IrType::Int, Operator::Mul, operand)
+    pub fn make_mul_inst(
+        name: String,
+        lhs: Rc<RefCell<Instruction>>,
+        rhs: Rc<RefCell<Instruction>>,
+    ) -> Rc<RefCell<BinaryOpInst>> {
+        Self::make_binary_op_inst(name, IrType::Int, Operator::Mul, lhs, rhs)
     }
 
     /// 构造一个加指令
-    pub fn make_div_inst(name: String, operand: Vec<Rc<Instruction>>) -> Rc<BinaryOpInst> {
-        Self::make_binary_op_inst(name, IrType::Int, Operator::Div, operand)
+    pub fn make_div_inst(
+        name: String,
+        lhs: Rc<RefCell<Instruction>>,
+        rhs: Rc<RefCell<Instruction>>,
+    ) -> Rc<RefCell<BinaryOpInst>> {
+        Self::make_binary_op_inst(name, IrType::Int, Operator::Div, lhs, rhs)
     }
 
     /// 获得操作符
@@ -60,17 +73,15 @@ impl BinaryOpInst {
     }
 
     /// 获得左操作数
-    pub fn get_lhs(&mut self) -> &mut Instruction {
-        let op = &mut self.operand[0];
-        Rc::get_mut(op).unwrap()
+    pub fn get_lhs(&self) -> RefMut<Instruction> {
+        self.user.get_operand(0)
     }
 
     /// 获得右操作数
     ///
     /// # Panics
     /// 右操作数不存在，是空指针
-    pub fn get_rhs(&mut self) -> &mut Instruction {
-        let op = &mut self.operand[1];
-        Rc::get_mut(op).unwrap()
+    pub fn get_rhs(&self) -> RefMut<Instruction> {
+        self.user.get_operand(1)
     }
 }
