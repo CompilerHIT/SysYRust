@@ -1,18 +1,18 @@
 const REG_COUNT: i8 = 32;
 
-#[derive(Clone, Copy, PartialEq, Hash)]
+#[derive(Clone, Copy, PartialEq, Hash, Eq)]
 pub struct Reg {
     id: usize,
     r_type: RegType
 }
 
-#[derive(Clone, Copy, PartialEq, Hash)]
+#[derive(Clone, Copy, PartialEq, Hash, Eq)]
 enum RegType {
     Int,
     Float
 }
 
-#[derive(Clone, Copy, PartialEq, Hash)]
+#[derive(Clone, Copy, PartialEq, Hash, Eq)]
 pub struct IImm {
     data: isize,
 }
@@ -22,7 +22,7 @@ pub struct FImm {
     data: f32
 }
 
-#[derive(Clone, Copy, PartialEq, Hash)]
+#[derive(Clone, Copy, PartialEq, Hash, Eq)]
 pub struct Addr {
     label: &'static str,
 }
@@ -45,6 +45,7 @@ impl ToString for Addr {
         panic!("Wrong Call")
     }
 }
+
 
 impl Reg {
     fn new(id: usize, r_type: RegType) -> Self {
