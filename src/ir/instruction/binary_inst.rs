@@ -1,5 +1,5 @@
-use super::super::instruction::Instruction;
-use super::super::ir_type::IrType;
+use crate::ir::instruction::Instruction;
+use crate::ir::ir_type::IrType;
 use crate::ir::user::User;
 use std::cell::{RefCell, RefMut};
 use std::rc::Rc;
@@ -23,9 +23,10 @@ impl BinaryOpInst {
         operator: Operator,
         lhs: Rc<RefCell<Instruction>>,
         rhs: Rc<RefCell<Instruction>>,
-    ) -> Rc<RefCell<BinaryOpInst>> {
+    ) -> Rc<RefCell<Instruction>> {
         let user = User::make_user(name, ir_type, vec![lhs, rhs]);
-        Rc::new(RefCell::new(BinaryOpInst { user, operator }))
+        let inst = BinaryOpInst { user, operator };
+        Rc::new(RefCell::new(Instruction::EBinaryOpInst(inst)))
     }
 
     /// 构造一个加指令
@@ -33,7 +34,7 @@ impl BinaryOpInst {
         name: String,
         lhs: Rc<RefCell<Instruction>>,
         rhs: Rc<RefCell<Instruction>>,
-    ) -> Rc<RefCell<BinaryOpInst>> {
+    ) -> Rc<RefCell<Instruction>> {
         Self::make_binary_op_inst(name, IrType::Int, Operator::Add, lhs, rhs)
     }
 
@@ -42,7 +43,7 @@ impl BinaryOpInst {
         name: String,
         lhs: Rc<RefCell<Instruction>>,
         rhs: Rc<RefCell<Instruction>>,
-    ) -> Rc<RefCell<BinaryOpInst>> {
+    ) -> Rc<RefCell<Instruction>> {
         Self::make_binary_op_inst(name, IrType::Int, Operator::Sub, lhs, rhs)
     }
 
@@ -51,7 +52,7 @@ impl BinaryOpInst {
         name: String,
         lhs: Rc<RefCell<Instruction>>,
         rhs: Rc<RefCell<Instruction>>,
-    ) -> Rc<RefCell<BinaryOpInst>> {
+    ) -> Rc<RefCell<Instruction>> {
         Self::make_binary_op_inst(name, IrType::Int, Operator::Mul, lhs, rhs)
     }
 
@@ -60,19 +61,18 @@ impl BinaryOpInst {
         name: String,
         lhs: Rc<RefCell<Instruction>>,
         rhs: Rc<RefCell<Instruction>>,
-    ) -> Rc<RefCell<BinaryOpInst>> {
+    ) -> Rc<RefCell<Instruction>> {
         Self::make_binary_op_inst(name, IrType::Int, Operator::Div, lhs, rhs)
     }
 
     /// 获得操作符
-    ///
-    /// # Panics
-    /// 左操作数不存在，是空指针
     pub fn get_operator(&self) -> &Operator {
         &self.operator
     }
 
     /// 获得左操作数
+    /// # Panics
+    /// 左操作数不存在，是空指针
     pub fn get_lhs(&self) -> RefMut<Instruction> {
         self.user.get_operand(0)
     }

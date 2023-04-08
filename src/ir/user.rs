@@ -26,4 +26,8 @@ impl User {
     pub fn get_operand(&self, index: usize) -> RefMut<Instruction> {
         (*self.get_operands()[index]).borrow_mut()
     }
+
+    pub fn get_operands_size(&self) -> usize {
+        self.operands.len()
+    }
 }
