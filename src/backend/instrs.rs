@@ -1,28 +1,40 @@
+use crate::backend::operand::*;
 use std::collections::HashSet;
 use std::fs::File;
-use crate::backend::operand::*;
 
+use super::operand;
 
 #[derive(Clone, Copy, PartialEq)]
 enum Operand {
     Addr(Addr),
     IImm(IImm),
     FImm(FImm),
-    Reg(Reg)
+    Reg(Reg),
 }
 
 // trait for instructs for asm
 pub trait Instrs {
     fn create_reg_use(&self) -> HashSet<Reg>;
     fn create_reg_def(&self) -> HashSet<Reg>;
-    // fn replace_value() {}
-    // fn replace_def_value() {}
-    // fn replace_use_value() {}
     fn generate(&self, f: &mut File) -> String {
         String::from("todo")
     }
+
+    // TODO: maybe todo
+    // for reg alloc
+    // fn replace_reg() {}  // todo: add regs() to get all regs the inst use
+
+    // for conditional branch
+
+    // fn replace_value() {}
+    // fn replace_def_value() {}
+    // fn replace_use_value() {}
+
 }
 
+pub trait LegalImm {
+    fn is_legal_imm(&self) -> bool;
+}
 
 //TODO:浮点数运算
 #[derive(Clone, Copy)]
@@ -52,11 +64,12 @@ enum CmpOp {
     Le,
 }
 
+// dst: reg = lhs: operand op rhs: operand
 pub struct Binary {
     op: BinaryOp,
     dst: Reg,
     lhs: Operand,
-    rhs: Operand
+    rhs: Operand,
 }
 
 impl Binary {
@@ -84,73 +97,19 @@ impl Binary {
     fn get_mr_dst(&mut self) -> &mut Reg {
         &mut self.dst
     }
+    fn if_limm(&self) -> bool {
+        match self.lhs {
+            Operand::IImm(_) => true,
+            _ => false,
+        }
+    }
+    fn if_rimm(&self) -> bool {
+        match self.rhs {
+            Operand::IImm(_) => true,
+            _ => false,
+        }
+    }
 }
-
-//TODO:
-enum StackOp {
-    ParamLoad,
-    StackAddr,
-    StackLoad,
-    StackStore
-}
-
-pub struct Call {
-    // block: Block,
-    // callee: Function,
-    // func_name: String,
-    // param_cnt: usize,
-    // float_param_cnt: usize,
-    args: Vec<Operand>,
-}
-
-pub struct Return {
-
-}
-
-pub struct Load {
-
-}
-
-pub struct Store {
-
-}
-
-pub struct MvReg {
-    dst: Reg,
-    src: Reg
-}
-
-pub struct MvIImm {
-    dst: Reg,
-    src: IImm
-}
-
-pub struct MvFImm {
-    dst: Reg,
-    src: FImm
-}
-
-pub struct Bz {
-    Cond: CmpOp,
-    src: Reg,
-    label: Operand
-}
-
-pub struct IUnary {
-    src: IImm
-}
-pub struct FUnary {
-    src: FImm
-}
-
-pub struct FToI {
-
-}
-
-pub struct IToF {
-    
-}
-
 
 impl Instrs for Binary {
     fn create_reg_def(&self) -> HashSet<Reg> {
@@ -178,6 +137,139 @@ impl Instrs for Binary {
         set
     }
 }
+
+// dst: reg = mv src: reg
+pub struct MvReg {
+    dst: Reg,
+    src: Reg,
+}
+
+impl Instrs for MvReg {
+    fn create_reg_def(&self) -> HashSet<Reg> {
+        let mut set: HashSet<Reg> = HashSet::new();
+        set.insert(self.dst);
+        set
+    }
+    fn create_reg_use(&self) -> HashSet<Reg> {
+        let mut set: HashSet<Reg> = HashSet::new();
+        set.insert(self.src);
+        set.insert(self.dst);
+        set
+    }
+}
+
+// dst: reg = li src: iimm
+pub struct Li {
+    dst: Reg,
+    src: IImm
+}
+
+impl LegalImm for Li {
+    fn is_legal_imm(&self) -> bool {
+        self.src.is_imm_20bs()
+    }
+}
+
+impl Instrs for Li {
+    fn create_reg_def(&self) -> HashSet<Reg> {
+        let mut set: HashSet<Reg> = HashSet::new();
+        set.insert(self.dst);
+        set
+    }
+    fn create_reg_use(&self) -> HashSet<Reg> {
+        let mut set: HashSet<Reg> = HashSet::new();
+        set.insert(self.dst);
+        set
+    }
+}
+
+pub struct Lui {
+    dst: Reg,
+    src: IImm
+}
+
+impl LegalImm for Lui {
+    fn is_legal_imm(&self) -> bool {
+        self.src.is_imm_20bs()
+    }
+}
+
+impl Instrs for Lui {
+    fn create_reg_def(&self) -> HashSet<Reg> {
+        let mut set: HashSet<Reg> = HashSet::new();
+        set.insert(self.dst);
+        set
+    }
+    fn create_reg_use(&self) -> HashSet<Reg> {
+        let mut set: HashSet<Reg> = HashSet::new();
+        set.insert(self.dst);
+        set
+    }
+}
+
+enum SingleOp {
+    Not,
+    FNeg,
+    I2F,
+    F2I,
+    F2D,
+    D2F,
+}
+
+pub struct OpReg {
+    op: SingleOp,
+    dst: Reg,
+    src: Operand
+}
+
+impl Instrs for OpReg {
+    fn create_reg_def(&self) -> HashSet<Reg> {
+        let mut set: HashSet<Reg> = HashSet::new();
+        set.insert(self.dst);
+        set
+    }
+    fn create_reg_use(&self) -> HashSet<Reg> {
+        let mut set: HashSet<Reg> = HashSet::new();
+        match self.src {
+            Operand::Reg(reg) => {
+                set.insert(reg);
+            }
+            _ => {}
+        }
+        set
+    }
+}
+
+//TODO:
+enum StackOp {
+    ParamLoad,
+    StackAddr,
+    StackLoad,
+    StackStore,
+}
+
+pub struct Call {
+    // block: Block,
+    // callee: Function,
+    // func_name: String,
+    // param_cnt: usize,
+    // float_param_cnt: usize,
+    args: Vec<Operand>,
+}
+pub struct Return {}
+
+pub struct Load {}
+
+pub struct Store {}
+
+
+pub struct Bz {
+    Cond: CmpOp,
+    src: Reg,
+    label: Operand,
+}
+
+
 // impl Instrs for Call {}
 // impl Instrs for Return {}
 // impl Instrs for Load {}
