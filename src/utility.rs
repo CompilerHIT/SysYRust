@@ -2,7 +2,7 @@ use std::{
     cell::{Ref, RefCell, RefMut},
     rc::Rc,
 };
-struct Pointer<T> {
+pub struct Pointer<T> {
     p: Rc<RefCell<T>>,
 }
 
@@ -24,4 +24,10 @@ impl<T> Pointer<T> {
     pub fn clone(&self) -> Pointer<T> {
         Pointer { p: self.p.clone() }
     }
+}
+
+#[derive(Clone, Copy, PartialEq, Hash, Eq)]
+pub enum ScalarType {
+    Int,
+    Float,
 }

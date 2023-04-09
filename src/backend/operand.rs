@@ -1,15 +1,11 @@
+use crate::utility::ScalarType;
+
 const REG_COUNT: i8 = 32;
 
 #[derive(Clone, Copy, PartialEq, Hash, Eq)]
 pub struct Reg {
     id: usize,
-    r_type: RegType
-}
-
-#[derive(Clone, Copy, PartialEq, Hash, Eq)]
-enum RegType {
-    Int,
-    Float
+    r_type: ScalarType,
 }
 
 #[derive(Clone, Copy, PartialEq, Hash, Eq)]
@@ -19,7 +15,30 @@ pub struct IImm {
 
 #[derive(Clone, Copy, PartialEq)]
 pub struct FImm {
-    data: f32
+    data: f64
+}
+
+pub trait ImmBs {
+    fn is_imm_20bs(&self) -> bool;
+    fn is_imm_12bs(&self) -> bool;
+}
+
+impl ImmBs for IImm {
+    fn is_imm_20bs(&self) -> bool {
+        self.data >= -524288 && self.data <= 524287
+    }
+    fn is_imm_12bs(&self) -> bool {
+        self.data >= -2048 && self.data <= 2047
+    }
+}
+
+impl ImmBs for FImm {
+    fn is_imm_20bs(&self) -> bool {
+        self.data >= -524288.0 && self.data <= 524287.0
+    }
+    fn is_imm_12bs(&self) -> bool {
+        self.data >= -2048.0 && self.data <= 2047.0
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, Hash, Eq)]
@@ -48,14 +67,14 @@ impl ToString for Addr {
 
 
 impl Reg {
-    fn new(id: usize, r_type: RegType) -> Self {
+    fn new(id: usize, r_type: ScalarType) -> Self {
         Self {
             id,
             r_type
         }
     }
     fn to_string(&self) -> String {
-        if self.r_type == RegType::Int {
+        if self.r_type == ScalarType::Int {
             match self.id {
                 0 => String::from("zero"),
                 1 => String::from("ra"),
@@ -86,11 +105,11 @@ impl Reg {
     // f0-7, f10-17, f28-31
     fn is_caller_save(&self) -> bool {
         match self.r_type {
-            RegType::Int => self.id == 1
+            ScalarType::Int => self.id == 1
                                 || (self.id >= 5 && self.id <= 7)
                                 || (self.id >= 10 && self.id <= 17)
                                 || (self.id >= 28 && self.id <= 31),
-            RegType::Float => (self.id >= 0 && self.id <= 7) 
+            ScalarType::Float => (self.id >= 0 && self.id <= 7) 
                                 || (self.id >= 10 && self.id <= 17)
                                 || (self.id >= 28 && self.id <= 31),
             _ => panic!("Wrong Type")
@@ -102,9 +121,9 @@ impl Reg {
     // f8-9, f18-27
     fn is_callee_save(&self) -> bool {
         match self.r_type {
-            RegType::Int => self.id == 2 || self.id == 8 || self.id == 9 
+            ScalarType::Int => self.id == 2 || self.id == 8 || self.id == 9 
                                 || (self.id >= 18 && self.id <= 27),
-            RegType::Float => (self.id >= 8 && self.id <= 9) || (self.id >= 18 && self.id <= 27),
+            ScalarType::Float => (self.id >= 8 && self.id <= 9) || (self.id >= 18 && self.id <= 27),
             _ => panic!("Wrong Type")
         }
     }
