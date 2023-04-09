@@ -1,28 +1,18 @@
-use std::collections::{HashMap, HashSet, VecDeque};
-use std::rc::Rc;
+use std::collections::{HashSet, VecDeque};
 
+use crate::utility::Pointer;
 use crate::backend::operand::*;
 use crate::backend::instrs::*;
-
-pub struct Map {
-    reg_mapping: HashMap<usize, Reg>,
-    // global_mapping: HashMap<String, GlobalVar>,
-    // const_array_mapping: HashMap<String, ArrayConst>,
-    // functions: Vec!<Function>
-}
-
-impl Map {
-
-}
+use crate::utility::ScalarType;
 
 pub struct BB {
     label: String,
 
     pred: VecDeque<BB>,
-    insts: Vec<Rc<Box<dyn Instrs>>>,
+    insts: Vec<Pointer<Box<dyn Instrs>>>,
 
-    in_edge: Vec<Rc<BB>>,
-    out_edge: Vec<Rc<BB>>,
+    in_edge: Vec<Pointer<BB>>,
+    out_edge: Vec<Pointer<BB>>,
 
     live_use: HashSet<Reg>,
     live_def: HashSet<Reg>,
@@ -37,6 +27,12 @@ impl BB {
         self.live_in.clear();
         self.live_out.clear();
     }
+}
 
-    
+pub struct GlobalVar {
+    name: String,
+    size: i32,   // only available when is_int
+    // void *init, // when !is_int, must not empty. Q: how to imply void* type
+    is_const: bool,
+    dtype: ScalarType,
 }
