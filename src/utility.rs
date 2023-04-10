@@ -2,6 +2,8 @@ use std::{
     cell::{Ref, RefCell, RefMut},
     rc::Rc,
 };
+
+#[derive(Clone)]
 pub struct Pointer<T> {
     p: Rc<RefCell<T>>,
 }

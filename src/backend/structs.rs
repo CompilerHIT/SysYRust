@@ -1,8 +1,8 @@
 use std::collections::{HashSet, VecDeque};
 
 use crate::utility::Pointer;
-use crate::backend::operand::*;
-use crate::backend::instrs::*;
+use crate::backend::operand::Reg;
+use crate::backend::instrs::Instrs;
 use crate::utility::ScalarType;
 
 pub struct BB {
@@ -29,10 +29,16 @@ impl BB {
     }
 }
 
+#[derive(Clone)]
 pub struct GlobalVar {
-    name: String,
-    size: i32,   // only available when is_int
+    pub name: String,
+    pub size: i32,   // only available when is_int
     // void *init, // when !is_int, must not empty. Q: how to imply void* type
-    is_const: bool,
-    dtype: ScalarType,
+    pub is_const: bool,
+    pub dtype: ScalarType,
+}
+
+#[derive(Clone)]
+pub struct Func {
+
 }
