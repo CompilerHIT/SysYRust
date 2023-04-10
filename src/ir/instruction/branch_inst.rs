@@ -4,6 +4,7 @@ use std::cell::{RefCell, RefMut};
 use std::panic;
 use std::rc::Rc;
 
+#[derive(Debug)]
 pub struct BranchInst {
     user: User,
     next_bb: Vec<Rc<RefCell<BasicBlock>>>,
@@ -21,14 +22,14 @@ impl BranchInst {
                     user: User::make_user(name, IrType::Void, vec![r]),
                     next_bb,
                 };
-                Rc::new(RefCell::new(Instruction::EBranchInst(inst)))
+                Rc::new(RefCell::new(Instruction::IBranchInst(inst)))
             }
             None => {
                 let inst = BranchInst {
                     user: User::make_user(name, IrType::Void, vec![]),
                     next_bb,
                 };
-                Rc::new(RefCell::new(Instruction::EBranchInst(inst)))
+                Rc::new(RefCell::new(Instruction::IBranchInst(inst)))
             }
         }
     }

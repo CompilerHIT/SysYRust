@@ -1,4 +1,6 @@
 use super::ir_type::IrType;
+
+#[derive(Debug)]
 pub struct Value {
     ir_type: IrType,
     name: String,

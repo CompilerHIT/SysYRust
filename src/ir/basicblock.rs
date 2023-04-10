@@ -2,6 +2,7 @@ use super::{instruction::Instruction, value::Value};
 use std::cell::RefCell;
 use std::rc::Rc;
 
+#[derive(Debug)]
 pub struct BasicBlock {
     value: Value,
     instruction: Vec<Rc<RefCell<Instruction>>>,

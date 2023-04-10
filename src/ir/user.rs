@@ -4,6 +4,8 @@ use std::rc::Rc;
 use super::instruction::Instruction;
 use super::ir_type::IrType;
 use super::value::Value;
+
+#[derive(Debug)]
 pub struct User {
     value: Value,
     operands: Vec<Rc<RefCell<Instruction>>>,

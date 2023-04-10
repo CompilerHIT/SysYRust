@@ -2,6 +2,8 @@ use std::{
     cell::{Ref, RefCell, RefMut},
     rc::Rc,
 };
+
+/// 使用Pointer<T>来替代Rc<RefCell<T>>，以便于简化操作
 pub struct Pointer<T> {
     p: Rc<RefCell<T>>,
 }
