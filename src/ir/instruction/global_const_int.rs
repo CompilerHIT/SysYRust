@@ -8,9 +8,9 @@ pub struct GlobalConstInt {
 }
 
 impl GlobalConstInt {
-    pub fn make_int(name: String, bonding: i32) -> Pointer<Instruction> {
+    pub fn make_int(bonding: i32) -> Pointer<Instruction> {
         Pointer::new(Instruction::IGlobalConstInt(GlobalConstInt {
-            value: Value::make_value(name, IrType::ConstInt),
+            value: Value::make_value(IrType::ConstInt),
             bonding,
         }))
     }

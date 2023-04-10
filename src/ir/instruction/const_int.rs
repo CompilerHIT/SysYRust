@@ -10,8 +10,8 @@ pub struct ConstInt {
 }
 
 impl ConstInt {
-    pub fn make_int(name: String, bonding: i32) -> Pointer<Instruction> {
-        let value = Value::make_value(name, IrType::Int);
+    pub fn make_int(bonding: i32) -> Pointer<Instruction> {
+        let value = Value::make_value(IrType::Int);
         Pointer::new(Instruction::IConstInt(ConstInt { value, bonding }))
     }
 

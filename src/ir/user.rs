@@ -1,6 +1,4 @@
-use super::instruction::Instruction;
-use super::ir_type::IrType;
-use super::value::Value;
+use super::{instruction::Instruction, ir_type::IrType, value::Value};
 use crate::utility::Pointer;
 use std::cell::RefMut;
 
@@ -11,8 +9,8 @@ pub struct User {
 }
 
 impl User {
-    pub fn make_user(name: String, ir_type: IrType, operands: Vec<Pointer<Instruction>>) -> User {
-        let value = Value::make_value(name, ir_type);
+    pub fn make_user(ir_type: IrType, operands: Vec<Pointer<Instruction>>) -> User {
+        let value = Value::make_value(ir_type);
         User { value, operands }
     }
 

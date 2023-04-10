@@ -23,10 +23,6 @@ impl<T> Pointer<T> {
     pub fn borrow_mut(&self) -> RefMut<T> {
         self.p.borrow_mut()
     }
-
-    pub fn clone(&self) -> Pointer<T> {
-        Pointer { p: self.p.clone() }
-    }
 }
 
 impl<T> Clone for Pointer<T> {

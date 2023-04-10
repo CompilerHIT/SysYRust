@@ -1,4 +1,4 @@
-use super::{instruction::Instruction, value::Value};
+use super::{instruction::Instruction, ir_type::IrType, value::Value};
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -10,8 +10,8 @@ pub struct BasicBlock {
 
 impl BasicBlock {
     /// 构造一个空的BisicBlock
-    pub fn make_basicblock(name: String) -> BasicBlock {
-        let value = Value::make_value(name, super::ir_type::IrType::BBlock);
+    pub fn make_basicblock() -> BasicBlock {
+        let value = Value::make_value(IrType::BBlock);
         BasicBlock {
             value,
             instruction: Vec::new(),
