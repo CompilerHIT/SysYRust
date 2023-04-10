@@ -4,6 +4,7 @@ use std::{
 };
 
 /// 使用Pointer<T>来替代Rc<RefCell<T>>，以便于简化操作
+#[derive(Debug)]
 pub struct Pointer<T> {
     p: Rc<RefCell<T>>,
 }
@@ -24,6 +25,13 @@ impl<T> Pointer<T> {
     }
 
     pub fn clone(&self) -> Pointer<T> {
+        Pointer { p: self.p.clone() }
+    }
+}
+
+impl<T> Clone for Pointer<T> {
+    // add code here
+    fn clone(&self) -> Pointer<T> {
         Pointer { p: self.p.clone() }
     }
 }
