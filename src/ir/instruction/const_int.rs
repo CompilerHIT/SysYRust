@@ -1,7 +1,7 @@
 use super::Instruction;
 use crate::ir::ir_type::IrType;
 use crate::ir::value::Value;
-use std::{cell::RefCell, rc::Rc, string};
+use crate::utility::Pointer;
 
 #[derive(Debug)]
 pub struct ConstInt {
@@ -10,12 +10,9 @@ pub struct ConstInt {
 }
 
 impl ConstInt {
-    pub fn make_int(name: String, bonding: i32) -> Rc<RefCell<Instruction>> {
+    pub fn make_int(name: String, bonding: i32) -> Pointer<Instruction> {
         let value = Value::make_value(name, IrType::Int);
-        Rc::new(RefCell::new(Instruction::IConstInt(ConstInt {
-            value,
-            bonding,
-        })))
+        Pointer::new(Instruction::IConstInt(ConstInt { value, bonding }))
     }
 
     pub fn get_bonding(&self) -> i32 {

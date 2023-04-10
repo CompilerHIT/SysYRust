@@ -1,35 +1,35 @@
 use super::Instruction;
 use crate::ir::{basicblock::BasicBlock, ir_type::IrType, user::User};
-use std::cell::{RefCell, RefMut};
+use crate::utility::Pointer;
+use std::cell::RefMut;
 use std::panic;
-use std::rc::Rc;
 
 #[derive(Debug)]
 pub struct BranchInst {
     user: User,
-    next_bb: Vec<Rc<RefCell<BasicBlock>>>,
+    next_bb: Vec<Pointer<BasicBlock>>,
 }
 
 impl BranchInst {
     fn make_branch_inst(
         name: String,
-        cond: Option<Rc<RefCell<Instruction>>>,
-        next_bb: Vec<Rc<RefCell<BasicBlock>>>,
-    ) -> Rc<RefCell<Instruction>> {
+        cond: Option<Pointer<Instruction>>,
+        next_bb: Vec<Pointer<BasicBlock>>,
+    ) -> Pointer<Instruction> {
         match cond {
             Some(r) => {
                 let inst = BranchInst {
                     user: User::make_user(name, IrType::Void, vec![r]),
                     next_bb,
                 };
-                Rc::new(RefCell::new(Instruction::IBranchInst(inst)))
+                Pointer::new(Instruction::IBranchInst(inst))
             }
             None => {
                 let inst = BranchInst {
                     user: User::make_user(name, IrType::Void, vec![]),
                     next_bb,
                 };
-                Rc::new(RefCell::new(Instruction::IBranchInst(inst)))
+                Pointer::new(Instruction::IBranchInst(inst))
             }
         }
     }
@@ -37,17 +37,14 @@ impl BranchInst {
     /// 构造一个条件跳转指令
     pub fn make_cond_br(
         name: String,
-        cond: Option<Rc<RefCell<Instruction>>>,
-        next_bb: Vec<Rc<RefCell<BasicBlock>>>,
-    ) -> Rc<RefCell<Instruction>> {
+        cond: Option<Pointer<Instruction>>,
+        next_bb: Vec<Pointer<BasicBlock>>,
+    ) -> Pointer<Instruction> {
         Self::make_branch_inst(name, cond, next_bb)
     }
 
     /// 构造一个无条件跳转指令
-    pub fn make_no_cond_br(
-        name: String,
-        next_bb: Rc<RefCell<BasicBlock>>,
-    ) -> Rc<RefCell<Instruction>> {
+    pub fn make_no_cond_br(name: String, next_bb: Pointer<BasicBlock>) -> Pointer<Instruction> {
         Self::make_branch_inst(name, None, vec![next_bb])
     }
 

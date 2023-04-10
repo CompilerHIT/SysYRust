@@ -1,8 +1,6 @@
-use crate::ir::instruction::Instruction;
-use crate::ir::ir_type::IrType;
-use crate::ir::user::User;
-use std::cell::{RefCell, RefMut};
-use std::rc::Rc;
+use crate::ir::{instruction::Instruction, ir_type::IrType, user::User};
+use crate::utility::Pointer;
+use std::cell::RefMut;
 
 #[derive(Debug)]
 pub enum Operator {
@@ -23,47 +21,47 @@ impl BinaryOpInst {
         name: String,
         ir_type: IrType,
         operator: Operator,
-        lhs: Rc<RefCell<Instruction>>,
-        rhs: Rc<RefCell<Instruction>>,
-    ) -> Rc<RefCell<Instruction>> {
+        lhs: Pointer<Instruction>,
+        rhs: Pointer<Instruction>,
+    ) -> Pointer<Instruction> {
         let user = User::make_user(name, ir_type, vec![lhs, rhs]);
         let inst = BinaryOpInst { user, operator };
-        Rc::new(RefCell::new(Instruction::IBinaryOpInst(inst)))
+        Pointer::new(Instruction::IBinaryOpInst(inst))
     }
 
     /// 构造一个加指令
     pub fn make_add_inst(
         name: String,
-        lhs: Rc<RefCell<Instruction>>,
-        rhs: Rc<RefCell<Instruction>>,
-    ) -> Rc<RefCell<Instruction>> {
+        lhs: Pointer<Instruction>,
+        rhs: Pointer<Instruction>,
+    ) -> Pointer<Instruction> {
         Self::make_binary_op_inst(name, IrType::Int, Operator::Add, lhs, rhs)
     }
 
     /// 构造一个加指令
     pub fn make_sub_inst(
         name: String,
-        lhs: Rc<RefCell<Instruction>>,
-        rhs: Rc<RefCell<Instruction>>,
-    ) -> Rc<RefCell<Instruction>> {
+        lhs: Pointer<Instruction>,
+        rhs: Pointer<Instruction>,
+    ) -> Pointer<Instruction> {
         Self::make_binary_op_inst(name, IrType::Int, Operator::Sub, lhs, rhs)
     }
 
     /// 构造一个加指令
     pub fn make_mul_inst(
         name: String,
-        lhs: Rc<RefCell<Instruction>>,
-        rhs: Rc<RefCell<Instruction>>,
-    ) -> Rc<RefCell<Instruction>> {
+        lhs: Pointer<Instruction>,
+        rhs: Pointer<Instruction>,
+    ) -> Pointer<Instruction> {
         Self::make_binary_op_inst(name, IrType::Int, Operator::Mul, lhs, rhs)
     }
 
     /// 构造一个加指令
     pub fn make_div_inst(
         name: String,
-        lhs: Rc<RefCell<Instruction>>,
-        rhs: Rc<RefCell<Instruction>>,
-    ) -> Rc<RefCell<Instruction>> {
+        lhs: Pointer<Instruction>,
+        rhs: Pointer<Instruction>,
+    ) -> Pointer<Instruction> {
         Self::make_binary_op_inst(name, IrType::Int, Operator::Div, lhs, rhs)
     }
 
