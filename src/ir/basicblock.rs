@@ -1,11 +1,10 @@
 use super::{instruction::Instruction, ir_type::IrType, value::Value};
-use std::cell::RefCell;
-use std::rc::Rc;
+use crate::utility::Pointer;
 
 #[derive(Debug)]
 pub struct BasicBlock {
     value: Value,
-    instruction: Vec<Rc<RefCell<Instruction>>>,
+    instruction: Vec<Pointer<Instruction>>,
 }
 
 impl BasicBlock {
@@ -19,7 +18,7 @@ impl BasicBlock {
     }
 
     /// 在index处插入一条指令
-    pub fn insert(&mut self, inst: Rc<RefCell<Instruction>>, index: usize) {
+    pub fn insert(&mut self, inst: Pointer<Instruction>, index: usize) {
         self.instruction.insert(index, inst);
     }
 }
