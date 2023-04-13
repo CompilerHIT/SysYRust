@@ -1,8 +1,8 @@
 mod asm_builder;
 mod instrs;
-mod operand;
-mod structs;
-mod module;
+pub mod operand;
+pub mod structs;
+pub mod module;
 
 use std::io::Result;
 use std::fs::File;
