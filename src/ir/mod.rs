@@ -1,9 +1,9 @@
 //! src/ir/mod.rs
 mod basicblock;
-mod function;
-mod instruction;
+pub mod function;
+pub mod instruction;
 mod ir_type;
-mod module;
+pub mod module;
 mod parameter;
 mod user;
 mod value;
