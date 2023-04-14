@@ -6,8 +6,8 @@ use super::{function::Function, instruction::Instruction};
 
 #[derive(Debug)]
 pub struct Module {
-    global_variable: HashMap<String, Pointer<Instruction>>,
-    function: HashMap<String, Pointer<Function>>,
+    pub global_variable: HashMap<String, Pointer<Instruction>>,
+    pub function: HashMap<String, Pointer<Function>>,
 }
 
 impl Module {

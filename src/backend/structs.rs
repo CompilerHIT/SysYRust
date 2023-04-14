@@ -29,14 +29,14 @@ impl BB {
     }
 }
 
-#[derive(Clone)]
-pub struct GlobalVar {
-    pub name: String,
-    pub size: i32,   // only available when is_int
-    // void *init, // when !is_int, must not empty. Q: how to imply void* type
-    pub is_const: bool,
-    pub dtype: ScalarType,
-}
+// #[derive(Clone)]
+// pub struct GlobalVar {
+//     pub name: String,
+//     // pub size: i32,   // only available when is_int
+//     void *init, // when !is_int, must not empty. Q: how to imply void* type
+//     // pub is_const: bool,
+//     pub dtype: ScalarType,
+// }
 
 #[derive(Clone)]
 pub struct Func {
