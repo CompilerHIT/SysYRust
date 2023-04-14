@@ -45,3 +45,43 @@ pub enum ScalarType {
     Int,
     Float,
 }
+
+/// 嵌入式链表
+trait EmbedList {
+    type Item;
+    /// 获得下一个节点的不可变引用
+    /// 如果当前节点是尾节点，则返回None
+    fn next(&self) -> Option<Ref<Self::Item>>;
+
+    /// 获得上一个节点的不可变引用
+    /// 如果当前节点是头节点，则返回None
+    fn prev(&self) -> Option<Ref<Self::Item>>;
+
+    /// 获得下一个节点的可变引用
+    /// 如果当前节点是尾节点，则返回None
+    fn next_mut(&mut self) -> Option<RefMut<Self::Item>>;
+
+    /// 获得上一个节点的可变引用
+    /// 如果当前节点是头节点，则返回None
+    fn prev_mut(&mut self) -> Option<RefMut<Self::Item>>;
+
+    /// 将node插入到当前节点之前
+    fn insert_before(&mut self, node: Pointer<Self::Item>);
+
+    /// 将node插入到当前节点之后
+    fn insert_after(&mut self, node: Pointer<Self::Item>);
+
+    /// 是否为头节点
+    fn is_head(&self) -> bool;
+
+    /// 是否为尾节点
+    fn is_tail(&self) -> bool;
+
+    /// 将当前结点从链表中移除
+    fn remove_self(&mut self);
+
+    /// 移除当前节点之后的结点
+    fn remove_after(&mut self);
+    /// 移除当前节点之前的结点
+    fn remove_before(&mut self);
+}
