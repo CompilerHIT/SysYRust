@@ -1,11 +1,11 @@
 //! src/ir/mod.rs
-mod basicblock;
-mod function;
-mod instruction;
-mod ir_type;
-mod module;
-mod parameter;
-mod user;
-mod value;
+pub mod basicblock;
+pub mod function;
+pub mod instruction;
+pub mod ir_type;
+pub mod module;
+pub mod parameter;
+pub mod user;
+pub mod value;
 
 pub use instruction::binary_inst::BinaryOpInst;

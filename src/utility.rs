@@ -10,6 +10,7 @@ pub struct Pointer<T> {
 }
 
 impl<T> Pointer<T> {
+    /// make a Pointer points to cell
     pub fn new(cell: T) -> Pointer<T> {
         Pointer {
             p: Rc::new(RefCell::new(cell)),
@@ -22,6 +23,13 @@ impl<T> Pointer<T> {
 
     pub fn borrow_mut(&self) -> RefMut<T> {
         self.p.borrow_mut()
+    }
+
+    /// Returns true if the two Rcs point to the
+    /// same allocation in a vein similar to ptr::eq.
+    /// See that function for caveats when comparing `dyn Trait` pointers.
+    pub fn point_eq(this: &Pointer<T>, other: &Pointer<T>) -> bool {
+        Rc::ptr_eq(&this.p, &other.p)
     }
 }
 

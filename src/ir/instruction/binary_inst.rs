@@ -36,7 +36,7 @@ impl BinaryOpInst {
         Self::make_binary_op_inst(IrType::Int, Operator::Add, lhs, rhs)
     }
 
-    /// 构造一个加指令
+    /// 构造一个减指令
     pub fn make_sub_inst(
         lhs: Pointer<Instruction>,
         rhs: Pointer<Instruction>,
@@ -44,7 +44,7 @@ impl BinaryOpInst {
         Self::make_binary_op_inst(IrType::Int, Operator::Sub, lhs, rhs)
     }
 
-    /// 构造一个加指令
+    /// 构造一个乘指令
     pub fn make_mul_inst(
         lhs: Pointer<Instruction>,
         rhs: Pointer<Instruction>,
@@ -52,7 +52,7 @@ impl BinaryOpInst {
         Self::make_binary_op_inst(IrType::Int, Operator::Mul, lhs, rhs)
     }
 
-    /// 构造一个加指令
+    /// 构造一个除指令
     pub fn make_div_inst(
         lhs: Pointer<Instruction>,
         rhs: Pointer<Instruction>,
