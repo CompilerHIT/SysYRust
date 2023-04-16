@@ -47,7 +47,7 @@ pub enum ScalarType {
 }
 
 /// 嵌入式链表
-trait EmbedList {
+trait IList {
     type Item;
     /// 获得下一个节点的不可变引用
     /// 如果当前节点是尾节点，则返回None
