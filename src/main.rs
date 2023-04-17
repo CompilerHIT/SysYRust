@@ -1,5 +1,5 @@
-mod backend;
-mod ir;
+use sysylib;
 fn main() {
     println!("Hello, world!");
 }
+

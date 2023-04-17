@@ -2,11 +2,18 @@
 pub mod binary_inst;
 pub mod branch_inst;
 pub mod call_inst;
+pub mod const_int;
+pub mod global_const_int;
 
+use self::const_int::ConstInt;
 use binary_inst::BinaryOpInst;
 use branch_inst::BranchInst;
+use global_const_int::GlobalConstInt;
 
+#[derive(Debug)]
 pub enum Instruction {
-    EBinaryOpInst(BinaryOpInst),
-    EBranchInst(BranchInst),
+    IBinaryOpInst(BinaryOpInst),
+    IBranchInst(BranchInst),
+    IConstInt(ConstInt),
+    IGlobalConstInt(GlobalConstInt),
 }
