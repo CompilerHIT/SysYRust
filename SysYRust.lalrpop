@@ -1,0 +1,411 @@
+use std::collections::HashMap;
+
+let mut typeVec:Vec<BType> =Vec::new(); 
+let mut varHashMap = HashMap::new();
+let mut layerOfNamesp = 0;
+
+
+grammar;
+
+pub CompUnit:i32 = {
+    CompUnit? Decl =>{
+
+    }
+    CompUnit? FuncDef =>{
+
+    }
+
+}
+
+Decl:i32 = {
+    ConstDecl=>{
+
+    }
+    VarDecl =>{
+
+    }
+}
+
+ConstDecl:i32 = {
+    "const" BType ConstDef ("," <ConstDef>)* ";"=>{
+
+    }
+}
+BType:String = {
+    "int" =>{
+        typeVec.push("int");
+    }
+    "float" =>{
+        typeVec.push("float");
+    }
+}
+
+ConstDef:i32 = {
+    Ident ("[" <ConstExp> "]") "=" ConstInitVal =>{
+
+    }
+}
+
+ConstInitVal:i32 = {
+    ConstExp =>{
+
+    }
+    "{" (<ConstInitVal> ("," <ConstInitVal>)*)? "}"=>{
+
+    }
+}
+
+VarDecl:i32 = {
+    BType VarDef ("," <VarDef>)* ";"=>{
+
+    }
+}
+
+VarDef:i32 = {
+    <i:Ident> ("[" <ConstExp> "]")* =>{
+        varHashMap.insert(&i ,Vec::new());//todo:全局hashmap(key,vector),找到vector，存储不同作用域下的相同名字，若无，创建一个该变量的vector
+        let s = varHashMap.get(&i).copied().unwrap_or(0);
+        //todo:判断该作用域下是否有同名变量
+        //todo:没有则标记类型后加入，有则报错
+
+    }
+    Ident ("[" <ConstExp> "]")* "=" InitVal =>{
+
+    }
+}
+
+
+InitVal:i32 = {
+    Exp =>{
+
+    }
+    "{" (<InitVal> ("," <InitVal>))? "}" =>{
+
+    }
+}
+
+FuncDef:i32 = {
+    FuncType Ident "(" FuncFParams? ")" Block =>{
+
+    }
+}
+
+FuncType:i32 = {
+    "void" =>{
+
+    }
+    "int" =>{
+
+    }
+    "float" =>{
+
+    }
+}
+
+FuncFParams:i32 = {
+    FuncFParam ("," <FuncFParam>)* =>{
+
+    }
+}
+
+FuncFParam:i32 = {
+    BType Ident ("[" "]" ("[" <Exp> "]")*)? =>{
+
+    }
+}
+
+Block:i32 = {
+    "{" (<BlockItem>)* "}"=>{
+
+    }
+}
+
+BlockItem:i32 = {
+    Decl =>{
+
+    }
+    Stmt =>{
+
+    }
+}
+
+Stmt:i32 = {
+    LVal "=" Exp ";" =>{
+
+    }
+    Exp? ";" =>{
+
+    }
+    Block =>{
+
+    }
+    "if" "(" Cond ")" Stmt ("else" <Stmt>)? =>{
+
+    }
+    "while" "(" Cond ")" Stmt ("else" <Stmt>)? =>{
+
+    }
+    "break" ";" =>{
+
+    }
+    "continue" ";" =>{
+
+    }
+    "return" (Exp)? ";" =>{
+
+    }
+}
+
+Exp:i32 = {
+    AddExp =>{
+
+    }
+}
+
+Cond:i32 = {
+    LOrExp =>{
+
+    }
+}
+
+LVal:i32 = {
+    Ident ("{" Exp "}")* =>{
+
+    }
+}
+
+PrimaryExp:i32 = {
+    "(" Exp ")" =>{
+
+    }
+    LVal =>{
+
+    }
+    Number =>{
+
+    }
+}
+
+Number:i32 = {
+    IntConst =>{
+
+    }
+    floatConst =>{
+
+    }
+}
+
+UnaryExp:i32 = {
+    PrimaryExp =>{
+
+    }
+    Ident "(" FuncFParams? ")" =>{
+
+    }
+    UnaryOp UnaryExp =>{
+
+    }
+}
+
+UnaryOp:i32 = {
+    "+" =>{
+
+    }
+    "-" =>{
+
+    }
+    "!" =>{
+
+    }
+}
+
+FuncRParams:i32 = {
+    Exp ("," <Exp>)* =>{
+
+    }
+}
+
+
+MulExp:i32 = {
+    UnaryExp =>{
+
+    }
+    MulExp "*" UnaryExp =>{
+
+    }
+    MulExp "/" UnaryExp =>{
+        
+    }
+    MulExp "%" UnaryExp =>{
+        
+    }
+}
+
+AddExp:i32 = {
+    MulExp =>{
+
+    }
+    AddExp "+" MulExp =>{
+
+    }
+    AddExp "-" MulExp =>{
+
+    }
+}
+
+RelExp:i32 = {
+    AddExp =>{
+
+    }
+    RelExp "<" AddExp =>{
+
+    }
+    RelExp ">" AddExp =>{
+
+    }
+    RelExp "<=" AddExp =>{
+
+    }
+    RelExp ">=" AddExp =>{
+
+    }
+}
+
+EqExp:i32 = {
+    RelExp =>{
+
+    }
+    EqExp "==" RelExp =>{
+
+    }
+    EqExp "!=" RelExp =>{
+        
+    }
+}
+
+LAndExp:i32 = {
+    EqExp =>{
+
+    }
+    LAndExp "&&" EqExp =>{
+
+    }
+}
+
+LOrExp:i32 = {
+    LAndExp =>{
+
+    }
+    LOrExp "||" LAndExp =>{
+
+    }
+}
+
+ConstExp:i32 = {
+    AddExp =>{
+
+    }
+}
+
+
+//下面是标识符
+//todo:
+
+
+Ident:String = {
+    
+    <mut s:IdentNonDigit> =>{
+        s,
+    }
+    <mut s:Ident> <mut r:IdentNonDigit> =>{
+        s = s+&r;
+        s,
+    }
+    <mut s:Ident> <mut r:Digit> =>{
+        s = s+&r;
+        s,
+    }
+}
+
+IdentNonDigit:String = {
+    <mut s:r"[a-zA-Z_]"> =>{
+        s,//todo:返回字符串值
+    }
+}
+
+Digit:String = {
+    <mut s:r"[0-9]"> =>{
+        s,//todo:返回字符串值
+    }
+}
+
+IntConst:i32 = {
+    DecimalConst =>{
+
+    }
+    OctalConst =>{
+
+    }
+    HexadecimalConst =>{
+
+    }
+}
+
+DecimalConst:i32 = {
+    NonzeroDigit =>{
+
+    }
+    DecimalConst Digit =>{
+
+    }
+}
+
+OctalConst:i32 = {
+    "0" =>{
+
+    }
+    OctalConst octalDigit =>{
+
+    }
+}
+
+HexadecimalConst:i32 = {
+    HexadecimalPrefix HexadecimalDigit =>{
+
+    }
+    HexadecimalConst HexadecimalDigit =>{
+
+    }
+}
+
+HexadecimalPrefix:String = {
+    "0x" =>{
+
+    }
+    "0X" =>{
+
+    }
+}
+
+NonzeroDigit:String = {
+    <s:r"[1-9]"> =>{
+        s,
+    }
+}
+
+octalDigit:String = {
+    <s:r"[0-7]"> =>{
+        s,
+    }
+}
+
+HexadecimalDigit:String = {
+    <s:r"[0-9a-fA-F]"> =>{
+        s,
+    }
+}
+
+//todo:浮点数还没加
+
+
+
