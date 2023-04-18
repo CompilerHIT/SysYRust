@@ -3,6 +3,7 @@ use std::fs::File;
 use std::io::{Result, Write};
 use std::ops::Deref;
 
+use crate::ir::instruction::global_const_int::GlobalConstInt;
 use crate::ir::module::Module;
 use crate::ir::instruction::Instruction;
 use crate::ir::function::Function;
@@ -15,7 +16,7 @@ pub struct AsmModule {
     reg_mapping: HashMap<usize, Reg>,
 
     //TODO: add global mapping: complete init pointer to make sure empty or not
-    global_mapping: HashMap<String, Pointer<Instruction>>,
+    global_mapping: HashMap<String, Pointer<Box<dyn Instruction>>>,
 
     // const_array_mapping: HashMap<String, ArrayConst>,
     functions: HashMap<String, Pointer<Function>>,
@@ -37,16 +38,13 @@ impl AsmModule {
     fn generate_global_var(&self, f: &mut File) -> Result<()> {
         for iter in self.global_mapping.iter() {
             let name = iter.0;
-            match iter.1.borrow().deref() {
-                Instruction::IGlobalConstInt(value) => {
-                    let value = value.get_bonding();
-                    writeln!(f, "{name}:")?;
-                    writeln!(f, "    {value}")?;
-                }
-                _ => {
-                    
-                }
-            } 
+            if let Some(global) = iter.1.borrow().as_any().downcast_ref::<GlobalConstInt>(){
+                let value = global.get_bonding();
+                writeln!(f, "{name}:")?;
+                writeln!(f, "    {value}")?;
+            } else {
+                panic!("fail to print");
+            };  
         }
         Ok(())
     }
