@@ -2,7 +2,6 @@ use super::{basicblock::BasicBlock, ir_type::IrType, parameter::Parameter, value
 use crate::utility::Pointer;
 use std::cell::RefMut;
 
-#[derive(Debug)]
 pub struct Function {
     value: Value,
     parameters: Vec<Parameter>,

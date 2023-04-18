@@ -1,21 +1,26 @@
-use super::Instruction;
+use super::*;
 use crate::ir::ir_type::IrType;
 use crate::ir::value::Value;
 use crate::utility::Pointer;
 
-#[derive(Debug)]
 pub struct ConstInt {
     value: Value,
     bonding: i32,
 }
 
 impl ConstInt {
-    pub fn make_int(bonding: i32) -> Pointer<Instruction> {
+    pub fn make_int(bonding: i32) -> Pointer<Box<dyn Instruction>> {
         let value = Value::make_value(IrType::Int);
-        Pointer::new(Instruction::IConstInt(ConstInt { value, bonding }))
+        Pointer::new(Box::new(ConstInt { value, bonding }))
     }
 
     pub fn get_bonding(&self) -> i32 {
         self.bonding
+    }
+}
+
+impl Instruction for ConstInt {
+    fn get_type(&self) -> InstructionType {
+        InstructionType::IConstInt
     }
 }
