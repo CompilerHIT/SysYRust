@@ -1,11 +1,9 @@
 use super::*;
 use crate::ir::{basicblock::BasicBlock, ir_type::IrType, user::User};
 use crate::utility::Pointer;
-use std::cell::RefMut;
-use std::panic;
+use std::cell::Ref;
 
 pub struct BranchInst {
-    itype: InstructionType,
     user: User,
     next_bb: Vec<Pointer<BasicBlock>>,
 }
@@ -18,7 +16,6 @@ impl BranchInst {
         match cond {
             Some(r) => {
                 let inst = BranchInst {
-                    itype: InstructionType::IBranchInst,
                     user: User::make_user(IrType::Void, vec![r]),
                     next_bb,
                 };
@@ -26,7 +23,6 @@ impl BranchInst {
             }
             None => {
                 let inst = BranchInst {
-                    itype: InstructionType::IBranchInst,
                     user: User::make_user(IrType::Void, vec![]),
                     next_bb,
                 };
@@ -48,22 +44,29 @@ impl BranchInst {
         Self::make_branch_inst(None, vec![next_bb])
     }
 
-    // 判断是否为无条件跳转语句
-    // pub fn is_cond(&self) -> bool {
-    // self.user.get_operands_size() == 0
-    // }
+    /// 判断是否为无条件跳转语句
+    pub fn is_cond(&self) -> bool {
+        self.user.get_operands_size() == 0
+    }
 
-    // pub fn get_cond(&self) -> RefMut<Box<dyn Instruction>> {
-    // if self.is_cond() {
-    // self.user.get_operand(0)
-    // } else {
-    // panic!("[Error] get_cond(): No condition BrInst has no condition!")
-    // }
-    // }
+    pub fn get_cond(&self) -> Option<Pointer<Box<dyn Instruction>>> {
+        if self.user.get_operands_size() == 1 {
+            Some(self.user.get_operand(0))
+        } else {
+            None
+        }
+    }
 }
 impl Instruction for BranchInst {
-    // add code here
     fn get_type(&self) -> InstructionType {
         InstructionType::IBranchInst
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
     }
 }

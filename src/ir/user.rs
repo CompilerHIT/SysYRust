@@ -17,9 +17,9 @@ impl User {
         &self.operands
     }
 
-    //pub fn get_operand(&self, index: usize) -> RefMut<dyn Instruction> {
-    //self.get_operands()[index].borrow_mut()
-    //}
+    pub fn get_operand(&self, index: usize) -> Pointer<Box<dyn Instruction>> {
+        self.get_operands()[index].clone()
+    }
 
     pub fn get_operands_size(&self) -> usize {
         self.operands.len()

@@ -1,6 +1,5 @@
 use crate::ir::{instruction::*, ir_type::IrType, user::User};
 use crate::utility::Pointer;
-use std::cell::RefMut;
 
 pub enum Operator {
     Add,
@@ -58,7 +57,7 @@ impl BinaryOpInst {
         Self::make_binary_op_inst(IrType::Int, Operator::Div, lhs, rhs)
     }
 
-    /// 获得操作符
+    // 获得操作符
     pub fn get_operator(&self) -> &Operator {
         &self.operator
     }
@@ -66,15 +65,29 @@ impl BinaryOpInst {
     // 获得左操作数
     // # Panics
     // 左操作数不存在，是空指针
+    pub fn get_lhs(&self) -> Pointer<Box<dyn Instruction>> {
+        self.user.get_operand(0)
+    }
 
     // 获得右操作数
     //
     // # Panics
     // 右操作数不存在，是空指针
+    pub fn get_rhs(&self) -> Pointer<Box<dyn Instruction>> {
+        self.user.get_operand(1)
+    }
 }
 
 impl Instruction for BinaryOpInst {
     fn get_type(&self) -> InstructionType {
         InstructionType::IBinaryOpInst
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
     }
 }
