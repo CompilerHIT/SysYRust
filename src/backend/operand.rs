@@ -1,6 +1,7 @@
 use crate::utility::ScalarType;
 
-const REG_COUNT: i8 = 32;
+pub const REG_COUNT: usize = 32;
+pub const ARG_REG_COUNT: usize = 8;
 
 #[derive(Clone, Copy, PartialEq, Hash, Eq)]
 pub struct Reg {
@@ -67,7 +68,7 @@ impl ToString for Addr {
 
 
 impl Reg {
-    fn new(id: usize, r_type: ScalarType) -> Self {
+    pub fn new(id: usize, r_type: ScalarType) -> Self {
         Self {
             id,
             r_type
@@ -103,7 +104,7 @@ impl Reg {
 
     // ra, t0, t1-2, a0-1, a2-7, t3-6
     // f0-7, f10-17, f28-31
-    fn is_caller_save(&self) -> bool {
+    pub fn is_caller_save(&self) -> bool {
         match self.r_type {
             ScalarType::Int => self.id == 1
                                 || (self.id >= 5 && self.id <= 7)
@@ -119,7 +120,7 @@ impl Reg {
 
     // sp, s0(fp), s1, s2-11    
     // f8-9, f18-27
-    fn is_callee_save(&self) -> bool {
+    pub fn is_callee_save(&self) -> bool {
         match self.r_type {
             ScalarType::Int => self.id == 2 || self.id == 8 || self.id == 9 
                                 || (self.id >= 18 && self.id <= 27),
@@ -130,22 +131,22 @@ impl Reg {
 
     // sp for both callee and special
     // zero, sp, gp, tp
-    fn is_special(&self) -> bool {
+    pub fn is_special(&self) -> bool {
         self.id == 0 || (self.id >= 2 && self.id <= 4)
     }
 
     // if virtual reg
-    fn is_virtual(&self) -> bool {
+    pub fn is_virtual(&self) -> bool {
         self.id > 31
     }
 
     // if physic reg
-    fn is_physic(&self) -> bool {
+    pub fn is_physic(&self) -> bool {
         self.id <= 31
     }
 
     // if mistake
-    fn is_mistake(&self) -> bool {
+    pub fn is_mistake(&self) -> bool {
         self.id < 0
     }
 }
