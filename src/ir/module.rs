@@ -4,9 +4,8 @@ use crate::utility::Pointer;
 
 use super::{function::Function, instruction::Instruction};
 
-#[derive(Debug)]
 pub struct Module {
-    pub global_variable: HashMap<String, Pointer<Instruction>>,
+    pub global_variable: HashMap<String, Pointer<Box<dyn Instruction>>>,
     pub function: HashMap<String, Pointer<Function>>,
 }
 
@@ -18,7 +17,7 @@ impl Module {
         }
     }
 
-    pub fn push_var(&mut self, name: &String, variable: Pointer<Instruction>) {
+    pub fn push_var(&mut self, name: &String, variable: Pointer<Box<dyn Instruction>>) {
         match self.global_variable.get(name) {
             None => self.global_variable.insert(name.to_string(), variable),
             Some(_) => panic!("Inser global variable error, the name has presented!"),

@@ -1,19 +1,23 @@
 //! src/ir/Instruction/mod.rs
+
+use std::any::Any;
+
 pub mod binary_inst;
 pub mod branch_inst;
 pub mod call_inst;
 pub mod const_int;
 pub mod global_const_int;
 
-use self::const_int::ConstInt;
-use binary_inst::BinaryOpInst;
-use branch_inst::BranchInst;
-use global_const_int::GlobalConstInt;
+pub enum InstructionType {
+    IBinaryOpInst,
+    IBranchInst,
+    IConstInt,
+    IGlobalConstInt,
+}
 
-#[derive(Debug)]
-pub enum Instruction {
-    IBinaryOpInst(BinaryOpInst),
-    IBranchInst(BranchInst),
-    IConstInt(ConstInt),
-    IGlobalConstInt(GlobalConstInt),
+pub trait Instruction {
+    fn get_type(&self) -> InstructionType;
+
+    fn as_any(&self) -> &dyn Any;
+    fn as_any_mut(&mut self) -> &mut dyn Any;
 }

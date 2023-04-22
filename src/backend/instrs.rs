@@ -1,8 +1,9 @@
-use crate::backend::operand::*;
+use crate::{backend::operand::*, utility::ScalarType};
+use std::cmp::min;
 use std::collections::HashSet;
 use std::fs::File;
 
-use super::operand;
+use super::structs::{BB, Func};
 
 #[derive(Clone, Copy, PartialEq)]
 enum Operand {
@@ -208,6 +209,7 @@ impl Instrs for Lui {
 }
 
 enum SingleOp {
+    Mov,
     Not,
     FNeg,
     I2F,
@@ -248,19 +250,46 @@ enum StackOp {
     StackStore,
 }
 
-pub struct Call {
-    // block: Block,
-    // callee: Function,
-    // func_name: String,
-    // param_cnt: usize,
-    // float_param_cnt: usize,
-    args: Vec<Operand>,
+
+pub struct Load {
+    dst: Reg,
+    src: Reg,
+    offset: u32
 }
-pub struct Return {}
 
-pub struct Load {}
+impl Instrs for Load {
+    fn create_reg_def(&self) -> HashSet<Reg> {
+        let mut set: HashSet<Reg> = HashSet::new();
+        set.insert(self.dst);
+        set
+    }
+    fn create_reg_use(&self) -> HashSet<Reg> {
+        let mut set: HashSet<Reg> = HashSet::new();
+        set.insert(self.dst);
+        set.insert(self.src);
+        set
+    }
+}
 
-pub struct Store {}
+pub struct Store {
+    dst: Reg,
+    src: Reg,
+    offset: u32
+}
+
+impl Instrs for Store {
+    fn create_reg_def(&self) -> HashSet<Reg> {
+        let mut set: HashSet<Reg> = HashSet::new();
+        set.insert(self.dst);
+        set
+    }
+    fn create_reg_use(&self) -> HashSet<Reg> {
+        let mut set: HashSet<Reg> = HashSet::new();
+        set.insert(self.dst);
+        set.insert(self.src);
+        set
+    }
+}
 
 
 pub struct Bz {
@@ -268,6 +297,55 @@ pub struct Bz {
     src: Reg,
     label: Operand,
 }
+
+
+pub struct Call {
+    // block: BB,
+    // callee: Func,
+    // args: Vec<Operand>,
+    lable: String,
+    iarg_cnt: usize,
+    farg_cnt: usize,
+}
+impl Instrs for Call {
+    fn create_reg_def(&self) -> HashSet<Reg> {
+        let mut set: HashSet<Reg> = HashSet::new();
+        let icnt: usize = min(self.iarg_cnt, ARG_REG_COUNT);
+        let mut ni = icnt;
+        while ni > 0 {
+            set.insert(Reg::new(icnt - ni, ScalarType::Int));
+            ni -= 1;
+        }
+        let fcnt: usize = min(self.farg_cnt, ARG_REG_COUNT);
+        let mut nf = fcnt;
+        while nf > 0 {
+            set.insert(Reg::new(fcnt - nf, ScalarType::Float));
+            nf -= 1;
+        } 
+        set
+    }
+    fn create_reg_use(&self) -> HashSet<Reg> {
+        let mut set: HashSet<Reg> = HashSet::new();
+        let cnt: usize = REG_COUNT;
+        let mut n = cnt;
+        while n > 0 {
+            let ireg = Reg::new(cnt - n, ScalarType::Int);
+            if ireg.is_caller_save() && !ireg.is_special() {
+                set.insert(ireg);
+            }
+            let freg = Reg::new(cnt - n, ScalarType::Float);
+            if freg.is_caller_save() {
+                set.insert(freg);
+            }
+            n -= 1;
+        }
+        set
+    }
+}
+
+/* FIXME: whether need ret instr?
+pub struct Return {}
+*/
 
 
 // impl Instrs for Call {}

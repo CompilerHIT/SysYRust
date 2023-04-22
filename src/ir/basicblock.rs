@@ -1,10 +1,9 @@
 use super::{instruction::Instruction, ir_type::IrType, value::Value};
 use crate::utility::Pointer;
 
-#[derive(Debug)]
 pub struct BasicBlock {
     value: Value,
-    instruction: Vec<Pointer<Instruction>>,
+    instruction: Vec<Pointer<Box<dyn Instruction>>>,
 }
 
 impl BasicBlock {
@@ -18,7 +17,7 @@ impl BasicBlock {
     }
 
     /// 在index处插入一条指令
-    pub fn insert(&mut self, inst: Pointer<Instruction>, index: usize) {
+    pub fn insert(&mut self, inst: Pointer<Box<dyn Instruction>>, index: usize) {
         self.instruction.insert(index, inst);
     }
 }
