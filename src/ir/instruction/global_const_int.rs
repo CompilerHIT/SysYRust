@@ -32,4 +32,25 @@ impl Instruction for GlobalConstInt {
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
     }
+
+    fn next(&self) -> Option<Pointer<Box<dyn Instruction>>> {
+        None
+    }
+
+    fn prev(&self) -> Option<Pointer<Box<dyn Instruction>>> {
+        None
+    }
+
+    fn insert_before(&mut self, _node: Pointer<Box<dyn Instruction>>) {}
+    fn insert_after(&mut self, _node: Pointer<Box<dyn Instruction>>) {}
+    fn remove_self(&mut self) {}
+    fn is_head(&self) -> bool {
+        false
+    }
+    fn is_tail(&self) -> bool {
+        false
+    }
+
+    fn set_prev(&mut self, _node: Pointer<Box<dyn Instruction>>) {}
+    fn set_next(&mut self, _node: Pointer<Box<dyn Instruction>>) {}
 }

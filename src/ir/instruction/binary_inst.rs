@@ -11,6 +11,7 @@ pub enum Operator {
 pub struct BinaryOpInst {
     user: User,
     operator: Operator,
+    list: IList,
 }
 
 impl BinaryOpInst {
@@ -21,7 +22,14 @@ impl BinaryOpInst {
         rhs: Pointer<Box<dyn Instruction>>,
     ) -> Pointer<Box<dyn Instruction>> {
         let user = User::make_user(ir_type, vec![lhs, rhs]);
-        let inst = BinaryOpInst { user, operator };
+        let inst = BinaryOpInst {
+            user,
+            operator,
+            list: IList {
+                prev: None,
+                next: None,
+            },
+        };
         Pointer::new(Box::new(inst))
     }
 
@@ -89,5 +97,41 @@ impl Instruction for BinaryOpInst {
 
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
+    }
+
+    fn next(&self) -> Option<Pointer<Box<dyn Instruction>>> {
+        self.list.next()
+    }
+
+    fn prev(&self) -> Option<Pointer<Box<dyn Instruction>>> {
+        self.list.prev()
+    }
+
+    fn insert_before(&mut self, node: Pointer<Box<dyn Instruction>>) {
+        self.list.insert_before(node)
+    }
+
+    fn insert_after(&mut self, node: Pointer<Box<dyn Instruction>>) {
+        self.list.insert_after(node)
+    }
+
+    fn is_head(&self) -> bool {
+        self.list.is_head()
+    }
+
+    fn is_tail(&self) -> bool {
+        self.list.is_tail()
+    }
+
+    fn set_next(&mut self, node: Pointer<Box<dyn Instruction>>) {
+        self.list.set_next(node);
+    }
+
+    fn set_prev(&mut self, node: Pointer<Box<dyn Instruction>>) {
+        self.list.set_prev(node);
+    }
+
+    fn remove_self(&mut self) {
+        self.list.remove_self();
     }
 }

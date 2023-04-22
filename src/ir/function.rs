@@ -1,6 +1,5 @@
 use super::{basicblock::BasicBlock, ir_type::IrType, parameter::Parameter, value::Value};
 use crate::utility::Pointer;
-use std::cell::RefMut;
 
 pub struct Function {
     value: Value,
@@ -17,7 +16,7 @@ impl Function {
         }
     }
 
-    pub fn get_head(&self) -> RefMut<BasicBlock> {
-        self.head_block.borrow_mut()
+    pub fn get_head(&self) -> Pointer<BasicBlock> {
+        self.head_block.clone()
     }
 }
