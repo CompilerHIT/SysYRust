@@ -10,6 +10,10 @@ pub enum Operator {
     Div,
     Mod,
 
+    // for logical operation
+    And,
+    Or,
+
     // for compare operation
     Lesser,
     Grater,
@@ -17,6 +21,11 @@ pub enum Operator {
     LesserEqual,
     GraeterEqual,
     NotEqual,
+
+    // for unary operation
+    Plus,
+    Minus,
+    Not,
 }
 
 pub struct BinaryOpInst {
@@ -82,6 +91,70 @@ impl BinaryOpInst {
         rhs: Pointer<Box<dyn Instruction>>,
     ) -> Pointer<Box<dyn Instruction>> {
         Self::make_binary_op_inst(IrType::Int, Operator::Mod, lhs, rhs)
+    }
+
+    /// 构造一个与指令
+    pub fn make_and_inst(
+        lhs: Pointer<Box<dyn Instruction>>,
+        rhs: Pointer<Box<dyn Instruction>>,
+    ) -> Pointer<Box<dyn Instruction>> {
+        Self::make_binary_op_inst(IrType::Bool, Operator::And, lhs, rhs)
+    }
+
+    /// 构造一个或指令
+    pub fn make_or_inst(
+        lhs: Pointer<Box<dyn Instruction>>,
+        rhs: Pointer<Box<dyn Instruction>>,
+    ) -> Pointer<Box<dyn Instruction>> {
+        Self::make_binary_op_inst(IrType::Bool, Operator::Or, lhs, rhs)
+    }
+
+    /// 构造一个小于指令
+    pub fn make_lesser_inst(
+        lhs: Pointer<Box<dyn Instruction>>,
+        rhs: Pointer<Box<dyn Instruction>>,
+    ) -> Pointer<Box<dyn Instruction>> {
+        Self::make_binary_op_inst(IrType::Bool, Operator::Lesser, lhs, rhs)
+    }
+
+    /// 构造一个大于指令
+    pub fn make_grater_inst(
+        lhs: Pointer<Box<dyn Instruction>>,
+        rhs: Pointer<Box<dyn Instruction>>,
+    ) -> Pointer<Box<dyn Instruction>> {
+        Self::make_binary_op_inst(IrType::Bool, Operator::Grater, lhs, rhs)
+    }
+
+    /// 构造一个等于指令
+    pub fn make_equal_inst(
+        lhs: Pointer<Box<dyn Instruction>>,
+        rhs: Pointer<Box<dyn Instruction>>,
+    ) -> Pointer<Box<dyn Instruction>> {
+        Self::make_binary_op_inst(IrType::Bool, Operator::Equal, lhs, rhs)
+    }
+
+    /// 构造一个小于等于指令
+    pub fn make_lesser_equal_inst(
+        lhs: Pointer<Box<dyn Instruction>>,
+        rhs: Pointer<Box<dyn Instruction>>,
+    ) -> Pointer<Box<dyn Instruction>> {
+        Self::make_binary_op_inst(IrType::Bool, Operator::LesserEqual, lhs, rhs)
+    }
+
+    /// 构造一个大于等于指令
+    pub fn make_grater_equal_inst(
+        lhs: Pointer<Box<dyn Instruction>>,
+        rhs: Pointer<Box<dyn Instruction>>,
+    ) -> Pointer<Box<dyn Instruction>> {
+        Self::make_binary_op_inst(IrType::Bool, Operator::GraeterEqual, lhs, rhs)
+    }
+
+    /// 构造一个不等于指令
+    pub fn make_not_equal_inst(
+        lhs: Pointer<Box<dyn Instruction>>,
+        rhs: Pointer<Box<dyn Instruction>>,
+    ) -> Pointer<Box<dyn Instruction>> {
+        Self::make_binary_op_inst(IrType::Bool, Operator::NotEqual, lhs, rhs)
     }
 
     // 获得操作符

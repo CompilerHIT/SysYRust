@@ -84,16 +84,6 @@ impl CompareInst {
     pub fn get_lhs(&self) -> Pointer<Box<dyn Instruction>> {
         self.user.get_operand(0)
     }
-
-    /// 修改左操作数
-    pub fn set_lhs(&mut self, nlhs: Pointer<Box<dyn Instruction>>) {
-        self.user.set_operand(0, nlhs);
-    }
-
-    /// 修改右操作数
-    pub fn set_rhs(&mut self, nrhs: Pointer<Box<dyn Instruction>>) {
-        self.user.set_operand(1, nrhs);
-    }
 }
 
 impl Instruction for CompareInst {
