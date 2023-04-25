@@ -18,6 +18,10 @@ impl GlobalConstInt {
     pub fn get_bonding(&self) -> i32 {
         self.bonding
     }
+
+    pub fn get_ir_type(&self) -> IrType {
+        self.user.get_ir_type()
+    }
 }
 
 impl Instruction for GlobalConstInt {

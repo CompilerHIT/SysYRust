@@ -6,6 +6,7 @@ use std::any::Any;
 pub mod binary_inst;
 pub mod branch_inst;
 pub mod call_inst;
+pub mod compare_inst;
 pub mod const_int;
 pub mod global_const_int;
 pub mod head_inst;

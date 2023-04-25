@@ -39,7 +39,7 @@ impl BasicBlock {
     pub fn push_back(&mut self, inst: Pointer<Box<dyn Instruction>>) {
         match self.get_tail_inst() {
             Some(tail) => {
-                tail.borrow_mut().insert_after(inst.clone());
+                tail.borrow_mut().insert_after(inst);
             }
             None => {
                 let mut head = self.inst_head.borrow_mut();
@@ -57,7 +57,7 @@ impl BasicBlock {
     pub fn push_front(&mut self, inst: Pointer<Box<dyn Instruction>>) {
         match self.get_head_inst() {
             Some(head) => {
-                head.borrow_mut().insert_before(inst.clone());
+                head.borrow_mut().insert_before(inst);
             }
             None => {
                 let mut head = self.inst_head.borrow_mut();
@@ -69,5 +69,9 @@ impl BasicBlock {
                 inst_b.set_prev(self.inst_head.clone());
             }
         }
+    }
+
+    pub fn get_ir_type(&self) -> IrType {
+        self.value.get_ir_type()
     }
 }

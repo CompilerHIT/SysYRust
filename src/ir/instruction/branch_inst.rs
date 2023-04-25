@@ -42,9 +42,10 @@ impl BranchInst {
     /// 构造一个条件跳转指令
     pub fn make_cond_br(
         cond: Option<Pointer<Box<dyn Instruction>>>,
-        next_bb: Vec<Pointer<BasicBlock>>,
+        ture_bb: Pointer<BasicBlock>,
+        false_bb: Pointer<BasicBlock>,
     ) -> Pointer<Box<dyn Instruction>> {
-        Self::make_branch_inst(cond, next_bb)
+        Self::make_branch_inst(cond, vec![ture_bb, false_bb])
     }
 
     /// 构造一个无条件跳转指令
@@ -52,16 +53,49 @@ impl BranchInst {
         Self::make_branch_inst(None, vec![next_bb])
     }
 
-    /// 判断是否为无条件跳转语句
+    /// 判断是否为条件跳转语句
     pub fn is_cond(&self) -> bool {
         self.user.get_operands_size() == 0
     }
 
+    /// 判断是否为无条件跳转语句
+    pub fn is_nocond(&self) -> bool {
+        !self.is_cond()
+    }
+
+    /// 获得条件
     pub fn get_cond(&self) -> Option<Pointer<Box<dyn Instruction>>> {
         if self.user.get_operands_size() == 1 {
             Some(self.user.get_operand(0))
         } else {
             None
+        }
+    }
+
+    /// 获得条件为真时跳转的BasicBlock
+    pub fn get_ture_bb(&self) -> Pointer<BasicBlock> {
+        if self.is_cond() {
+            self.next_bb[0].clone()
+        } else {
+            panic!("It's not a condition jump!")
+        }
+    }
+
+    /// 获得条件为假时跳转的BasicBlock
+    pub fn get_false_bb(&self) -> Pointer<BasicBlock> {
+        if self.is_cond() {
+            self.next_bb[1].clone()
+        } else {
+            panic!("It's not a condition jump!")
+        }
+    }
+
+    /// 获得无条件跳转的BasicBlock
+    pub fn get_nocond_bb(&self) -> Pointer<BasicBlock> {
+        if self.is_nocond() {
+            self.next_bb[0].clone()
+        } else {
+            panic!("It 's not a non-condition jump")
         }
     }
 }

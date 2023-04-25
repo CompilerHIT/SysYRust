@@ -1,39 +1,22 @@
+use crate::ir::instruction::binary_inst::Operator;
 use crate::ir::{instruction::*, ir_type::IrType, user::User};
 use crate::utility::Pointer;
 
-#[derive(Clone, Copy)]
-pub enum Operator {
-    // for binary operation
-    Add,
-    Sub,
-    Mul,
-    Div,
-    Mod,
-
-    // for compare operation
-    Lesser,
-    Grater,
-    Equal,
-    LesserEqual,
-    GraeterEqual,
-    NotEqual,
-}
-
-pub struct BinaryOpInst {
+pub struct CompareInst {
     user: User,
     operator: Operator,
     list: IList,
 }
 
-impl BinaryOpInst {
-    fn make_binary_op_inst(
+impl CompareInst {
+    fn make_compare_inst(
         ir_type: IrType,
         operator: Operator,
         lhs: Pointer<Box<dyn Instruction>>,
         rhs: Pointer<Box<dyn Instruction>>,
     ) -> Pointer<Box<dyn Instruction>> {
         let user = User::make_user(ir_type, vec![lhs, rhs]);
-        let inst = BinaryOpInst {
+        let inst = CompareInst {
             user,
             operator,
             list: IList {
@@ -44,64 +27,62 @@ impl BinaryOpInst {
         Pointer::new(Box::new(inst))
     }
 
-    /// 构造一个加指令
-    pub fn make_add_inst(
+    /// 构造一个小于指令
+    pub fn make_lesser_inst(
         lhs: Pointer<Box<dyn Instruction>>,
         rhs: Pointer<Box<dyn Instruction>>,
     ) -> Pointer<Box<dyn Instruction>> {
-        Self::make_binary_op_inst(IrType::Int, Operator::Add, lhs, rhs)
+        Self::make_compare_inst(IrType::Bool, Operator::Lesser, lhs, rhs)
     }
 
-    /// 构造一个减指令
-    pub fn make_sub_inst(
+    /// 构造一个大于指令
+    pub fn make_grater_inst(
         lhs: Pointer<Box<dyn Instruction>>,
         rhs: Pointer<Box<dyn Instruction>>,
     ) -> Pointer<Box<dyn Instruction>> {
-        Self::make_binary_op_inst(IrType::Int, Operator::Sub, lhs, rhs)
+        Self::make_compare_inst(IrType::Bool, Operator::Grater, lhs, rhs)
     }
 
-    /// 构造一个乘指令
-    pub fn make_mul_inst(
+    /// 构造一个等于指令
+    pub fn make_equal_inst(
         lhs: Pointer<Box<dyn Instruction>>,
         rhs: Pointer<Box<dyn Instruction>>,
     ) -> Pointer<Box<dyn Instruction>> {
-        Self::make_binary_op_inst(IrType::Int, Operator::Mul, lhs, rhs)
+        Self::make_compare_inst(IrType::Bool, Operator::Equal, lhs, rhs)
     }
 
-    /// 构造一个除指令
-    pub fn make_div_inst(
+    /// 构造一个小于等于指令
+    pub fn make_lesser_equal_inst(
         lhs: Pointer<Box<dyn Instruction>>,
         rhs: Pointer<Box<dyn Instruction>>,
     ) -> Pointer<Box<dyn Instruction>> {
-        Self::make_binary_op_inst(IrType::Int, Operator::Div, lhs, rhs)
+        Self::make_compare_inst(IrType::Bool, Operator::LesserEqual, lhs, rhs)
     }
 
-    /// 构造一个取模指令
-    pub fn make_mod_inst(
+    /// 构造一个大于等于指令
+    pub fn make_grater_equal_inst(
         lhs: Pointer<Box<dyn Instruction>>,
         rhs: Pointer<Box<dyn Instruction>>,
     ) -> Pointer<Box<dyn Instruction>> {
-        Self::make_binary_op_inst(IrType::Int, Operator::Mod, lhs, rhs)
+        Self::make_compare_inst(IrType::Bool, Operator::GraeterEqual, lhs, rhs)
     }
 
-    // 获得操作符
-    pub fn get_operator(&self) -> &Operator {
-        &self.operator
+    /// 构造一个不等于指令
+    pub fn make_not_equal_inst(
+        lhs: Pointer<Box<dyn Instruction>>,
+        rhs: Pointer<Box<dyn Instruction>>,
+    ) -> Pointer<Box<dyn Instruction>> {
+        Self::make_compare_inst(IrType::Bool, Operator::NotEqual, lhs, rhs)
     }
 
-    // 获得左操作数
-    // # Panics
-    // 左操作数不存在，是空指针
+    /// 获取操作符
+    pub fn get_operator(&self) -> Operator {
+        self.operator
+    }
+
+    /// 获取左操作数
     pub fn get_lhs(&self) -> Pointer<Box<dyn Instruction>> {
         self.user.get_operand(0)
-    }
-
-    // 获得右操作数
-    //
-    // # Panics
-    // 右操作数不存在，是空指针
-    pub fn get_rhs(&self) -> Pointer<Box<dyn Instruction>> {
-        self.user.get_operand(1)
     }
 
     /// 修改左操作数
@@ -115,7 +96,7 @@ impl BinaryOpInst {
     }
 }
 
-impl Instruction for BinaryOpInst {
+impl Instruction for CompareInst {
     fn get_type(&self) -> InstructionType {
         InstructionType::IBinaryOpInst
     }
