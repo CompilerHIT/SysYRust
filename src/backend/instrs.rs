@@ -214,8 +214,8 @@ enum SingleOp {
     FNeg,
     I2F,
     F2I,
-    F2D,
-    D2F,
+    // F2D,
+    // D2F,
 }
 
 pub struct OpReg {

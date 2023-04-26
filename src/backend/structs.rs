@@ -5,6 +5,18 @@ use crate::backend::operand::Reg;
 use crate::backend::instrs::Instrs;
 use crate::utility::ScalarType;
 
+
+#[derive(Clone)]
+pub struct GlobalVar<V> {
+    name: String,
+    value: V,     
+    dtype: ScalarType,  
+}
+
+pub struct StackObj {
+    
+}
+
 pub struct BB {
     label: String,
 
@@ -20,6 +32,27 @@ pub struct BB {
     live_out: HashSet<Reg>,
 }
 
+#[derive(Clone)]
+struct CurInstrInfo {
+    block: Pointer<BB>,
+    insts_it: Vec<Pointer<Box<dyn Instrs>>>,
+    // pos: usize,
+}
+
+#[derive(Clone)]
+pub struct Func {
+    label: String,
+    blocks: Vec<Pointer<BB>>,
+    // stack_obj: Vec<Pointer<StackObj>>,
+    // caller_stack_obj: Vec<Pointer<StackObj>>,
+    params: Vec<Pointer<Reg>>,
+    entry: Pointer<BB>,
+
+    reg_def: Vec<HashSet<CurInstrInfo>>,
+    reg_use: Vec<HashSet<CurInstrInfo>>,
+    fregs: HashSet<Reg>,
+}
+
 impl BB {
     fn clear_reg_info(&mut self) {
         self.live_def.clear();
@@ -29,16 +62,21 @@ impl BB {
     }
 }
 
-// #[derive(Clone)]
-// pub struct GlobalVar {
-//     pub name: String,
-//     // pub size: i32,   // only available when is_int
-//     void *init, // when !is_int, must not empty. Q: how to imply void* type
-//     // pub is_const: bool,
-//     pub dtype: ScalarType,
-// }
-
-#[derive(Clone)]
-pub struct Func {
-
+impl<V> GlobalVar<V> {
+    pub fn new(name: String, value: V, dtype: ScalarType) -> Self {
+        Self {
+            name,
+            value,
+            dtype,
+        }
+    }
+    pub fn get_name(&self) -> &String {
+        &self.name
+    }
+    pub fn get_value(&self) -> &V {
+        &self.value
+    }
+    pub fn get_dtype(&self) -> &ScalarType {
+        &self.dtype
+    }
 }
