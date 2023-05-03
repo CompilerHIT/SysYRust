@@ -30,6 +30,11 @@ impl BasicBlock {
         self.inst_head.borrow().next().clone()
     }
 
+    // 获取BasicBlock的第零条指令
+    pub fn get_dummy_head_inst(&self) -> Pointer<Box<dyn Instruction>> {
+        self.inst_head.clone()
+    }
+
     /// 获取BasicBlock的最后一条指令
     pub fn get_tail_inst(&self) -> Option<Pointer<Box<dyn Instruction>>> {
         self.inst_head.borrow().prev().clone()
