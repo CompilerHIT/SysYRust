@@ -1,5 +1,8 @@
 use std::collections::{HashSet, VecDeque};
 
+use crate::ir::basicblock::BasicBlock;
+use crate::ir::instruction::Instruction;
+use crate::ir::instruction::const_int::{self, ConstInt};
 use crate::utility::Pointer;
 use crate::backend::operand::Reg;
 use crate::backend::instrs::Instrs;
@@ -54,6 +57,60 @@ pub struct Func {
 }
 
 impl BB {
+    pub fn new(label: &String) -> Self {
+        Self {
+            label: label.to_string(),
+            pred: VecDeque::new(),
+            insts: Vec::new(),
+            in_edge: Vec::new(),
+            out_edge: Vec::new(),
+            live_use: HashSet::new(),
+            live_def: HashSet::new(),
+            live_in: HashSet::new(),
+            live_out: HashSet::new(),
+        }
+    }
+
+    pub fn construct(block: Pointer<BasicBlock>, func: Pointer<Func>, next_block: Pointer<BB>) {
+        let mut ir_block_inst = block.borrow().get_dummy_head_inst();
+        while let Some(inst) = ir_block_inst.borrow_mut().next() {
+            let dr_inst = inst.borrow().as_any();
+
+            //TODO: wait for ir:
+            // if let Some(inst1) = dr_inst.downcast_ref::<IR::Instructruction>() {
+
+            // } else if let Some(inst2) = dr_inst.downcast_mut::<IR::Instructruction>() {
+
+            // } 
+            // ...
+            // else {
+            //     panic!("fail to downcast inst");
+            // }
+            
+            if Pointer::point_eq(&inst, &block.borrow().get_tail_inst().unwrap()) {
+                break;
+            }
+        }
+    }
+
+    pub fn push_back(&mut self, inst: Pointer<Box<dyn Instruction>>) {
+        //FIXME: push 'lir inst' back
+        // match self.get_tail_inst() {
+        //     Some(tail) => {
+        //         tail.borrow_mut().insert_after(inst);
+        //     }
+        //     None => {
+        //         let mut head = self.inst_head.borrow_mut();
+        //         let mut inst_b = inst.borrow_mut();
+        //         head.set_next(inst.clone());
+        //         head.set_prev(inst.clone());
+
+        //         inst_b.set_next(self.inst_head.clone());
+        //         inst_b.set_prev(self.inst_head.clone());
+        //     }
+        // }
+    }
+
     fn clear_reg_info(&mut self) {
         self.live_def.clear();
         self.live_use.clear();
