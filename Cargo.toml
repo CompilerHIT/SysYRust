@@ -4,16 +4,14 @@ version = "0.1.0"
 edition = "2021"
 rust-version = "1.56"
 
-<<<<<<< HEAD
-build = "build.rs"# LALRPOP preprocessing
-=======
+# build = "build.rs"# LALRPOP preprocessing
 [lib]
 name="sysylib"
 
->>>>>>> refs/remotes/origin/master
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+lazy_static = "1.4"
 lalrpop-util = "0.19.9"
 regex = "1"
 
