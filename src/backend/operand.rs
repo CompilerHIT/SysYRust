@@ -149,4 +149,8 @@ impl Reg {
     pub fn is_mistake(&self) -> bool {
         self.id < 0
     }
+
+    pub fn get_id(&self) -> usize {
+        self.id
+    }
 }

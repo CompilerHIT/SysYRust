@@ -21,6 +21,7 @@ pub struct AsmModule {
 
     // const_array_mapping: HashMap<String, ArrayConst>,
     functions: HashMap<String, Pointer<Function>>,
+    blocks: usize,
 }
 
 impl AsmModule {
@@ -30,6 +31,7 @@ impl AsmModule {
             reg_mapping: HashMap::new(),
             global_var_list,
             functions: ir_module.function.clone(),
+            blocks: 0,
         }
     }
 

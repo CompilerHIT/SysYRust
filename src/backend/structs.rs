@@ -1,27 +1,36 @@
 use std::collections::{HashSet, VecDeque};
+use std::fs::File;
+use std::io::Result;
 
-use crate::ir::basicblock::BasicBlock;
-use crate::ir::instruction::Instruction;
-use crate::ir::instruction::const_int::{self, ConstInt};
-use crate::utility::Pointer;
-use crate::backend::operand::Reg;
 use crate::backend::instrs::Instrs;
+use crate::backend::operand::Reg;
+use crate::ir::basicblock::BasicBlock;
+use crate::ir::function::Function;
+use crate::ir::instruction::const_int::{self, ConstInt};
+use crate::ir::instruction::Instruction;
+use crate::utility::Pointer;
 use crate::utility::ScalarType;
 
+use super::module::AsmModule;
 
 #[derive(Clone)]
 pub struct GlobalVar<V> {
     name: String,
-    value: V,     
-    dtype: ScalarType,  
+    value: V,
+    dtype: ScalarType,
 }
 
-pub struct StackObj {
-    
+pub struct StackObj {}
+
+pub struct Context {
+    stack_offset: i32,
+    epilogue: Option<Box<dyn Fn()>>,
+    prologue: Option<Box<dyn Fn()>>,
 }
 
 pub struct BB {
     label: String,
+    called: bool,
 
     pred: VecDeque<BB>,
     insts: Vec<Pointer<Box<dyn Instrs>>>,
@@ -42,7 +51,7 @@ struct CurInstrInfo {
     // pos: usize,
 }
 
-#[derive(Clone)]
+// #[derive(Clone)]
 pub struct Func {
     label: String,
     blocks: Vec<Pointer<BB>>,
@@ -60,6 +69,7 @@ impl BB {
     pub fn new(label: &String) -> Self {
         Self {
             label: label.to_string(),
+            called: false,
             pred: VecDeque::new(),
             insts: Vec::new(),
             in_edge: Vec::new(),
@@ -71,7 +81,7 @@ impl BB {
         }
     }
 
-    pub fn construct(block: Pointer<BasicBlock>, func: Pointer<Func>, next_block: Pointer<BB>) {
+    pub fn construct(&mut self, block: Pointer<BasicBlock>, func: Pointer<Func>, next_block: Pointer<BB>) {
         let mut ir_block_inst = block.borrow().get_dummy_head_inst();
         while let Some(inst) = ir_block_inst.borrow_mut().next() {
             let dr_inst = inst.borrow().as_any();
@@ -81,51 +91,127 @@ impl BB {
 
             // } else if let Some(inst2) = dr_inst.downcast_mut::<IR::Instructruction>() {
 
-            // } 
+            // }
             // ...
             // else {
             //     panic!("fail to downcast inst");
             // }
-            
+
             if Pointer::point_eq(&inst, &block.borrow().get_tail_inst().unwrap()) {
                 break;
             }
         }
     }
 
-    pub fn push_back(&mut self, inst: Pointer<Box<dyn Instruction>>) {
-        //FIXME: push 'lir inst' back
-        // match self.get_tail_inst() {
-        //     Some(tail) => {
-        //         tail.borrow_mut().insert_after(inst);
-        //     }
-        //     None => {
-        //         let mut head = self.inst_head.borrow_mut();
-        //         let mut inst_b = inst.borrow_mut();
-        //         head.set_next(inst.clone());
-        //         head.set_prev(inst.clone());
-
-        //         inst_b.set_next(self.inst_head.clone());
-        //         inst_b.set_prev(self.inst_head.clone());
-        //     }
-        // }
+    pub fn push_back(&mut self, inst: Pointer<Box<dyn Instrs>>) {
+        self.insts.push(inst);
     }
 
-    fn clear_reg_info(&mut self) {
-        self.live_def.clear();
-        self.live_use.clear();
-        self.live_in.clear();
-        self.live_out.clear();
+    pub fn push_back_list(&mut self, inst: &mut Vec<Pointer<Box<dyn Instrs>>>) {
+        self.insts.append(inst);
+    }
+
+    // fn clear_reg_info(&mut self) {
+    //     self.live_def.clear();
+    //     self.live_use.clear();
+    //     self.live_in.clear();
+    //     self.live_out.clear();
+    // }
+}
+
+impl GenerateAsm for BB {
+    fn generate(&self, context: Pointer<Context>,f: &mut File) -> String {
+        if self.called {
+            writeln!(f, "{}:", Self::label);
+        }
+
+        for inst in self.insts {
+            inst.borrow().generate(context, f);
+        }
+    }
+}
+
+impl Func {
+    pub fn new(name: &String) -> Self {
+        Self {
+            label: name.to_string(),
+            blocks: Vec::new(),
+            params: Vec::new(),
+            entry: None,
+            reg_def: Vec::new(),
+            reg_use: Vec::new(),
+            fregs: HashSet::new(),
+        }
+    }
+
+    pub fn construct(&mut self, module: Pointer<AsmModule>, ir_func: Pointer<Function>) {
+
+    }
+
+    pub fn del_inst_reg(&mut self, cur_info: &CurInstrInfo, inst: Pointer<Box<dyn Instrs>>) {
+        for reg in inst.borrow().get_reg_use() {
+            self.reg_use[reg.get_id()].remove(cur_info);
+        }
+        for reg in inst.borrow().get_reg_def() {
+            self.reg_def[reg.get_id()].remove(cur_info);
+        }
+    }
+
+    pub fn add_inst_reg(&mut self, cur_info: &CurInstrInfo, inst: Pointer<Box<dyn Instrs>>) {
+        for reg in inst.borrow().get_reg_use() {
+            self.reg_use[reg.get_id()].insert(*cur_info);
+        }
+        for reg in inst.borrow().get_reg_def() {
+            self.reg_def[reg.get_id()].insert(*cur_info);
+        }
+    }
+}
+
+impl GenerateAsm for Func {
+
+}
+
+impl Context {
+    pub fn new() -> Self {
+        Self {
+            stack_offset: 0,
+            epilogue: None,
+            prologue: None,
+        }
+    }
+
+    pub fn set_epilogue_event<F: Fn() + 'static>(&mut self, callback: F) {
+        self.epilogue = Some(Box::new(callback));
+    }
+    
+    pub fn set_prologue_event<F: Fn() + 'static>(&mut self, callback: F) {
+        self.prologue = Some(Box::new(callback));
+    }
+
+    pub fn set_offset(&mut self, offset: i32) {
+        self.stack_offset = offset;
+    }
+
+    pub fn get_offset(&self) -> i32 {
+        self.stack_offset
+    }
+
+    pub fn call_epilogue_event(&self) {
+        if let Some(ref callback) = self.epilogue {
+            callback();
+        }
+    }
+
+    pub fn call_prologue_event(&self) {
+        if let Some(ref callback) = self.prologue {
+            callback();
+        }
     }
 }
 
 impl<V> GlobalVar<V> {
     pub fn new(name: String, value: V, dtype: ScalarType) -> Self {
-        Self {
-            name,
-            value,
-            dtype,
-        }
+        Self { name, value, dtype }
     }
     pub fn get_name(&self) -> &String {
         &self.name
@@ -135,5 +221,12 @@ impl<V> GlobalVar<V> {
     }
     pub fn get_dtype(&self) -> &ScalarType {
         &self.dtype
+    }
+}
+
+pub trait GenerateAsm {
+    fn generate(&self, context: Pointer<Context>,f: &mut File) -> Result<()> {
+        writeln!(f, "to realize")?;
+        Ok(())
     }
 }
