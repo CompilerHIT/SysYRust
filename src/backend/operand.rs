@@ -42,25 +42,37 @@ impl ImmBs for FImm {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Hash, Eq)]
+#[derive(Clone, PartialEq, Hash, Eq)]
 pub struct Addr {
     label: &'static str,
 }
 
-trait ToString {
-    fn to_string(&self) -> String 
-    where Self: std::fmt::Display {
-        format!("{}", self)
-    }
-    fn to_hex_string(&self) -> String
-    where Self: std::fmt::LowerHex {
-        format!("{:x}", self)
-    }
+pub trait ToString {
+    fn to_string(&self) -> String;
+    fn to_hex_string(&self) -> String;
 }
 
-impl ToString for IImm {}
-impl ToString for FImm {}
+impl ToString for IImm {
+    fn to_string(&self) -> String {
+        self.data.to_string()
+    }
+    fn to_hex_string(&self) -> String {
+        format!("{:x}", self.data)
+    }
+}
+impl ToString for FImm {
+    fn to_string(&self) -> String {
+        self.data.to_string()
+    }
+    fn to_hex_string(&self) -> String {
+        let bits = self.data.to_bits();
+        format!("0x{:x}", bits)
+    }
+}
 impl ToString for Addr {
+    fn to_string(&self) -> String {
+        self.label.to_string()
+    }
     fn to_hex_string(&self) -> String {
         panic!("Wrong Call")
     }
@@ -74,7 +86,7 @@ impl Reg {
             r_type
         }
     }
-    fn to_string(&self) -> String {
+    pub fn to_string(&self) -> String {
         if self.r_type == ScalarType::Int {
             match self.id {
                 0 => String::from("zero"),

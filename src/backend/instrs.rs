@@ -1,20 +1,22 @@
-use std::cmp::min;
-use std::collections::HashSet;
+pub use std::io::Result;
+// use std::collections::HashSet;
 use std::vec;
+use std::cmp::min;
 
+pub use crate::backend::structs::{BB, Func, Context, GenerateAsm};
+pub use crate::utility::{ScalarType, Pointer};
+pub use crate::backend::asm_builder::AsmBuilder;
 use crate::backend::operand::*;
-use crate::backend::structs::{BB, Func, Context, GenerateAsm};
-use crate::utility::{ScalarType, Pointer};
 
-#[derive(Clone, Copy, PartialEq)]
-enum Operand {
+#[derive(Clone, PartialEq)]
+pub enum Operand {
     Addr(Addr),
     IImm(IImm),
     FImm(FImm),
     Reg(Reg),
 }
 
-// trait for instructs for asm
+/// trait for instructs for asm
 pub trait Instrs: GenerateAsm {
     fn get_reg_use(&self) -> Vec<Reg>;
     fn get_reg_def(&self) -> Vec<Reg>;
@@ -32,13 +34,14 @@ pub trait Instrs: GenerateAsm {
 
 }
 
+/// 判断是否是合法的立即数
 pub trait LegalImm {
     fn is_legal_imm(&self) -> bool;
 }
 
 //TODO:浮点数运算
 #[derive(Clone, Copy)]
-enum BinaryOp {
+pub enum BinaryOp {
     Add,
     Sub,
     Mul,
@@ -55,6 +58,7 @@ enum BinaryOp {
     Sar,
 }
 
+/// 比较运算符
 enum CmpOp {
     Ne,
     Eq,
@@ -64,7 +68,8 @@ enum CmpOp {
     Le,
 }
 
-// dst: reg = lhs: operand op rhs: operand
+/// dst: reg = lhs: operand op rhs: operand
+/// 默认左操作数为寄存器，为此需要进行常量折叠 / 交换(前端完成？)
 pub struct Binary {
     op: BinaryOp,
     dst: Reg,
@@ -74,8 +79,10 @@ pub struct Binary {
     use_regs: Vec<Reg>,
 }
 
+//FIXME:考虑是否将对lhs与rhs的clone操作换为ref
+/// 为二元运算定义创建方法与获取成员的方法
 impl Binary {
-    fn new(op: BinaryOp, dst: Reg, lhs: Operand, rhs: Operand) -> Self {
+    pub fn new(op: BinaryOp, dst: Reg, lhs: Operand, rhs: Operand) -> Self {
         Self {
             op,
             dst,
@@ -85,37 +92,37 @@ impl Binary {
             use_regs: Vec::new(),
         }
     }
-    fn get_op(&self) -> BinaryOp {
+    pub fn get_op(&self) -> BinaryOp {
         self.op
     }
-    fn get_mr_op(&mut self) -> &mut BinaryOp {
+    pub fn get_mr_op(&mut self) -> &mut BinaryOp {
         &mut self.op
     }
-    fn get_lhs(&self) -> Operand {
-        self.lhs
+    pub fn get_lhs(&self) -> Operand {
+        self.lhs.clone()
     }
-    fn get_mr_lhs(&mut self) -> &mut Operand {
+    pub fn get_mr_lhs(&mut self) -> &mut Operand {
         &mut self.lhs
     }
-    fn get_rhs(&self) -> Operand {
-        self.rhs
+    pub fn get_rhs(&self) -> Operand {
+        self.rhs.clone()
     }
-    fn get_mr_rhs(&mut self) -> &mut Operand {
+    pub fn get_mr_rhs(&mut self) -> &mut Operand {
         &mut self.rhs
     }
-    fn get_dst(&self) -> Reg {
+    pub fn get_dst(&self) -> Reg {
         self.dst
     }
-    fn get_mr_dst(&mut self) -> &mut Reg {
+    pub fn get_mr_dst(&mut self) -> &mut Reg {
         &mut self.dst
     }
-    fn if_limm(&self) -> bool {
+    pub fn if_limm(&self) -> bool {
         match self.lhs {
             Operand::IImm(_) => true,
             _ => false,
         }
     }
-    fn if_rimm(&self) -> bool {
+    pub fn if_rimm(&self) -> bool {
         match self.rhs {
             Operand::IImm(_) => true,
             _ => false,
@@ -123,6 +130,7 @@ impl Binary {
     }
 }
 
+/// 实现Instr与GenerateAsm的trait
 impl Instrs for Binary {
     fn get_reg_def(&self) -> Vec<Reg> {
         vec![self.dst]
@@ -229,7 +237,7 @@ impl Instrs for Lui {
     }
 }
 
-enum SingleOp {
+pub enum SingleOp {
     Mov,
     Not,
     FNeg,
@@ -268,6 +276,7 @@ impl Instrs for OpReg {
             }
             _ => {}
         }
+        regs
     }
 }
 
@@ -347,44 +356,38 @@ pub struct Call {
     farg_cnt: usize,
 }
 impl Instrs for Call {
-    // fn create_reg_def(&self) -> HashSet<Reg> {
-    //     let mut set: HashSet<Reg> = HashSet::new();
-    //     let icnt: usize = min(self.iarg_cnt, ARG_REG_COUNT);
-    //     let mut ni = icnt;
-    //     while ni > 0 {
-    //         set.insert(Reg::new(icnt - ni, ScalarType::Int));
-    //         ni -= 1;
-    //     }
-    //     let fcnt: usize = min(self.farg_cnt, ARG_REG_COUNT);
-    //     let mut nf = fcnt;
-    //     while nf > 0 {
-    //         set.insert(Reg::new(fcnt - nf, ScalarType::Float));
-    //         nf -= 1;
-    //     } 
-    //     set
-    // }
-    // fn create_reg_use(&self) -> HashSet<Reg> {
-    //     let mut set: HashSet<Reg> = HashSet::new();
-    //     let cnt: usize = REG_COUNT;
-    //     let mut n = cnt;
-    //     while n > 0 {
-    //         let ireg = Reg::new(cnt - n, ScalarType::Int);
-    //         if ireg.is_caller_save() && !ireg.is_special() {
-    //             set.insert(ireg);
-    //         }
-    //         let freg = Reg::new(cnt - n, ScalarType::Float);
-    //         if freg.is_caller_save() {
-    //             set.insert(freg);
-    //         }
-    //         n -= 1;
-    //     }
-    //     set
-    // }
     fn get_reg_def(&self) -> Vec<Reg> {
-        
+        let mut set = Vec::new();
+        let icnt: usize = min(self.iarg_cnt, ARG_REG_COUNT);
+        let mut ni = icnt;
+        while ni > 0 {
+            set.push(Reg::new(icnt - ni, ScalarType::Int));
+            ni -= 1;
+        }
+        let fcnt: usize = min(self.farg_cnt, ARG_REG_COUNT);
+        let mut nf = fcnt;
+        while nf > 0 {
+            set.push(Reg::new(fcnt - nf, ScalarType::Float));
+            nf -= 1;
+        } 
+        set
     }
     fn get_reg_use(&self) -> Vec<Reg> {
-        
+        let mut set = Vec::new();
+        let cnt: usize = REG_COUNT;
+        let mut n = cnt;
+        while n > 0 {
+            let ireg = Reg::new(cnt - n, ScalarType::Int);
+            if ireg.is_caller_save() && !ireg.is_special() {
+                set.push(ireg);
+            }
+            let freg = Reg::new(cnt - n, ScalarType::Float);
+            if freg.is_caller_save() {
+                set.push(freg);
+            }
+            n -= 1;
+        }
+        set
     }
 }
 
@@ -399,3 +402,4 @@ pub struct Return {}
 // impl Instrs for Store {}
 // impl Instrs for FToI {}
 // impl Instrs for IToF {}
+

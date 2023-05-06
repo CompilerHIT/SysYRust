@@ -1,6 +1,8 @@
 use std::collections::{HashSet, VecDeque};
 use std::fs::File;
-use std::io::Result;
+use std::hash::{Hash, Hasher};
+use std::io::{Result, Write};
+use std::rc::Rc;
 
 use crate::backend::instrs::Instrs;
 use crate::backend::operand::Reg;
@@ -45,10 +47,10 @@ pub struct BB {
 }
 
 #[derive(Clone)]
-struct CurInstrInfo {
-    block: Pointer<BB>,
+pub struct CurInstrInfo {
+    block: Option<Pointer<BB>>,
     insts_it: Vec<Pointer<Box<dyn Instrs>>>,
-    // pos: usize,
+    id: usize,
 }
 
 // #[derive(Clone)]
@@ -58,7 +60,7 @@ pub struct Func {
     // stack_obj: Vec<Pointer<StackObj>>,
     // caller_stack_obj: Vec<Pointer<StackObj>>,
     params: Vec<Pointer<Reg>>,
-    entry: Pointer<BB>,
+    entry: Option<Pointer<BB>>,
 
     reg_def: Vec<HashSet<CurInstrInfo>>,
     reg_use: Vec<HashSet<CurInstrInfo>>,
@@ -120,14 +122,16 @@ impl BB {
 }
 
 impl GenerateAsm for BB {
-    fn generate(&self, context: Pointer<Context>,f: &mut File) -> String {
+    fn generate(&self, context: Pointer<Context>,f: &mut File) -> Result<()> {
         if self.called {
-            writeln!(f, "{}:", Self::label);
+            writeln!(f, "{}:", self.label)?;
         }
 
-        for inst in self.insts {
-            inst.borrow().generate(context, f);
+        for inst in self.insts.iter() {
+            inst.borrow().generate(context.clone(), f);
         }
+
+        Ok(())
     }
 }
 
@@ -159,16 +163,16 @@ impl Func {
 
     pub fn add_inst_reg(&mut self, cur_info: &CurInstrInfo, inst: Pointer<Box<dyn Instrs>>) {
         for reg in inst.borrow().get_reg_use() {
-            self.reg_use[reg.get_id()].insert(*cur_info);
+            self.reg_use[reg.get_id()].insert((*cur_info).clone());
         }
         for reg in inst.borrow().get_reg_def() {
-            self.reg_def[reg.get_id()].insert(*cur_info);
+            self.reg_def[reg.get_id()].insert((*cur_info).clone());
         }
     }
 }
 
 impl GenerateAsm for Func {
-
+    //TODO:
 }
 
 impl Context {
@@ -209,6 +213,32 @@ impl Context {
     }
 }
 
+impl CurInstrInfo {
+    pub fn new(id: usize) -> Self {
+        Self {
+           id,
+           block: None,
+           insts_it: Vec::new(),
+        }
+    }
+
+    pub fn band_block(&mut self, block: Pointer<BB>) {
+        self.block = Some(block.clone());
+    }
+
+    pub fn get_block(&self) -> Pointer<BB> {
+        self.block.clone().unwrap()
+    }
+
+    pub fn add_inst(&mut self, inst: Pointer<Box<dyn Instrs>>) {
+        self.insts_it.push(inst.clone());
+    }
+
+    pub fn add_insts(&mut self, insts: Vec<Pointer<Box<dyn Instrs>>>) {
+        self.insts_it.append(&mut insts.clone());
+    }
+}
+
 impl<V> GlobalVar<V> {
     pub fn new(name: String, value: V, dtype: ScalarType) -> Self {
         Self { name, value, dtype }
@@ -225,8 +255,22 @@ impl<V> GlobalVar<V> {
 }
 
 pub trait GenerateAsm {
-    fn generate(&self, context: Pointer<Context>,f: &mut File) -> Result<()> {
+    fn generate(&self, _: Pointer<Context>, f: &mut File) -> Result<()> {
         writeln!(f, "to realize")?;
         Ok(())
+    }
+}
+
+impl PartialEq for CurInstrInfo {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+    }
+}
+
+impl Eq for CurInstrInfo {}
+
+impl Hash for CurInstrInfo {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.id.hash(state);
     }
 }
