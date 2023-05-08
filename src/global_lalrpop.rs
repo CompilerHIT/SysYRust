@@ -27,8 +27,8 @@ use std::{collections::HashMap, sync::Mutex};
 // static ref MY_GLOBAL_VAR: Mutex<Rc<String>> = Mutex::new(Rc::new("Hello, world!".to_string()));
 // }
 thread_local! {
-    pub static MODULE:CfgModule = CfgModule::make_module();
-    pub static IN_FUNC: i32 = 0;
+    pub static MODULE:RefCell<CfgModule> = RefCell::new(CfgModule::make_module());
+    pub static IN_FUNC: RefCell<i32> = RefCell::new(0);
 }
 
 // pub static IN_FUNC: i32 = 0;

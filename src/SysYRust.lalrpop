@@ -71,7 +71,7 @@ ConstInitVal:i32 = {
 }
 
 VarDecl:i32 = {
-    <t:BType> <var1:VarDef> <v:VarDefVec> ";"=>{
+    <t:BType> <var1:VarDef> <mut v:VarDefVec> ";"=>{
         let mut val1name = var1.0;
         let mut val1init = var1.1;
         //let infunc = IN_FUNC.with(|foo| {
@@ -79,7 +79,7 @@ VarDecl:i32 = {
         //*val
         //});
         let mut infunc = IN_FUNC.with(|i|{
-            *i
+            *i.borrow_mut()
         });
         if infunc==1//在函数声明体内
         {
@@ -97,21 +97,25 @@ VarDecl:i32 = {
         {
             if t=="int".to_string()//字符串比较
             {
-                let mut inst1 = CfgGlobalConstInt::make_int(val1init,val1name);
+                let mut inst1 = CfgGlobalConstInt::make_int(val1init,val1name.clone());
                 //MODULE.push_var(val1name,inst1);
                 MODULE.with(|foo| {
-                //let mut val = foo.borrow_mut();
-                //let mut val = &(*foo.global_variable);
-                //*val.push_var(&val1name,inst1);
-                foo.push_var(&val1name,inst1);
+                let mut valtemp = foo.borrow_mut();
+                valtemp.push_var(&val1name,inst1);
+
                 });
 
                 for i in &mut v
                 {
-                    let  (mut tempname,mut tempval) = *i;
-                    let mut inst1 = CfgGlobalConstInt::make_int(tempval,tempname);
+                    // let  (mut tempname,mut tempval) = *i;
+                    let mut tempname:String = i.0.clone();
+                    let mut tempval = i.1;
+                    let mut inst1 = CfgGlobalConstInt::make_int(tempval,tempname.clone());
                     MODULE.with(|foo| {
-                    foo.push_var(&tempname,inst1);
+                    // foo.push_var(&tempname,inst1);
+                    let mut valtemp = foo.borrow_mut();
+                    valtemp.push_var(&tempname,inst1);
+                    
                     //*val.push_var(tempname,inst1);
                     });
                 }
@@ -155,7 +159,7 @@ VarDef:(String,i32) = {
 
 
     <i:Ident> "=" <initval:InitVal> =>{
-        (i,0)//todo:这里
+        (i,initval)//todo:这里
     },
 
     <i:Ident> ("[" <ConstExp> "]")+ "=" <initval:InitVal> =>{//todo:对数组做处理
@@ -179,7 +183,9 @@ ActionBeforeFuncDef:i32 = {
         IN_FUNC.with(|foo| {
         //let mut val = foo.borrow_mut();
         //*val = 1;
-        *foo = 1;
+        // *foo = 1;
+        let mut val = foo.borrow_mut();
+        *val = 1;
         });
         0
     },
@@ -191,7 +197,9 @@ ActionAfterFuncDef:i32 = {
         IN_FUNC.with(|foo| {
         //let mut val = foo.borrow_mut();
         //*val = 0;
-        *foo = 0;
+        // *foo = 0;
+        let mut val = foo.borrow_mut();
+        *val = 0;
         });
         0
     },
@@ -392,7 +400,7 @@ AddExp:i32 = {
     MulExp =>{
 0
     },
-    //AddExp "+" MulExp =>{
+    //AddExp "+" MulExp =>{}
     AddExp <op:AddOp> MulExp =>{
 0
     },
@@ -523,7 +531,7 @@ DecimalConst:i32 = {
     <mut s:r"[1-9][0-9]*"> =>{
         //s//todo:返回字符串值
         //from_str::<int>(s.as_slice())
-        0
+        i32::from_str_radix(<>, 10).unwrap()
     },
 }
 
@@ -536,7 +544,7 @@ OctalConst:i32 = {
     //}
     <mut s:r"0[0-7]*"> =>{
         //s//todo:返回字符串值
-    0
+        i32::from_str_radix(<>, 8).unwrap()
     },
 }
 
@@ -548,7 +556,7 @@ HexadecimalConst:i32 = {
 
     //}
     <mut s:r"0[xX][0-9a-fA-F]+"> =>{
-        0//s//todo:返回字符串值
+        i32::from_str_radix(&<>[2..], 16).unwrap()//s//todo:返回字符串值
     },
 }
 

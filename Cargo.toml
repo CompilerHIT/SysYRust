@@ -12,7 +12,7 @@ name="sysylib"
 
 [dependencies]
 lazy_static = "1.4"
-lalrpop-util = "0.19.9"
+lalrpop-util = {version = "0.19.9", features = ["lexer"]}
 regex = "1"
 
 [build-dependencies]
