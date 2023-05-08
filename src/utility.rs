@@ -4,7 +4,7 @@ use std::{
 };
 
 /// 使用Pointer<T>来替代Rc<RefCell<T>>，以便于简化操作
-#[derive(Debug)]
+#[derive(PartialEq, Eq)]
 pub struct Pointer<T> {
     p: Rc<RefCell<T>>,
 }
