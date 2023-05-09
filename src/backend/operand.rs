@@ -147,6 +147,10 @@ impl Reg {
         self.id == 0 || (self.id >= 2 && self.id <= 4)
     }
 
+    pub fn is_allocable(&self) -> bool {
+        !self.is_special()
+    }
+
     // if virtual reg
     pub fn is_virtual(&self) -> bool {
         self.id > 31

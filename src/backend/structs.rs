@@ -2,7 +2,6 @@ use std::collections::{HashSet, VecDeque};
 use std::fs::File;
 use std::hash::{Hash, Hasher};
 use std::io::{Result, Write};
-use std::rc::Rc;
 
 use crate::backend::instrs::Instrs;
 use crate::backend::operand::Reg;
@@ -13,6 +12,7 @@ use crate::ir::instruction::Instruction;
 use crate::utility::Pointer;
 use crate::utility::ScalarType;
 
+use super::instrs::InstrsType;
 use super::module::AsmModule;
 
 #[derive(Clone)]
@@ -128,7 +128,7 @@ impl GenerateAsm for BB {
         }
 
         for inst in self.insts.iter() {
-            inst.borrow().generate(context.clone(), f);
+            inst.borrow().generate(context.clone(), f)?;
         }
 
         Ok(())
@@ -168,6 +168,47 @@ impl Func {
         for reg in inst.borrow().get_reg_def() {
             self.reg_def[reg.get_id()].insert((*cur_info).clone());
         }
+    }
+
+    pub fn calc_live(&mut self) {
+        let mut queue : VecDeque<(Pointer<BB>, Reg)> = VecDeque::new();
+        for block in self.blocks.clone().iter() {
+            block.borrow_mut().live_use.clear();
+            block.borrow_mut().live_def.clear();
+            for it in block.borrow().insts.iter().rev() {
+                for reg in it.borrow().get_reg_def().into_iter() {
+                    if (reg.is_virtual() || reg.is_allocable()) {
+                        block.borrow_mut().live_use.remove(&reg);
+                        block.borrow_mut().live_def.insert(reg);
+                    }
+                }
+                for reg in it.borrow().get_reg_use().into_iter() {
+                    if (reg.is_virtual() || reg.is_allocable()) {
+                        block.borrow_mut().live_def.remove(&reg);
+                        block.borrow_mut().live_use.insert(reg);
+                    }
+                }
+            }
+            for reg in block.borrow().live_use.iter() {
+                queue.push_back((block.clone(), reg.clone()));
+            }
+            block.borrow_mut().live_in = block.borrow().live_use.clone();
+            block.borrow_mut().live_out.clear();
+        }
+        while let Some(value) = queue.pop_front() {
+            let (block, reg) = value;
+            for pred in block.borrow().in_edge.iter() {
+                if pred.borrow_mut().live_out.insert(reg) {
+                    if pred.borrow_mut().live_def.take(&reg) == None && pred.borrow_mut().live_in.insert(reg) {
+                        queue.push_back((pred.clone(), reg.clone()));
+                    }
+                }
+            }
+        }
+    }
+
+    pub fn allocate_reg(&mut self) {
+        //TODO:
     }
 }
 

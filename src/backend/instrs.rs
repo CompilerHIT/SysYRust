@@ -16,8 +16,21 @@ pub enum Operand {
     Reg(Reg),
 }
 
+pub enum InstrsType {
+    Binary,
+    MvReg,
+    Li,
+    Lui,
+    OpReg,
+    Load,
+    Store,
+    Call,
+    Branch,
+}
+
 /// trait for instructs for asm
 pub trait Instrs: GenerateAsm {
+    fn get_type(&self) -> InstrsType;
     fn get_reg_use(&self) -> Vec<Reg>;
     fn get_reg_def(&self) -> Vec<Reg>;
     
@@ -132,6 +145,9 @@ impl Binary {
 
 /// 实现Instr与GenerateAsm的trait
 impl Instrs for Binary {
+    fn get_type(&self) -> InstrsType {
+        InstrsType::Binary
+    }
     fn get_reg_def(&self) -> Vec<Reg> {
         vec![self.dst]
     }
@@ -170,6 +186,9 @@ impl MvReg {
 }
 
 impl Instrs for MvReg {
+    fn get_type(&self) -> InstrsType {
+        InstrsType::MvReg
+    }
     fn get_reg_def(&self) -> Vec<Reg> {
         vec![self.dst]
     }
@@ -200,6 +219,9 @@ impl LegalImm for Li {
 }
 
 impl Instrs for Li {
+    fn get_type(&self) -> InstrsType {
+        InstrsType::Li
+    }
     fn get_reg_def(&self) -> Vec<Reg> {
         vec![self.dst]
     }
@@ -229,6 +251,9 @@ impl LegalImm for Lui {
 }
 
 impl Instrs for Lui {
+    fn get_type(&self) -> InstrsType {
+        InstrsType::Lui
+    }
     fn get_reg_def(&self) -> Vec<Reg> {
         vec![self.dst]
     }
@@ -264,6 +289,9 @@ impl OpReg {
 }
 
 impl Instrs for OpReg {
+    fn get_type(&self) -> InstrsType {
+        InstrsType::OpReg
+    }
     fn get_reg_def(&self) -> Vec<Reg> {
         vec![self.dst]
     }
@@ -306,6 +334,9 @@ impl Load {
 }
 
 impl Instrs for Load {
+    fn get_type(&self) -> InstrsType {
+        InstrsType::Load
+    }
     fn get_reg_def(&self) -> Vec<Reg> {
         vec![self.dst]
     }
@@ -331,6 +362,9 @@ impl Store {
 }
 
 impl Instrs for Store {
+    fn get_type(&self) -> InstrsType {
+        InstrsType::Store
+    }
     fn get_reg_def(&self) -> Vec<Reg> {
         vec![self.dst]
     }
@@ -356,6 +390,9 @@ pub struct Call {
     farg_cnt: usize,
 }
 impl Instrs for Call {
+    fn get_type(&self) -> InstrsType {
+        InstrsType::Call
+    }
     fn get_reg_def(&self) -> Vec<Reg> {
         let mut set = Vec::new();
         let icnt: usize = min(self.iarg_cnt, ARG_REG_COUNT);
