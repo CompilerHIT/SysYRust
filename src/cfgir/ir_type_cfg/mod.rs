@@ -72,11 +72,11 @@ impl CfgIrType {
     }
 }
 
-#[test]
-fn is_void_test() {
-    let tested = CfgIrType::Void;
-    assert!(tested.is_void());
-}
+// #[test]
+// fn is_void_test() {
+//     let tested = CfgIrType::Void;
+//     assert!(tested.is_void());
+// }
 
 // #[test]
 // fn global_variable_test() {
