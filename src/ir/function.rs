@@ -1,21 +1,18 @@
-use super::{basicblock::BasicBlock, ir_type::IrType, parameter::Parameter, value::Value};
+use super::{basicblock::BasicBlock, instruction::Instruction, ir_type::IrType, value::Value};
 use crate::utility::Pointer;
 use std::collections::HashMap;
 
 pub struct Function {
     value: Value,
-    parameters: HashMap<String, Pointer<Parameter>>,
+    parameters: HashMap<String, Pointer<Box<dyn Instruction>>>,
     head_block: Pointer<BasicBlock>,
 }
 
 impl Function {
-    fn make_function(
-        parameters: HashMap<String, Pointer<Parameter>>,
-        head_block: Pointer<BasicBlock>,
-    ) -> Function {
+    pub fn make_function(head_block: Pointer<BasicBlock>) -> Function {
         Function {
             value: Value::make_value(IrType::Function),
-            parameters,
+            parameters: HashMap::new(),
             head_block,
         }
     }
@@ -24,7 +21,11 @@ impl Function {
         self.head_block.clone()
     }
 
-    pub fn get_parameter(&self, name: String) -> Option<Pointer<Parameter>> {
+    pub fn set_parameter(&mut self, name: String, parameter: Pointer<Box<dyn Instruction>>) {
+        self.parameters.insert(name, parameter);
+    }
+
+    pub fn get_parameter(&self, name: String) -> Option<Pointer<Box<dyn Instruction>>> {
         match self.parameters.get(&name) {
             Some(p) => Some(p.clone()),
             None => None,

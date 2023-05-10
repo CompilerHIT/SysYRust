@@ -4,7 +4,6 @@ pub mod function;
 pub mod instruction;
 pub mod ir_type;
 pub mod module;
-pub mod parameter;
 pub mod user;
 pub mod value;
 

@@ -9,6 +9,8 @@ pub mod call_inst;
 pub mod const_int;
 pub mod global_const_int;
 pub mod head_inst;
+pub mod load_inst;
+pub mod parameter;
 pub mod return_inst;
 pub mod unary_inst;
 
@@ -20,7 +22,9 @@ pub enum InstructionType {
     IGlobalConstInt,
     IUnaryOpInst,
     ICallInst,
+    ILoadInst,
     IReturn,
+    IParameter,
 
     /// 没有这个节点，你不需要获得
     IHead,

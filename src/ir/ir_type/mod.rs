@@ -8,8 +8,7 @@ pub enum IrType {
     ConstInt,
     Float,
     ConstFloat,
-    Pointer,
-    Array,
+    Ptr,
     Function,
     BBlock,
     Parameter,
@@ -41,15 +40,9 @@ impl IrType {
             __ => false,
         }
     }
-    pub fn is_pointer(&self) -> bool {
+    pub fn is_ptr(&self) -> bool {
         match self {
-            IrType::Pointer => true,
-            __ => false,
-        }
-    }
-    pub fn is_array(&self) -> bool {
-        match self {
-            IrType::Array => true,
+            IrType::Ptr => true,
             __ => false,
         }
     }
