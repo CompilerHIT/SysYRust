@@ -9,6 +9,7 @@ pub mod call_inst;
 pub mod const_int;
 pub mod global_const_int;
 pub mod head_inst;
+pub mod return_inst;
 pub mod unary_inst;
 
 #[derive(PartialEq)]
@@ -19,6 +20,7 @@ pub enum InstructionType {
     IGlobalConstInt,
     IUnaryOpInst,
     ICallInst,
+    IReturn,
 
     /// 没有这个节点，你不需要获得
     IHead,

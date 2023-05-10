@@ -1,5 +1,5 @@
 [package]
-name = "sysy_rust"
+name = "compiler"
 version = "0.1.0"
 edition = "2021"
 rust-version = "1.56"
@@ -14,6 +14,7 @@ name="sysylib"
 lazy_static = "1.4"
 lalrpop-util = {version = "0.19.9", features = ["lexer"]}
 regex = "1"
+clap = "2.33"
 
 [build-dependencies]
 lalrpop = "0.19.9"

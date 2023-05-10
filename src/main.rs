@@ -11,7 +11,7 @@ lalrpop_mod! {
   SysYRust
 }
 fn main() {
-    println!("Hello, world!");
+    sysylib::run_main();
 }
 #[test]
 fn global_variable_test() {
