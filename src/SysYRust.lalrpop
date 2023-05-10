@@ -10,7 +10,8 @@ use std::thread::LocalKey;
 // use crate::cfgir::instruction_cfg::global_const_int_cfg::CfgGlobalConstInt;
 use sysylib::cfgir::instruction_cfg::global_const_int_cfg::CfgGlobalConstInt;
 // use crate::ast::*;
-use sysylib::ast::*;
+use sysylib::frontend::ast::*;
+// use crate::frontend::ast::*;
 
 
 

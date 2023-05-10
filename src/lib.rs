@@ -1,9 +1,9 @@
 pub mod ast;
 pub mod backend;
 pub mod cfgir;
+pub mod frontend;
 pub mod global_lalrpop;
 pub mod ir;
-pub mod test;
 pub mod utility;
 
 // TODO: to add call for generate and new module.
@@ -22,6 +22,13 @@ pub mod utility;
 //     }
 // }
 //
+
+use crate::cfgir::instruction_cfg::CfgInstruction;
+use crate::global_lalrpop::IN_FUNC;
+use crate::global_lalrpop::MODULE;
+use crate::utility::Pointer;
+use lalrpop_util::lalrpop_mod;
+use std::collections::HashMap;
 
 pub fn run_main() {
     use clap::{App, Arg};
