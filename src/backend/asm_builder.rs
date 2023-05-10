@@ -29,7 +29,7 @@ impl<'f> AsmBuilder<'f> {
         Self { f, temp }
     }
 
-    pub fn li(&mut self, dest: &str, imm: i32) -> Result<()> {
+    pub fn li(&mut self, dest: &str, imm: isize) -> Result<()> {
         writeln!(self.f, "  li {dest}, {imm}")
     }
 
@@ -65,7 +65,7 @@ impl<'f> AsmBuilder<'f> {
         writeln!(self.f, "  {op} {dest}, {src}")
     }
 
-    pub fn addi(&mut self, dest: &str, opr: &str, imm: i32) -> Result<()> {
+    pub fn addi(&mut self, dest: &str, opr: &str, imm: isize) -> Result<()> {
         if (-2048..=2047).contains(&imm) {
             writeln!(self.f, "  addi {dest}, {opr}, {imm}")
         } else {
@@ -83,7 +83,7 @@ impl<'f> AsmBuilder<'f> {
     }
 
     //TODO: optimize mul and div
-    pub fn muli(&mut self, dest: &str, opr: &str, imm: i32) -> Result<()> {
+    pub fn muli(&mut self, dest: &str, opr: &str, imm: isize) -> Result<()> {
         if imm == 0 {
             self.mv(dest, "x0")
         } else if imm > 0 && (imm & (imm - 1)) == 0 {
@@ -100,7 +100,7 @@ impl<'f> AsmBuilder<'f> {
         }
     }
 
-    pub fn divi(&mut self, dest: &str, opr: &str, imm: i32) -> Result<()> {
+    pub fn divi(&mut self, dest: &str, opr: &str, imm: isize) -> Result<()> {
         if imm == 0 {
             panic!("div by zero!");
         } else if imm > 0 && (imm & (imm - 1)) == 0 {
@@ -130,7 +130,7 @@ impl<'f> AsmBuilder<'f> {
         }
     }
 
-    pub fn sd(&mut self, src: &str, addr: &str, offset: i32) -> Result<()> {
+    pub fn sd(&mut self, src: &str, addr: &str, offset: isize) -> Result<()> {
         if (-2048..=2047).contains(&offset) {
             writeln!(self.f, "  sd {src}, {offset}({addr})")
         } else {
@@ -139,7 +139,7 @@ impl<'f> AsmBuilder<'f> {
         }
     }
 
-    pub fn ld(&mut self, dest: &str, addr: &str, offset: i32) -> Result<()> {
+    pub fn ld(&mut self, dest: &str, addr: &str, offset: isize) -> Result<()> {
         if (-2048..=2047).contains(&offset) {
             writeln!(self.f, "  ld {dest}, {offset}({addr})")
         } else {

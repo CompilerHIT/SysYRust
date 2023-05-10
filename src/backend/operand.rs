@@ -2,6 +2,7 @@ use crate::utility::ScalarType;
 
 pub const REG_COUNT: usize = 32;
 pub const ARG_REG_COUNT: usize = 8;
+pub const REG_SP: usize = 2;
 
 #[derive(Clone, Copy, PartialEq, Hash, Eq)]
 pub struct Reg {
@@ -19,6 +20,23 @@ pub struct FImm {
     data: f64
 }
 
+impl IImm {
+    pub fn new(data: isize) -> Self {
+        Self { data }
+    }
+    pub fn get_data(&self) -> isize {
+        self.data
+    }
+}
+
+impl FImm {
+    pub fn new(data: f64) -> Self {
+        Self { data }
+    }
+    pub fn get_data(&self) -> f64 {
+        self.data
+    }
+}
 pub trait ImmBs {
     fn is_imm_20bs(&self) -> bool;
     fn is_imm_12bs(&self) -> bool;

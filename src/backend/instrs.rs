@@ -18,14 +18,15 @@ pub enum Operand {
 
 pub enum InstrsType {
     Binary,
-    MvReg,
-    Li,
-    Lui,
     OpReg,
+    ChangeSp,
+    StackLoad,
+
     Load,
     Store,
     Call,
     Branch,
+    Ret
 }
 
 /// trait for instructs for asm
@@ -170,99 +171,8 @@ impl Instrs for Binary {
     }
 }
 
-// dst: reg = mv src: reg
-pub struct MvReg {
-    dst: Reg,
-    src: Reg,
-}
-
-impl MvReg {
-    pub fn new(dst: Reg, src: Reg) -> Self {
-        Self {
-            dst,
-            src,
-        }
-    }
-}
-
-impl Instrs for MvReg {
-    fn get_type(&self) -> InstrsType {
-        InstrsType::MvReg
-    }
-    fn get_reg_def(&self) -> Vec<Reg> {
-        vec![self.dst]
-    }
-    fn get_reg_use(&self) -> Vec<Reg> {
-        vec![self.src, self.dst]
-    }
-}
-
-// dst: reg = li src: iimm
-pub struct Li {
-    dst: Reg,
-    src: IImm
-}
-
-impl Li {
-    pub fn new(dst: Reg, src: IImm) -> Self {
-        Self {
-            dst,
-            src,
-        }
-    }
-}
-
-impl LegalImm for Li {
-    fn is_legal_imm(&self) -> bool {
-        self.src.is_imm_20bs()
-    }
-}
-
-impl Instrs for Li {
-    fn get_type(&self) -> InstrsType {
-        InstrsType::Li
-    }
-    fn get_reg_def(&self) -> Vec<Reg> {
-        vec![self.dst]
-    }
-    fn get_reg_use(&self) -> Vec<Reg> {
-        vec![self.dst]
-    }
-}
-
-pub struct Lui {
-    dst: Reg,
-    src: IImm
-}
-
-impl Lui {
-    pub fn new(dst: Reg, src: IImm) -> Self {
-        Self {
-            dst,
-            src,
-        }
-    }
-}
-
-impl LegalImm for Lui {
-    fn is_legal_imm(&self) -> bool {
-        self.src.is_imm_20bs()
-    }
-}
-
-impl Instrs for Lui {
-    fn get_type(&self) -> InstrsType {
-        InstrsType::Lui
-    }
-    fn get_reg_def(&self) -> Vec<Reg> {
-        vec![self.dst]
-    }
-    fn get_reg_use(&self) -> Vec<Reg> {
-        vec![self.dst]
-    }
-}
-
 pub enum SingleOp {
+    // Li, Lui, MvReg
     Mov,
     Not,
     FNeg,
@@ -309,22 +219,49 @@ impl Instrs for OpReg {
 }
 
 //TODO:
-enum StackOp {
-    ParamLoad,
-    StackAddr,
-    StackLoad,
-    StackStore,
+// enum StackOp {
+//     ParamLoad,
+//     StackAddr,
+//     StackLoad,
+//     StackStore,
+// }
+
+/// addi sp (-)imm, check legal first
+pub struct ChangeSp {
+    offset: IImm
 }
 
+impl ChangeSp {
+    pub fn new(offset: IImm) -> Self {
+        Self {
+            offset
+        }
+    }
+    pub fn get_offset(&self) -> isize {
+        self.offset.get_data()
+    }
+}
+
+impl Instrs for ChangeSp {
+    fn get_type(&self) -> InstrsType {
+        InstrsType::ChangeSp
+    }    
+    fn get_reg_def(&self) -> Vec<Reg> {
+        vec![Reg::new(REG_SP, ScalarType::Int)]
+    }
+    fn get_reg_use(&self) -> Vec<Reg> {
+        vec![Reg::new(REG_SP, ScalarType::Int)]
+    }
+}
 
 pub struct Load {
     dst: Reg,
     src: Reg,
-    offset: u32
+    offset: IImm
 }
 
 impl Load {
-    pub fn new(dst: Reg, src: Reg, offset: u32) -> Self {
+    pub fn new(dst: Reg, src: Reg, offset: IImm) -> Self {
         Self {
             dst,
             src,
@@ -348,11 +285,11 @@ impl Instrs for Load {
 pub struct Store {
     dst: Reg,
     src: Reg,
-    offset: u32
+    offset: IImm
 }
 
 impl Store {
-    pub fn new(dst: Reg, src: Reg, offset: u32) -> Self {
+    pub fn new(dst: Reg, src: Reg, offset: IImm) -> Self {
         Self {
             dst,
             src,
@@ -428,9 +365,29 @@ impl Instrs for Call {
     }
 }
 
-/* FIXME: whether need ret instr?
-pub struct Return {}
-*/
+//FIXME: whether need ret instr? 
+pub struct Return {
+    re_type: ScalarType,
+}
+
+impl Instrs for Return {
+    fn get_type(&self) -> InstrsType {
+        InstrsType::Ret
+    }
+    fn get_reg_def(&self) -> Vec<Reg> {
+        match self.re_type {
+            ScalarType::Int => vec![Reg::new(0, ScalarType::Int)],
+            ScalarType::Float => vec![Reg::new(0, ScalarType::Float)],
+        }
+    }
+    fn get_reg_use(&self) -> Vec<Reg> {
+        match self.re_type {
+            ScalarType::Int => vec![Reg::new(0, ScalarType::Int)],
+            ScalarType::Float => vec![Reg::new(0, ScalarType::Float)]
+        }
+    }
+}
+
 
 
 // impl Instrs for Call {}

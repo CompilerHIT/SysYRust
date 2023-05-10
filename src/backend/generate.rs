@@ -34,20 +34,17 @@ impl GenerateAsm for Binary {
     }
 }
 
-impl GenerateAsm for MvReg {
-    //TODO:
-}
-
-impl GenerateAsm for Li {
-    //TODO:
-}
-
-impl GenerateAsm for Lui {
-    //TODO:
-}
-
 impl GenerateAsm for OpReg {
     //TODO:
+}
+
+impl GenerateAsm for ChangeSp {
+    fn generate(&self, _: Pointer<Context>, f: &mut std::fs::File) -> Result<()> {
+        let mut builder = AsmBuilder::new(f, "");
+        let imm = self.get_offset();
+        builder.addi("sp", "sp", imm)?;
+        Ok(())
+    }
 }
 
 impl GenerateAsm for Load {
@@ -60,4 +57,13 @@ impl GenerateAsm for Store {
 
 impl GenerateAsm for Call {
     //TODO:
+}
+
+impl GenerateAsm for Return {
+    fn generate(&self, _: Pointer<Context>, f: &mut std::fs::File) -> Result<()> {
+        let mut builder = AsmBuilder::new(f, "");
+        // 需保证context epilogue内容为空
+        builder.ret()?;
+        Ok(())
+    }
 }
