@@ -1,4 +1,5 @@
 use crate::ir::instruction::{Instruction, InstructionType};
+use crate::ir::ir_type::IrType;
 use crate::utility::Pointer;
 
 pub struct HeadInst {
@@ -16,8 +17,11 @@ impl HeadInst {
 }
 
 impl Instruction for HeadInst {
-    fn get_type(&self) -> InstructionType {
+    fn get_inst_type(&self) -> InstructionType {
         InstructionType::IHead
+    }
+    fn get_value_type(&self) -> IrType {
+        IrType::Void
     }
 
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any {

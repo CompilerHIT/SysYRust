@@ -3,15 +3,19 @@
 use crate::utility::Pointer;
 use std::any::Any;
 
+use super::ir_type::IrType;
+
 pub mod binary_inst;
 pub mod branch_inst;
 pub mod call_inst;
 pub mod const_int;
+pub mod gep_inst;
 pub mod global_const_int;
 pub mod head_inst;
 pub mod load_inst;
 pub mod parameter;
 pub mod return_inst;
+pub mod store_inst;
 pub mod unary_inst;
 
 #[derive(PartialEq)]
@@ -23,6 +27,8 @@ pub enum InstructionType {
     IUnaryOpInst,
     ICallInst,
     ILoadInst,
+    IStoreInst,
+    IGEPInst,
     IReturn,
     IParameter,
 
@@ -31,7 +37,10 @@ pub enum InstructionType {
 }
 
 pub trait Instruction {
-    fn get_type(&self) -> InstructionType;
+    // 获得指令类型
+    fn get_inst_type(&self) -> InstructionType;
+    // 获得值类型
+    fn get_value_type(&self) -> IrType;
 
     fn as_any(&self) -> &dyn Any;
     fn as_any_mut(&mut self) -> &mut dyn Any;
@@ -82,7 +91,7 @@ impl IList {
     pub fn next(&self) -> Option<Pointer<Box<dyn Instruction>>> {
         match self.next {
             None => None,
-            Some(ref node) => match node.borrow_mut().get_type() {
+            Some(ref node) => match node.borrow_mut().get_inst_type() {
                 InstructionType::IHead => None,
                 _ => Some(node.clone()),
             },
@@ -92,7 +101,7 @@ impl IList {
     pub fn prev(&self) -> Option<Pointer<Box<dyn Instruction>>> {
         match self.prev {
             None => None,
-            Some(ref node) => match node.borrow_mut().get_type() {
+            Some(ref node) => match node.borrow_mut().get_inst_type() {
                 InstructionType::IHead => None,
                 _ => Some(node.clone()),
             },
@@ -126,11 +135,11 @@ impl IList {
     }
 
     pub fn is_head(&self) -> bool {
-        self.prev.as_ref().unwrap().borrow().get_type() == InstructionType::IHead
+        self.prev.as_ref().unwrap().borrow().get_inst_type() == InstructionType::IHead
     }
 
     pub fn is_tail(&self) -> bool {
-        self.next.as_ref().unwrap().borrow().get_type() == InstructionType::IHead
+        self.next.as_ref().unwrap().borrow().get_inst_type() == InstructionType::IHead
     }
 
     pub fn remove_self(&mut self) {

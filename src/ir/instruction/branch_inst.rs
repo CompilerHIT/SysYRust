@@ -100,8 +100,11 @@ impl BranchInst {
     }
 }
 impl Instruction for BranchInst {
-    fn get_type(&self) -> InstructionType {
+    fn get_inst_type(&self) -> InstructionType {
         InstructionType::IBranchInst
+    }
+    fn get_value_type(&self) -> IrType {
+        self.user.get_ir_type()
     }
 
     fn as_any(&self) -> &dyn Any {

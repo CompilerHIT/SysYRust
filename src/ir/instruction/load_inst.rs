@@ -1,22 +1,20 @@
-use crate::ir::{
-    instruction::{IList, Instruction, InstructionType},
-    ir_type::IrType,
-    user::User,
-};
+use crate::ir::{ir_type::IrType, user::User};
 use crate::utility::Pointer;
 
-pub struct ReturnInst {
+use super::{IList, Instruction, InstructionType};
+
+pub struct LoadInst {
     user: User,
     list: IList,
 }
 
-impl ReturnInst {
-    pub fn make_return_inst(
+impl LoadInst {
+    fn make_load_inst(
         ir_type: IrType,
         value: Pointer<Box<dyn Instruction>>,
     ) -> Pointer<Box<dyn Instruction>> {
         let user = User::make_user(ir_type, vec![value]);
-        let inst = ReturnInst {
+        let inst = LoadInst {
             user,
             list: IList {
                 prev: None,
@@ -26,17 +24,38 @@ impl ReturnInst {
         Pointer::new(Box::new(inst))
     }
 
-    pub fn get_return_value(&self) -> Pointer<Box<dyn Instruction>> {
+    pub fn make_int_load(value: Pointer<Box<dyn Instruction>>) -> Pointer<Box<dyn Instruction>> {
+        Self::make_load_inst(IrType::Int, value)
+    }
+
+    pub fn make_float_load(value: Pointer<Box<dyn Instruction>>) -> Pointer<Box<dyn Instruction>> {
+        Self::make_load_inst(IrType::Float, value)
+    }
+
+    pub fn make_int_ptr_load(
+        value: Pointer<Box<dyn Instruction>>,
+    ) -> Pointer<Box<dyn Instruction>> {
+        Self::make_load_inst(IrType::IntPtr, value)
+    }
+
+    pub fn make_float_ptr_load(
+        value: Pointer<Box<dyn Instruction>>,
+    ) -> Pointer<Box<dyn Instruction>> {
+        Self::make_load_inst(IrType::FloatPtr, value)
+    }
+
+    pub fn get_pointer_operand(&self) -> Pointer<Box<dyn Instruction>> {
         self.user.get_operand(0)
+    }
+
+    pub fn set_pointer_operand(&mut self, ptr: Pointer<Box<dyn Instruction>>) {
+        self.user.set_operand(0, ptr)
     }
 }
 
-impl Instruction for ReturnInst {
+impl Instruction for LoadInst {
     fn get_inst_type(&self) -> super::InstructionType {
-        InstructionType::IReturn
-    }
-    fn get_value_type(&self) -> IrType {
-        self.user.get_ir_type()
+        InstructionType::ILoadInst
     }
 
     fn as_any(&self) -> &dyn std::any::Any {
@@ -81,5 +100,8 @@ impl Instruction for ReturnInst {
 
     fn remove_self(&mut self) {
         self.list.remove_self()
+    }
+    fn get_value_type(&self) -> IrType {
+        self.user.get_ir_type()
     }
 }

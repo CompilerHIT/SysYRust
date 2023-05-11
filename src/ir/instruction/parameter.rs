@@ -28,8 +28,11 @@ impl Parameter {
 }
 
 impl Instruction for Parameter {
-    fn get_type(&self) -> super::InstructionType {
+    fn get_inst_type(&self) -> super::InstructionType {
         super::InstructionType::IParameter
+    }
+    fn get_value_type(&self) -> IrType {
+        self.user.get_ir_type()
     }
     fn as_any(&self) -> &dyn std::any::Any {
         self
