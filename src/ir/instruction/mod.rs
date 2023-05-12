@@ -5,6 +5,7 @@ use std::any::Any;
 
 use super::ir_type::IrType;
 
+pub mod alloca_inst;
 pub mod binary_inst;
 pub mod branch_inst;
 pub mod call_inst;
@@ -14,6 +15,7 @@ pub mod global_const_int;
 pub mod head_inst;
 pub mod load_inst;
 pub mod parameter;
+pub mod phi;
 pub mod return_inst;
 pub mod store_inst;
 pub mod unary_inst;
@@ -29,8 +31,10 @@ pub enum InstructionType {
     ILoadInst,
     IStoreInst,
     IGEPInst,
+    IAllocaInst,
     IReturn,
     IParameter,
+    IPhi,
 
     /// 没有这个节点，你不需要获得
     IHead,

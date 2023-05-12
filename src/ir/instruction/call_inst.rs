@@ -10,7 +10,6 @@ use super::{IList, Instruction, InstructionType};
 pub struct CallInst {
     user: User,
     callee: Pointer<Function>,
-    args: Vec<Pointer<Box<dyn Instruction>>>,
     list: IList,
 }
 
@@ -20,11 +19,10 @@ impl CallInst {
         callee: Pointer<Function>,
         args: Vec<Pointer<Box<dyn Instruction>>>,
     ) -> Pointer<Box<dyn Instruction>> {
-        let user = User::make_user(ir_type, vec![]);
+        let user = User::make_user(ir_type, args);
         let inst = CallInst {
             user,
             callee,
-            args,
             list: IList {
                 prev: None,
                 next: None,
@@ -57,11 +55,6 @@ impl CallInst {
         Self::make_call_inst(IrType::Void, callee, args)
     }
 
-    /// 获取返回值类型
-    pub fn get_ir_type(&self) -> IrType {
-        self.user.get_ir_type()
-    }
-
     /// 获取被调用的函数
     pub fn get_callee(&self) -> Pointer<Function> {
         self.callee.clone()
@@ -69,7 +62,10 @@ impl CallInst {
 
     /// 获取参数列表
     pub fn get_args(&self) -> &Vec<Pointer<Box<dyn Instruction>>> {
-        &self.args
+        self.user.get_operands()
+    }
+    pub fn get_args_mut(&mut self) -> &mut Vec<Pointer<Box<dyn Instruction>>> {
+        self.user.get_operands_mut()
     }
 }
 

@@ -17,6 +17,13 @@ impl User {
         }
     }
 
+    pub fn get_operands(&self) -> &Vec<Pointer<Box<dyn Instruction>>> {
+        &self.operands
+    }
+    pub fn get_operands_mut(&mut self) -> &mut Vec<Pointer<Box<dyn Instruction>>> {
+        &mut self.operands
+    }
+
     pub fn get_operand(&self, index: usize) -> Pointer<Box<dyn Instruction>> {
         self.operands[index].clone()
     }
@@ -33,7 +40,33 @@ impl User {
         self.operands[index] = operand;
     }
 
+    pub fn delete_operand(&mut self, operand: &Pointer<Box<dyn Instruction>>) {
+        self.use_list = self
+            .use_list
+            .iter()
+            .filter(|&x| x != operand)
+            .cloned()
+            .collect();
+    }
+
+    pub fn push_operand(&mut self, operand: Pointer<Box<dyn Instruction>>) {
+        self.operands.push(operand)
+    }
+
     pub fn get_use_list(&mut self) -> &mut Vec<Pointer<Box<dyn Instruction>>> {
         &mut self.use_list
+    }
+
+    pub fn used(&mut self, inst: Pointer<Box<dyn Instruction>>) {
+        self.use_list.push(inst);
+    }
+
+    pub fn delete_user(&mut self, inst: &Pointer<Box<dyn Instruction>>) {
+        self.use_list = self
+            .use_list
+            .iter()
+            .filter(|&x| x != inst)
+            .cloned()
+            .collect();
     }
 }
