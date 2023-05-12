@@ -4,7 +4,6 @@ use std::{
 };
 
 /// 使用Pointer<T>来替代Rc<RefCell<T>>，以便于简化操作
-#[derive(PartialEq, Eq)]
 pub struct Pointer<T> {
     p: Rc<RefCell<T>>,
 }
@@ -32,6 +31,14 @@ impl<T> Pointer<T> {
         Rc::ptr_eq(&this.p, &other.p)
     }
 }
+
+impl<T> PartialEq for Pointer<T> {
+    fn eq(&self, other: &Self) -> bool {
+        Rc::ptr_eq(&self.p, &other.p)
+    }
+}
+
+impl<T> Eq for Pointer<T> {}
 
 impl<T> Clone for Pointer<T> {
     // add code here
