@@ -1,0 +1,594 @@
+use std::collections::HashMap;
+//use lazy_static::lazy_static;
+// use crate::global_lalrpop::MODULE;
+use sysylib::global_lalrpop::MODULE;
+// use crate::global_lalrpop::IN_FUNC;
+use sysylib::global_lalrpop::IN_FUNC;
+use std::thread_local;
+use std::borrow::Borrow;
+use std::thread::LocalKey;
+// use crate::cfgir::instruction_cfg::global_const_int_cfg::CfgGlobalConstInt;
+use sysylib::cfgir::instruction_cfg::global_const_int_cfg::CfgGlobalConstInt;
+// use crate::ast::*;
+use sysylib::frontend::ast::*;
+// use crate::frontend::ast::*;
+
+
+
+grammar;
+
+
+
+
+pub CompUnit:i32 = {
+    CompUnit? Decl =>{
+        0
+    },
+    CompUnit? FuncDef =>{
+0
+    },
+
+}
+
+Decl:i32 = {
+    ConstDecl=>{
+0
+    },
+    VarDecl =>{
+0
+    },
+}
+
+ConstDecl:i32 = {
+    "const" BType ConstDef ("," <ConstDef>)* ";"=>{
+0
+    },
+}
+
+
+BType:String = {
+    "int" =>{
+        "int".to_string()
+    },
+    "float" =>{
+        //typeVec.push("float");
+        "float".to_string()
+    },
+}
+
+ConstDef:i32 = {
+    Ident ("[" <ConstExp> "]")* "=" ConstInitVal =>{
+0
+    },
+}
+
+ConstInitVal:i32 = {
+    ConstExp =>{
+0
+    },
+    "{" (<ConstInitVal> ("," <ConstInitVal>)*)? "}"=>{
+0
+    },
+}
+
+VarDecl:i32 = {
+    <t:BType> <var1:VarDef> <mut v:VarDefVec> ";"=>{
+        let mut val1name = var1.0;
+        let mut val1init = var1.1;
+        //let infunc = IN_FUNC.with(|foo| {
+        //let mut val = foo.borrow_mut();
+        //*val
+        //});
+        let mut infunc = IN_FUNC.with(|i|{
+            *i.borrow_mut()
+        });
+        if infunc==1//在函数声明体内
+        {
+            if t=="int".to_string()//字符串比较
+            {
+                
+            }
+            else
+            {
+                
+            }
+            
+        }
+        else
+        {
+            if t=="int".to_string()//字符串比较
+            {
+                let mut inst1 = CfgGlobalConstInt::make_int(val1init,val1name.clone());
+                //MODULE.push_var(val1name,inst1);
+                MODULE.with(|foo| {
+                let mut valtemp = foo.borrow_mut();
+                valtemp.push_var(&val1name,inst1);
+
+                });
+
+                for i in &mut v
+                {
+                    // let  (mut tempname,mut tempval) = *i;
+                    let mut tempname:String = i.0.clone();
+                    let mut tempval = i.1;
+                    let mut inst1 = CfgGlobalConstInt::make_int(tempval,tempname.clone());
+                    MODULE.with(|foo| {
+                    // foo.push_var(&tempname,inst1);
+                    let mut valtemp = foo.borrow_mut();
+                    valtemp.push_var(&tempname,inst1);
+                    
+                    //*val.push_var(tempname,inst1);
+                    });
+                }
+            }
+            else
+            {
+                
+            }
+        }
+        0
+    },
+}
+
+VarDefVec:Vec<(String,i32)> = {
+    <mut v:("," <VarDef>)*> <e:VarDef?> =>{
+        match e{
+            None => v,
+            Some(e) =>{
+                v.push(e);
+                v
+            }
+        }
+    },
+}
+
+
+VarDef:(String,i32) = {
+    <i:Ident>  =>{
+        (i,0)
+    },
+    
+    <i:Ident> ("[" <ConstExp> "]")+ =>{//todo:对数组做处理
+        (i,0)//todo:这里
+
+        //varHashMap.insert(&i ,Vec::new());//todo:全局hashmap(key,vector),找到vector，存储不同作用域下的相同名字，若无，创建一个该变量的vector
+        //let s = varHashMap.get(&i).copied().unwrap_or(0);
+        //todo:判断该作用域下是否有同名变量
+        //todo:没有则标记类型后加入，有则报错
+
+    },
+
+
+    <i:Ident> "=" <initval:InitVal> =>{
+        (i,initval)//todo:这里
+    },
+
+    <i:Ident> ("[" <ConstExp> "]")+ "=" <initval:InitVal> =>{//todo:对数组做处理
+        //(i,initval)
+        (i,0)//todo:这里
+    },
+}
+
+
+InitVal:i32 = {
+    Exp =>{
+0
+    },
+    "{" (<InitVal> ("," <InitVal>))? "}" =>{
+0
+    },
+}
+
+ActionBeforeFuncDef:i32 = {
+    ""=>{
+        IN_FUNC.with(|foo| {
+        //let mut val = foo.borrow_mut();
+        //*val = 1;
+        // *foo = 1;
+        let mut val = foo.borrow_mut();
+        *val = 1;
+        });
+        0
+    },
+}
+
+ActionAfterFuncDef:i32 = {
+    ""=>{
+        //IN_FUNC = 0;
+        IN_FUNC.with(|foo| {
+        //let mut val = foo.borrow_mut();
+        //*val = 0;
+        // *foo = 0;
+        let mut val = foo.borrow_mut();
+        *val = 0;
+        });
+        0
+    },
+}
+
+FuncDef:i32 = {
+    //IN_FUNC = 1;
+    ActionBeforeFuncDef FuncType Ident "(" FuncFParams? ")" Block ActionAfterFuncDef =>{
+0
+    },
+    //IN_FUNC = 0;
+}
+
+FuncType:i32 = {
+    "void" =>{
+0
+    },
+    "int" =>{
+0
+    },
+    "float" =>{
+0
+    },
+}
+
+FuncFParams:i32 = {
+    FuncFParam ("," <FuncFParam>)* =>{
+0
+    },
+}
+
+FuncFParam:i32 = {
+    BType Ident ("[" "]" ("[" <Exp> "]")*)? =>{
+0
+    },
+}
+
+Block:i32 = {
+    "{" (<BlockItem>)* "}"=>{
+0
+    },
+}
+
+BlockItem:i32 = {
+    Decl =>{
+0
+    },
+    Stmt =>{
+0
+    },
+}
+
+
+Stmt: i32 = {
+  MatchedStmt => <>,
+  OpenStmt => <>,
+}
+
+MatchedStmt: i32 = {
+  <lval: LVal> "=" <exp: Exp> ";" => {
+0
+  },
+  <exp: (Exp)?> ";" => {
+0
+  },
+  Block =>{
+0
+  },
+  "if" "(" <cond: Cond> ")" <then: MatchedStmt> 
+  "else" <else_then: MatchedStmt> => {
+0
+  },
+  "while" "(" <cond: Cond> ")" <body: MatchedStmt> => {
+0
+  },
+  "break" ";" => {
+0
+  },
+  "continue" ";" => {
+0
+  },
+  "return" <exp: (Exp)?> ";" => {
+0
+  },
+}
+
+OpenStmt: i32 = {
+  "if" "(" <cond: Cond> ")" <then: Stmt> => {
+0
+  },
+  "if" "(" <cond: Cond> ")" <then: MatchedStmt> 
+  "else" <else_then: OpenStmt> => {
+0
+  },
+  "while" "(" <cond: Cond> ")" <body: OpenStmt> => {
+0
+  },
+}
+
+Exp:i32 = {
+    AddExp =>{
+0
+    },
+}
+
+Cond:i32 = {
+    LOrExp =>{
+0
+    },
+}
+
+LVal:i32 = {
+    Ident ("[" Exp "]")* =>{
+0
+    },
+}
+
+PrimaryExp:i32 = {
+    "(" Exp ")" =>{
+0
+    },
+    LVal =>{
+0
+    },
+    Number =>{
+0
+    },
+}
+
+Number:i32 = {
+    IntConst =>{
+0
+    },
+    //floatConst =>{
+
+    //},todo:floatConst
+}
+
+UnaryExp:i32 = {
+    PrimaryExp =>{
+0
+    },
+    Ident "(" FuncFParams? ")" =>{
+0
+    },
+    "+" UnaryExp =>{
+0
+    },
+    UnaryOp UnaryExp =>{
+0
+    },
+}
+
+UnaryOp:i32 = {
+    //"+" =>{
+//0
+    //},
+    "-" =>{
+0
+    },
+    "!" =>{
+0
+    },
+}
+
+FuncRParams:i32 = {
+    Exp ("," <Exp>)* =>{
+0
+    },
+}
+
+
+MulExp:i32 = {
+    UnaryExp =>{
+0
+    },
+    MulExp "*" UnaryExp =>{
+0
+    },
+    MulExp "/" UnaryExp =>{
+        0
+    },
+    MulExp "%" UnaryExp =>{
+        0
+    },
+}
+
+AddOp:String  = {
+    "+" =>{
+        "+".to_string()
+    },
+    "-" =>{
+        "-".to_string()
+    },
+}
+
+AddExp:i32 = {
+    MulExp =>{
+0
+    },
+    //AddExp "+" MulExp =>{}
+    AddExp <op:AddOp> MulExp =>{
+0
+    },
+    //AddExp "-" MulExp =>{
+//0
+    //},
+}
+
+RelOp:String = {
+    "<" =>{
+        "<".to_string()
+    },
+    "<=" =>{
+        "<=".to_string()
+    },
+    ">" =>{
+        ">".to_string()
+    },
+    ">=" =>{
+        ">=".to_string()
+    },
+
+}
+
+RelExp:i32 = {
+    AddExp =>{
+0
+    },
+    RelExp <op:RelOp> AddExp =>{
+0
+    },
+}
+
+EqExp:i32 = {
+    RelExp =>{
+0
+    },
+    EqExp "==" RelExp =>{
+0
+    },
+    EqExp "!=" RelExp =>{
+        0
+    },
+}
+
+LAndExp:i32 = {
+    EqExp =>{
+0
+    },
+    LAndExp "&&" EqExp =>{
+0
+    },
+}
+
+LOrExp:i32 = {
+    LAndExp =>{
+0
+    },
+    LOrExp "||" LAndExp =>{
+0
+    },
+}
+
+ConstExp:i32 = {
+    AddExp =>{
+0
+    },
+}
+
+
+//下面是标识符
+//todo:
+
+
+Ident:String = {
+    
+// <mut s:IdentNonDigit> =>{
+//     s,
+// }
+// <mut s:Ident> <mut r:IdentNonDigit> =>{
+//     s = s+&r;
+//     s,
+// }
+// <mut s:Ident> <mut r:Digit> =>{
+//     s = s+&r;
+//     s,
+// }
+    <mut s:r"[_a-zA-Z][_a-zA-Z0-9]*"> =>{
+        s.to_string()//todo:返回字符串值
+    },
+}
+
+//IdentNonDigit:String = {
+    //<mut s:r"[_a-zA-Z]"> =>{
+        //s,//todo:返回字符串值
+    //}
+//}
+
+//Digit:String = {
+     //<mut s:r"[0-9]"> =>{
+        // s,//todo:返回字符串值
+    // }
+
+
+    
+//}
+
+IntConst:i32 = {
+    <i:DecimalConst> =>{
+       i 
+    },
+    <i:OctalConst> =>{
+i
+    },
+    <i:HexadecimalConst> =>{
+i
+    },
+}
+
+DecimalConst:i32 = {
+    // NonzeroDigit =>{
+
+    // }
+    // DecimalConst Digit =>{
+
+    // }
+
+    <mut s:r"[1-9][0-9]*"> =>{
+        //s//todo:返回字符串值
+        //from_str::<int>(s.as_slice())
+        i32::from_str_radix(<>, 10).unwrap()
+    },
+}
+
+OctalConst:i32 = {
+    //"0" =>{
+
+    //}
+    //OctalConst octalDigit =>{
+
+    //}
+    <mut s:r"0[0-7]*"> =>{
+        //s//todo:返回字符串值
+        i32::from_str_radix(<>, 8).unwrap()
+    },
+}
+
+HexadecimalConst:i32 = {
+    //HexadecimalPrefix HexadecimalDigit =>{
+
+    //}
+    //HexadecimalConst HexadecimalDigit =>{
+
+    //}
+    <mut s:r"0[xX][0-9a-fA-F]+"> =>{
+        i32::from_str_radix(&<>[2..], 16).unwrap()//s//todo:返回字符串值
+    },
+}
+
+// HexadecimalPrefix:String = {
+//     "0x" =>{
+
+//     }
+//     "0X" =>{
+
+//     }
+// }
+
+// NonzeroDigit:String = {
+//     <mut s:r"[1-9]">=>{
+//         s,
+//     }
+// }
+
+// octalDigit:String = {
+//     <s:r"[0-7]"> =>{
+//         s,
+//     }
+// }
+
+// HexadecimalDigit:String = {
+//     <s:r"[0-9a-fA-F]"> =>{
+//         s,
+//     }
+// }
+
+//todo:浮点数还没加
+
+
+
