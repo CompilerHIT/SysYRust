@@ -11,11 +11,14 @@ pub struct ReturnInst {
 }
 
 impl ReturnInst {
-    pub fn make_return_inst(
+    pub fn new(
         ir_type: IrType,
-        value: Pointer<Box<dyn Instruction>>,
+        value: Option<Pointer<Box<dyn Instruction>>>,
     ) -> Pointer<Box<dyn Instruction>> {
-        let user = User::make_user(ir_type, vec![value]);
+        let mut user = User::make_user(ir_type, vec![]);
+        if let Some(value) = value {
+            user.push_operand(value)
+        }
         let inst = ReturnInst {
             user,
             list: IList {
@@ -24,6 +27,20 @@ impl ReturnInst {
             },
         };
         Pointer::new(Box::new(inst))
+    }
+
+    pub fn make_void_return() -> Pointer<Box<dyn Instruction>> {
+        Self::new(IrType::Void, None)
+    }
+
+    pub fn make_int_return(value: Pointer<Box<dyn Instruction>>) -> Pointer<Box<dyn Instruction>> {
+        Self::new(IrType::Int, Some(value))
+    }
+
+    pub fn make_float_return(
+        value: Pointer<Box<dyn Instruction>>,
+    ) -> Pointer<Box<dyn Instruction>> {
+        Self::new(IrType::Float, Some(value))
     }
 
     pub fn get_return_value(&self) -> Pointer<Box<dyn Instruction>> {
