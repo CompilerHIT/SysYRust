@@ -29,7 +29,7 @@ impl<'f> AsmBuilder<'f> {
         Self { f, temp }
     }
 
-    pub fn li(&mut self, dest: &str, imm: isize) -> Result<()> {
+    pub fn li(&mut self, dest: &str, imm: i32) -> Result<()> {
         writeln!(self.f, "  li {dest}, {imm}")
     }
 
@@ -65,13 +65,9 @@ impl<'f> AsmBuilder<'f> {
         writeln!(self.f, "  {op} {dest}, {src}")
     }
 
-    pub fn addi(&mut self, dest: &str, opr: &str, imm: isize) -> Result<()> {
-        if (-2048..=2047).contains(&imm) {
-            writeln!(self.f, "  addi {dest}, {opr}, {imm}")
-        } else {
-            self.li(self.temp, imm)?;
-            writeln!(self.f, "  add {dest}, {opr}, {}", self.temp)
-        }
+    pub fn addi(&mut self, dest: &str, opr: &str, imm: i32) -> Result<()> {
+        writeln!(self.f, "  addi {dest}, {opr}, {imm}")
+        
     }
 
     pub fn slli(&mut self, dest: &str, opr: &str, imm: usize) -> Result<()> {
@@ -83,7 +79,7 @@ impl<'f> AsmBuilder<'f> {
     }
 
     //TODO: optimize mul and div
-    pub fn muli(&mut self, dest: &str, opr: &str, imm: isize) -> Result<()> {
+    pub fn muli(&mut self, dest: &str, opr: &str, imm: i32) -> Result<()> {
         if imm == 0 {
             self.mv(dest, "x0")
         } else if imm > 0 && (imm & (imm - 1)) == 0 {
@@ -100,7 +96,7 @@ impl<'f> AsmBuilder<'f> {
         }
     }
 
-    pub fn divi(&mut self, dest: &str, opr: &str, imm: isize) -> Result<()> {
+    pub fn divi(&mut self, dest: &str, opr: &str, imm: i32) -> Result<()> {
         if imm == 0 {
             panic!("div by zero!");
         } else if imm > 0 && (imm & (imm - 1)) == 0 {
@@ -130,22 +126,21 @@ impl<'f> AsmBuilder<'f> {
         }
     }
 
-    pub fn sd(&mut self, src: &str, addr: &str, offset: isize) -> Result<()> {
-        if (-2048..=2047).contains(&offset) {
-            writeln!(self.f, "  sd {src}, {offset}({addr})")
+    pub fn sd(&mut self, src: &str, addr: &str, offset: i32, is_float: bool) -> Result<()> {
+        if is_float {
+            writeln!(self.f, "  fsd {src}, {offset}({addr})")
         } else {
-            self.addi(self.temp, addr, offset)?;
-            writeln!(self.f, "  sd {src}, 0({})", self.temp)
+            writeln!(self.f, "  sd {src}, {offset}({addr})")
         }
     }
 
-    pub fn ld(&mut self, dest: &str, addr: &str, offset: isize) -> Result<()> {
-        if (-2048..=2047).contains(&offset) {
-            writeln!(self.f, "  ld {dest}, {offset}({addr})")
+    pub fn ld(&mut self, dest: &str, addr: &str, offset: i32, is_float: bool) -> Result<()> {
+        if is_float {
+            writeln!(self.f, "  fld {dest}, {offset}({addr})")
         } else {
-            self.addi(self.temp, addr, offset)?;
-            writeln!(self.f, "  ld {dest}, 0({})", self.temp)
+            writeln!(self.f, "  ld {dest}, {offset}({addr})")
         }
+        
     }
 
     pub fn j(&mut self, label: &str) -> Result<()> {
@@ -154,6 +149,10 @@ impl<'f> AsmBuilder<'f> {
 
     pub fn call(&mut self, func: &str) -> Result<()> {
         writeln!(self.f, "  call {func}")
+    }
+
+    pub fn show_func(&mut self, label: &str) -> Result<()> {
+        writeln!(self.f, "{label}:")
     }
 
     //TODO: for function

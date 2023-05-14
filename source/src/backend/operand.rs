@@ -3,6 +3,8 @@ use crate::utility::ScalarType;
 pub const REG_COUNT: usize = 32;
 pub const ARG_REG_COUNT: usize = 8;
 pub const REG_SP: usize = 2;
+const IMM_12Bs: i32 = 2047;
+const IMM_20Bs: i32 = 524287;
 
 #[derive(Clone, Copy, PartialEq, Hash, Eq)]
 pub struct Reg {
@@ -12,7 +14,7 @@ pub struct Reg {
 
 #[derive(Clone, Copy, PartialEq, Hash, Eq)]
 pub struct IImm {
-    data: isize,
+    data: i32,
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -21,10 +23,10 @@ pub struct FImm {
 }
 
 impl IImm {
-    pub fn new(data: isize) -> Self {
+    pub fn new(data: i32) -> Self {
         Self { data }
     }
-    pub fn get_data(&self) -> isize {
+    pub fn get_data(&self) -> i32 {
         self.data
     }
 }
@@ -44,19 +46,21 @@ pub trait ImmBs {
 
 impl ImmBs for IImm {
     fn is_imm_20bs(&self) -> bool {
-        self.data >= -524288 && self.data <= 524287
+        self.data >= -IMM_20Bs && self.data <= IMM_20Bs
     }
     fn is_imm_12bs(&self) -> bool {
-        self.data >= -2048 && self.data <= 2047
+        self.data >= -IMM_12Bs && self.data <= IMM_12Bs
     }
 }
 
 impl ImmBs for FImm {
     fn is_imm_20bs(&self) -> bool {
-        self.data >= -524288.0 && self.data <= 524287.0
+        true
+        // self.data >= -524288.0 && self.data <= 524287.0
     }
     fn is_imm_12bs(&self) -> bool {
-        self.data >= -2048.0 && self.data <= 2047.0
+        true
+        // self.data >= -2048.0 && self.data <= 2047.0
     }
 }
 
@@ -186,5 +190,8 @@ impl Reg {
 
     pub fn get_id(&self) -> usize {
         self.id
+    }
+    pub fn get_type(&self) -> ScalarType {
+        self.r_type
     }
 }

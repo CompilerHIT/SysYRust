@@ -8,6 +8,8 @@ pub use crate::utility::{ScalarType, Pointer};
 pub use crate::backend::asm_builder::AsmBuilder;
 use crate::backend::operand::*;
 
+use super::structs::StackSlot;
+
 #[derive(Clone, PartialEq)]
 pub enum Operand {
     Addr(Addr),
@@ -21,7 +23,7 @@ pub enum InstrsType {
     OpReg,
     ChangeSp,
     StackLoad,
-
+    StackStore,
     Load,
     Store,
     Call,
@@ -32,8 +34,8 @@ pub enum InstrsType {
 /// trait for instructs for asm
 pub trait Instrs: GenerateAsm {
     fn get_type(&self) -> InstrsType;
-    fn get_reg_use(&self) -> Vec<Reg>;
-    fn get_reg_def(&self) -> Vec<Reg>;
+    fn get_reg_use(&self) -> Vec<Reg> { vec![] }
+    fn get_reg_def(&self) -> Vec<Reg> { vec![] }
     
 
     // TODO: maybe todo
@@ -46,11 +48,6 @@ pub trait Instrs: GenerateAsm {
     // fn replace_def_value() {}
     // fn replace_use_value() {}
 
-}
-
-/// 判断是否是合法的立即数
-pub trait LegalImm {
-    fn is_legal_imm(&self) -> bool;
 }
 
 //TODO:浮点数运算
@@ -237,7 +234,7 @@ impl ChangeSp {
             offset
         }
     }
-    pub fn get_offset(&self) -> isize {
+    pub fn get_offset(&self) -> i32 {
         self.offset.get_data()
     }
 }
@@ -246,12 +243,6 @@ impl Instrs for ChangeSp {
     fn get_type(&self) -> InstrsType {
         InstrsType::ChangeSp
     }    
-    fn get_reg_def(&self) -> Vec<Reg> {
-        vec![Reg::new(REG_SP, ScalarType::Int)]
-    }
-    fn get_reg_use(&self) -> Vec<Reg> {
-        vec![Reg::new(REG_SP, ScalarType::Int)]
-    }
 }
 
 pub struct Load {
@@ -310,6 +301,75 @@ impl Instrs for Store {
     }
 }
 
+pub struct StackLoad {
+    src: Pointer<StackSlot>,
+    dst: Reg,
+    offset: IImm,
+}
+
+impl StackLoad {
+    pub fn new(src: Pointer<StackSlot>, dst: Reg, offset: IImm) -> Self {
+        Self { src, dst, offset }
+    }
+    pub fn set_offset(&mut self, offset: IImm) {
+        self.offset = offset;
+    }
+    pub fn get_offset(&self) -> IImm {
+        self.offset
+    }
+    pub fn get_src(&self) -> Pointer<StackSlot> {
+        self.src.clone()
+    }
+    pub fn get_dst(&self) -> Reg {
+        self.dst
+    }
+}
+
+impl Instrs for StackLoad {
+    fn get_type(&self) -> InstrsType {
+        InstrsType::StackLoad
+    }
+    fn get_reg_def(&self) -> Vec<Reg> {
+        vec![self.dst]
+    }
+    fn get_reg_use(&self) -> Vec<Reg> {
+        vec![self.dst]
+    }
+}
+
+pub struct StackStore {
+    src: Reg,
+    dst: Pointer<StackSlot>,
+    offset: IImm
+}
+
+impl StackStore {
+    pub fn new(src: Reg, dst: Pointer<StackSlot>, offset: IImm) -> Self {
+        Self { src, dst, offset }
+    }
+    pub fn set_offset(&mut self, offset: IImm) {
+        self.offset = offset;
+    }
+    pub fn get_offset(&self) -> IImm {
+        self.offset
+    }
+    pub fn get_src(&self) -> Reg {
+        self.src
+    }
+    pub fn get_dst(&self) -> Pointer<StackSlot> {
+        self.dst.clone()
+    }
+}
+
+impl Instrs for StackStore {
+    fn get_type(&self) -> InstrsType {
+        InstrsType::StackStore
+    }
+    
+    fn get_reg_use(&self) -> Vec<Reg> {
+        vec![self.src]
+    }
+}
 
 pub struct Bz {
     Cond: CmpOp,
@@ -388,7 +448,12 @@ impl Instrs for Return {
     }
 }
 
-
+// pub fn process_change_sp_instrs(offset: &IImm) -> Option<Pointer<Box<dyn Instrs>>> {
+//     if offset.get_data() == 0 {
+//         return None;
+//     }
+//     if offset.()
+// }
 
 // impl Instrs for Call {}
 // impl Instrs for Return {}
