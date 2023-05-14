@@ -68,6 +68,7 @@ impl GenerateAsm for StackLoad {
         match dst.get_type() {
             ScalarType::Int => builder.ld(&dst.to_string(), "sp", offset, false)?,
             ScalarType::Float => builder.ld(&dst.to_string(), "sp", offset, true)?,
+            _ => panic!("illegal type"),
         }
         Ok(())
     }
@@ -85,6 +86,7 @@ impl GenerateAsm for StackStore {
         match src.get_type() {
             ScalarType::Int => builder.sd("sp", &src.to_string(), offset, false)?,
             ScalarType::Float => builder.sd("sp", &src.to_string(), offset, true)?,
+            _ => panic!("illegal type"),
         }
         Ok(())
     }
