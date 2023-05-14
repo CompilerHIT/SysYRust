@@ -86,8 +86,6 @@ pub struct Binary {
     dst: Reg,
     lhs: Operand,
     rhs: Operand,
-    def_regs: Vec<Reg>,
-    use_regs: Vec<Reg>,
 }
 
 //FIXME:考虑是否将对lhs与rhs的clone操作换为ref
@@ -98,9 +96,7 @@ impl Binary {
             op,
             dst,
             lhs,
-            rhs,
-            def_regs: Vec::new(),
-            use_regs: Vec::new(),
+            rhs
         }
     }
     pub fn get_op(&self) -> BinaryOp {
@@ -430,6 +426,14 @@ pub struct Return {
     re_type: ScalarType,
 }
 
+impl Return {
+    pub fn new(re_type: ScalarType) -> Self {
+        Self {
+            re_type,
+        }
+    }
+}
+
 impl Instrs for Return {
     fn get_type(&self) -> InstrsType {
         InstrsType::Ret
@@ -438,12 +442,14 @@ impl Instrs for Return {
         match self.re_type {
             ScalarType::Int => vec![Reg::new(0, ScalarType::Int)],
             ScalarType::Float => vec![Reg::new(0, ScalarType::Float)],
+            ScalarType::Void => vec![],
         }
     }
     fn get_reg_use(&self) -> Vec<Reg> {
         match self.re_type {
             ScalarType::Int => vec![Reg::new(0, ScalarType::Int)],
-            ScalarType::Float => vec![Reg::new(0, ScalarType::Float)]
+            ScalarType::Float => vec![Reg::new(0, ScalarType::Float)],
+            ScalarType::Void => vec![],
         }
     }
 }

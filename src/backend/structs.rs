@@ -4,14 +4,16 @@ use std::fs::File;
 use std::hash::{Hash, Hasher};
 use std::io::{Result, Write};
 
-use lazy_static::__Deref;
-
 use crate::backend::{instrs::Instrs, operand::{Reg, IImm, FImm}, asm_builder::AsmBuilder, module::AsmModule};
 use crate::ir::basicblock::BasicBlock;
+use crate::ir::instruction::{Instruction, const_int::ConstInt};
 use crate::ir::function::Function;
-use crate::ir::instruction::Instruction;
+use crate::ir::ir_type;
+use crate::ir::instruction::return_inst::ReturnInst;
 use crate::utility::Pointer;
 use crate::utility::ScalarType;
+
+use super::instrs::*;
 
 #[derive(Clone)]
 pub struct IGlobalVar {
@@ -41,7 +43,6 @@ pub struct BB {
     label: String,
     called: bool,
 
-    pred: VecDeque<BB>,
     insts: Vec<Pointer<Box<dyn Instrs>>>,
 
     in_edge: Vec<Pointer<BB>>,
@@ -81,7 +82,6 @@ impl BB {
         Self {
             label: label.to_string(),
             called: false,
-            pred: VecDeque::new(),
             insts: Vec::new(),
             in_edge: Vec::new(),
             out_edge: Vec::new(),
@@ -93,9 +93,10 @@ impl BB {
     }
 
     pub fn construct(&mut self, block: Pointer<BasicBlock>, next_block: Pointer<BB>) {
-        let mut ir_block_inst = block.borrow().get_dummy_head_inst();
+        let ir_block_inst = block.borrow().get_dummy_head_inst();
         while let Some(inst) = ir_block_inst.borrow_mut().next() {
-            let dr_inst = inst.borrow().as_any();
+            let inst_borrow = inst.borrow();
+            let dr_inst = inst_borrow.as_any();
 
             //TODO: wait for ir:
             // if let Some(inst1) = dr_inst.downcast_ref::<IR::Instructruction>() {
@@ -107,7 +108,25 @@ impl BB {
             // else {
             //     panic!("fail to downcast inst");
             // }
-            if let Some(inst) = dr_inst.downcast_ref()::<>
+            if let Some(inst) = dr_inst.downcast_ref::<ReturnInst>() {
+                match inst.get_value_type() {
+                    ir_type::IrType::Void => self.insts.push(Pointer::new(Box::new(Return::new(ScalarType::Void)))),
+                    ir_type::IrType::Int => {
+                        let src = inst.get_return_value();
+                        let src_operand = self.resolvOperand(src);
+                        self.insts.push(Pointer::new(Box::new(OpReg::new(
+                            SingleOp::Mov, 
+                            Reg::new(0, ScalarType::Int),
+                            src_operand,
+                        ))));
+                        self.insts.push(Pointer::new(Box::new(Return::new(ScalarType::Int))));
+                    },
+                    ir_type::IrType::Float => {
+                        //TODO:
+                    },
+                    _ => panic!("cannot reach, Return false")
+                }
+            }
             if Pointer::point_eq(&inst, &block.borrow().get_tail_inst().unwrap()) {
                 break;
             }
@@ -120,6 +139,15 @@ impl BB {
 
     pub fn push_back_list(&mut self, inst: &mut Vec<Pointer<Box<dyn Instrs>>>) {
         self.insts.append(inst);
+    }
+
+    fn resolvOperand(&self, src: Pointer<Box<dyn Instruction>>) -> Operand {
+        if let Some(iimm) = src.borrow().as_any().downcast_ref::<ConstInt>() {
+            return Operand::IImm(IImm::new(iimm.get_bonding()));
+        } else {
+            //TODO:
+            panic!("to realize more operand solution");
+        }
     }
 
     // fn clear_reg_info(&mut self) {
@@ -200,13 +228,13 @@ impl Func {
             block.borrow_mut().live_def.clear();
             for it in block.borrow().insts.iter().rev() {
                 for reg in it.borrow().get_reg_def().into_iter() {
-                    if (reg.is_virtual() || reg.is_allocable()) {
+                    if reg.is_virtual() || reg.is_allocable() {
                         block.borrow_mut().live_use.remove(&reg);
                         block.borrow_mut().live_def.insert(reg);
                     }
                 }
                 for reg in it.borrow().get_reg_use().into_iter() {
-                    if (reg.is_virtual() || reg.is_allocable()) {
+                    if reg.is_virtual() || reg.is_allocable() {
                         block.borrow_mut().live_def.remove(&reg);
                         block.borrow_mut().live_use.insert(reg);
                     }
@@ -412,3 +440,17 @@ impl StackSlot {
         self.size = size
     }
 }   
+
+impl PartialEq for BB {
+    fn eq(&self, other: &Self) -> bool {
+        self.label == other.label
+    }
+}
+
+impl Eq for BB {}
+
+impl Hash for BB {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.label.hash(state);
+    }
+}
