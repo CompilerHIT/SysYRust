@@ -1,137 +1,75 @@
-use std::collections::HashMap;
-//use lazy_static::lazy_static;
-// use crate::global_lalrpop::MODULE;
-use sysylib::global_lalrpop::MODULE;
-// use crate::global_lalrpop::IN_FUNC;
-use sysylib::global_lalrpop::IN_FUNC;
-use std::thread_local;
-use std::borrow::Borrow;
-use std::thread::LocalKey;
-// use crate::cfgir::instruction_cfg::global_const_int_cfg::CfgGlobalConstInt;
-use sysylib::cfgir::instruction_cfg::global_const_int_cfg::CfgGlobalConstInt;
-// use crate::ast::*;
 use sysylib::frontend::ast::*;
-// use crate::frontend::ast::*;
 
 
 
 grammar;
 
+match {
+    r"\s*" => {},
+    r"//[^\n\r]*[\n\r]*" => {},
+    r"/\*[^*]*\*+(?:[^/*][^*]*\*+)*/" => {},
+    _
+  }
+
+pub CompUnit:CompUnit  = <mut global_items:GlobalItems*> =>CompUnit{<>};
 
 
 
-pub CompUnit:i32 = {
-    CompUnit? Decl =>{
-        0
-    },
-    CompUnit? FuncDef =>{
-0
-    },
+GlobalItems:GlobalItems = {
+    <d:Decl> =>{GlobalItems::Decl(<>)},
+    <fd:FuncDef> =>{GlobalItems::FuncDef(<>)},
 
 }
 
-Decl:i32 = {
-    ConstDecl=>{
-0
-    },
-    VarDecl =>{
-0
-    },
+Decl:Decl = {
+    ConstDecl=>{Decl::ConstDecl(<>)},
+    VarDecl =>{Decl::VarDecl(<>)},
 }
 
-ConstDecl:i32 = {
-    "const" BType ConstDef ("," <ConstDef>)* ";"=>{
-0
-    },
+ConstDecl:ConstDecl = {
+    "const" "int"  <cdv:ConstDefVec> ";"=>{ConstDecl{btype:BType::Int,const_def_vec:cdv}},
+    "const" "float"  <cdv:ConstDefVec> ";"=>{ConstDecl{btype:BType::Float,const_def_vec:cdv}},
 }
 
-
-BType:String = {
-    "int" =>{
-        "int".to_string()
-    },
-    "float" =>{
-        //typeVec.push("float");
-        "float".to_string()
-    },
-}
-
-ConstDef:i32 = {
-    Ident ("[" <ConstExp> "]")* "=" ConstInitVal =>{
-0
-    },
-}
-
-ConstInitVal:i32 = {
-    ConstExp =>{
-0
-    },
-    "{" (<ConstInitVal> ("," <ConstInitVal>)*)? "}"=>{
-0
-    },
-}
-
-VarDecl:i32 = {
-    <t:BType> <var1:VarDef> <mut v:VarDefVec> ";"=>{
-        let mut val1name = var1.0;
-        let mut val1init = var1.1;
-        //let infunc = IN_FUNC.with(|foo| {
-        //let mut val = foo.borrow_mut();
-        //*val
-        //});
-        let mut infunc = IN_FUNC.with(|i|{
-            *i.borrow_mut()
-        });
-        if infunc==1//在函数声明体内
-        {
-            if t=="int".to_string()//字符串比较
-            {
-                
-            }
-            else
-            {
-                
-            }
-            
-        }
-        else
-        {
-            if t=="int".to_string()//字符串比较
-            {
-                let mut inst1 = CfgGlobalConstInt::make_int(val1init,val1name.clone());
-                //MODULE.push_var(val1name,inst1);
-                MODULE.with(|foo| {
-                let mut valtemp = foo.borrow_mut();
-                valtemp.push_var(&val1name,inst1);
-
-                });
-
-                for i in &mut v
-                {
-                    // let  (mut tempname,mut tempval) = *i;
-                    let mut tempname:String = i.0.clone();
-                    let mut tempval = i.1;
-                    let mut inst1 = CfgGlobalConstInt::make_int(tempval,tempname.clone());
-                    MODULE.with(|foo| {
-                    // foo.push_var(&tempname,inst1);
-                    let mut valtemp = foo.borrow_mut();
-                    valtemp.push_var(&tempname,inst1);
-                    
-                    //*val.push_var(tempname,inst1);
-                    });
-                }
-            }
-            else
-            {
-                
+ConstDefVec:Vec<ConstDef> = {
+    <mut constvec:(<ConstDef> ",")*>  <c:ConstDef?> =>{
+        match c{
+            None =>constvec,
+            Some(c) =>{
+                constvec.push(c);
+                constvec
             }
         }
-        0
     },
 }
 
-VarDefVec:Vec<(String,i32)> = {
-    <mut v:("," <VarDef>)*> <e:VarDef?> =>{
+
+
+ConstDef:ConstDef = {
+    <ident:Ident> <mut const_exp_vec:("[" <ConstExp> "]")*> "=" <const_init_val:ConstInitVal> =>{ConstDef{<>}},
+}
+
+ConstInitVal:ConstInitVal = {
+    ConstExp =>{ConstInitVal::ConstExp(<>)},
+    "{" <mut v:(<ConstInitVal> ",")*> <val:ConstInitVal?> "}"=>{
+        match val{
+            None =>ConstInitVal::ConstInitValVec(v),
+            Some(val) =>{
+                v.push(val);
+                ConstInitVal::ConstInitValVec(v)
+            }
+        }
+    },
+}
+
+VarDecl:VarDecl = {
+    // <t:BType> <mut v:VarDefVec> ";"=>{VarDecl{<>}},
+    "int" <mut v:VarDefVec> ";"=>{VarDecl{btype:BType::Int,var_def_vec:v}},
+    "float" <mut v:VarDefVec> ";"=>{VarDecl{btype:BType::Float,var_def_vec:v}},
+}
+
+VarDefVec:Vec<VarDef> = {
+    <mut v:(<VarDef> ",")*> <e:VarDef?> =>{
         match e{
             None => v,
             Some(e) =>{
@@ -143,331 +81,332 @@ VarDefVec:Vec<(String,i32)> = {
 }
 
 
-VarDef:(String,i32) = {
+VarDef:VarDef = {
     <i:Ident>  =>{
-        (i,0)
+        VarDef::NonArray(<>)
     },
     
-    <i:Ident> ("[" <ConstExp> "]")+ =>{//todo:对数组做处理
-        (i,0)//todo:这里
+    <i:Ident> <mut expvec:("[" <ConstExp> "]")+> =>{VarDef::Array((i,expvec))},
 
-        //varHashMap.insert(&i ,Vec::new());//todo:全局hashmap(key,vector),找到vector，存储不同作用域下的相同名字，若无，创建一个该变量的vector
-        //let s = varHashMap.get(&i).copied().unwrap_or(0);
-        //todo:判断该作用域下是否有同名变量
-        //todo:没有则标记类型后加入，有则报错
 
+    <i:Ident> "=" <initval:InitVal> =>{VarDef::NonArrayInit((i,initval))},
+
+    <i:Ident> <mut expvec:("[" <ConstExp> "]")+> "=" <initval:InitVal> =>{VarDef::ArrayInit((i,expvec,initval))},
+}
+
+
+InitVal:InitVal = {
+    Exp =>{InitVal::Exp(<>)},
+    "{" <i:InitVal> <mut initvec1:("," <InitVal>)*> "}" =>{
+        initvec1.insert(0,i);
+        InitVal::InitValVec(initvec1)
+    },
+    "{" "}" =>{InitVal::InitValVec(Vec::new())},
+}
+
+
+FuncDef:FuncDef = {
+    "int" <mut funcname:Ident> "(" <mut funcfpv:FuncFParams> ")" <b:Block> =>{
+        FuncDef::ParameterFuncDef((FuncType::Int, funcname, funcfpv,b))
+    },
+    "void" <mut funcname:Ident> "(" <mut funcfpv:FuncFParams> ")" <b:Block> =>{
+        FuncDef::ParameterFuncDef((FuncType::Void, funcname, funcfpv,b))
+    },
+    "float" <mut funcname:Ident> "(" <mut funcfpv:FuncFParams> ")" <b:Block> =>{
+        FuncDef::ParameterFuncDef((FuncType::Float, funcname, funcfpv,b))
     },
 
-
-    <i:Ident> "=" <initval:InitVal> =>{
-        (i,initval)//todo:这里
+    "int" <mut funcname:Ident> "(" ")" <b:Block> =>{
+        FuncDef::NonParameterFuncDef((FuncType::Int, funcname,b))
     },
-
-    <i:Ident> ("[" <ConstExp> "]")+ "=" <initval:InitVal> =>{//todo:对数组做处理
-        //(i,initval)
-        (i,0)//todo:这里
+    "void" <mut funcname:Ident> "(" ")" <b:Block> =>{
+        FuncDef::NonParameterFuncDef((FuncType::Void, funcname,b))
+    },
+    "float" <mut funcname:Ident> "(" ")" <b:Block> =>{
+        FuncDef::NonParameterFuncDef((FuncType::Float, funcname,b))
     },
 }
 
 
-InitVal:i32 = {
-    Exp =>{
-0
-    },
-    "{" (<InitVal> ("," <InitVal>))? "}" =>{
-0
+FuncFParams:FuncFParams= {
+    <funcp1:FuncFParam> <mut func_fparams_vec:("," <FuncFParam>)*> =>{
+        func_fparams_vec.insert(0,funcp1);
+        FuncFParams{func_fparams_vec}
     },
 }
 
-ActionBeforeFuncDef:i32 = {
-    ""=>{
-        IN_FUNC.with(|foo| {
-        //let mut val = foo.borrow_mut();
-        //*val = 1;
-        // *foo = 1;
-        let mut val = foo.borrow_mut();
-        *val = 1;
-        });
-        0
+FuncFParam:FuncFParam = {
+    "int" <name:Ident>  =>{
+        FuncFParam::NonArray((BType::Int,name))
+    },
+    "float" <name:Ident>  =>{
+        FuncFParam::NonArray((BType::Float,name))
+    },
+
+    "int" <name:Ident> "[" "]" <mut expvec:("[" <Exp> "]")*> =>{
+        FuncFParam::Array((BType::Int,name,expvec))
+    },
+    "float" <name:Ident> "[" "]" <mut expvec:("[" <Exp> "]")*> =>{
+        FuncFParam::Array((BType::Float,name,expvec))
     },
 }
 
-ActionAfterFuncDef:i32 = {
-    ""=>{
-        //IN_FUNC = 0;
-        IN_FUNC.with(|foo| {
-        //let mut val = foo.borrow_mut();
-        //*val = 0;
-        // *foo = 0;
-        let mut val = foo.borrow_mut();
-        *val = 0;
-        });
-        0
+Block:Block = {
+    "{" <mut block_vec:BlockItem*> "}"=>{
+Block{<>}
     },
 }
 
-FuncDef:i32 = {
-    //IN_FUNC = 1;
-    ActionBeforeFuncDef FuncType Ident "(" FuncFParams? ")" Block ActionAfterFuncDef =>{
-0
-    },
-    //IN_FUNC = 0;
-}
-
-FuncType:i32 = {
-    "void" =>{
-0
-    },
-    "int" =>{
-0
-    },
-    "float" =>{
-0
-    },
-}
-
-FuncFParams:i32 = {
-    FuncFParam ("," <FuncFParam>)* =>{
-0
-    },
-}
-
-FuncFParam:i32 = {
-    BType Ident ("[" "]" ("[" <Exp> "]")*)? =>{
-0
-    },
-}
-
-Block:i32 = {
-    "{" (<BlockItem>)* "}"=>{
-0
-    },
-}
-
-BlockItem:i32 = {
-    Decl =>{
-0
-    },
-    Stmt =>{
-0
-    },
+BlockItem:BlockItem = {
+    Decl =>{BlockItem::Decl(<>)},
+    Stmt =>{BlockItem::Stmt(<>)},
 }
 
 
-Stmt: i32 = {
-  MatchedStmt => <>,
-  OpenStmt => <>,
-}
+// Stmt: Stmt = {
+//     MatchedStmt => {Stmt::MatchedStmt(<>)},
+//     OpenStmt => {Stmt::OpenStmt(<>)},
+// }
 
-MatchedStmt: i32 = {
-  <lval: LVal> "=" <exp: Exp> ";" => {
-0
-  },
-  <exp: (Exp)?> ";" => {
-0
-  },
-  Block =>{
-0
-  },
-  "if" "(" <cond: Cond> ")" <then: MatchedStmt> 
-  "else" <else_then: MatchedStmt> => {
-0
-  },
-  "while" "(" <cond: Cond> ")" <body: MatchedStmt> => {
-0
-  },
-  "break" ";" => {
-0
-  },
-  "continue" ";" => {
-0
-  },
-  "return" <exp: (Exp)?> ";" => {
-0
-  },
-}
+// MatchedStmt: MatchedStmt = {
+//   <lval: LVal> "=" <exp: Exp> ";" => {
+//     MatchedStmt::AssignStmt((lval, exp))
+//   },
+//   <exp: (Exp)?> ";" => {
+//     MatchedStmt::NonActionStmt(ExpStmt{<>})
+//   },
+//   Block =>{
+//     MatchedStmt::BlockStmt(<>)
+//   },
+//   "if" "(" <cond: Cond> ")" <then: MatchedStmt> 
+//   "else" <else_then: MatchedStmt> => {
+//     MatchedStmt::IfElseStmt((cond,then,else_then))
+//   },
+//   "while" "(" <cond: Cond> ")" <body: MatchedStmt> => {
+//     MatchedStmt::WhileStmt((cond,body))
+//   },
+//   "break" ";" => {
+//     MatchedStmt::BreakStmt
+//   },
+//   "continue" ";" => {
+//     MatchedStmt::ContinueStmt
+//   },
+//   "return" <exp: (Exp)?> ";" => {
+//     MatchedStmt::RetStmt(ExpStmt{<>})
+//   },
+// }
 
-OpenStmt: i32 = {
-  "if" "(" <cond: Cond> ")" <then: Stmt> => {
-0
-  },
-  "if" "(" <cond: Cond> ")" <then: MatchedStmt> 
-  "else" <else_then: OpenStmt> => {
-0
-  },
-  "while" "(" <cond: Cond> ")" <body: OpenStmt> => {
-0
-  },
-}
+// OpenStmt: OpenStmt = {
+//   "if" "(" <cond: Cond> ")" <then: Stmt> => {
+//     OpenStmt::IfStmt((cond,then))
+//   },
+//   "if" "(" <cond: Cond> ")" <then: MatchedStmt> 
+//   "else" <else_then: OpenStmt> => {
+//     OpenStmt::IfElseStmt((cond,then,else_then))
+//   },
+//   "while" "(" <cond: Cond> ")" <body: OpenStmt> => {
+//     OpenStmt::WhileStmt((cond,body))
+//   },
+// }
 
-Exp:i32 = {
-    AddExp =>{
-0
+
+Stmt: Stmt = {
+    MatchedStmt => <>,
+    OpenStmt => <>,
+  }
+  
+  MatchedStmt: Stmt = {
+    <lval: LVal> "=" <exp: Exp> ";" => Stmt::Assign(Assign { <> }),
+    <exp: (Exp)?> ";" => Stmt::ExpStmt(ExpStmt { <> }),
+    Block => Stmt::Block(<>),
+    "if" "(" <cond: Cond> ")" <then: MatchedStmt>
+    "else" <else_then: MatchedStmt> => {
+      Stmt::If(Box::new(If { cond, then, else_then: Some(else_then) }))
     },
-}
-
-Cond:i32 = {
-    LOrExp =>{
-0
+    "while" "(" <cond: Cond> ")" <body: MatchedStmt> => {
+      Stmt::While(Box::new(While { <> }))
     },
-}
-
-LVal:i32 = {
-    Ident ("[" Exp "]")* =>{
-0
+    "break" ";" => Stmt::Break(Break),
+    "continue" ";" => Stmt::Continue(Continue),
+    "return" <exp: (Exp)?> ";" => Stmt::Return(Return { <> }),
+  }
+  
+  OpenStmt: Stmt = {
+    "if" "(" <cond: Cond> ")" <then: Stmt> => {
+      Stmt::If(Box::new(If { cond, then, else_then: None }))
     },
+    "if" "(" <cond: Cond> ")" <then: MatchedStmt>
+    "else" <else_then: OpenStmt> => {
+      Stmt::If(Box::new(If { cond, then, else_then: Some(else_then) }))
+    },
+    "while" "(" <cond: Cond> ")" <body: OpenStmt> => {
+      Stmt::While(Box::new(While { <> }))
+    },
+  }
+
+Exp:Exp = {
+    AddExp =>{Exp{add_exp:Box::new(<>)}},
 }
 
-PrimaryExp:i32 = {
-    "(" Exp ")" =>{
-0
+Cond:Cond = {
+    <l_or_exp:LOrExp> =>{Cond{<>}},
+}
+
+LVal:LVal = {
+    <id:Ident> <mut exp_vec:("[" <Exp> "]")*> =>{LVal{<>}},
+}
+
+PrimaryExp:PrimaryExp = {
+    "(" <Exp> ")" =>{
+        PrimaryExp::Exp(Box::new(<>))
     },
     LVal =>{
-0
+        PrimaryExp::LVal(<>)
     },
     Number =>{
-0
+        PrimaryExp::Number(<>)
     },
 }
 
-Number:i32 = {
-    IntConst =>{
-0
+Number:Number = {
+    <int_const:IntConst> =>{
+        Number{<>}
     },
     //floatConst =>{
 
     //},todo:floatConst
 }
 
-UnaryExp:i32 = {
+UnaryExp:UnaryExp = {
     PrimaryExp =>{
-0
+        UnaryExp::PrimaryExp(Box::new(<>))
     },
-    Ident "(" FuncFParams? ")" =>{
-0
+    <id:Ident> "(" <func_fparams:FuncFParams?> ")" =>{
+        UnaryExp::FuncCall((id,OptionFuncFParams{func_fparams}))
     },
-    "+" UnaryExp =>{
-0
+    "+" <UnaryExp> =>{
+        UnaryExp::AddUnaryExp(Box::new(<>))
     },
-    UnaryOp UnaryExp =>{
-0
+    <op:UnaryOp> <exp:UnaryExp> =>{
+        UnaryExp::OpUnary((op,Box::new(exp)))
     },
 }
 
-UnaryOp:i32 = {
+UnaryOp:UnaryOp = {
     //"+" =>{
 //0
     //},
     "-" =>{
-0
+        UnaryOp::Minus
     },
     "!" =>{
-0
+        UnaryOp::Exclamation
     },
 }
 
-FuncRParams:i32 = {
-    Exp ("," <Exp>)* =>{
-0
+FuncRParams:FuncRParams = {
+    <e:Exp> <mut exp_vec:("," <Exp>)*> =>{
+        exp_vec.insert(0,e);
+        FuncRParams{exp_vec}
     },
 }
 
 
-MulExp:i32 = {
+MulExp:MulExp = {
     UnaryExp =>{
-0
+        MulExp::UnaryExp(Box::new(<>))
     },
-    MulExp "*" UnaryExp =>{
-0
+    <m:MulExp> "*" <u:UnaryExp> =>{
+        MulExp::MulExp((Box::new(m),u))
     },
-    MulExp "/" UnaryExp =>{
-        0
+    <m:MulExp> "/" <u:UnaryExp> =>{
+        MulExp::DivExp((Box::new(m),u))
     },
-    MulExp "%" UnaryExp =>{
-        0
+    <m:MulExp> "%" <u:UnaryExp> =>{
+        MulExp::ModExp((Box::new(m),u))
     },
 }
 
-AddOp:String  = {
+AddOp:AddOp  = {
     "+" =>{
-        "+".to_string()
+        AddOp::Add
     },
     "-" =>{
-        "-".to_string()
+        AddOp::Minus
     },
 }
 
-AddExp:i32 = {
+AddExp:AddExp = {
     MulExp =>{
-0
+        AddExp::MulExp(Box::new(<>))
     },
     //AddExp "+" MulExp =>{}
-    AddExp <op:AddOp> MulExp =>{
-0
+    <a:AddExp> <op:AddOp> <m:MulExp> =>{
+        AddExp::OpExp((Box::new(a),op,m))
     },
     //AddExp "-" MulExp =>{
 //0
     //},
 }
 
-RelOp:String = {
+RelOp:RelOp = {
     "<" =>{
-        "<".to_string()
+        RelOp::Less
     },
     "<=" =>{
-        "<=".to_string()
+        RelOp::LessOrEqual
     },
     ">" =>{
-        ">".to_string()
+        RelOp::Greater
     },
     ">=" =>{
-        ">=".to_string()
+        RelOp::GreaterOrEqual
     },
 
 }
 
-RelExp:i32 = {
+RelExp:RelExp = {
     AddExp =>{
-0
+        RelExp::AddExp(<>)
     },
-    RelExp <op:RelOp> AddExp =>{
-0
+    <r:RelExp> <op:RelOp> <a:AddExp> =>{
+        RelExp::OpExp((Box::new(r),op,a))
     },
 }
 
-EqExp:i32 = {
+EqExp:EqExp = {
     RelExp =>{
-0
+        EqExp::RelExp(<>)
     },
-    EqExp "==" RelExp =>{
-0
+    <e:EqExp> "==" <r:RelExp> =>{
+        EqExp::EqualExp((Box::new(e), r))
     },
-    EqExp "!=" RelExp =>{
-        0
+    <e:EqExp> "!=" <r:RelExp> =>{
+        EqExp::NotEqualExp((Box::new(e), r))
     },
 }
 
-LAndExp:i32 = {
+LAndExp:LAndExp = {
     EqExp =>{
-0
+        LAndExp::EqExp(<>)
     },
-    LAndExp "&&" EqExp =>{
-0
+    <l:LAndExp> "&&" <e:EqExp> =>{
+        LAndExp::AndExp((Box::new(l), e))
     },
 }
 
-LOrExp:i32 = {
+LOrExp:LOrExp = {
     LAndExp =>{
-0
+        LOrExp::LAndExp(<>)
     },
-    LOrExp "||" LAndExp =>{
-0
+    <o:LOrExp> "||" <a:LAndExp> =>{
+        LOrExp::OrExp((Box::new(o),a))
     },
 }
 
-ConstExp:i32 = {
-    AddExp =>{
-0
+ConstExp:ConstExp = {
+    <add_exp:AddExp> =>{
+        ConstExp{<>}
     },
 }
 
@@ -476,40 +415,14 @@ ConstExp:i32 = {
 //todo:
 
 
-Ident:String = {
-    
-// <mut s:IdentNonDigit> =>{
-//     s,
-// }
-// <mut s:Ident> <mut r:IdentNonDigit> =>{
-//     s = s+&r;
-//     s,
-// }
-// <mut s:Ident> <mut r:Digit> =>{
-//     s = s+&r;
-//     s,
-// }
+Ident:Ident = {
+
     <mut s:r"[_a-zA-Z][_a-zA-Z0-9]*"> =>{
         s.to_string()//todo:返回字符串值
     },
 }
 
-//IdentNonDigit:String = {
-    //<mut s:r"[_a-zA-Z]"> =>{
-        //s,//todo:返回字符串值
-    //}
-//}
-
-//Digit:String = {
-     //<mut s:r"[0-9]"> =>{
-        // s,//todo:返回字符串值
-    // }
-
-
-    
-//}
-
-IntConst:i32 = {
+IntConst:IntConst = {
     <i:DecimalConst> =>{
        i 
     },
@@ -521,72 +434,26 @@ i
     },
 }
 
-DecimalConst:i32 = {
-    // NonzeroDigit =>{
-
-    // }
-    // DecimalConst Digit =>{
-
-    // }
-
+DecimalConst:IntConst = {
     <mut s:r"[1-9][0-9]*"> =>{
-        //s//todo:返回字符串值
-        //from_str::<int>(s.as_slice())
         i32::from_str_radix(<>, 10).unwrap()
     },
 }
 
-OctalConst:i32 = {
-    //"0" =>{
+OctalConst:IntConst = {
 
-    //}
-    //OctalConst octalDigit =>{
-
-    //}
     <mut s:r"0[0-7]*"> =>{
         //s//todo:返回字符串值
         i32::from_str_radix(<>, 8).unwrap()
     },
 }
 
-HexadecimalConst:i32 = {
-    //HexadecimalPrefix HexadecimalDigit =>{
-
-    //}
-    //HexadecimalConst HexadecimalDigit =>{
-
-    //}
+HexadecimalConst:IntConst = {
     <mut s:r"0[xX][0-9a-fA-F]+"> =>{
         i32::from_str_radix(&<>[2..], 16).unwrap()//s//todo:返回字符串值
     },
 }
 
-// HexadecimalPrefix:String = {
-//     "0x" =>{
-
-//     }
-//     "0X" =>{
-
-//     }
-// }
-
-// NonzeroDigit:String = {
-//     <mut s:r"[1-9]">=>{
-//         s,
-//     }
-// }
-
-// octalDigit:String = {
-//     <s:r"[0-7]"> =>{
-//         s,
-//     }
-// }
-
-// HexadecimalDigit:String = {
-//     <s:r"[0-9a-fA-F]"> =>{
-//         s,
-//     }
-// }
 
 //todo:浮点数还没加
 
