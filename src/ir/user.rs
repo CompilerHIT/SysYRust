@@ -1,15 +1,16 @@
-use super::{instruction::Instruction, ir_type::IrType, value::Value};
-use crate::utility::Pointer;
+use std::ptr::eq;
+
+use super::{instruction::Inst, ir_type::IrType, value::Value};
 
 pub struct User {
     value: Value,
-    operands: Vec<Pointer<Box<dyn Instruction>>>,
-    use_list: Vec<Pointer<Box<dyn Instruction>>>,
+    operands: Vec<&'static Inst>,
+    use_list: Vec<&'static Inst>,
 }
 
 impl User {
-    pub fn make_user(ir_type: IrType, operands: Vec<Pointer<Box<dyn Instruction>>>) -> User {
-        let value = Value::make_value(ir_type);
+    pub fn new(ir_type: IrType, operands: Vec<&Inst>) -> User {
+        let value = Value::new(ir_type);
         User {
             value,
             operands,
@@ -17,15 +18,15 @@ impl User {
         }
     }
 
-    pub fn get_operands(&self) -> &Vec<Pointer<Box<dyn Instruction>>> {
+    pub fn get_operands(&self) -> &Vec<&'static Inst> {
         &self.operands
     }
-    pub fn get_operands_mut(&mut self) -> &mut Vec<Pointer<Box<dyn Instruction>>> {
+    pub fn get_operands_mut(&mut self) -> &mut Vec<&'static Inst> {
         &mut self.operands
     }
 
-    pub fn get_operand(&self, index: usize) -> Pointer<Box<dyn Instruction>> {
-        self.operands[index].clone()
+    pub fn get_operand(&self, index: usize) -> &Inst {
+        self.operands[index]
     }
 
     pub fn get_operands_size(&self) -> usize {
@@ -36,36 +37,29 @@ impl User {
         self.value.get_ir_type()
     }
 
-    pub fn set_operand(&mut self, index: usize, operand: Pointer<Box<dyn Instruction>>) {
+    pub fn set_operand(&mut self, index: usize, operand: &Inst) {
         self.operands[index] = operand;
     }
 
-    pub fn delete_operand(&mut self, operand: &Pointer<Box<dyn Instruction>>) {
-        self.use_list = self
-            .use_list
-            .iter()
-            .filter(|&x| x != operand)
-            .cloned()
-            .collect();
-    }
-
-    pub fn push_operand(&mut self, operand: Pointer<Box<dyn Instruction>>) {
+    pub fn push_operand(&mut self, operand: &Inst) {
         self.operands.push(operand)
     }
 
-    pub fn get_use_list(&mut self) -> &mut Vec<Pointer<Box<dyn Instruction>>> {
+    pub fn get_use_list(&mut self) -> &mut Vec<&Inst> {
         &mut self.use_list
     }
 
-    pub fn used(&mut self, inst: Pointer<Box<dyn Instruction>>) {
+    /// 表示当前指令被使用，将其加入use list
+    pub fn used(&mut self, inst: &Inst) {
         self.use_list.push(inst);
     }
 
-    pub fn delete_user(&mut self, inst: &Pointer<Box<dyn Instruction>>) {
+    /// 当前指令不再被使用，删除将对方从use list中删除
+    pub fn un_unsed(&mut self, inst: &Inst) {
         self.use_list = self
             .use_list
             .iter()
-            .filter(|&x| x != inst)
+            .filter(|&&x| eq(x, inst))
             .cloned()
             .collect();
     }

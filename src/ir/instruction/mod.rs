@@ -1,155 +1,154 @@
 //! src/ir/Instruction/mod.rs
 
-use crate::utility::Pointer;
-use std::any::Any;
+use super::{ir_type::IrType, user::User, IList};
 
-use super::ir_type::IrType;
-
-pub mod alloca_inst;
-pub mod binary_inst;
-pub mod branch_inst;
-pub mod call_inst;
-pub mod const_int;
-pub mod gep_inst;
-pub mod global_const_int;
-pub mod head_inst;
-pub mod load_inst;
-pub mod parameter;
-pub mod phi;
-pub mod return_inst;
-pub mod store_inst;
-pub mod unary_inst;
-
-#[derive(PartialEq)]
-pub enum InstructionType {
-    IBinaryOpInst,
-    IBranchInst,
-    IConstInt,
-    IGlobalConstInt,
-    IUnaryOpInst,
-    ICallInst,
-    ILoadInst,
-    IStoreInst,
-    IGEPInst,
-    IAllocaInst,
-    IReturn,
-    IParameter,
-    IPhi,
-
-    /// 没有这个节点，你不需要获得
-    IHead,
+pub struct Inst {
+    user: User,
+    list: IList<Inst>,
+    kind: InstKind,
 }
 
-pub trait Instruction {
-    // 获得指令类型
-    fn get_inst_type(&self) -> InstructionType;
-    // 获得值类型
-    fn get_value_type(&self) -> IrType;
+#[derive(Debug, Clone, Copy)]
+pub enum InstKind {
+    // 内存相关
+    Alloca,
+    Gep,
+    Load,
+    Store,
 
-    fn as_any(&self) -> &dyn Any;
-    fn as_any_mut(&mut self) -> &mut dyn Any;
+    // 计算指令
+    Binary,
+    Unary,
 
-    /// 获得下一个节点的不可变引用
-    /// 如果当前节点是尾节点，则返回None
-    fn next(&self) -> Option<Pointer<Box<dyn Instruction>>>;
+    // 跳转
+    Branch,
 
-    /// 获得上一个节点的不可变引用
-    /// 如果当前节点是头节点，则返回None
-    fn prev(&self) -> Option<Pointer<Box<dyn Instruction>>>;
+    // 函数相关
+    Call,
+    Parameter,
+    Return,
 
-    /// 将node插入到当前节点之前
-    fn insert_before(&mut self, node: Pointer<Box<dyn Instruction>>);
+    // 常量
+    ConstInt(i32),
+    GlobalConstInt(i32),
 
-    /// 将node插入到当前节点之后
-    fn insert_after(&mut self, node: Pointer<Box<dyn Instruction>>);
+    // Phi函数
+    Phi,
 
-    /// 是否为头节点
-    fn is_head(&self) -> bool;
-
-    /// 是否为尾节点
-    fn is_tail(&self) -> bool;
-
-    /// 将当前结点从链表中移除
-    fn remove_self(&mut self);
-
-    /// 不要使用这个函数
-    fn set_next(&mut self, node: Pointer<Box<dyn Instruction>>);
-    /// 不要使用这个函数
-    fn set_prev(&mut self, node: Pointer<Box<dyn Instruction>>);
+    // 作为链表头存在，没有实际意义
+    Head,
 }
 
-struct IList {
-    prev: Option<Pointer<Box<dyn Instruction>>>,
-    next: Option<Pointer<Box<dyn Instruction>>>,
-}
-
-impl IList {
-    fn set_next(&mut self, node: Pointer<Box<dyn Instruction>>) {
-        self.next = Some(node);
-    }
-
-    fn set_prev(&mut self, node: Pointer<Box<dyn Instruction>>) {
-        self.prev = Some(node);
-    }
-
-    pub fn next(&self) -> Option<Pointer<Box<dyn Instruction>>> {
-        match self.next {
-            None => None,
-            Some(ref node) => match node.borrow_mut().get_inst_type() {
-                InstructionType::IHead => None,
-                _ => Some(node.clone()),
-            },
+impl Inst {
+    /// Inst的构造指令，建议使用各类型指令的函数来创建
+    pub fn new(ir_type: IrType, kind: InstKind, operands: Vec<&Inst>, list: IList<Inst>) -> Self {
+        Self {
+            user: User::new(ir_type, operands),
+            list,
+            kind,
         }
     }
 
-    pub fn prev(&self) -> Option<Pointer<Box<dyn Instruction>>> {
-        match self.prev {
-            None => None,
-            Some(ref node) => match node.borrow_mut().get_inst_type() {
-                InstructionType::IHead => None,
-                _ => Some(node.clone()),
-            },
-        }
+    pub fn get_kind(&self) -> InstKind {
+        self.kind
     }
 
-    pub fn insert_before(&mut self, node: Pointer<Box<dyn Instruction>>) {
-        if let Some(prev_op) = self.prev.as_mut() {
-            let mut prev_in = prev_op.borrow_mut();
-            let myself = prev_in.next().unwrap();
-            let mut node_mut = node.borrow_mut();
-
-            node_mut.set_next(myself);
-            node_mut.set_prev(prev_op.clone());
-            prev_in.set_next(node.clone());
-        }
-        self.prev = Some(node.clone());
+    pub fn get_use_list(&self) -> &mut Vec<&Inst> {
+        self.user.get_use_list()
     }
 
-    pub fn insert_after(&mut self, node: Pointer<Box<dyn Instruction>>) {
-        if let Some(next_op) = self.next.as_mut() {
-            let mut prev_in = next_op.borrow_mut();
-            let myself = prev_in.prev().unwrap();
-            let mut node_mut = node.borrow_mut();
-
-            node_mut.set_next(next_op.clone());
-            node_mut.set_prev(myself);
-            prev_in.set_prev(node.clone());
-        }
-        self.next = Some(node.clone());
-    }
-
+    // 链表行为
+    /// 判断是否为当前bb的第一条指令
     pub fn is_head(&self) -> bool {
-        self.prev.as_ref().unwrap().borrow().get_inst_type() == InstructionType::IHead
+        match self.list.get_prev().get_kind() {
+            Head => true,
+            _ => false,
+        }
     }
 
+    /// 判断是否为当前bb的最后一条指令
     pub fn is_tail(&self) -> bool {
-        self.next.as_ref().unwrap().borrow().get_inst_type() == InstructionType::IHead
+        // 同上
+        match self.list.get_next().get_kind() {
+            Head => true,
+            _ => false,
+        }
     }
 
+    /// 获得当前指令的前一条指令。若为第一条指令，则返回None
+    pub fn get_prev(&self) -> Option<&Inst> {
+        if self.is_head() {
+            None
+        } else {
+            Some(self.list.get_prev())
+        }
+    }
+
+    /// 获得当前指令的下一条指令。若为最后一条指令，则返回None
+    pub fn get_next(&self) -> Option<&Inst> {
+        if self.is_tail() {
+            None
+        } else {
+            Some(self.list.get_next())
+        }
+    }
+
+    /// 在当前指令之前插入一条指令
+    pub fn insert_before(&mut self, inst: &mut Inst) {
+        debug_assert_ne!(self.list.prev, None);
+
+        let p = self.list.get_prev_mut();
+        self.list.set_prev(inst);
+        p.list.set_next(inst);
+        inst.list.set_prev(p);
+        inst.list.set_next(self);
+    }
+
+    /// 在当前指令之后插入一条指令
+    pub fn insert_after(&mut self, inst: &mut Inst) {
+        debug_assert_ne!(self.list.next, None);
+
+        let p = self.list.get_next_mut();
+        self.list.set_next(inst);
+        p.list.set_prev(inst);
+        inst.list.set_prev(self);
+        inst.list.set_next(self);
+    }
+
+    /// 把自己从指令中移除
     pub fn remove_self(&mut self) {
-        let prev = self.prev.take().unwrap();
-        let next = self.next.take().unwrap();
-        prev.borrow_mut().set_next(next.clone());
-        next.borrow_mut().set_prev(prev.clone());
+        debug_assert_ne!(self.list.next, None);
+        debug_assert_ne!(self.list.prev, None);
+
+        let next = self.list.get_next_mut();
+        let prev = self.list.get_prev_mut();
+
+        next.list.set_prev(prev);
+        prev.list.set_next(next);
+
+        self.list.next = None;
+        self.list.prev = None;
+    }
+
+    /// 构造一个Head
+    pub fn make_head() -> Inst {
+        Inst::new(
+            IrType::Void,
+            InstKind::Head,
+            vec![],
+            IList {
+                prev: None,
+                next: None,
+            },
+        )
+    }
+    /// 初始化Head
+    pub fn init_head(&mut self) {
+        if let Head = self.kind {
+            self.list.set_prev(self);
+            self.list.set_next(self);
+        } else {
+            debug_assert!(false);
+        }
     }
 }

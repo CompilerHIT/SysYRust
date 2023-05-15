@@ -1,80 +1,55 @@
-use super::{
-    instruction::{head_inst::HeadInst, Instruction},
-    ir_type::IrType,
-    value::Value,
-};
-use crate::utility::Pointer;
+use super::{instruction::Inst, ir_type::IrType, value::Value};
 pub struct BasicBlock {
     value: Value,
-    inst_head: Pointer<Box<dyn Instruction>>,
+    inst_head: Inst,
 }
 
 impl BasicBlock {
-    /// 构造一个空的BisicBlock
-    pub fn make_basicblock() -> Pointer<BasicBlock> {
-        let value = Value::make_value(IrType::BBlock);
-        let bb = BasicBlock {
-            value,
-            inst_head: Pointer::new(Box::new(HeadInst::new())),
-        };
-        Pointer::new(bb)
+    /// 构造一个空的BasicBlock
+    pub fn new() -> BasicBlock {
+        BasicBlock {
+            value: Value::new(IrType::BBlock),
+            inst_head: Inst::make_head(),
+        }
     }
 
     /// 检查是否为空的BasicBlock
     pub fn is_empty(&self) -> bool {
-        self.inst_head.borrow().next().is_none()
+        if self.inst_head.is_head() {
+            debug_assert_eq!(self.inst_head.is_tail(), true);
+            true
+        } else {
+            debug_assert_eq!(self.inst_head.is_tail(), false);
+            false
+        }
     }
 
     /// 获取BasicBlock的第一条指令
-    pub fn get_head_inst(&self) -> Option<Pointer<Box<dyn Instruction>>> {
-        self.inst_head.borrow().next().clone()
-    }
-
-    /// 获取BasicBlock的第零条指令
-    // for backend
-    pub fn get_dummy_head_inst(&self) -> Pointer<Box<dyn Instruction>> {
-        self.inst_head.clone()
+    pub fn get_head_inst(&self) -> &Inst {
+        assert_eq!(self.is_empty(), false);
+        self.inst_head.get_next().unwrap()
     }
 
     /// 获取BasicBlock的最后一条指令
-    pub fn get_tail_inst(&self) -> Option<Pointer<Box<dyn Instruction>>> {
-        self.inst_head.borrow().prev().clone()
+    pub fn get_tail_inst(&self) -> &Inst {
+        assert_eq!(self.is_empty(), false);
+        self.inst_head.get_prev().unwrap()
     }
 
     /// 将指令插入到BasicBlock的最后
-    pub fn push_back(&mut self, inst: Pointer<Box<dyn Instruction>>) {
-        match self.get_tail_inst() {
-            Some(tail) => {
-                tail.borrow_mut().insert_after(inst);
-            }
-            None => {
-                let mut head = self.inst_head.borrow_mut();
-                let mut inst_b = inst.borrow_mut();
-                head.set_next(inst.clone());
-                head.set_prev(inst.clone());
-
-                inst_b.set_next(self.inst_head.clone());
-                inst_b.set_prev(self.inst_head.clone());
-            }
-        }
+    pub fn push_back(&mut self, inst: &mut Inst) {
+        self.inst_head.insert_before(inst);
     }
 
     /// 将指令插入到BasicBlock的最前
-    pub fn push_front(&mut self, inst: Pointer<Box<dyn Instruction>>) {
-        match self.get_head_inst() {
-            Some(head) => {
-                head.borrow_mut().insert_before(inst);
-            }
-            None => {
-                let mut head = self.inst_head.borrow_mut();
-                let mut inst_b = inst.borrow_mut();
-                head.set_next(inst.clone());
-                head.set_prev(inst.clone());
+    pub fn push_front(&mut self, inst: &mut Inst) {
+        self.inst_head.insert_after(inst);
+    }
 
-                inst_b.set_next(self.inst_head.clone());
-                inst_b.set_prev(self.inst_head.clone());
-            }
-        }
+    /// 初始化BB
+    /// 建议在向内存池申请内存后对BB使用一次此函数
+    pub fn init_bb(&mut self) {
+        self.inst_head.init_head();
     }
 
     pub fn get_ir_type(&self) -> IrType {
