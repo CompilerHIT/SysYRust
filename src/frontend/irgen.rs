@@ -1,8 +1,16 @@
 use super::{actionscope::ActionScope, ast::*};
 use crate::frontend::error::Error;
+use crate::global_lalrpop::{IN_FUNC, MODULE};
+use crate::ir::function::Function;
 use crate::ir::module::{self, Module};
+use std::borrow::Borrow;
+use std::thread::LocalKey;
 use std::{self};
-pub fn irgen(compunit: &mut CompUnit) {}
+pub fn irgen(compunit: &mut CompUnit) {
+    let mut module = Module::make_module();
+    let mut scope = ActionScope::new();
+    compunit.process(1, &mut module, &mut scope);
+}
 pub trait Process {
     type Ret;
     type Message;
@@ -14,6 +22,19 @@ pub trait Process {
     ) -> Result<Self::Ret, Error>;
 }
 
+impl Process for CompUnit {
+    type Ret = i32;
+    type Message = i32;
+    fn process(
+        &self,
+        input: Self::Message,
+        module: &mut Module,
+        scope: &mut ActionScope,
+    ) -> Result<Self::Ret, Error> {
+        Ok(1)
+    }
+}
+
 impl Process for GlobalItems {
     type Ret = i32;
     type Message = i32;
@@ -23,6 +44,20 @@ impl Process for GlobalItems {
         module: &mut Module,
         scope: &mut ActionScope,
     ) -> Result<Self::Ret, Error> {
+        match self {
+            Self::Decl(decl) => {}
+            Self::FuncDef(funcdef) => {
+                IN_FUNC.with(|i| {
+                    let mut valtemp = i.borrow_mut();
+                    *valtemp = 1;
+                });
+                funcdef.process(1, module, scope);
+                IN_FUNC.with(|i| {
+                    let mut valtemp = i.borrow_mut();
+                    *valtemp = 0;
+                });
+            }
+        }
         Ok(1)
     }
 }
@@ -36,6 +71,10 @@ impl Process for Decl {
         module: &mut Module,
         scope: &mut ActionScope,
     ) -> Result<Self::Ret, Error> {
+        match self {
+            Self::ConstDecl(decl) => {}
+            Self::VarDecl(funcdef) => {}
+        }
         Ok(1)
     }
 }
@@ -125,6 +164,13 @@ impl Process for FuncDef {
         module: &mut Module,
         scope: &mut ActionScope,
     ) -> Result<Self::Ret, Error> {
+        match self {
+            Self::NonParameterFuncDef(npfd) => {
+                // module.push_function(npfd.1, Function::make_function(head_block));
+            }
+            Self::ParameterFuncDef(pf) => {}
+        }
+        // module.push_function(name, function);
         Ok(1)
     }
 }
