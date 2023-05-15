@@ -1,6 +1,20 @@
 //! src/ir/Instruction/mod.rs
-
+///! 此模块中存放有Inst和InstKind结构体的定义，还有
+///! 所有Inst类型的公有方法和Head的简单实现。特定的
+///! inst的相关实现放在当前目录下的其他文件中。
 use super::{ir_type::IrType, user::User, IList};
+mod alloca;
+mod binary;
+mod branch;
+mod call;
+mod gep;
+mod iconst;
+mod ireturn;
+mod load;
+mod parameter;
+mod phi;
+mod store;
+mod unary;
 
 pub struct Inst {
     user: User,
@@ -17,20 +31,26 @@ pub enum InstKind {
     Store,
 
     // 计算指令
-    Binary,
-    Unary,
+    Binary(BinOp),
+    Unary(UnOp),
 
     // 跳转
     Branch,
 
     // 函数相关
-    Call,
+    Call(&'static str),
     Parameter,
     Return,
 
     // 常量
     ConstInt(i32),
     GlobalConstInt(i32),
+    ConstFloat(f32),
+    GlobalConstFloat(f32),
+
+    // 全局变量
+    GlobalInt(i32),
+    GlobalFloat(f32),
 
     // Phi函数
     Phi,
@@ -39,14 +59,45 @@ pub enum InstKind {
     Head,
 }
 
+#[derive(Debug, Clone, Copy)]
+pub enum BinOp {
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Rem,
+    And,
+    Or,
+    Eq,
+    Ne,
+    Le,
+    Lt,
+    Ge,
+    Gt,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum UnOp {
+    Pos,
+    Neg,
+    Not,
+}
+
 impl Inst {
     /// Inst的构造指令，建议使用各类型指令的函数来创建
-    pub fn new(ir_type: IrType, kind: InstKind, operands: Vec<&Inst>, list: IList<Inst>) -> Self {
+    pub fn new(ir_type: IrType, kind: InstKind, operands: Vec<&Inst>) -> Self {
         Self {
             user: User::new(ir_type, operands),
-            list,
+            list: IList {
+                prev: None,
+                next: None,
+            },
             kind,
         }
+    }
+
+    pub fn get_ir_type(&self) -> IrType {
+        self.user.get_ir_type()
     }
 
     pub fn get_kind(&self) -> InstKind {
@@ -132,15 +183,7 @@ impl Inst {
 
     /// 构造一个Head
     pub fn make_head() -> Inst {
-        Inst::new(
-            IrType::Void,
-            InstKind::Head,
-            vec![],
-            IList {
-                prev: None,
-                next: None,
-            },
-        )
+        Inst::new(IrType::Void, InstKind::Head, vec![])
     }
     /// 初始化Head
     pub fn init_head(&mut self) {

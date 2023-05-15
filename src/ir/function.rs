@@ -3,6 +3,7 @@ use std::collections::HashMap;
 
 pub struct Function {
     value: Value,
+    return_type: IrType,
     parameters: HashMap<&'static str, &'static Inst>,
     head_block: Option<&'static BasicBlock>,
 }
@@ -12,9 +13,20 @@ impl Function {
     pub fn new() -> Function {
         Function {
             value: Value::new(IrType::Function),
+            return_type: IrType::Void,
             parameters: HashMap::new(),
             head_block: None,
         }
+    }
+
+    /// 设置函数的返回类型
+    pub fn set_return_type(&mut self, return_type: IrType) {
+        self.return_type = return_type;
+    }
+
+    /// 获得函数的返回类型
+    pub fn get_return_type(&self) -> IrType {
+        self.return_type
     }
 
     /// 判断函数中是否有bb
@@ -24,6 +36,12 @@ impl Function {
         } else {
             false
         }
+    }
+
+    /// 将第一个BB加入到函数中
+    pub fn insert_first_bb(&mut self, bb: &BasicBlock) {
+        debug_assert_eq!(self.head_block.is_none(), true);
+        self.head_block = Some(bb);
     }
 
     /// 获得第一个块，默认为非空块
