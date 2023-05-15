@@ -49,6 +49,7 @@ impl<T> Clone for Pointer<T> {
 
 #[derive(Clone, Copy, PartialEq, Hash, Eq)]
 pub enum ScalarType {
+    Void,
     Int,
     Float,
 }
