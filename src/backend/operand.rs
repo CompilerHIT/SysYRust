@@ -1,14 +1,14 @@
 use crate::utility::ScalarType;
 
-pub const REG_COUNT: usize = 32;
-pub const ARG_REG_COUNT: usize = 8;
-pub const REG_SP: usize = 2;
+pub const REG_COUNT: i32 = 32;
+pub const ARG_REG_COUNT: i32 = 8;
+pub const REG_SP: i32 = 2;
 const IMM_12Bs: i32 = 2047;
 const IMM_20Bs: i32 = 524287;
 
 #[derive(Clone, Copy, PartialEq, Hash, Eq)]
 pub struct Reg {
-    id: usize,
+    id: i32,
     r_type: ScalarType,
 }
 
@@ -102,7 +102,7 @@ impl ToString for Addr {
 
 
 impl Reg {
-    pub fn new(id: usize, r_type: ScalarType) -> Self {
+    pub fn new(id: i32, r_type: ScalarType) -> Self {
         Self {
             id,
             r_type
@@ -188,7 +188,7 @@ impl Reg {
         self.id < 0
     }
 
-    pub fn get_id(&self) -> usize {
+    pub fn get_id(&self) -> i32 {
         self.id
     }
     pub fn get_type(&self) -> ScalarType {

@@ -8,7 +8,7 @@ use crate::ir::instruction::Instruction;
 use crate::ir::function::Function;
 use crate::backend::operand::Reg;
 use crate::backend::structs::{Func, IGlobalVar, FGlobalVar};
-use crate::utility::{Pointer, ScalarType};
+use crate::utility::{ScalarType, ObjPtr};
 
 
 #[derive(Clone)]    
@@ -19,7 +19,7 @@ pub struct AsmModule {
     // global_fvar_list: Vec<FGlobalVar>,
 
     // const_array_mapping: HashMap<String, ArrayConst>,
-    functions: HashMap<String, Pointer<Function>>,
+    functions: HashMap<String, ObjPtr<Function>>,
     blocks: usize,
 }
 
@@ -35,16 +35,16 @@ impl AsmModule {
         }
     }
 
-    pub fn get_funcs(&self) -> HashMap<String, Pointer<Function>> {
-        self.functions.clone()
+    pub fn get_funcs(&self) -> &HashMap<String, ObjPtr<Function>> {
+        &self.functions
     }
 
     pub fn get_blocks_num(&self) -> usize {
         self.blocks
     }
 
-    pub fn get_reg_mapping(&self) -> HashMap<usize, Reg> {
-        self.reg_mapping.clone()
+    pub fn get_reg_mapping(&self) -> &HashMap<usize, Reg> {
+        &self.reg_mapping
     }
 
     pub fn set_reg_mapping(&mut self, reg: Reg, id: usize) {
@@ -61,11 +61,12 @@ impl AsmModule {
         let mut list = Vec::with_capacity(map.len());
         for iter in map.iter() {
             let name = iter.0.to_string();
-            if let Some(value) = iter.1.borrow().as_any().downcast_ref::<GlobalConstInt>() {
-                list.push(IGlobalVar::init(name, value.get_bonding()))
-            } else {
-                panic!("fail to analyse GlobalConstInt");
-            }
+            //TODO: update ir translation，to use ObjPtr match
+            // if let Some(value) = iter.1.borrow().as_any().downcast_ref::<GlobalConstInt>() {
+            //     list.push(IGlobalVar::init(name, value.get_bonding()))
+            // } else {
+            //     panic!("fail to analyse GlobalConstInt");
+            // }
         }
         list
     }

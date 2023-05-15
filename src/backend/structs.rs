@@ -3,14 +3,13 @@ use std::fs::File;
 use std::hash::{Hash, Hasher};
 use std::io::{Result, Write};
 
-use crate::backend::{instrs::Instrs, operand::{Reg, IImm, FImm}, asm_builder::AsmBuilder, module::AsmModule};
+use crate::backend::{instrs::LIRInst, operand::{Reg, IImm, FImm}, asm_builder::AsmBuilder, module::AsmModule};
 use crate::ir::basicblock::BasicBlock;
 use crate::ir::instruction::{Instruction, const_int::ConstInt};
 use crate::ir::function::Function;
 use crate::ir::ir_type;
 use crate::ir::instruction::return_inst::ReturnInst;
-use crate::utility::Pointer;
-use crate::utility::ScalarType;
+use crate::utility::{ScalarType, ObjPool, ObjPtr};
 
 use super::instrs::*;
 
@@ -27,6 +26,7 @@ pub struct FGlobalVar {
     value:FImm,
 }
 
+#[derive(Clone, PartialEq)]
 pub struct StackSlot {
     pos: i32,
     size: i32,
@@ -42,10 +42,10 @@ pub struct BB {
     label: String,
     called: bool,
 
-    insts: Vec<Pointer<Box<dyn Instrs>>>,
+    insts: Vec<ObjPtr<LIRInst>>,
 
-    in_edge: Vec<Pointer<BB>>,
-    out_edge: Vec<Pointer<BB>>,
+    in_edge: Vec<ObjPtr<BB>>,
+    out_edge: Vec<ObjPtr<BB>>,
 
     live_use: HashSet<Reg>,
     live_def: HashSet<Reg>,
@@ -55,25 +55,25 @@ pub struct BB {
 
 #[derive(Clone)]
 pub struct CurInstrInfo {
-    block: Option<Pointer<BB>>,
-    insts_it: Vec<Pointer<Box<dyn Instrs>>>,
-    id: usize,
+    block: Option<ObjPtr<BB>>,
+    insts_it: Vec<ObjPtr<LIRInst>>,
+    reg_id: i32,
 }
 
 // #[derive(Clone)]
 pub struct Func {
     label: String,
-    blocks: Vec<Pointer<BB>>,
-    stack_addr: Vec<Pointer<StackSlot>>,
-    caller_stack_addr: Vec<Pointer<StackSlot>>,
-    params: Vec<Pointer<Reg>>,
+    blocks: Vec<ObjPtr<BB>>,
+    stack_addr: Vec<ObjPtr<StackSlot>>,
+    caller_stack_addr: Vec<ObjPtr<StackSlot>>,
+    params: Vec<ObjPtr<Reg>>,
     entry: Option<BB>,
 
     reg_def: Vec<HashSet<CurInstrInfo>>,
     reg_use: Vec<HashSet<CurInstrInfo>>,
     fregs: HashSet<Reg>,
 
-    context: Option<Pointer<Context>>,
+    context: Option<ObjPtr<Context>>,
 }
 
 impl BB {
@@ -91,11 +91,12 @@ impl BB {
         }
     }
 
-    pub fn construct(&mut self, block: Pointer<BasicBlock>, next_block: Pointer<BB>) {
-        let ir_block_inst = block.borrow().get_dummy_head_inst();
-        while let Some(inst) = ir_block_inst.borrow_mut().next() {
-            let inst_borrow = inst.borrow();
-            let dr_inst = inst_borrow.as_any();
+    pub fn construct(&mut self, block: ObjPtr<BasicBlock>, next_block: ObjPtr<BB>) {
+        //TODO: update ir translation，to use ObjPtr match
+        // let ir_block_inst = block.as_ref().get_dummy_head_inst();
+        // while let Some(inst) = ir_block_inst.as_mut().next() {
+        //     let inst_borrow = inst.borrow();
+        //     let dr_inst = inst_borrow.as_any();
 
             //TODO: wait for ir:
             // if let Some(inst1) = dr_inst.downcast_ref::<IR::Instructruction>() {
@@ -107,47 +108,48 @@ impl BB {
             // else {
             //     panic!("fail to downcast inst");
             // }
-            if let Some(inst) = dr_inst.downcast_ref::<ReturnInst>() {
-                match inst.get_value_type() {
-                    ir_type::IrType::Void => self.insts.push(Pointer::new(Box::new(Return::new(ScalarType::Void)))),
-                    ir_type::IrType::Int => {
-                        let src = inst.get_return_value();
-                        let src_operand = self.resolvOperand(src);
-                        self.insts.push(Pointer::new(Box::new(OpReg::new(
-                            SingleOp::Mov, 
-                            Reg::new(0, ScalarType::Int),
-                            src_operand,
-                        ))));
-                        self.insts.push(Pointer::new(Box::new(Return::new(ScalarType::Int))));
-                    },
-                    ir_type::IrType::Float => {
-                        //TODO:
-                    },
-                    _ => panic!("cannot reach, Return false")
-                }
-            }
-            if Pointer::point_eq(&inst, &block.borrow().get_tail_inst().unwrap()) {
-                break;
-            }
-        }
+            // if let Some(inst) = dr_inst.downcast_ref::<ReturnInst>() {
+            //     match inst.get_value_type() {
+            //         ir_type::IrType::Void => self.insts.push(Pointer::new(Box::new(Return::new(ScalarType::Void)))),
+            //         ir_type::IrType::Int => {
+            //             let src = inst.get_return_value();
+            //             let src_operand = self.resolvOperand(src);
+            //             self.insts.push(Pointer::new(Box::new(OpReg::new(
+            //                 SingleOp::Mov, 
+            //                 Reg::new(0, ScalarType::Int),
+            //                 src_operand,
+            //             ))));
+            //             self.insts.push(Pointer::new(Box::new(Return::new(ScalarType::Int))));
+            //         },
+            //         ir_type::IrType::Float => {
+            //             //TODO:
+            //         },
+            //         _ => panic!("cannot reach, Return false")
+            //     }
+            // }
+            // if Pointer::point_eq(&inst, &block.borrow().get_tail_inst().unwrap()) {
+            //     break;
+            // }
+        // }
     }
 
-    pub fn push_back(&mut self, inst: Pointer<Box<dyn Instrs>>) {
+    pub fn push_back(&mut self, inst: ObjPtr<LIRInst>) {
         self.insts.push(inst);
     }
 
-    pub fn push_back_list(&mut self, inst: &mut Vec<Pointer<Box<dyn Instrs>>>) {
+    pub fn push_back_list(&mut self, inst: &mut Vec<ObjPtr<LIRInst>>) {
         self.insts.append(inst);
     }
 
-    fn resolvOperand(&self, src: Pointer<Box<dyn Instruction>>) -> Operand {
-        if let Some(iimm) = src.borrow().as_any().downcast_ref::<ConstInt>() {
-            return Operand::IImm(IImm::new(iimm.get_bonding()));
-        } else {
-            //TODO:
-            panic!("to realize more operand solution");
-        }
-    }
+    // fn resolvOperand(&self, src: ObjPtr<LIRInst>) -> Operand {
+    //     //TODO: ObjPtr match
+    //     if let Some(iimm) = src.borrow().as_any().downcast_ref::<ConstInt>() {
+    //         return Operand::IImm(IImm::new(iimm.get_bonding()));
+    //     } else {
+    //         //TODO:
+    //         panic!("to realize more operand solution");
+    //     }
+    // }
 
     // fn clear_reg_info(&mut self) {
     //     self.live_def.clear();
@@ -156,15 +158,14 @@ impl BB {
     //     self.live_out.clear();
     // }
 }
-
 impl GenerateAsm for BB {
-    fn generate(&self, context: Pointer<Context>,f: &mut File) -> Result<()> {
+    fn generate(&self, context: ObjPtr<Context>,f: &mut File) -> Result<()> {
         if self.called {
             writeln!(f, "{}:", self.label)?;
         }
 
         for inst in self.insts.iter() {
-            inst.borrow().generate(context.clone(), f)?;
+            inst.as_ref().generate(context.clone(), f)?;
         }
 
         Ok(())
@@ -202,55 +203,57 @@ impl Func {
         }
     }
 
-    pub fn del_inst_reg(&mut self, cur_info: &CurInstrInfo, inst: Pointer<Box<dyn Instrs>>) {
-        for reg in inst.borrow().get_reg_use() {
-            self.reg_use[reg.get_id()].remove(cur_info);
+    // 移除指定id的寄存器的使用信息
+    pub fn del_inst_reg(&mut self, cur_info: &CurInstrInfo, inst: ObjPtr<LIRInst>) {
+        for reg in inst.as_ref().get_reg_use() {
+            self.reg_use[reg.get_id() as usize].remove(cur_info);
         }
-        for reg in inst.borrow().get_reg_def() {
-            self.reg_def[reg.get_id()].remove(cur_info);
+        for reg in inst.as_ref().get_reg_def() {
+            self.reg_def[reg.get_id() as usize].remove(cur_info);
         }
     }
 
-    pub fn add_inst_reg(&mut self, cur_info: &CurInstrInfo, inst: Pointer<Box<dyn Instrs>>) {
-        for reg in inst.borrow().get_reg_use() {
-            self.reg_use[reg.get_id()].insert((*cur_info).clone());
+    // 添加指定id的寄存器的使用信息
+    pub fn add_inst_reg(&mut self, cur_info: &CurInstrInfo, inst: ObjPtr<LIRInst>) {
+        for reg in inst.as_ref().get_reg_use() {
+            self.reg_use[reg.get_id() as usize].insert(cur_info.clone());
         }
-        for reg in inst.borrow().get_reg_def() {
-            self.reg_def[reg.get_id()].insert((*cur_info).clone());
+        for reg in inst.as_ref().get_reg_def() {
+            self.reg_def[reg.get_id() as usize].insert(cur_info.clone());
         }
     }
 
     pub fn calc_live(&mut self) {
-        let mut queue : VecDeque<(Pointer<BB>, Reg)> = VecDeque::new();
+        let mut queue : VecDeque<(ObjPtr<BB>, Reg)> = VecDeque::new();
         for block in self.blocks.clone().iter() {
-            block.borrow_mut().live_use.clear();
-            block.borrow_mut().live_def.clear();
-            for it in block.borrow().insts.iter().rev() {
-                for reg in it.borrow().get_reg_def().into_iter() {
+            block.as_mut().live_use.clear();
+            block.as_mut().live_def.clear();
+            for it in block.as_ref().insts.iter().rev() {
+                for reg in it.as_ref().get_reg_def().into_iter() {
                     if reg.is_virtual() || reg.is_allocable() {
-                        block.borrow_mut().live_use.remove(&reg);
-                        block.borrow_mut().live_def.insert(reg);
+                        block.as_mut().live_use.remove(&reg);
+                        block.as_mut().live_def.insert(reg);
                     }
                 }
-                for reg in it.borrow().get_reg_use().into_iter() {
+                for reg in it.as_ref().get_reg_use().into_iter() {
                     if reg.is_virtual() || reg.is_allocable() {
-                        block.borrow_mut().live_def.remove(&reg);
-                        block.borrow_mut().live_use.insert(reg);
+                        block.as_mut().live_def.remove(&reg);
+                        block.as_mut().live_use.insert(reg);
                     }
                 }
             }
-            for reg in block.borrow().live_use.iter() {
+            for reg in block.as_ref().live_use.iter() {
                 queue.push_back((block.clone(), reg.clone()));
             }
-            block.borrow_mut().live_in = block.borrow().live_use.clone();
-            block.borrow_mut().live_out.clear();
+            block.as_mut().live_in = block.as_ref().live_use.clone();
+            block.as_mut().live_out.clear();
         }
         while let Some(value) = queue.pop_front() {
             let (block, reg) = value;
-            for pred in block.borrow().in_edge.iter() {
-                if pred.borrow_mut().live_out.insert(reg) {
-                    if pred.borrow_mut().live_def.take(&reg) == None && pred.borrow_mut().live_in.insert(reg) {
-                        queue.push_back((pred.clone(), reg.clone()));
+            for pred in block.as_ref().in_edge.iter() {
+                if pred.as_mut().live_out.insert(reg) {
+                    if pred.as_mut().live_def.take(&reg) == None && pred.as_mut().live_in.insert(reg) {
+                        queue.push_back((pred.clone(), reg));
                     }
                 }
             }
@@ -264,8 +267,8 @@ impl Func {
 
         let mut stack_size = 0;
         for it in self.stack_addr.iter().rev() {
-            it.borrow_mut().set_pos(stack_size);
-            stack_size += it.borrow().get_size();
+            it.as_mut().set_pos(stack_size);
+            stack_size += it.as_ref().get_size();
         }
 
         let mut reg_int_res = Vec::from(reg_int);
@@ -277,7 +280,7 @@ impl Func {
         let mut offset = stack_size;
         let mut f1 = f.try_clone().unwrap();
         if let Some(contxt) = &self.context {
-            contxt.borrow_mut().set_prologue_event(move||{
+            contxt.as_mut().set_prologue_event(move||{
                 let mut builder = AsmBuilder::new(f, "");
                 // addi sp -stack_size
                 builder.addi("sp", "sp", -offset);
@@ -287,7 +290,7 @@ impl Func {
                 }
             });
             let mut offset = stack_size;
-            contxt.borrow_mut().set_epilogue_event(move||{
+            contxt.as_mut().set_epilogue_event(move||{
                 let mut builder = AsmBuilder::new(&mut f1, "");
                 for src in reg_int_res_cl.iter() {
                     offset -= 8;
@@ -309,12 +312,12 @@ impl Func {
 }
 
 impl GenerateAsm for Func {
-    fn generate(&self, _: Pointer<Context>, f: &mut File) -> Result<()> {
+    fn generate(&self, _: ObjPtr<Context>, f: &mut File) -> Result<()> {
         AsmBuilder::new(f, "").show_func(&self.label);
         if let Some(contxt) = &self.context {
-            contxt.borrow_mut().call_prologue_event();
+            contxt.as_mut().call_prologue_event();
             for block in self.blocks.iter() {
-                block.borrow().generate(contxt.clone(), f)?;
+                block.as_ref().generate(contxt.clone(), f)?;
             }
         }
         Ok(())
@@ -360,27 +363,27 @@ impl Context {
 }
 
 impl CurInstrInfo {
-    pub fn new(id: usize) -> Self {
+    pub fn new(reg_id: i32) -> Self {
         Self {
-           id,
+           reg_id,
            block: None,
            insts_it: Vec::new(),
         }
     }
 
-    pub fn band_block(&mut self, block: Pointer<BB>) {
-        self.block = Some(block.clone());
+    pub fn band_block(&mut self, block: ObjPtr<BB>) {
+        self.block = Some(block);
     }
 
-    pub fn get_block(&self) -> Pointer<BB> {
-        self.block.clone().unwrap()
+    pub fn get_block(&self) -> Option<ObjPtr<BB>> {
+        self.block
     }
 
-    pub fn add_inst(&mut self, inst: Pointer<Box<dyn Instrs>>) {
+    pub fn add_inst(&mut self, inst: ObjPtr<LIRInst>) {
         self.insts_it.push(inst.clone());
     }
 
-    pub fn add_insts(&mut self, insts: Vec<Pointer<Box<dyn Instrs>>>) {
+    pub fn add_insts(&mut self, insts: Vec<ObjPtr<LIRInst>>) {
         self.insts_it.append(&mut insts.clone());
     }
 }
@@ -401,15 +404,15 @@ impl IGlobalVar {
 }
 
 pub trait GenerateAsm {
-    fn generate(&self, _: Pointer<Context>, f: &mut File) -> Result<()> {
-        writeln!(f, "to realize")?;
+    fn generate(&self, _: ObjPtr<Context>, f: &mut File) -> Result<()> {
+        writeln!(f, "unreachable")?;
         Ok(())
     }
 }
 
 impl PartialEq for CurInstrInfo {
     fn eq(&self, other: &Self) -> bool {
-        self.id == other.id
+        self.reg_id == other.reg_id
     }
 }
 
@@ -417,7 +420,7 @@ impl Eq for CurInstrInfo {}
 
 impl Hash for CurInstrInfo {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.id.hash(state);
+        self.reg_id.hash(state);
     }
 }
 
