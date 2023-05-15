@@ -1,51 +1,7 @@
 use std::{
-    cell::{Ref, RefCell, RefMut},
-    rc::Rc,
+    fmt::Debug,
+    {pin::Pin, ptr::NonNull},
 };
-
-/// 使用Pointer<T>来替代Rc<RefCell<T>>，以便于简化操作
-pub struct Pointer<T> {
-    p: Rc<RefCell<T>>,
-}
-
-impl<T> Pointer<T> {
-    /// make a Pointer points to cell
-    pub fn new(cell: T) -> Pointer<T> {
-        Pointer {
-            p: Rc::new(RefCell::new(cell)),
-        }
-    }
-
-    pub fn borrow(&self) -> Ref<T> {
-        self.p.borrow()
-    }
-
-    pub fn borrow_mut(&self) -> RefMut<T> {
-        self.p.borrow_mut()
-    }
-
-    /// Returns true if the two Rcs point to the
-    /// same allocation in a vein similar to ptr::eq.
-    /// See that function for caveats when comparing `dyn Trait` pointers.
-    pub fn point_eq(this: &Pointer<T>, other: &Pointer<T>) -> bool {
-        Rc::ptr_eq(&this.p, &other.p)
-    }
-}
-
-impl<T> PartialEq for Pointer<T> {
-    fn eq(&self, other: &Self) -> bool {
-        Rc::ptr_eq(&self.p, &other.p)
-    }
-}
-
-impl<T> Eq for Pointer<T> {}
-
-impl<T> Clone for Pointer<T> {
-    // add code here
-    fn clone(&self) -> Pointer<T> {
-        Pointer { p: self.p.clone() }
-    }
-}
 
 #[derive(Clone, Copy, PartialEq, Hash, Eq)]
 pub enum ScalarType {
@@ -53,42 +9,56 @@ pub enum ScalarType {
     Float,
 }
 
-/// 嵌入式链表
-pub trait IList {
-    type Item;
-    /// 获得下一个节点的不可变引用
-    /// 如果当前节点是尾节点，则返回None
-    fn next(&self) -> Option<Ref<Self::Item>>;
+/// 一个封装的指针
+/// 通过调用as_ref和as_mut来获得可变或不可变引用
+pub struct ObjPtr<T>(NonNull<T>);
 
-    /// 获得上一个节点的不可变引用
-    /// 如果当前节点是头节点，则返回None
-    fn prev(&self) -> Option<Ref<Self::Item>>;
+impl<T> ObjPtr<T> {
+    pub fn as_ref(self) -> &'static T {
+        unsafe { self.0.as_ref() }
+    }
 
-    /// 获得下一个节点的可变引用
-    /// 如果当前节点是尾节点，则返回None
-    fn next_mut(&mut self) -> Option<RefMut<Self::Item>>;
+    pub fn as_mut(mut self) -> &'static T {
+        unsafe { self.0.as_mut() }
+    }
+}
 
-    /// 获得上一个节点的可变引用
-    /// 如果当前节点是头节点，则返回None
-    fn prev_mut(&mut self) -> Option<RefMut<Self::Item>>;
+impl<T> Clone for ObjPtr<T> {
+    fn clone(&self) -> Self {
+        ObjPtr(self.0.clone())
+    }
+}
 
-    /// 将node插入到当前节点之前
-    fn insert_before(&mut self, node: Pointer<Self::Item>);
+impl<T> Copy for ObjPtr<T> {}
 
-    /// 将node插入到当前节点之后
-    fn insert_after(&mut self, node: Pointer<Self::Item>);
+impl<T: Debug + 'static> Debug for ObjPtr<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.as_ref().fmt(f)
+    }
+}
 
-    /// 是否为头节点
-    fn is_head(&self) -> bool;
+/// 一个内存池
+/// 通过调用put申请一块内存，然后函数返回ObjPtr获得其指针
+pub struct ObjPool<T> {
+    data: Vec<Pin<Box<T>>>,
+}
 
-    /// 是否为尾节点
-    fn is_tail(&self) -> bool;
+impl<T> ObjPool<T> {
+    pub const fn new() -> Self {
+        Self { data: Vec::new() }
+    }
 
-    /// 将当前结点从链表中移除
-    fn remove_self(&mut self);
+    pub fn put(&mut self, value: T) -> ObjPtr<T> {
+        self.data.push(Box::pin(value));
+        let p = self.data.last_mut().unwrap();
+        unsafe {
+            ObjPtr(NonNull::new_unchecked(
+                p.as_ref().get_ref() as *const _ as *mut _
+            ))
+        }
+    }
 
-    /// 移除当前节点之后的结点
-    fn remove_after(&mut self);
-    /// 移除当前节点之前的结点
-    fn remove_before(&mut self);
+    pub fn free_all(&mut self) {
+        self.data.clear()
+    }
 }
