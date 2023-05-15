@@ -5,7 +5,7 @@ pub struct Value {
 }
 
 impl Value {
-    pub fn make_value(ir_type: IrType) -> Value {
+    pub fn new(ir_type: IrType) -> Value {
         Value { ir_type }
     }
 
