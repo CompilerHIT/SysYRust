@@ -7,7 +7,7 @@ impl Inst {
     /// * `cond` - 条件
     /// # Returns
     /// 返回创建的条件跳转指令
-    pub fn make_br(cond: &Inst) -> Self {
+    pub fn make_br(cond: ObjPtr<Inst>) -> Self {
         let ir_type = IrType::Void;
         let kind = InstKind::Branch;
         let operands = vec![cond];
@@ -43,14 +43,14 @@ impl Inst {
     }
 
     /// 获得条件跳转指令的条件
-    pub fn get_br_cond(&self) -> &Inst {
+    pub fn get_br_cond(&self) -> ObjPtr<Inst> {
         self.user.get_operand(0)
     }
 
     /// 设置条件跳转指令的条件
     /// # Arguments
     /// * `cond` - 条件
-    pub fn set_br_cond(&mut self, cond: &Inst) {
+    pub fn set_br_cond(&mut self, cond: ObjPtr<Inst>) {
         self.user.set_operand(0, cond);
     }
 }

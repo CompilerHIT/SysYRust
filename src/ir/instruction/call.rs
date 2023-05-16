@@ -6,7 +6,7 @@ impl Inst {
     /// # Arguments
     /// * `callee` - 被调用的函数
     /// * `args` - 参数列表
-    pub fn make_int_call(callee: &str, args: Vec<&Inst>) -> Self {
+    pub fn make_int_call(callee: &str, args: Vec<ObjPtr<Inst>>) -> Self {
         Self {
             user: User::new(IrType::Int, args),
             list: IList {
@@ -21,7 +21,7 @@ impl Inst {
     /// # Arguments
     /// * `callee` - 被调用的函数
     /// * `args` - 参数列表
-    pub fn make_void_call(callee: &str, args: Vec<&Inst>) -> Self {
+    pub fn make_void_call(callee: &str, args: Vec<ObjPtr<Inst>>) -> Self {
         Self {
             user: User::new(IrType::Void, args),
             list: IList {
@@ -36,7 +36,7 @@ impl Inst {
     /// # Arguments
     /// * `callee` - 被调用的函数
     /// * `args` - 参数列表
-    pub fn make_float_call(callee: &str, args: Vec<&Inst>) -> Self {
+    pub fn make_float_call(callee: &str, args: Vec<ObjPtr<Inst>>) -> Self {
         Self {
             user: User::new(IrType::Float, args),
             list: IList {
@@ -56,7 +56,7 @@ impl Inst {
     }
 
     /// 获得函数调用指令的参数列表
-    pub fn get_args(&self) -> &Vec<&Inst> {
+    pub fn get_args(&self) -> &Vec<ObjPtr<Inst>> {
         self.user.get_operands()
     }
 }

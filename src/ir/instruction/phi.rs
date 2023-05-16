@@ -23,7 +23,12 @@ impl Inst {
     }
 
     /// 向phi指令中添加一个操作数
-    pub fn add_operand(&mut self, operand: &Inst) {
+    pub fn add_operand(&mut self, operand: ObjPtr<Inst>) {
         self.user.push_operand(operand);
+    }
+
+    /// 获得phi指令的操作数列表
+    pub fn get_operands(&self) -> &Vec<ObjPtr<Inst>> {
+        self.user.get_operands()
     }
 }

@@ -1,11 +1,13 @@
+use crate::utility::ObjPtr;
+
 use super::{basicblock::BasicBlock, instruction::Inst, ir_type::IrType, value::Value};
 use std::collections::HashMap;
 
 pub struct Function {
     value: Value,
     return_type: IrType,
-    parameters: HashMap<&'static str, &'static Inst>,
-    head_block: Option<&'static BasicBlock>,
+    parameters: HashMap<&'static str, ObjPtr<Inst>>,
+    head_block: Option<ObjPtr<BasicBlock>>,
 }
 
 impl Function {
@@ -39,13 +41,13 @@ impl Function {
     }
 
     /// 将第一个BB加入到函数中
-    pub fn insert_first_bb(&mut self, bb: &BasicBlock) {
+    pub fn insert_first_bb(&mut self, bb: ObjPtr<BasicBlock>) {
         debug_assert_eq!(self.head_block.is_none(), true);
         self.head_block = Some(bb);
     }
 
     /// 获得第一个块，默认为非空块
-    pub fn get_head(&self) -> &BasicBlock {
+    pub fn get_head(&self) -> ObjPtr<BasicBlock> {
         match self.head_block {
             Some(bb) => bb,
             None => panic!("尝试获得一个空的BB"),
@@ -53,15 +55,15 @@ impl Function {
     }
 
     /// 为函数增加参数
-    pub fn set_parameter(&mut self, name: &str, parameter: &Inst) {
+    pub fn set_parameter(&mut self, name: &str, parameter: ObjPtr<Inst>) {
         self.parameters.insert(name, parameter);
     }
 
     /// 获得参数
     /// 默认参数存在
-    pub fn get_parameter(&self, name: &str) -> &Inst {
+    pub fn get_parameter(&self, name: &str) -> ObjPtr<Inst> {
         match self.parameters.get(name) {
-            Some(p) => p,
+            Some(p) => *p,
             None => panic!("尝试获得不存在的参数"),
         }
     }

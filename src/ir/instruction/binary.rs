@@ -7,9 +7,9 @@ impl Inst {
     /// # Arguments
     /// * `lhs` - 左操作数
     /// * `rhs` - 右操作数
-    pub fn make_add(lhs: &Inst, rhs: &Inst) -> Self {
+    pub fn make_add(lhs: ObjPtr<Inst>, rhs: ObjPtr<Inst>) -> Self {
         Self::new(
-            lhs.get_ir_type(),
+            lhs.as_ref().get_ir_type(),
             InstKind::Binary(BinOp::Add),
             vec![lhs, rhs],
         )
@@ -19,9 +19,9 @@ impl Inst {
     /// # Arguments
     /// * `lhs` - 左操作数
     /// * `rhs` - 右操作数
-    pub fn make_sub(lhs: &Inst, rhs: &Inst) -> Self {
+    pub fn make_sub(lhs: ObjPtr<Inst>, rhs: ObjPtr<Inst>) -> Self {
         Self::new(
-            lhs.get_ir_type(),
+            lhs.as_ref().get_ir_type(),
             InstKind::Binary(BinOp::Sub),
             vec![lhs, rhs],
         )
@@ -31,9 +31,9 @@ impl Inst {
     /// # Arguments
     /// * `lhs` - 左操作数
     /// * `rhs` - 右操作数
-    pub fn make_mul(lhs: &Inst, rhs: &Inst) -> Self {
+    pub fn make_mul(lhs: ObjPtr<Inst>, rhs: ObjPtr<Inst>) -> Self {
         Self::new(
-            lhs.get_ir_type(),
+            lhs.as_ref().get_ir_type(),
             InstKind::Binary(BinOp::Mul),
             vec![lhs, rhs],
         )
@@ -43,9 +43,9 @@ impl Inst {
     /// # Arguments
     /// * `lhs` - 左操作数
     /// * `rhs` - 右操作数
-    pub fn make_div(lhs: &Inst, rhs: &Inst) -> Self {
+    pub fn make_div(lhs: ObjPtr<Inst>, rhs: ObjPtr<Inst>) -> Self {
         Self::new(
-            lhs.get_ir_type(),
+            lhs.as_ref().get_ir_type(),
             InstKind::Binary(BinOp::Div),
             vec![lhs, rhs],
         )
@@ -55,9 +55,9 @@ impl Inst {
     /// # Arguments
     /// * `lhs` - 左操作数
     /// * `rhs` - 右操作数
-    pub fn make_rem(lhs: &Inst, rhs: &Inst) -> Self {
+    pub fn make_rem(lhs: ObjPtr<Inst>, rhs: ObjPtr<Inst>) -> Self {
         Self::new(
-            lhs.get_ir_type(),
+            lhs.as_ref().get_ir_type(),
             InstKind::Binary(BinOp::Rem),
             vec![lhs, rhs],
         )
@@ -67,9 +67,9 @@ impl Inst {
     /// # Arguments
     /// * `lhs` - 左操作数
     /// * `rhs` - 右操作数
-    pub fn make_and(lhs: &Inst, rhs: &Inst) -> Self {
+    pub fn make_and(lhs: ObjPtr<Inst>, rhs: ObjPtr<Inst>) -> Self {
         Self::new(
-            lhs.get_ir_type(),
+            lhs.as_ref().get_ir_type(),
             InstKind::Binary(BinOp::And),
             vec![lhs, rhs],
         )
@@ -79,9 +79,9 @@ impl Inst {
     /// # Arguments
     /// * `lhs` - 左操作数
     /// * `rhs` - 右操作数
-    pub fn make_or(lhs: &Inst, rhs: &Inst) -> Self {
+    pub fn make_or(lhs: ObjPtr<Inst>, rhs: ObjPtr<Inst>) -> Self {
         Self::new(
-            lhs.get_ir_type(),
+            lhs.as_ref().get_ir_type(),
             InstKind::Binary(BinOp::Or),
             vec![lhs, rhs],
         )
@@ -91,9 +91,9 @@ impl Inst {
     /// # Arguments
     /// * `lhs` - 左操作数
     /// * `rhs` - 右操作数
-    pub fn make_le(lhs: &Inst, rhs: &Inst) -> Self {
+    pub fn make_le(lhs: ObjPtr<Inst>, rhs: ObjPtr<Inst>) -> Self {
         Self::new(
-            lhs.get_ir_type(),
+            lhs.as_ref().get_ir_type(),
             InstKind::Binary(BinOp::Le),
             vec![lhs, rhs],
         )
@@ -103,9 +103,9 @@ impl Inst {
     /// # Arguments
     /// * `lhs` - 左操作数
     /// * `rhs` - 右操作数
-    pub fn make_lt(lhs: &Inst, rhs: &Inst) -> Self {
+    pub fn make_lt(lhs: ObjPtr<Inst>, rhs: ObjPtr<Inst>) -> Self {
         Self::new(
-            lhs.get_ir_type(),
+            lhs.as_ref().get_ir_type(),
             InstKind::Binary(BinOp::Lt),
             vec![lhs, rhs],
         )
@@ -115,9 +115,9 @@ impl Inst {
     /// # Arguments
     /// * `lhs` - 左操作数
     /// * `rhs` - 右操作数
-    pub fn make_ge(lhs: &Inst, rhs: &Inst) -> Self {
+    pub fn make_ge(lhs: ObjPtr<Inst>, rhs: ObjPtr<Inst>) -> Self {
         Self::new(
-            lhs.get_ir_type(),
+            lhs.as_ref().get_ir_type(),
             InstKind::Binary(BinOp::Ge),
             vec![lhs, rhs],
         )
@@ -127,9 +127,9 @@ impl Inst {
     /// # Arguments
     /// * `lhs` - 左操作数
     /// * `rhs` - 右操作数
-    pub fn make_gt(lhs: &Inst, rhs: &Inst) -> Self {
+    pub fn make_gt(lhs: ObjPtr<Inst>, rhs: ObjPtr<Inst>) -> Self {
         Self::new(
-            lhs.get_ir_type(),
+            lhs.as_ref().get_ir_type(),
             InstKind::Binary(BinOp::Gt),
             vec![lhs, rhs],
         )
@@ -139,9 +139,9 @@ impl Inst {
     /// # Arguments
     /// * `lhs` - 左操作数
     /// * `rhs` - 右操作数
-    pub fn make_eq(lhs: &Inst, rhs: &Inst) -> Self {
+    pub fn make_eq(lhs: ObjPtr<Inst>, rhs: ObjPtr<Inst>) -> Self {
         Self::new(
-            lhs.get_ir_type(),
+            lhs.as_ref().get_ir_type(),
             InstKind::Binary(BinOp::Eq),
             vec![lhs, rhs],
         )
@@ -151,31 +151,31 @@ impl Inst {
     /// # Arguments
     /// * `lhs` - 左操作数
     /// * `rhs` - 右操作数
-    pub fn make_ne(lhs: &Inst, rhs: &Inst) -> Self {
+    pub fn make_ne(lhs: ObjPtr<Inst>, rhs: ObjPtr<Inst>) -> Self {
         Self::new(
-            lhs.get_ir_type(),
+            lhs.as_ref().get_ir_type(),
             InstKind::Binary(BinOp::Ne),
             vec![lhs, rhs],
         )
     }
 
     /// 获得左操作数
-    pub fn get_lhs(&self) -> &Inst {
+    pub fn get_lhs(&self) -> ObjPtr<Inst> {
         self.user.get_operand(0)
     }
 
     /// 获得右操作数
-    pub fn get_rhs(&self) -> &Inst {
+    pub fn get_rhs(&self) -> ObjPtr<Inst> {
         self.user.get_operand(1)
     }
 
     /// 修改左操作数
-    pub fn set_lhs(&mut self, lhs: &Inst) {
+    pub fn set_lhs(&mut self, lhs: ObjPtr<Inst>) {
         self.user.set_operand(0, lhs);
     }
 
     /// 修改右操作数
-    pub fn set_rhs(&mut self, rhs: &Inst) {
+    pub fn set_rhs(&mut self, rhs: ObjPtr<Inst>) {
         self.user.set_operand(1, rhs);
     }
 }

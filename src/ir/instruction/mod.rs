@@ -3,6 +3,7 @@
 ///! 所有Inst类型的公有方法和Head的简单实现。特定的
 ///! inst的相关实现放在当前目录下的其他文件中。
 use super::{ir_type::IrType, user::User, IList};
+use crate::utility::ObjPtr;
 mod alloca;
 mod binary;
 mod branch;
@@ -85,7 +86,7 @@ pub enum UnOp {
 
 impl Inst {
     /// Inst的构造指令，建议使用各类型指令的函数来创建
-    pub fn new(ir_type: IrType, kind: InstKind, operands: Vec<&Inst>) -> Self {
+    pub fn new(ir_type: IrType, kind: InstKind, operands: Vec<ObjPtr<Inst>>) -> Self {
         Self {
             user: User::new(ir_type, operands),
             list: IList {
@@ -104,14 +105,14 @@ impl Inst {
         self.kind
     }
 
-    pub fn get_use_list(&self) -> &mut Vec<&Inst> {
+    pub fn get_use_list(&self) -> &mut Vec<ObjPtr<Inst>> {
         self.user.get_use_list()
     }
 
     // 链表行为
     /// 判断是否为当前bb的第一条指令
     pub fn is_head(&self) -> bool {
-        match self.list.get_prev().get_kind() {
+        match self.list.get_prev().as_ref().get_kind() {
             Head => true,
             _ => false,
         }
@@ -120,14 +121,14 @@ impl Inst {
     /// 判断是否为当前bb的最后一条指令
     pub fn is_tail(&self) -> bool {
         // 同上
-        match self.list.get_next().get_kind() {
+        match self.list.get_next().as_ref().get_kind() {
             Head => true,
             _ => false,
         }
     }
 
     /// 获得当前指令的前一条指令。若为第一条指令，则返回None
-    pub fn get_prev(&self) -> Option<&Inst> {
+    pub fn get_prev(&self) -> Option<ObjPtr<Inst>> {
         if self.is_head() {
             None
         } else {
@@ -136,7 +137,7 @@ impl Inst {
     }
 
     /// 获得当前指令的下一条指令。若为最后一条指令，则返回None
-    pub fn get_next(&self) -> Option<&Inst> {
+    pub fn get_next(&self) -> Option<ObjPtr<Inst>> {
         if self.is_tail() {
             None
         } else {
@@ -145,37 +146,30 @@ impl Inst {
     }
 
     /// 在当前指令之前插入一条指令
-    pub fn insert_before(&mut self, inst: &mut Inst) {
-        debug_assert_ne!(self.list.prev, None);
-
-        let p = self.list.get_prev_mut();
+    pub fn insert_before(&mut self, inst: ObjPtr<Inst>) {
+        let p = self.list.get_prev().as_mut();
         self.list.set_prev(inst);
         p.list.set_next(inst);
-        inst.list.set_prev(p);
-        inst.list.set_next(self);
+        inst.as_mut().list.set_prev(ObjPtr::new(p));
+        inst.as_mut().list.set_next(ObjPtr::new(p));
     }
 
     /// 在当前指令之后插入一条指令
-    pub fn insert_after(&mut self, inst: &mut Inst) {
-        debug_assert_ne!(self.list.next, None);
-
-        let p = self.list.get_next_mut();
+    pub fn insert_after(&mut self, inst: ObjPtr<Inst>) {
+        let p = self.list.get_next().as_mut();
         self.list.set_next(inst);
         p.list.set_prev(inst);
-        inst.list.set_prev(self);
-        inst.list.set_next(self);
+        inst.as_mut().list.set_prev(ObjPtr::new(self));
+        inst.as_mut().list.set_next(ObjPtr::new(self));
     }
 
     /// 把自己从指令中移除
     pub fn remove_self(&mut self) {
-        debug_assert_ne!(self.list.next, None);
-        debug_assert_ne!(self.list.prev, None);
+        let next = self.list.get_next().as_mut();
+        let prev = self.list.get_prev().as_mut();
 
-        let next = self.list.get_next_mut();
-        let prev = self.list.get_prev_mut();
-
-        next.list.set_prev(prev);
-        prev.list.set_next(next);
+        next.list.set_prev(ObjPtr::new(prev));
+        prev.list.set_next(ObjPtr::new(next));
 
         self.list.next = None;
         self.list.prev = None;
@@ -188,8 +182,8 @@ impl Inst {
     /// 初始化Head
     pub fn init_head(&mut self) {
         if let Head = self.kind {
-            self.list.set_prev(self);
-            self.list.set_next(self);
+            self.list.set_prev(ObjPtr::new(self));
+            self.list.set_next(ObjPtr::new(self));
         } else {
             debug_assert!(false);
         }
