@@ -247,7 +247,7 @@ impl LIRInst {
         }
     }
 
-    // LoadFromStack, StoreToStack:
+    // LoadFromStack, StoreToStack, Load, Store:
     pub fn set_offset(&mut self, offset: IImm) {
         self.operands[2] = Operand::IImm(offset);
     }

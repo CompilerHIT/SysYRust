@@ -3,7 +3,7 @@ use crate::backend::operand::ToString;
 
 impl GenerateAsm for LIRInst { 
     fn generate(&self, context: ObjPtr<Context>, f: &mut std::fs::File) -> Result<()> {
-        let mut builder = AsmBuilder::new(f, "");
+        let mut builder = AsmBuilder::new(f);
         match self.get_type() {
             InstrsType::Binary(op) => {
                 let op = match op {
@@ -41,20 +41,50 @@ impl GenerateAsm for LIRInst {
                 Ok(())
             },
             InstrsType::ChangeSp => {
-                let mut builder = AsmBuilder::new(f, "");
+                let mut builder = AsmBuilder::new(f);
                 let imm = self.get_change_sp_offset();
                 builder.addi("sp", "sp", imm)?;
                 Ok(())
             },
             InstrsType::Load => {
-                //TODO:
+                //FIXME: only call ld -- lw...to implement
+                let mut builder = AsmBuilder::new(f);
+                let offset = self.get_offset();
+                if !offset.is_imm_12bs() {
+                    panic!("illegal offset");
+                }
+                let dst = match self.get_dst() {
+                    Operand::Reg(reg) => reg.to_string(),
+                    _ => panic!("dst of load must be reg, to improve"),
+                };
+                let addr = match self.get_lhs() {
+                    Operand::Reg(reg) => reg.to_string(),
+                    _ => panic!("src of load must be reg, to improve"),
+                };
+                
+                builder.ld(&dst, &addr, offset.get_data(), false);
                 Ok(())
             },
             InstrsType::Store => {
+                //FIXME: only call sd -- sw...to implement
+                let mut builder = AsmBuilder::new(f);
+                let offset = self.get_offset();
+                if !offset.is_imm_12bs() {
+                    panic!("illegal offset");
+                }
+                let src = match self.get_lhs() {
+                    Operand::Reg(reg) => reg.to_string(),
+                    _ => panic!("src of store must be reg, to improve"),
+                };
+                let addr = match self.get_dst() {
+                    Operand::Reg(reg) => reg.to_string(),
+                    _ => panic!("dst of store must be reg, to improve"),
+                };
+                builder.sd(&src, &addr, offset.get_data(), false);
                 Ok(())
             },
             InstrsType::StoreToStack => {
-                let mut builder = AsmBuilder::new(f, "");
+                let mut builder = AsmBuilder::new(f);
                 if !self.get_offset().is_imm_12bs() {
                     panic!("illegal offset");
                 }
@@ -75,7 +105,7 @@ impl GenerateAsm for LIRInst {
                 Ok(())
             },
             InstrsType::LoadFromStack => {
-                let mut builder = AsmBuilder::new(f, "");
+                let mut builder = AsmBuilder::new(f);
                 if !self.get_offset().is_imm_12bs() {
                     panic!("illegal offset");
                 }
@@ -110,7 +140,7 @@ impl GenerateAsm for LIRInst {
             },
             InstrsType::Ret(..) => {
                 context.as_ref().call_epilogue_event();
-                let mut builder = AsmBuilder::new(f, "");
+                let mut builder = AsmBuilder::new(f);
                 builder.ret()?;
                 Ok(())
             }
