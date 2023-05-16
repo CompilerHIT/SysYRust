@@ -1,5 +1,5 @@
 ///! 此文件为 load 指令的实现
-use super::{Inst, InstKind};
+use super::*;
 
 impl Inst {
     /// 加载一个int值
@@ -8,7 +8,7 @@ impl Inst {
     /// * 'offset' - 偏移量
     /// # Return
     /// 返回一个Inst实例
-    pub fn make_int_load(ptr: &Inst, offset: &Inst) -> Self {
+    pub fn make_int_load(ptr: ObjPtr<Inst>, offset: ObjPtr<Inst>) -> Self {
         Self::new(
             crate::ir::ir_type::IrType::Int,
             InstKind::Load,
@@ -22,7 +22,7 @@ impl Inst {
     /// * 'offset' - 偏移量
     /// # Return
     /// 返回一个Inst实例
-    pub fn make_global_int_load(ptr: &Inst, offset: &Inst) -> Self {
+    pub fn make_global_int_load(ptr: ObjPtr<Inst>, offset: ObjPtr<Inst>) -> Self {
         Self::new(
             crate::ir::ir_type::IrType::Int,
             InstKind::Load,
@@ -36,7 +36,7 @@ impl Inst {
     /// * 'offset' - 偏移量
     /// # Return
     /// 返回一个Inst实例
-    pub fn make_int_array_load(ptr: &Inst, offset: &Inst) -> Self {
+    pub fn make_int_array_load(ptr: ObjPtr<Inst>, offset: ObjPtr<Inst>) -> Self {
         Self::new(
             crate::ir::ir_type::IrType::Int,
             InstKind::Load,
@@ -50,7 +50,7 @@ impl Inst {
     /// * 'offset' - 偏移量
     /// # Return
     /// 返回一个Inst实例
-    pub fn make_global_int_array_load(ptr: &Inst, offset: &Inst) -> Self {
+    pub fn make_global_int_array_load(ptr: ObjPtr<Inst>, offset: ObjPtr<Inst>) -> Self {
         Self::new(
             crate::ir::ir_type::IrType::IntPtr,
             InstKind::Load,
@@ -64,7 +64,7 @@ impl Inst {
     /// * 'offset' - 偏移量
     /// # Return
     /// 返回一个Inst实例
-    pub fn make_float_load(ptr: &Inst, offset: &Inst) -> Self {
+    pub fn make_float_load(ptr: ObjPtr<Inst>, offset: ObjPtr<Inst>) -> Self {
         Self::new(
             crate::ir::ir_type::IrType::Float,
             InstKind::Load,
@@ -78,7 +78,7 @@ impl Inst {
     /// * 'offset' - 偏移量
     /// # Return
     /// 返回一个Inst实例
-    pub fn make_global_float_load(ptr: &Inst, offset: &Inst) -> Self {
+    pub fn make_global_float_load(ptr: ObjPtr<Inst>, offset: ObjPtr<Inst>) -> Self {
         Self::new(
             crate::ir::ir_type::IrType::Float,
             InstKind::Load,
@@ -92,7 +92,7 @@ impl Inst {
     /// * 'offset' - 偏移量
     /// # Return
     /// 返回一个Inst实例
-    pub fn make_float_array_load(ptr: &Inst, offset: &Inst) -> Self {
+    pub fn make_float_array_load(ptr: ObjPtr<Inst>, offset: ObjPtr<Inst>) -> Self {
         Self::new(
             crate::ir::ir_type::IrType::Float,
             InstKind::Load,
@@ -106,7 +106,7 @@ impl Inst {
     /// * 'offset' - 偏移量
     /// # Return
     /// 返回一个Inst实例
-    pub fn make_global_float_array_load(ptr: &Inst, offset: &Inst) -> Self {
+    pub fn make_global_float_array_load(ptr: ObjPtr<Inst>, offset: ObjPtr<Inst>) -> Self {
         Self::new(
             crate::ir::ir_type::IrType::FloatPtr,
             InstKind::Load,
@@ -117,28 +117,28 @@ impl Inst {
     /// 获得指针
     /// # Return
     /// 返回指针的引用
-    pub fn get_ptr(&self) -> &Inst {
-        &self.user.get_operand(0)
+    pub fn get_ptr(&self) -> ObjPtr<Inst> {
+        self.user.get_operand(0)
     }
 
     /// 获得偏移量
     /// # Return
     /// 返回偏移量的引用
-    pub fn get_offset(&self) -> &Inst {
-        &self.user.get_operand(1)
+    pub fn get_offset(&self) -> ObjPtr<Inst> {
+        self.user.get_operand(1)
     }
 
     /// 修改指针
     /// # Arguments
     /// * 'ptr' - 新的指针
-    pub fn set_ptr(&mut self, ptr: &Inst) {
+    pub fn set_ptr(&mut self, ptr: ObjPtr<Inst>) {
         self.user.set_operand(0, ptr);
     }
 
     /// 修改偏移量
     /// # Arguments
     /// * 'offset' - 新的偏移量
-    pub fn set_offset(&mut self, offset: &Inst) {
+    pub fn set_offset(&mut self, offset: ObjPtr<Inst>) {
         self.user.set_operand(1, offset);
     }
 }

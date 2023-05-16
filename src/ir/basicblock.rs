@@ -1,4 +1,5 @@
 use super::{instruction::Inst, ir_type::IrType, value::Value};
+use crate::utility::ObjPtr;
 pub struct BasicBlock {
     value: Value,
     inst_head: Inst,
@@ -25,24 +26,24 @@ impl BasicBlock {
     }
 
     /// 获取BasicBlock的第一条指令
-    pub fn get_head_inst(&self) -> &Inst {
+    pub fn get_head_inst(&self) -> ObjPtr<Inst> {
         assert_eq!(self.is_empty(), false);
         self.inst_head.get_next().unwrap()
     }
 
     /// 获取BasicBlock的最后一条指令
-    pub fn get_tail_inst(&self) -> &Inst {
+    pub fn get_tail_inst(&self) -> ObjPtr<Inst> {
         assert_eq!(self.is_empty(), false);
         self.inst_head.get_prev().unwrap()
     }
 
     /// 将指令插入到BasicBlock的最后
-    pub fn push_back(&mut self, inst: &mut Inst) {
+    pub fn push_back(&mut self, inst: ObjPtr<Inst>) {
         self.inst_head.insert_before(inst);
     }
 
     /// 将指令插入到BasicBlock的最前
-    pub fn push_front(&mut self, inst: &mut Inst) {
+    pub fn push_front(&mut self, inst: ObjPtr<Inst>) {
         self.inst_head.insert_after(inst);
     }
 

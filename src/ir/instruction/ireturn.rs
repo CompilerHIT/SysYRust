@@ -5,7 +5,7 @@ impl Inst {
     /// 创建return指令
     /// # Arguments
     /// * 'value' - 返回值
-    pub fn make_return(value: &Inst) -> Self {
+    pub fn make_return(value: ObjPtr<Inst>) -> Self {
         Self {
             user: User::new(IrType::Void, vec![value]),
             list: IList {
@@ -17,7 +17,7 @@ impl Inst {
     }
 
     /// 获得返回值
-    pub fn get_return_value(&self) -> &Inst {
+    pub fn get_return_value(&self) -> ObjPtr<Inst> {
         self.user.get_operand(0)
     }
 }

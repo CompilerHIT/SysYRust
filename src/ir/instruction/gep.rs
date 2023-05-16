@@ -1,5 +1,5 @@
 ///! 此模块为 GEP 指令提供了实现
-use super::{Inst, InstKind};
+use super::*;
 impl Inst {
     /// 构造一个 GEP 指令
     ///
@@ -8,7 +8,7 @@ impl Inst {
     /// * 'offset' - 偏移量
     /// # Returns
     /// 构造好的 GEP 指令
-    pub fn make_gep(ptr: &Inst, offset: &Inst) -> Inst {
+    pub fn make_gep(ptr: ObjPtr<Inst>, offset: ObjPtr<Inst>) -> Inst {
         Inst::new(
             crate::ir::ir_type::IrType::IntPtr,
             InstKind::Gep,
@@ -17,22 +17,22 @@ impl Inst {
     }
 
     /// 获得 GEP 指令的指针
-    pub fn get_gep_ptr(&self) -> &Inst {
+    pub fn get_gep_ptr(&self) -> ObjPtr<Inst> {
         self.user.get_operand(0)
     }
 
     /// 设置 GEP 指令的指针
-    pub fn set_gep_ptr(&mut self, ptr: &Inst) {
+    pub fn set_gep_ptr(&mut self, ptr: ObjPtr<Inst>) {
         self.user.set_operand(0, ptr);
     }
 
     /// 获得 GEP 指令的偏移量
-    pub fn get_gep_offset(&self) -> &Inst {
+    pub fn get_gep_offset(&self) -> ObjPtr<Inst> {
         self.user.get_operand(1)
     }
 
     /// 设置 GEP 指令的偏移量
-    pub fn set_gep_offset(&mut self, offset: &Inst) {
+    pub fn set_gep_offset(&mut self, offset: ObjPtr<Inst>) {
         self.user.set_operand(1, offset);
     }
 }

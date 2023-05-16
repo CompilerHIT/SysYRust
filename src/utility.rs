@@ -19,8 +19,12 @@ impl<T> ObjPtr<T> {
         unsafe { self.0.as_ref() }
     }
 
-    pub fn as_mut(mut self) -> &'static T {
+    pub fn as_mut(mut self) -> &'static mut T {
         unsafe { self.0.as_mut() }
+    }
+
+    pub fn new(ptr: &'static T) -> Self {
+        unsafe { Self(NonNull::new_unchecked(ptr as *const _ as *mut _)) }
     }
 }
 
@@ -52,11 +56,7 @@ impl<T> ObjPool<T> {
     pub fn put(&mut self, value: T) -> ObjPtr<T> {
         self.data.push(Box::pin(value));
         let p = self.data.last_mut().unwrap();
-        unsafe {
-            ObjPtr(NonNull::new_unchecked(
-                p.as_ref().get_ref() as *const _ as *mut _
-            ))
-        }
+        ObjPtr::new(p)
     }
 
     pub fn free_all(&mut self) {
