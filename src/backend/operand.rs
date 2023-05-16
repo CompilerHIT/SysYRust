@@ -19,7 +19,7 @@ pub struct IImm {
 
 #[derive(Clone, Copy, PartialEq)]
 pub struct FImm {
-    data: f64
+    data: f32
 }
 
 impl IImm {
@@ -32,10 +32,10 @@ impl IImm {
 }
 
 impl FImm {
-    pub fn new(data: f64) -> Self {
+    pub fn new(data: f32) -> Self {
         Self { data }
     }
-    pub fn get_data(&self) -> f64 {
+    pub fn get_data(&self) -> f32 {
         self.data
     }
 }

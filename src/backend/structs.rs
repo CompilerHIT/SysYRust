@@ -3,15 +3,17 @@ use std::fs::File;
 use std::hash::{Hash, Hasher};
 use std::io::{Result, Write};
 
-use crate::backend::{instrs::LIRInst, operand::{Reg, IImm, FImm}, asm_builder::AsmBuilder, module::AsmModule};
+use crate::utility::{ScalarType, ObjPool, ObjPtr};
 use crate::ir::basicblock::BasicBlock;
-use crate::ir::instruction::{Instruction, const_int::ConstInt};
+use crate::ir::instruction::{Inst, InstKind};
 use crate::ir::function::Function;
 use crate::ir::ir_type;
-use crate::ir::instruction::return_inst::ReturnInst;
-use crate::utility::{ScalarType, ObjPool, ObjPtr};
+use crate::backend::instrs::{LIRInst, InstrsType, SingleOp};
+use crate::backend::operand::{Reg, IImm, FImm};
+use crate::backend::asm_builder::AsmBuilder;
+use crate::backend::module::AsmModule;
 
-use super::instrs::*;
+use super::instrs::Operand;
 
 #[derive(Clone)]
 pub struct IGlobalVar {
@@ -24,6 +26,13 @@ pub struct FGlobalVar {
     name: String,
     init: bool,
     value:FImm,
+}
+
+//TODO: to implement const array
+#[derive(Clone)]
+pub enum GlobalVar {
+    IGlobalVar(IGlobalVar),
+    FGlobalVar(FGlobalVar)
 }
 
 #[derive(Clone, PartialEq)]
@@ -51,6 +60,8 @@ pub struct BB {
     live_def: HashSet<Reg>,
     live_in: HashSet<Reg>,
     live_out: HashSet<Reg>,
+
+    insts_mpool: ObjPool<LIRInst>,
 }
 
 #[derive(Clone)]
@@ -74,6 +85,8 @@ pub struct Func {
     fregs: HashSet<Reg>,
 
     context: Option<ObjPtr<Context>>,
+
+    blocks_mpool: ObjPool<BB>,
 }
 
 impl BB {
@@ -88,49 +101,57 @@ impl BB {
             live_def: HashSet::new(),
             live_in: HashSet::new(),
             live_out: HashSet::new(),
+            insts_mpool: ObjPool::new(),
         }
     }
 
+    // 删除BB时清空当前块维护的内存池
+    pub fn del(&self) {
+        self.insts_mpool.free_all()
+    }
+
     pub fn construct(&mut self, block: ObjPtr<BasicBlock>, next_block: ObjPtr<BB>) {
-        //TODO: update ir translation，to use ObjPtr match
-        // let ir_block_inst = block.as_ref().get_dummy_head_inst();
-        // while let Some(inst) = ir_block_inst.as_mut().next() {
-        //     let inst_borrow = inst.borrow();
-        //     let dr_inst = inst_borrow.as_any();
-
-            //TODO: wait for ir:
-            // if let Some(inst1) = dr_inst.downcast_ref::<IR::Instructruction>() {
-
-            // } else if let Some(inst2) = dr_inst.downcast_mut::<IR::Instructruction>() {
-
-            // }
-            // ...
-            // else {
-            //     panic!("fail to downcast inst");
-            // }
-            // if let Some(inst) = dr_inst.downcast_ref::<ReturnInst>() {
-            //     match inst.get_value_type() {
-            //         ir_type::IrType::Void => self.insts.push(Pointer::new(Box::new(Return::new(ScalarType::Void)))),
-            //         ir_type::IrType::Int => {
-            //             let src = inst.get_return_value();
-            //             let src_operand = self.resolvOperand(src);
-            //             self.insts.push(Pointer::new(Box::new(OpReg::new(
-            //                 SingleOp::Mov, 
-            //                 Reg::new(0, ScalarType::Int),
-            //                 src_operand,
-            //             ))));
-            //             self.insts.push(Pointer::new(Box::new(Return::new(ScalarType::Int))));
-            //         },
-            //         ir_type::IrType::Float => {
-            //             //TODO:
-            //         },
-            //         _ => panic!("cannot reach, Return false")
-            //     }
-            // }
-            // if Pointer::point_eq(&inst, &block.borrow().get_tail_inst().unwrap()) {
-            //     break;
-            // }
-        // }
+        let mut ir_block_inst = block.as_ref().get_head_inst();
+        loop {
+            let inst_ref = ir_block_inst.as_ref();
+            // translate ir to lir, use match
+            match inst_ref.get_kind() {
+                InstKind::Return => {
+                    match inst_ref.get_ir_type() {
+                        ir_type::IrType::Void => self.insts.push(
+                            self.insts_mpool.put(
+                                LIRInst::new(InstrsType::Ret(ScalarType::Void), vec![])
+                            )
+                        ),
+                        ir_type::IrType::Int => {
+                            let src = inst_ref.get_return_value();
+                            let src_operand = self.resolvOperand(src);
+                            self.insts.push(
+                                self.insts_mpool.put(
+                                    LIRInst::new(InstrsType::OpReg(SingleOp::Mov), vec![src_operand])
+                                )
+                            );
+                            self.insts.push(
+                                self.insts_mpool.put(
+                                    LIRInst::new(InstrsType::Ret(ScalarType::Int), vec![])
+                                )
+                            );
+                        },
+                        ir_type::IrType::Float => {
+                            //TODO:
+                        },
+                        _ => panic!("cannot reach, Return false")
+                    }
+                }
+                _ => {
+                // TODO: ir translation.
+                }
+            }
+            if let Some(ir_block_inst) = ir_block_inst.as_ref().get_next() {} 
+            else {
+                break;
+            }
+        }
     }
 
     pub fn push_back(&mut self, inst: ObjPtr<LIRInst>) {
@@ -141,15 +162,17 @@ impl BB {
         self.insts.append(inst);
     }
 
-    // fn resolvOperand(&self, src: ObjPtr<LIRInst>) -> Operand {
-    //     //TODO: ObjPtr match
-    //     if let Some(iimm) = src.borrow().as_any().downcast_ref::<ConstInt>() {
-    //         return Operand::IImm(IImm::new(iimm.get_bonding()));
-    //     } else {
-    //         //TODO:
-    //         panic!("to realize more operand solution");
-    //     }
-    // }
+    fn resolvOperand(&self, src: ObjPtr<Inst>) -> Operand {
+        //TODO: ObjPtr match
+        match src.as_ref().get_kind() {
+            //TODO: resolve different kind of operand
+            InstKind::ConstInt(iimm) => resolveConstInt(iimm),
+            InstKind::ConstFloat(fimm) => resolveConstFloat(fimm),
+            InstKind::GlobalConstInt(_) => resolveGlobalVar(src),
+            InstKind::GlobalConstFloat(_) => resolveGlobalVar(src),
+            _ => {}
+        }
+    }
 
     // fn clear_reg_info(&mut self) {
     //     self.live_def.clear();
@@ -186,14 +209,21 @@ impl Func {
             fregs: HashSet::new(),
 
             context: None,
+
+            blocks_mpool: ObjPool::new(),
         }
+    }
+
+    // 或许不会删除函数？
+    pub fn del(&self) {
+        self.blocks_mpool.free_all()
     }
 
     pub fn construct(&mut self, module: &AsmModule) {
         //FIXME: temporary
         let func_map = module.get_funcs();
         for (name, func_p) in func_map {
-            self.label = name.clone();
+            self.label = name.to_string();
             // more infos to add
             let show = format!(".entry_{name}");
             self.entry = Some(BB::new(&show));
@@ -261,7 +291,8 @@ impl Func {
     }
 
     pub fn allocate_reg(&mut self, f: &'static mut File) {
-        //FIXME: 暂时使用固定的寄存器ra与s0，即r1, r8
+        // 函数返回地址保存在ra中
+        //FIXME: 暂时使用固定的寄存器ra、a0与s0，即r1, r8, r10
         //FIXME:暂时只考虑int型
         let reg_int = vec![Reg::new(1, ScalarType::Int), Reg::new(8, ScalarType::Int)];
 
@@ -275,13 +306,13 @@ impl Func {
         let mut reg_int_res_cl = reg_int_res.clone();
         let reg_int_size = reg_int_res.len();
         
-        //TODO:栈对齐 - 8字节
+        //TODO:栈对齐 - 调用func时sp需按16字节对齐
 
         let mut offset = stack_size;
         let mut f1 = f.try_clone().unwrap();
         if let Some(contxt) = &self.context {
             contxt.as_mut().set_prologue_event(move||{
-                let mut builder = AsmBuilder::new(f, "");
+                let mut builder = AsmBuilder::new(f);
                 // addi sp -stack_size
                 builder.addi("sp", "sp", -offset);
                 for src in reg_int_res.iter() {
@@ -291,7 +322,7 @@ impl Func {
             });
             let mut offset = stack_size;
             contxt.as_mut().set_epilogue_event(move||{
-                let mut builder = AsmBuilder::new(&mut f1, "");
+                let mut builder = AsmBuilder::new(&mut f1);
                 for src in reg_int_res_cl.iter() {
                     offset -= 8;
                     builder.ld("sp", &src.to_string(), offset, false);
@@ -313,7 +344,7 @@ impl Func {
 
 impl GenerateAsm for Func {
     fn generate(&self, _: ObjPtr<Context>, f: &mut File) -> Result<()> {
-        AsmBuilder::new(f, "").show_func(&self.label);
+        AsmBuilder::new(f).show_func(&self.label);
         if let Some(contxt) = &self.context {
             contxt.as_mut().call_prologue_event();
             for block in self.blocks.iter() {
@@ -389,16 +420,31 @@ impl CurInstrInfo {
 }
 
 impl IGlobalVar {
-    pub fn new(name: String) -> Self {
-        Self { name, value: IImm::new(0), init: false }
+    pub fn init(name: String, value: i32, init: bool) -> Self {
+        Self { name, value: IImm::new(value), init }
     }
-    pub fn init(name: String, value: i32) -> Self {
-        Self { name, value: IImm::new(value), init: true }
+    pub fn new(name: String) -> Self {
+        Self::init(name, 0, false)
     }
     pub fn get_name(&self) -> &String {
         &self.name
     }
     pub fn get_init(&self) -> IImm {
+        self.value
+    }
+}
+
+impl FGlobalVar {
+    pub fn init(name: String, value: f32, init: bool) -> Self {
+        Self { name, value: FImm::new(value), init }
+    }
+    pub fn new(name: String) -> Self {
+        Self::init(name, 0.0, false)
+    }
+    pub fn get_name(&self) -> &String {
+        &self.name
+    }
+    pub fn get_init(&self) -> FImm {
         self.value
     }
 }
