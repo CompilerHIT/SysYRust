@@ -1,6 +1,8 @@
 mod asm_builder;
 mod instrs;
 mod generate;
+mod block;
+mod func;
 pub mod operand;
 pub mod structs;
 pub mod module;

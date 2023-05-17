@@ -3,7 +3,9 @@ pub use std::io::Result;
 use std::vec;
 use std::cmp::min;
 
-pub use crate::backend::structs::{BB, Func, Context, GenerateAsm};
+pub use crate::backend::structs::{Context, GenerateAsm};
+pub use crate::backend::block::BB;
+pub use crate::backend::func::Func;
 pub use crate::utility::{ScalarType, ObjPtr};
 pub use crate::backend::asm_builder::AsmBuilder;
 use crate::backend::operand::*;
