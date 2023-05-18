@@ -1,8 +1,10 @@
 pub use std::collections::{HashSet, VecDeque};
+use std::vec::Vec;
 pub use std::fs::File;
 pub use std::hash::{Hash, Hasher};
 pub use std::io::{Result, Write};
 
+use crate::ir::basicblock::BasicBlock;
 use crate::ir::function::Function;
 use crate::utility::{ScalarType, ObjPool, ObjPtr};
 use crate::backend::operand::Reg;
@@ -59,13 +61,51 @@ impl Func {
     pub fn construct(&mut self, module: &AsmModule, ir_func: &Function, func_seq: i32, ) {
         //FIXME: temporary
         // more infos to add
+        let mut info = Mapping::new();
+        
         self.entry = Some(BB::new(&self.label));
-        module.push_block(&self.label, &self.entry.unwrap());
-        let mut block = ir_func.get_head().as_ref();
+        // 第一遍pass
+        let mut fblock = ir_func.get_head();
+        let mut ir_block_set: HashSet<ObjPtr<BasicBlock>> = set_append(fblock.as_ref().get_next_bb());
+        let mut block_seq = 0;
+        while !fblock.as_ref().has_next_bb() {
+            block_seq += 1;
+            let label = format!(".LBB{func_seq}_{block_seq}");
+            info.block_map.insert(fblock.clone(), self.blocks_mpool.put(BB::new(&label)));
+            ir_block_set.union(&set_append(fblock.as_ref().get_next_bb()));
+            fblock = ir_block_set.iter().next().unwrap().clone();
+        }
+
         loop {
-            let label = format!(".L");
-            let mut bb = BB::new(&block.get)
-            
+            if !fblock.as_ref().has_next_bb() {
+                break;
+            }
+            info.block_map.iter().for_each(|(key, value)|{
+                if key == &fblock {
+                    self.blocks.push(value.clone());
+                }
+            });
+        }
+        let obj_entry = self.blocks_mpool.put(self.entry.unwrap());
+        self.blocks.push(obj_entry);
+
+        // 第一个块，非空
+        let mut bb = self.blocks_mpool.put(BB::new(label.as_str()));
+        self.entry.unwrap().out_edge.push(bb);
+        bb.as_ref().in_edge.push(obj_entry);
+        
+        info.block_map.insert(fblock, bb);
+        //TODO: 遇到global variable产生新的block, label为 .Lpcrel_hi{num}
+        loop {
+            if (fblock.as_ref().has_next_bb()) {
+                bb.as_ref().construct(fblock, fblock.as_ref().get_next_bb())
+            } else {
+                break;
+            }
+            block_seq += 1;
+            let label = format!(".LBB{func_seq}_{block_seq}");
+            let mut bb = BB::new(label.as_str());
+            bb.construct(block, next_block);
         }
         // 需要遍历block的接口
         // self.borrow_mut().blocks.push(Pointer::new(self.entry));
@@ -192,4 +232,12 @@ impl GenerateAsm for Func {
         }
         Ok(())
     }
+}
+
+fn set_append(blocks: &Vec<ObjPtr<BasicBlock>>) -> HashSet<ObjPtr<BasicBlock>>{
+    let mut set = HashSet::new();
+    for block in blocks.iter() {
+        set.insert(block.clone());
+    }
+    set
 }

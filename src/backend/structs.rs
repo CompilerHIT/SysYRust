@@ -1,12 +1,14 @@
 pub use std::collections::{HashSet, VecDeque};
+pub use std::collections::HashMap;
 pub use std::fs::File;
 pub use std::hash::{Hash, Hasher};
 pub use std::io::{Result, Write};
 
-use crate::utility::{ObjPtr};
+use crate::utility::ObjPtr;
 use crate::backend::operand::{IImm, FImm};
-use crate::backend::instrs::{LIRInst};
+use crate::backend::instrs::LIRInst;
 use crate::backend::block::BB;
+use crate::ir::basicblock::BasicBlock;
 
 
 #[derive(Clone)]
@@ -184,16 +186,28 @@ impl StackSlot {
     }
 }   
 
-impl PartialEq for BB {
+pub struct Mapping {
+    pub block_map: HashMap<ObjPtr<BasicBlock>, ObjPtr<BB>>,
+    
+}
+
+impl PartialEq for ObjPtr<BasicBlock> {
     fn eq(&self, other: &Self) -> bool {
-        self.label == other.label
+        std::ptr::eq(self.as_ref(), other.as_ref())
+    }
+}
+impl Eq for ObjPtr<BasicBlock> {}
+
+impl Hash for ObjPtr<BasicBlock> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        std::ptr::hash(self.as_ref(), state)
     }
 }
 
-impl Eq for BB {}
-
-impl Hash for BB {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.label.hash(state);
+impl Mapping {
+    pub fn new() -> Self {
+        Self {
+            block_map: HashMap::new(),
+        }
     }
 }

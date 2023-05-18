@@ -52,7 +52,7 @@ impl BB {
         self.insts_mpool.free_all()
     }
 
-    pub fn construct(&mut self, block: ObjPtr<BasicBlock>, next_block: ObjPtr<BB>) {
+    pub fn construct(&mut self, block: ObjPtr<BasicBlock>, next_blocks: ObjPtr<BasicBlock>, map_info: &Mapping) {
         let mut ir_block_inst = block.as_ref().get_head_inst();
         loop {
             let inst_ref = ir_block_inst.as_ref();
@@ -138,5 +138,19 @@ impl GenerateAsm for BB {
         }
 
         Ok(())
+    }
+}
+
+impl PartialEq for BB {
+    fn eq(&self, other: &Self) -> bool {
+        self.label == other.label
+    }
+}
+
+impl Eq for BB {}
+
+impl Hash for BB {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.label.hash(state);
     }
 }
