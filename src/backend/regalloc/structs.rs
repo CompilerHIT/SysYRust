@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 use std::collections::HashMap;
+use std::cmp::Ordering;
 
 #[derive(Clone)]
 pub struct RegUsedStat{
@@ -12,28 +13,47 @@ impl RegUsedStat {
     pub fn new()->RegUsedStat {
         RegUsedStat { iregs_used: 0, fregs_used: 0 }
     }
-    fn is_available_ireg(&self,ireg:i32)->bool {
+    pub fn is_available_ireg(&self,ireg:i32)->bool {
         if (1<<ireg&self.iregs_used) !=0 {
             return  true;
         }
         return  false;
     }
-    fn is_available_freg(&self,freg:i32)->bool {
+    pub fn is_available_freg(&self,freg:i32)->bool {
         if (1<<freg&self.fregs_used) !=0 {
             return  true;
         }
         return  false;
     }
 
+    pub fn num_available_iregs(&self)->i32 {
+        let mut out=0;
+        for i in 0..31 {
+            if self.is_available_ireg(i) {
+                out+=1;
+            }
+        }
+        out
+    }
+    pub fn num_available_fregs(&self)->i32 {
+        let mut out=0;
+        for i in 0..31 {
+            if self.is_available_freg(i) {
+                out+=1;
+            }
+        }
+        out
+    }
+
     // 获取一个可用的整数寄存器
-    fn get_available_ireg(&self)->Option<i32> {
+    pub fn get_available_ireg(&self)->Option<i32> {
         // 对于通用寄存器来说，x0-x4有特殊用途
         // x10-x17用来传递函数参数
 
-        // if self.iregs_used&(1<<3)==0 {
-        //     // gp寄存器x3保留来做优化
-        //     return Some(3)
-        // }
+        if self.iregs_used&(1<<3)==0 {
+            // gp寄存器x3,后面可能保留不分配用来做优化
+            return Some(3)
+        }
         for i in 5..=9 {
             if self.iregs_used&(1<<i)==0 {
                 return Some(i)
@@ -48,7 +68,7 @@ impl RegUsedStat {
     }
     
     // 获取一个可用的浮点寄存器
-    fn get_available_freg(&self)->Option<i32> {
+    pub fn get_available_freg(&self)->Option<i32> {
         // f0作为特殊浮点寄存器保持0
         for i in 1..=31 {
             if self.iregs_used&(1<<i)==0 {
@@ -59,21 +79,20 @@ impl RegUsedStat {
     }
 
     // 释放一个寄存器
-    fn release_ireg(&mut self,reg :i32) {
+    pub fn release_ireg(&mut self,reg :i32) {
         self.iregs_used&=!(1<<reg);
     }
     // 占有一个寄存器
-    fn use_ireg(&mut self,reg :i32){
+    pub fn use_ireg(&mut self,reg :i32){
         self.iregs_used|=1<<reg;
     }
     // 
-    fn release_freg(&mut self,reg :i32) {
+    pub fn release_freg(&mut self,reg :i32) {
         self.fregs_used&=!(1<<reg);
     }
-    fn use_freg(&mut self,reg: i32) {
+    pub fn use_freg(&mut self,reg: i32) {
         self.fregs_used|=1<<reg;
     }
-
 
 }
 
@@ -99,3 +118,5 @@ impl  BlockAllocStat {
         BlockAllocStat { spillings: HashSet::new(), dstr: HashMap::new()}
     }
 }
+
+

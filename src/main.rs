@@ -5,6 +5,7 @@ use sysylib::cfgir::instruction_cfg::CfgInstruction;
 use sysylib::global_lalrpop::IN_FUNC;
 use sysylib::global_lalrpop::MODULE;
 use sysylib::utility::Pointer;
+use prioritydeque::PriorityDeque;
 lalrpop_mod! {
   #[allow(clippy::all)]
   SysYRust
