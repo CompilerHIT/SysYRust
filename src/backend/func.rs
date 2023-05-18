@@ -3,6 +3,7 @@ pub use std::fs::File;
 pub use std::hash::{Hash, Hasher};
 pub use std::io::{Result, Write};
 
+use crate::ir::function::Function;
 use crate::utility::{ScalarType, ObjPool, ObjPtr};
 use crate::backend::operand::Reg;
 use crate::backend::instrs::LIRInst;
@@ -55,11 +56,17 @@ impl Func {
         self.blocks_mpool.free_all()
     }
 
-    pub fn construct(&mut self, module: &AsmModule) {
+    pub fn construct(&mut self, module: &AsmModule, ir_func: &Function, func_seq: i32, ) {
         //FIXME: temporary
         // more infos to add
         self.entry = Some(BB::new(&self.label));
-        module.push_block(&self.entry.unwrap());
+        module.push_block(&self.label, &self.entry.unwrap());
+        let mut block = ir_func.get_head().as_ref();
+        loop {
+            let label = format!(".L");
+            let mut bb = BB::new(&block.get)
+            
+        }
         // 需要遍历block的接口
         // self.borrow_mut().blocks.push(Pointer::new(self.entry));
             

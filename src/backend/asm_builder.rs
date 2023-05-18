@@ -154,6 +154,10 @@ impl<'f> AsmBuilder<'f> {
         writeln!(self.f, "{label}:")
     }
 
+    pub fn load_global(&mut self, tmp_reg: &str, target_reg: &str, global_label: &str, block_label: &str) -> Result<()> {
+        writeln!(self.f, "        auipc   {tmp_reg}, %pcrel_hi({global_label})")?;
+        writeln!(self.f, "        addi    {target_reg}, {tmp_reg}, %pcrel_lo{block_label}")
+    }
     //TODO: for function
     // pub fn prologue(&mut self, func_name: &str, info: &FunctionInfo) -> Result<()> {
     //     // declaration

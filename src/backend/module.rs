@@ -10,7 +10,9 @@ use crate::backend::operand::Reg;
 use crate::backend::structs::{IGlobalVar, FGlobalVar, GlobalVar};
 use crate::backend::func::Func;
 use crate::backend::block::BB;
+use crate::backend::operand::ToString;
 use crate::utility::{ScalarType, ObjPtr};
+
 
 #[derive(Clone)]    
 pub struct AsmModule {
@@ -19,8 +21,8 @@ pub struct AsmModule {
     global_var_list: Vec<GlobalVar>,
 
     // const_array_mapping: HashMap<String, ArrayConst>,
-    func_list: Vec<&'static Func>,
-    block_list: Vec<&'static BB>,
+    func_map: HashMap<&'static str, &'static Func>,
+    block_map: HashMap<&'static str, &'static BB>,
 }
 
 impl AsmModule {
@@ -30,28 +32,31 @@ impl AsmModule {
             reg_map: HashMap::new(),
             global_var_list,
             // global_fvar_list,
-            func_list: Vec::new(),
-            block_list: Vec::new(),
+            func_map: HashMap::new(),
+            block_map: HashMap::new(),
         }
     }
     
     pub fn build_lir(&self, ir_module: &Module) {
+        let mut func_seq = 0;
         for (name, iter) in ir_module.function {
+            func_seq += 1;
             let ir_func = iter.as_ref();
             let mut func = Func::new(name);
-            func.construct(&self);
-            self.func_list.push(&func);
+            func.construct(&self, ir_func, func_seq);
+            self.func_map.insert(name, &func);
         }
     } 
+
+    pub fn push_block(&self, label: &str, block: &BB) {
+        self.block_map.insert(label, block);
+    }
 
     pub fn generator(&mut self, f: &mut File) -> Result<()> {
         self.generate_global_var(f)?;
         Ok(())
     }
 
-    pub fn push_block(&mut self, block: &'static BB) {
-        self.block_list.push(block);
-    }
 
     fn get_global(ir_module: &Module) -> Vec<GlobalVar> {
         let map = ir_module.global_variable;
@@ -79,15 +84,14 @@ impl AsmModule {
             match iter {
                 GlobalVar::IGlobalVar(ig) => {
                     let name = ig.get_name();
-                    let value = ig.get_init().get_data();
-                    writeln!(f, "{name}:")?;
+                    let value = ig.get_init().to_string();
+                    writeln!(f, "{name}:\n        .word:   {value}")?;
                     writeln!(f, "    {value}")?;
                 }
                 GlobalVar::FGlobalVar(fg) => {
                     let name = fg.get_name();
-                    let value = fg.get_init().get_data();
-                    writeln!(f, "{name}:")?;
-                    writeln!(f, "    {value}")?;
+                    let value = fg.get_init().to_hex_string();
+                    writeln!(f, "{name}:\n        .word:   {value}")?;
                 }
             }
         }
