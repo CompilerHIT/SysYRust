@@ -18,7 +18,7 @@ pub struct Func {
     stack_addr: Vec<ObjPtr<StackSlot>>,
     caller_stack_addr: Vec<ObjPtr<StackSlot>>,
     params: Vec<ObjPtr<Reg>>,
-    entry: Option<BB>,
+    pub entry: Option<BB>,
 
     reg_def: Vec<HashSet<CurInstrInfo>>,
     reg_use: Vec<HashSet<CurInstrInfo>>,
