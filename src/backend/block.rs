@@ -11,6 +11,7 @@ use crate::backend::operand::{Reg, IImm, FImm};
 use crate::backend::instrs::{LIRInst, InstrsType, SingleOp};
 use crate::backend::instrs::Operand;
 
+use crate::backend::func::Func;
 use super::structs::*;
 
 
@@ -52,7 +53,7 @@ impl BB {
         self.insts_mpool.free_all()
     }
 
-    pub fn construct(&mut self, block: ObjPtr<BasicBlock>, next_blocks: ObjPtr<BasicBlock>, map_info: &Mapping) {
+    pub fn construct(&mut self, func: &Func, block: ObjPtr<BasicBlock>, next_blocks: Option<ObjPtr<BB>>, map_info: &Mapping) {
         let mut ir_block_inst = block.as_ref().get_head_inst();
         loop {
             let inst_ref = ir_block_inst.as_ref();
@@ -91,6 +92,9 @@ impl BB {
             }
             if let Some(ir_block_inst) = ir_block_inst.as_ref().get_next() {} 
             else {
+                break;
+            }
+            if ir_block_inst == block.as_ref().get_tail_inst() {
                 break;
             }
         }
@@ -154,3 +158,10 @@ impl Hash for BB {
         self.label.hash(state);
     }
 }
+
+impl PartialEq for ObjPtr<Inst> {
+    fn eq(&self, other: &Self) -> bool {
+        std::ptr::eq(self.as_ref(), other.as_ref())
+    }
+}
+impl Eq for ObjPtr<Inst> {}

@@ -4,6 +4,8 @@ pub use std::fs::File;
 pub use std::hash::{Hash, Hasher};
 pub use std::io::{Result, Write};
 
+use lazy_static::__Deref;
+
 use crate::ir::basicblock::BasicBlock;
 use crate::ir::function::Function;
 use crate::utility::{ScalarType, ObjPool, ObjPtr};
@@ -21,7 +23,7 @@ pub struct Func {
     stack_addr: Vec<ObjPtr<StackSlot>>,
     caller_stack_addr: Vec<ObjPtr<StackSlot>>,
     params: Vec<ObjPtr<Reg>>,
-    pub entry: Option<BB>,
+    pub entry: Option<ObjPtr<BB>>,
 
     reg_def: Vec<HashSet<CurInstrInfo>>,
     reg_use: Vec<HashSet<CurInstrInfo>>,
@@ -63,53 +65,59 @@ impl Func {
         // more infos to add
         let mut info = Mapping::new();
         
-        self.entry = Some(BB::new(&self.label));
+        // entry shouldn't generate for asm, called label for entry should always be false
+        let label = &self.label;
+        let entry = self.blocks_mpool.put(BB::new(&format!(".entry_{label}")));
+        self.entry = Some(entry);
+        self.blocks.push(self.entry.unwrap());
+
         // 第一遍pass
         let mut fblock = ir_func.get_head();
-        let mut ir_block_set: HashSet<ObjPtr<BasicBlock>> = set_append(fblock.as_ref().get_next_bb());
-        let mut block_seq = 0;
-        while !fblock.as_ref().has_next_bb() {
-            block_seq += 1;
-            let label = format!(".LBB{func_seq}_{block_seq}");
-            info.block_map.insert(fblock.clone(), self.blocks_mpool.put(BB::new(&label)));
-            ir_block_set.union(&set_append(fblock.as_ref().get_next_bb()));
-            fblock = ir_block_set.iter().next().unwrap().clone();
-        }
+        let mut ir_block_set: HashSet<ObjPtr<BasicBlock>> = HashSet::new();
+        let first_block = self.blocks_mpool.put(BB::new(&label));
+        info.ir_block_map.insert(fblock, first_block);
+        info.block_ir_map.insert(first_block, fblock);
+        ir_block_set.insert(fblock);
 
-        loop {
-            if !fblock.as_ref().has_next_bb() {
-                break;
-            }
-            info.block_map.iter().for_each(|(key, value)|{
-                if key == &fblock {
-                    self.blocks.push(value.clone());
-                }
-            });
-        }
-        let obj_entry = self.blocks_mpool.put(self.entry.unwrap());
-        self.blocks.push(obj_entry);
-
-        // 第一个块，非空
-        let mut bb = self.blocks_mpool.put(BB::new(label.as_str()));
-        self.entry.unwrap().out_edge.push(bb);
-        bb.as_ref().in_edge.push(obj_entry);
+        let mut tmp = VecDeque::new();
+        tmp.push_back(fblock);
         
-        info.block_map.insert(fblock, bb);
-        //TODO: 遇到global variable产生新的block, label为 .Lpcrel_hi{num}
-        loop {
-            if (fblock.as_ref().has_next_bb()) {
-                bb.as_ref().construct(fblock, fblock.as_ref().get_next_bb())
-            } else {
-                break;
+        let mut block_seq = 0;
+        
+        while let Some(fblock) = tmp.pop_front() {
+            let next_blocks = fblock.as_ref().get_next_bb();
+            next_blocks.iter().for_each(|block|tmp.push_back(block.clone()));
+            if block_seq == 0 {
+                block_seq += 1;
+                continue;
             }
-            block_seq += 1;
-            let label = format!(".LBB{func_seq}_{block_seq}");
-            let mut bb = BB::new(label.as_str());
-            bb.construct(block, next_block);
+            if ir_block_set.insert(fblock) {
+                let label = format!(".LBB{func_seq}_{block_seq}");
+                let block = self.blocks_mpool.put(BB::new(&label));
+                info.ir_block_map.insert(fblock, block);
+                info.block_ir_map.insert(block, fblock);
+                self.blocks.push(block);
+                block_seq += 1;
+            }
         }
-        // 需要遍历block的接口
-        // self.borrow_mut().blocks.push(Pointer::new(self.entry));
-            
+        handle_parameters();
+        // 第二遍pass
+        let mut first_block = info.ir_block_map.get(&ir_func.get_head()).unwrap();
+        self.entry.unwrap().as_mut().out_edge.push(*first_block);
+        first_block.as_mut().in_edge.push(self.entry.unwrap());
+        let mut i = 0;
+        self.blocks.iter().for_each(|block| {
+            if *block != self.entry.unwrap() {
+                let basicblock = info.block_ir_map.get(block).unwrap();
+                if i + 1 < self.blocks.len() {
+                    let next_block = Some(self.blocks[i + 1]);
+                    block.as_mut().construct(&self,*basicblock, next_block, &info);
+                } else {
+                    block.as_mut().construct(&self,*basicblock, None, &info);
+                }
+                i += 1;
+            }
+        });
     }
 
     // 移除指定id的寄存器的使用信息
@@ -234,10 +242,14 @@ impl GenerateAsm for Func {
     }
 }
 
-fn set_append(blocks: &Vec<ObjPtr<BasicBlock>>) -> HashSet<ObjPtr<BasicBlock>>{
+fn set_append(blocks: &Vec<ObjPtr<BasicBlock>>) -> HashSet<ObjPtr<BasicBlock>> {
     let mut set = HashSet::new();
     for block in blocks.iter() {
         set.insert(block.clone());
     }
     set
+}
+
+fn handle_parameters() {
+    //TODO:
 }
