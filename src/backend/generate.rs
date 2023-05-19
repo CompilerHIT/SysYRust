@@ -40,12 +40,12 @@ impl GenerateAsm for LIRInst {
                 //TODO:
                 Ok(())
             },
-            InstrsType::ChangeSp => {
-                let mut builder = AsmBuilder::new(f);
-                let imm = self.get_change_sp_offset();
-                builder.addi("sp", "sp", imm)?;
-                Ok(())
-            },
+            // InstrsType::ChangeSp => {
+            //     let mut builder = AsmBuilder::new(f);
+            //     let imm = self.get_change_sp_offset();
+            //     builder.addi("sp", "sp", imm)?;
+            //     Ok(())
+            // },
             InstrsType::Load => {
                 //FIXME: only call ld -- lw...to implement
                 let mut builder = AsmBuilder::new(f);
@@ -83,6 +83,9 @@ impl GenerateAsm for LIRInst {
                 builder.sd(&src, &addr, offset.get_data(), false);
                 Ok(())
             },
+
+            //FIXME:是否有必要使用s0作为fp，来对栈寻址从而多出一个寄存器
+
             InstrsType::StoreToStack => {
                 let mut builder = AsmBuilder::new(f);
                 if !self.get_offset().is_imm_12bs() {
@@ -126,6 +129,9 @@ impl GenerateAsm for LIRInst {
                 }
                 Ok(())
             },
+            InstrsType::LoadParamFromStack => {
+                
+            }
             InstrsType::Branch(..) => {
                 //TODO:
                 Ok(())

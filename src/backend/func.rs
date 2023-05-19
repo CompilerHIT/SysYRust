@@ -36,7 +36,8 @@ pub struct Func {
 }
 
 
-
+/// reg_num, stack_addr, caller_stack_addr考虑借助回填实现
+/// 是否需要caller_stack_addr？caller函数sp保存在s0中
 impl Func {
     pub fn new(name: &str) -> Self {
         Self {
@@ -196,21 +197,24 @@ impl Func {
 
     pub fn allocate_reg(&mut self, f: &'static mut File) {
         // 函数返回地址保存在ra中
-        //FIXME: 暂时使用固定的寄存器ra、a0与s0，即r1, r8, r10
         //FIXME:暂时只考虑int型
-        let reg_int = vec![Reg::new(1, ScalarType::Int), Reg::new(8, ScalarType::Int)];
+        //必须将ra保存起来，其他情况优先将值保存在寄存器中，保存方式：使用addi。
+        let fp = Reg::new(8, ScalarType::Int);
+        let reg_int = vec![Reg::new(1, ScalarType::Int), fp];
 
         let mut stack_size = 0;
         for it in self.stack_addr.iter().rev() {
             it.as_mut().set_pos(stack_size);
             stack_size += it.as_ref().get_size();
         }
-
+        
+        // 寄存器够用，不需要开栈。若够用则优先将r0值保存在寄存器中
         let mut reg_int_res = Vec::from(reg_int);
         let mut reg_int_res_cl = reg_int_res.clone();
         let reg_int_size = reg_int_res.len();
         
-        //TODO:栈对齐 - 调用func时sp需按16字节对齐
+        //栈对齐 - 调用func时sp需按16字节对齐
+        stack_size = stack_size / 16 * 16 + 16;
 
         let mut offset = stack_size;
         let mut f1 = f.try_clone().unwrap();
@@ -223,6 +227,7 @@ impl Func {
                     offset -= 8;
                     builder.sd(&src.to_string(), "sp", offset, false);
                 }
+                builder.addi(&fp.to_string(), &fp.to_string(), stack_size);
             });
             let mut offset = stack_size;
             contxt.as_mut().set_epilogue_event(move||{
@@ -231,7 +236,7 @@ impl Func {
                     offset -= 8;
                     builder.ld("sp", &src.to_string(), offset, false);
                 }
-                builder.addi("sp", "sp", offset);
+                builder.addi("sp", "sp", stack_size);
             });
         }
         
