@@ -2,56 +2,61 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::io::{Result, Write};
 
+use crate::ir::basicblock::BasicBlock;
 use crate::ir::module::Module;
 use crate::ir::instruction::{Inst, InstKind};
 use crate::ir::function::Function;
 use crate::backend::operand::Reg;
-use crate::backend::structs::{Func, IGlobalVar, FGlobalVar, GlobalVar};
+use crate::backend::structs::{IGlobalVar, FGlobalVar, GlobalVar};
+use crate::backend::func::Func;
+use crate::backend::block::BB;
+use crate::backend::operand::ToString;
 use crate::utility::{ScalarType, ObjPtr};
+
 
 #[derive(Clone)]    
 pub struct AsmModule {
-    reg_mapping: HashMap<i32, Reg>,
+    reg_map: HashMap<i32, Reg>,
 
     global_var_list: Vec<GlobalVar>,
 
     // const_array_mapping: HashMap<String, ArrayConst>,
-    functions: HashMap<&'static str, ObjPtr<Function>>,
-    blocks: usize,
+    func_map: HashMap<&'static str, &'static Func>,
+    block_map: HashMap<&'static str, &'static BB>,
 }
 
 impl AsmModule {
     pub fn new(ir_module: &Module) -> Self {
         let global_var_list = Self::get_global(ir_module);
         Self {
-            reg_mapping: HashMap::new(),
+            reg_map: HashMap::new(),
             global_var_list,
             // global_fvar_list,
-            functions: ir_module.function.clone(),
-            blocks: 0,
+            func_map: HashMap::new(),
+            block_map: HashMap::new(),
         }
     }
+    
+    pub fn build_lir(&self, ir_module: &Module) {
+        let mut func_seq = 0;
+        for (name, iter) in ir_module.function {
+            func_seq += 1;
+            let ir_func = iter.as_ref();
+            let mut func = Func::new(name);
+            func.construct(&self, ir_func, func_seq);
+            self.func_map.insert(name, &func);
+        }
+    } 
 
-    pub fn get_funcs(&self) -> &HashMap<&'static str, ObjPtr<Function>> {
-        &self.functions
-    }
-
-    pub fn get_blocks_num(&self) -> usize {
-        self.blocks
-    }
-
-    pub fn get_reg_mapping(&self) -> &HashMap<i32, Reg> {
-        &self.reg_mapping
-    }
-
-    pub fn set_reg_mapping(&mut self, reg: Reg, id: i32) {
-        self.reg_mapping.insert(id, reg);
+    pub fn push_block(&self, label: &str, block: &BB) {
+        self.block_map.insert(label, block);
     }
 
     pub fn generator(&mut self, f: &mut File) -> Result<()> {
         self.generate_global_var(f)?;
         Ok(())
     }
+
 
     fn get_global(ir_module: &Module) -> Vec<GlobalVar> {
         let map = ir_module.global_variable;
@@ -79,15 +84,14 @@ impl AsmModule {
             match iter {
                 GlobalVar::IGlobalVar(ig) => {
                     let name = ig.get_name();
-                    let value = ig.get_init().get_data();
-                    writeln!(f, "{name}:")?;
+                    let value = ig.get_init().to_string();
+                    writeln!(f, "{name}:\n        .word:   {value}")?;
                     writeln!(f, "    {value}")?;
                 }
                 GlobalVar::FGlobalVar(fg) => {
                     let name = fg.get_name();
-                    let value = fg.get_init().get_data();
-                    writeln!(f, "{name}:")?;
-                    writeln!(f, "    {value}")?;
+                    let value = fg.get_init().to_hex_string();
+                    writeln!(f, "{name}:\n        .word:   {value}")?;
                 }
             }
         }

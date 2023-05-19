@@ -3,6 +3,7 @@ use crate::utility::ObjPtr;
 pub struct BasicBlock {
     value: Value,
     inst_head: Inst,
+    next_bb: Vec<ObjPtr<BasicBlock>>,
 }
 
 impl BasicBlock {
@@ -11,6 +12,7 @@ impl BasicBlock {
         BasicBlock {
             value: Value::new(IrType::BBlock),
             inst_head: Inst::make_head(),
+            next_bb: Vec::new(),
         }
     }
 
@@ -55,5 +57,25 @@ impl BasicBlock {
 
     pub fn get_ir_type(&self) -> IrType {
         self.value.get_ir_type()
+    }
+
+    /// 是否还有下一个BB
+    pub fn has_next_bb(&self) -> bool {
+        self.next_bb.len() != 0
+    }
+
+    /// 添加下一个BB
+    pub fn add_next_bb(&mut self, bb: ObjPtr<BasicBlock>) {
+        // 正确性检查
+        if self.next_bb.len() > 1 {
+            panic!("BasicBlock has more than one next bb");
+        }
+
+        self.next_bb.push(bb);
+    }
+
+    /// 获取下一个BB
+    pub fn get_next_bb(&self) -> &Vec<ObjPtr<BasicBlock>> {
+        &self.next_bb
     }
 }
