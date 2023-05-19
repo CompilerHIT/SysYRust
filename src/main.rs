@@ -39,6 +39,12 @@ fn run_main() {
 
     // TODO 生成IR
     let mut compunit = SysYRust::CompUnitParser::new().parse(file.as_str());
-
     // TODO 后端解析
+}
+
+#[test]
+fn test() {
+    let file = std::fs::read_to_string("src/input.txt").unwrap();
+    let mut compunit = SysYRust::CompUnitParser::new().parse(file.as_str());
+    println!("{:#?}", compunit);
 }
