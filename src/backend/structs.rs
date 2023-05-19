@@ -48,8 +48,8 @@ pub struct Context {
 #[derive(Clone)]
 pub struct CurInstrInfo {
     block: Option<ObjPtr<BB>>,
-    insts_it: Vec<ObjPtr<LIRInst>>,
-    reg_id: i32,
+    pub insts_it: Option<ObjPtr<LIRInst>>,
+    pub pos: i32,
 }
 
 impl Context {
@@ -91,11 +91,11 @@ impl Context {
 }
 
 impl CurInstrInfo {
-    pub fn new(reg_id: i32) -> Self {
+    pub fn new(pos: i32) -> Self {
         Self {
-           reg_id,
+           pos,
            block: None,
-           insts_it: Vec::new(),
+           insts_it: None,
         }
     }
 
@@ -105,14 +105,6 @@ impl CurInstrInfo {
 
     pub fn get_block(&self) -> Option<ObjPtr<BB>> {
         self.block
-    }
-
-    pub fn add_inst(&mut self, inst: ObjPtr<LIRInst>) {
-        self.insts_it.push(inst.clone());
-    }
-
-    pub fn add_insts(&mut self, insts: Vec<ObjPtr<LIRInst>>) {
-        self.insts_it.append(&mut insts.clone());
     }
 }
 
@@ -155,7 +147,7 @@ pub trait GenerateAsm {
 
 impl PartialEq for CurInstrInfo {
     fn eq(&self, other: &Self) -> bool {
-        self.reg_id == other.reg_id
+        self.pos == other.pos
     }
 }
 
@@ -163,7 +155,7 @@ impl Eq for CurInstrInfo {}
 
 impl Hash for CurInstrInfo {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.reg_id.hash(state);
+        self.pos.hash(state);
     }
 }
 

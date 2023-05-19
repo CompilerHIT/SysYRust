@@ -59,6 +59,18 @@ impl BB {
             let inst_ref = ir_block_inst.as_ref();
             // translate ir to lir, use match
             match inst_ref.get_kind() {
+                InstKind::Binary(op) => {
+                    let lhs = inst_ref.get_lhs();
+                    let rhs = inst_ref.get_rhs();
+                    let mut lhsReg : Operand;
+                    let mut rhsReg : Operand;
+                    let mut dstReg : Operand;
+                    match op {
+                        BinOp::Add => {
+                            
+                        }
+                    }
+                }
                 InstKind::Return => {
                     match inst_ref.get_ir_type() {
                         ir_type::IrType::Void => self.insts.push(

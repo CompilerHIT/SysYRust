@@ -23,6 +23,7 @@ pub struct AsmModule {
 
     // const_array_mapping: HashMap<String, ArrayConst>,
     func_map: HashMap<ObjPtr<Function>, &'static Func>,
+    upper_module: &'static Module,
 }
 
 impl AsmModule {
@@ -33,12 +34,13 @@ impl AsmModule {
             global_var_list,
             // global_fvar_list,
             func_map: HashMap::new(),
+            upper_module: ir_module,
         }
     }
     
-    pub fn build_lir(&self, ir_module: &Module) {
+    pub fn build_lir(&self) {
         let mut func_seq = 0;
-        for (name, iter) in ir_module.function {
+        for (name, iter) in self.upper_module.function {
             let ir_func = iter.as_ref();
             let mut func = Func::new(name);
             func.construct(&self, ir_func, func_seq);
@@ -48,10 +50,17 @@ impl AsmModule {
     }
 
     pub fn generator(&mut self, f: &mut File) -> Result<()> {
+        self.build_lir();
+        self.allocate_reg(f);
         self.generate_global_var(f)?;
         Ok(())
     }
 
+    fn allocate_reg(&self, f: &mut File) {
+        self.func_map.iter_mut().for_each(|(_, func)| {
+            func.allocate_reg(f);
+        });
+    }
 
     fn get_global(ir_module: &Module) -> Vec<GlobalVar> {
         let map = ir_module.global_variable;

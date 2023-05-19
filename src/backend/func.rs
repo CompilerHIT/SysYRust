@@ -27,6 +27,7 @@ pub struct Func {
 
     reg_def: Vec<HashSet<CurInstrInfo>>,
     reg_use: Vec<HashSet<CurInstrInfo>>,
+    reg_num: i32,
     fregs: HashSet<Reg>,
 
     context: Option<ObjPtr<Context>>,
@@ -47,6 +48,7 @@ impl Func {
             entry: None,
             reg_def: Vec::new(),
             reg_use: Vec::new(),
+            reg_num: 0,
             fregs: HashSet::new(),
 
             context: None,
@@ -138,6 +140,21 @@ impl Func {
         for reg in inst.as_ref().get_reg_def() {
             self.reg_def[reg.get_id() as usize].insert(cur_info.clone());
         }
+    }
+
+    pub fn build_reg_info(&mut self) {
+        self.reg_def.clear();   self.reg_use.clear();
+        self.reg_def.resize(self.reg_num as usize, HashSet::new());
+        self.reg_use.resize(self.reg_num as usize, HashSet::new());
+        let mut p : CurInstrInfo = CurInstrInfo::new(0);
+        self.blocks.iter().for_each(|block| {
+            p.band_block(*block);
+            for inst in block.as_ref().insts.iter() {
+                p.insts_it = Some(*inst);
+                self.add_inst_reg(&p, *inst);
+                p.pos += 1;
+            }
+        });
     }
 
     pub fn calc_live(&mut self) {
