@@ -1,6 +1,7 @@
 use super::{instruction::Inst, ir_type::IrType, value::Value};
 use crate::utility::ObjPtr;
 pub struct BasicBlock {
+    name: &'static str,
     value: Value,
     inst_head: Inst,
     next_bb: Vec<ObjPtr<BasicBlock>>,
@@ -8,12 +9,18 @@ pub struct BasicBlock {
 
 impl BasicBlock {
     /// 构造一个空的BasicBlock
-    pub fn new() -> BasicBlock {
+    pub fn new(name: &str) -> BasicBlock {
         BasicBlock {
+            name,
             value: Value::new(IrType::BBlock),
             inst_head: Inst::make_head(),
             next_bb: Vec::new(),
         }
+    }
+
+    /// 获取BasicBlock的名字
+    pub fn get_name(&self) -> &str {
+        self.name
     }
 
     /// 检查是否为空的BasicBlock
