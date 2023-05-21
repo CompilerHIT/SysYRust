@@ -1,4 +1,4 @@
-use crate::utility::ObjPtr;
+use crate::utility::{ObjPool, ObjPtr};
 
 use super::{basicblock::BasicBlock, instruction::Inst, ir_type::IrType, value::Value};
 use std::collections::HashMap;
@@ -8,6 +8,13 @@ pub struct Function {
     return_type: IrType,
     parameters: HashMap<&'static str, ObjPtr<Inst>>,
     head_block: Option<ObjPtr<BasicBlock>>,
+}
+
+impl ObjPool<Function> {
+    /// 创建一个新的函数
+    pub fn new_function(&mut self) -> ObjPtr<Function> {
+        self.put(Function::new())
+    }
 }
 
 impl Function {

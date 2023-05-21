@@ -10,8 +10,6 @@ use std::cmp::Ordering;
 use crate::prioritydeque::PriorityDeque;
 
 
-
-
 // 摆烂的深度优先指令编码简单实现的线性扫描寄存器分配
 pub struct Allocator{
     func :Option<Box<Func>>,
@@ -115,8 +113,11 @@ impl Allocator {
     // 指令窗口分析
     fn interval_anaylise(&mut self){
         let mut use_set:HashMap<i32,usize> =HashMap::new();
-        for (i,inst) in self.lines.iter().enumerate().rev() {
+        for (i,inst) in self.lines.iter().enumerate() {
             for reg in inst.get_reg_use() {
+                if !reg.is_allocable() {
+                    continue;
+                }
                 use_set.insert(reg.get_id(), i);
             }
             // for reg in inst.get_reg_def() {
@@ -154,6 +155,7 @@ impl Allocator {
             }
 
             for reg in it.get_reg_def() {
+                if !reg.is_allocable() {continue;}
                 let id=reg.get_id();
                 if dstr.contains_key(&id) {
                     continue;
