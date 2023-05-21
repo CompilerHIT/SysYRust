@@ -16,6 +16,10 @@ where T:Ord {
         PriorityDeque { arr:Vec::new() }
     }
     
+    pub fn len(&self)->usize {
+        self.arr.len()
+    }
+
     // 交换两个位置的元素
     fn swap(&mut self,i:usize,j:usize) {
         let tmp=self.arr[i];
