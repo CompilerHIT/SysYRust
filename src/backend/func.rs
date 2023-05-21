@@ -197,8 +197,6 @@ impl Func {
 
     pub fn allocate_reg(&mut self, f: &'static mut File) {
         // 函数返回地址保存在ra中
-        //FIXME:暂时只考虑int型
-        //必须将ra保存起来，其他情况优先将值保存在寄存器中，保存方式：使用addi。
         let fp = Reg::new(8, ScalarType::Int);
         let reg_int = vec![Reg::new(1, ScalarType::Int), fp];
 
