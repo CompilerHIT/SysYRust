@@ -8,10 +8,11 @@ use crate::ir::basicblock::BasicBlock;
 use crate::ir::instruction::{Inst, InstKind};
 use crate::ir::ir_type;
 use crate::backend::operand::{Reg, IImm, FImm};
-use crate::backend::instrs::{LIRInst, InstrsType, SingleOp};
+use crate::backend::instrs::{LIRInst, InstrsType, SingleOp, BinaryOp};
 use crate::backend::instrs::Operand;
 
 use crate::backend::func::Func;
+use crate::backend::operand::ImmBs;
 use super::structs::*;
 
 
@@ -65,14 +66,25 @@ impl BB {
                 InstKind::Binary(op) => {
                     let lhs = inst_ref.get_lhs();
                     let rhs = inst_ref.get_rhs();
-                    let mut lhsReg : Operand;
-                    let mut rhsReg : Operand;
-                    let mut dstReg : Operand;
-                    // match op {
-                    //     BinOp::Add => {
-                            
-                    //     }
-                    // }
+                    let mut lhs_reg : Operand;
+                    let mut rhs_reg : Operand;
+                    let mut dst_reg : Operand;
+                    match op {
+                        Add => {
+                            let inst_kind = InstrsType::Binary(super::instrs::BinaryOp::Add);
+                            match lhs.as_ref().get_ir_type() {
+                                ir_type::IrType::ConstInt => {
+                                    // 负数范围比正数大，使用subi代替addi
+                                    let imm = lhs.as_ref().get_int_bond();
+                                    let iimm = IImm::new(-imm);
+                                    if iimm.is_imm_12bs() {
+                                        rhs_reg = self.resolve_iimm(-imm);
+                                    }
+                                },
+                                _ => rhs_reg = self.resolve_operand(lhs),
+                            }
+                        }
+                    }
                 }
                 InstKind::Return => {
                     match inst_ref.get_ir_type() {
@@ -105,13 +117,10 @@ impl BB {
                 // TODO: ir translation.
                 }
             }
-            if let Some(ir_block_inst) = ir_block_inst.as_ref().get_next() {} 
-            else {
-                break;
-            }
             if ir_block_inst == block.as_ref().get_tail_inst() {
                 break;
             }
+            ir_block_inst = ir_block_inst.as_ref().get_next();
         }
     }
 
@@ -173,10 +182,3 @@ impl Hash for BB {
         self.label.hash(state);
     }
 }
-
-impl PartialEq for ObjPtr<Inst> {
-    fn eq(&self, other: &Self) -> bool {
-        std::ptr::eq(self.as_ref(), other.as_ref())
-    }
-}
-impl Eq for ObjPtr<Inst> {}

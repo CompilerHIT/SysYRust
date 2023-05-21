@@ -102,16 +102,3 @@ impl AsmModule {
         Ok(())
     }
 }
-
-impl PartialEq for ObjPtr<Function> {
-    fn eq(&self, other: &Self) -> bool {
-        std::ptr::eq(self.as_ref(), other.as_ref())
-    }
-}
-impl Eq for ObjPtr<Function> {}
-
-impl Hash for ObjPtr<Function> {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        std::ptr::hash(self.as_ref(), state)
-    }    
-}

@@ -20,12 +20,6 @@ pub enum Operand {
     Reg(Reg),
 }
 
-impl PartialEq for ObjPtr<StackSlot> {
-    fn eq(&self, other: &Self) -> bool {
-        self.as_ref() == other.as_ref()
-    }
-}
-
 //TODO:浮点数运算
 /// 二元运算符
 #[derive(Clone, Copy)]
