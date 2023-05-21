@@ -1,12 +1,14 @@
 pub use std::collections::{HashSet, VecDeque};
+pub use std::collections::HashMap;
 pub use std::fs::File;
 pub use std::hash::{Hash, Hasher};
 pub use std::io::{Result, Write};
 
-use crate::utility::{ObjPtr};
+use crate::utility::ObjPtr;
 use crate::backend::operand::{IImm, FImm};
-use crate::backend::instrs::{LIRInst};
+use crate::backend::instrs::LIRInst;
 use crate::backend::block::BB;
+use crate::ir::basicblock::BasicBlock;
 
 
 #[derive(Clone)]
@@ -46,8 +48,8 @@ pub struct Context {
 #[derive(Clone)]
 pub struct CurInstrInfo {
     block: Option<ObjPtr<BB>>,
-    insts_it: Vec<ObjPtr<LIRInst>>,
-    reg_id: i32,
+    pub insts_it: Option<ObjPtr<LIRInst>>,
+    pub pos: i32,
 }
 
 impl Context {
@@ -89,11 +91,11 @@ impl Context {
 }
 
 impl CurInstrInfo {
-    pub fn new(reg_id: i32) -> Self {
+    pub fn new(pos: i32) -> Self {
         Self {
-           reg_id,
+           pos,
            block: None,
-           insts_it: Vec::new(),
+           insts_it: None,
         }
     }
 
@@ -103,14 +105,6 @@ impl CurInstrInfo {
 
     pub fn get_block(&self) -> Option<ObjPtr<BB>> {
         self.block
-    }
-
-    pub fn add_inst(&mut self, inst: ObjPtr<LIRInst>) {
-        self.insts_it.push(inst.clone());
-    }
-
-    pub fn add_insts(&mut self, insts: Vec<ObjPtr<LIRInst>>) {
-        self.insts_it.append(&mut insts.clone());
     }
 }
 
@@ -153,7 +147,7 @@ pub trait GenerateAsm {
 
 impl PartialEq for CurInstrInfo {
     fn eq(&self, other: &Self) -> bool {
-        self.reg_id == other.reg_id
+        self.pos == other.pos
     }
 }
 
@@ -161,7 +155,7 @@ impl Eq for CurInstrInfo {}
 
 impl Hash for CurInstrInfo {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.reg_id.hash(state);
+        self.pos.hash(state);
     }
 }
 
@@ -184,16 +178,43 @@ impl StackSlot {
     }
 }   
 
-impl PartialEq for BB {
+pub struct Mapping {
+    pub ir_block_map: HashMap<ObjPtr<BasicBlock>, ObjPtr<BB>>,
+    pub block_ir_map: HashMap<ObjPtr<BB>, ObjPtr<BasicBlock>>,
+}
+
+impl PartialEq for ObjPtr<BasicBlock> {
     fn eq(&self, other: &Self) -> bool {
-        self.label == other.label
+        std::ptr::eq(self.as_ref(), other.as_ref())
+    }
+}
+impl Eq for ObjPtr<BasicBlock> {}
+
+impl Hash for ObjPtr<BasicBlock> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        std::ptr::hash(self.as_ref(), state)
     }
 }
 
-impl Eq for BB {}
+impl PartialEq for ObjPtr<BB> {
+    fn eq(&self, other: &Self) -> bool {
+        std::ptr::eq(self.as_ref(), other.as_ref())
+    }
+}
 
-impl Hash for BB {
+impl Eq for ObjPtr<BB> {}
+
+impl Hash for ObjPtr<BB> {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.label.hash(state);
+        std::ptr::hash(self.as_ref(), state)
+    }
+}
+
+impl Mapping {
+    pub fn new() -> Self {
+        Self {
+            ir_block_map: HashMap::new(),
+            block_ir_map: HashMap::new(),
+        }
     }
 }

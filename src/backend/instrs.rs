@@ -75,11 +75,13 @@ pub enum InstrsType {
     // dst: reg = op src: operand
     OpReg(SingleOp),
     // addi sp (-)imm, check legal first
-    ChangeSp,
+    // ChangeSp,
     // src: stackslot, dst: reg, offset: iimm  
     LoadFromStack,
     // src: reg, dst: stackslot, offset: iimm
     StoreToStack,
+    // src: stackslot, dst: reg, offset: iimm
+    LoadParamFromStack,
     // dst: reg, src: iimm(reg)
     Load,
     // dst: iimm(reg), src: reg
@@ -152,7 +154,7 @@ impl LIRInst {
     pub fn get_reg_def(&self) -> Vec<Reg> {
         match self.inst_type {
             InstrsType::Binary(..) | InstrsType::OpReg(..) | InstrsType::Load | InstrsType::Store |
-            InstrsType::LoadFromStack =>
+            InstrsType::LoadFromStack | InstrsType::LoadParamFromStack =>
             { 
                 match self.operands[0] {
                     Operand::Reg(dst_reg) => vec![dst_reg],
@@ -176,8 +178,7 @@ impl LIRInst {
                 }
                 set
             }
-            // 其中，sp为特殊寄存器，不参与寄存器分配
-            InstrsType::ChangeSp | InstrsType::StoreToStack | InstrsType::Jump | InstrsType::Branch(..) => vec![],
+            InstrsType::StoreToStack | InstrsType::Jump | InstrsType::Branch(..) => vec![],
 
             InstrsType::Ret(re_type) => {
                 match re_type {
@@ -190,9 +191,9 @@ impl LIRInst {
     }
     pub fn get_reg_use(&self) -> Vec<Reg> {
         match self.inst_type {
-            InstrsType::Binary(..) | InstrsType::OpReg(..) | InstrsType::ChangeSp| InstrsType::Load |
+            InstrsType::Binary(..) | InstrsType::OpReg(..) | InstrsType::Load |
             InstrsType::Store | InstrsType::LoadFromStack | InstrsType::StoreToStack | InstrsType::Branch(..) |
-            InstrsType::Jump => {
+            InstrsType::Jump | InstrsType::LoadParamFromStack => {
                 let mut regs = self.operands.clone();
                 let mut res = Vec::new();
                 while let Some(operand) = regs.pop() {
@@ -241,13 +242,13 @@ impl LIRInst {
         self.func_name = func_name;
     }
 
-    // ChangeSp:
-    pub fn get_change_sp_offset(&self) -> i32 {
-        match self.operands[0] {
-            Operand::IImm(offset) => offset.get_data(),
-            _ => panic!("only support imm sp offset"),
-        }
-    }
+    // // ChangeSp:
+    // pub fn get_change_sp_offset(&self) -> i32 {
+    //     match self.operands[0] {
+    //         Operand::IImm(offset) => offset.get_data(),
+    //         _ => panic!("only support imm sp offset"),
+    //     }
+    // }
 
     // LoadFromStack, StoreToStack, Load, Store:
     pub fn set_offset(&mut self, offset: IImm) {

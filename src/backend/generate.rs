@@ -40,12 +40,12 @@ impl GenerateAsm for LIRInst {
                 //TODO:
                 Ok(())
             },
-            InstrsType::ChangeSp => {
-                let mut builder = AsmBuilder::new(f);
-                let imm = self.get_change_sp_offset();
-                builder.addi("sp", "sp", imm)?;
-                Ok(())
-            },
+            // InstrsType::ChangeSp => {
+            //     let mut builder = AsmBuilder::new(f);
+            //     let imm = self.get_change_sp_offset();
+            //     builder.addi("sp", "sp", imm)?;
+            //     Ok(())
+            // },
             InstrsType::Load => {
                 //FIXME: only call ld -- lw...to implement
                 let mut builder = AsmBuilder::new(f);
@@ -83,6 +83,7 @@ impl GenerateAsm for LIRInst {
                 builder.sd(&src, &addr, offset.get_data(), false);
                 Ok(())
             },
+
             InstrsType::StoreToStack => {
                 let mut builder = AsmBuilder::new(f);
                 if !self.get_offset().is_imm_12bs() {
@@ -92,19 +93,15 @@ impl GenerateAsm for LIRInst {
                     Operand::Reg(reg) => reg,
                     _ => panic!("src of store must be reg, to improve"),
                 };
-                let offset =  match self.get_dst() {
-                    Operand::Addr(slot) => slot.as_ref().get_pos() + self.get_offset().get_data() 
-                                    - context.as_ref().get_offset(),
-                    _ => panic!("dst of store must be stackslot, to improve"),
-                };
+                let offset =  self.get_offset().get_data();
                 match src.get_type() {
-                    ScalarType::Int => builder.sd("sp", &src.to_string(), offset, false)?,
-                    ScalarType::Float => builder.sd("sp", &src.to_string(), offset, true)?,
+                    ScalarType::Int => builder.sd(&src.to_string(), "sp", offset, false)?,
+                    ScalarType::Float => builder.sd(&src.to_string(), "sp", offset, true)?,
                     _ => panic!("illegal type"),
                 }
                 Ok(())
             },
-            InstrsType::LoadFromStack => {
+            InstrsType::LoadFromStack | InstrsType::LoadParamFromStack => {
                 let mut builder = AsmBuilder::new(f);
                 if !self.get_offset().is_imm_12bs() {
                     panic!("illegal offset");
@@ -114,11 +111,7 @@ impl GenerateAsm for LIRInst {
                     _ => panic!("dst of load must be reg, to improve"),
                 };
                 // let inst_off = self.get_offset().
-                let offset = match self.get_lhs() {
-                    Operand::Addr(slot) => slot.as_ref().get_pos() + self.get_offset().get_data() 
-                                    - context.as_ref().get_offset(),
-                    _ => panic!("src of load must be stackslot, to improve"),
-                };
+                let offset = self.get_offset().get_data();
                 match dst.get_type() {
                     ScalarType::Int => builder.ld(&dst.to_string(), "sp", offset, false)?,
                     ScalarType::Float => builder.ld(&dst.to_string(), "sp", offset, true)?,
@@ -126,6 +119,7 @@ impl GenerateAsm for LIRInst {
                 }
                 Ok(())
             },
+            // 判断！是否需要多插入一条j，间接跳转到
             InstrsType::Branch(..) => {
                 //TODO:
                 Ok(())
