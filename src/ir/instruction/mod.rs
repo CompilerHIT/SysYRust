@@ -3,7 +3,7 @@
 ///! 所有Inst类型的公有方法和Head的简单实现。特定的
 ///! inst的相关实现放在当前目录下的其他文件中。
 use super::{ir_type::IrType, user::User, IList};
-use crate::utility::ObjPtr;
+use crate::utility::{ObjPool, ObjPtr};
 mod alloca;
 mod binary;
 mod branch;

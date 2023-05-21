@@ -1,19 +1,19 @@
 ///! 此文件为 load 指令的实现
 use super::*;
 
-impl Inst {
+impl ObjPool<Inst> {
     /// 加载一个int值
     /// # Arguments
     /// * 'ptr' - 需要加载的指针
     /// * 'offset' - 偏移量
     /// # Return
     /// 返回一个Inst实例
-    pub fn make_int_load(ptr: ObjPtr<Inst>, offset: ObjPtr<Inst>) -> Self {
-        Self::new(
+    pub fn make_int_load(&mut self, ptr: ObjPtr<Inst>, offset: ObjPtr<Inst>) -> ObjPtr<Inst> {
+        self.put(Inst::new(
             crate::ir::ir_type::IrType::Int,
             InstKind::Load,
             vec![ptr, offset],
-        )
+        ))
     }
 
     /// 加载一个全局int值
@@ -22,26 +22,29 @@ impl Inst {
     /// * 'offset' - 偏移量
     /// # Return
     /// 返回一个Inst实例
-    pub fn make_global_int_load(ptr: ObjPtr<Inst>, offset: ObjPtr<Inst>) -> Self {
-        Self::new(
+    pub fn make_global_int_load(
+        &mut self,
+        ptr: ObjPtr<Inst>,
+        offset: ObjPtr<Inst>,
+    ) -> ObjPtr<Inst> {
+        self.put(Inst::new(
             crate::ir::ir_type::IrType::Int,
             InstKind::Load,
             vec![ptr, offset],
-        )
+        ))
     }
-
     /// 加载一个int数组
     /// # Arguments
     /// * 'ptr' - 需要加载的指针
     /// * 'offset' - 偏移量
     /// # Return
     /// 返回一个Inst实例
-    pub fn make_int_array_load(ptr: ObjPtr<Inst>, offset: ObjPtr<Inst>) -> Self {
-        Self::new(
+    pub fn make_int_array_load(&mut self, ptr: ObjPtr<Inst>, offset: ObjPtr<Inst>) -> ObjPtr<Inst> {
+        self.put(Inst::new(
             crate::ir::ir_type::IrType::Int,
             InstKind::Load,
             vec![ptr, offset],
-        )
+        ))
     }
 
     /// 加载一个全局int数组
@@ -50,26 +53,29 @@ impl Inst {
     /// * 'offset' - 偏移量
     /// # Return
     /// 返回一个Inst实例
-    pub fn make_global_int_array_load(ptr: ObjPtr<Inst>, offset: ObjPtr<Inst>) -> Self {
-        Self::new(
+    pub fn make_global_int_array_load(
+        &mut self,
+        ptr: ObjPtr<Inst>,
+        offset: ObjPtr<Inst>,
+    ) -> ObjPtr<Inst> {
+        self.put(Inst::new(
             crate::ir::ir_type::IrType::IntPtr,
             InstKind::Load,
             vec![ptr, offset],
-        )
+        ))
     }
-
     /// 加载一个float值
     /// # Arguments
     /// * 'ptr' - 需要加载的指针
     /// * 'offset' - 偏移量
     /// # Return
     /// 返回一个Inst实例
-    pub fn make_float_load(ptr: ObjPtr<Inst>, offset: ObjPtr<Inst>) -> Self {
-        Self::new(
+    pub fn make_float_load(&mut self, ptr: ObjPtr<Inst>, offset: ObjPtr<Inst>) -> ObjPtr<Inst> {
+        self.put(Inst::new(
             crate::ir::ir_type::IrType::Float,
             InstKind::Load,
             vec![ptr, offset],
-        )
+        ))
     }
 
     /// 加载一个全局float值
@@ -78,26 +84,33 @@ impl Inst {
     /// * 'offset' - 偏移量
     /// # Return
     /// 返回一个Inst实例
-    pub fn make_global_float_load(ptr: ObjPtr<Inst>, offset: ObjPtr<Inst>) -> Self {
-        Self::new(
+    pub fn make_global_float_load(
+        &mut self,
+        ptr: ObjPtr<Inst>,
+        offset: ObjPtr<Inst>,
+    ) -> ObjPtr<Inst> {
+        self.put(Inst::new(
             crate::ir::ir_type::IrType::Float,
             InstKind::Load,
             vec![ptr, offset],
-        )
+        ))
     }
-
     /// 加载一个float数组
     /// # Arguments
     /// * 'ptr' - 需要加载的指针
     /// * 'offset' - 偏移量
     /// # Return
     /// 返回一个Inst实例
-    pub fn make_float_array_load(ptr: ObjPtr<Inst>, offset: ObjPtr<Inst>) -> Self {
-        Self::new(
+    pub fn make_float_array_load(
+        &mut self,
+        ptr: ObjPtr<Inst>,
+        offset: ObjPtr<Inst>,
+    ) -> ObjPtr<Inst> {
+        self.put(Inst::new(
             crate::ir::ir_type::IrType::Float,
             InstKind::Load,
             vec![ptr, offset],
-        )
+        ))
     }
 
     /// 加载一个全局float数组
@@ -106,14 +119,20 @@ impl Inst {
     /// * 'offset' - 偏移量
     /// # Return
     /// 返回一个Inst实例
-    pub fn make_global_float_array_load(ptr: ObjPtr<Inst>, offset: ObjPtr<Inst>) -> Self {
-        Self::new(
+    pub fn make_global_float_array_load(
+        &mut self,
+        ptr: ObjPtr<Inst>,
+        offset: ObjPtr<Inst>,
+    ) -> ObjPtr<Inst> {
+        self.put(Inst::new(
             crate::ir::ir_type::IrType::FloatPtr,
             InstKind::Load,
             vec![ptr, offset],
-        )
+        ))
     }
+}
 
+impl Inst {
     /// 获得指针
     /// # Return
     /// 返回指针的引用

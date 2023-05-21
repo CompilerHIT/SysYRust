@@ -60,7 +60,7 @@ impl User {
         self.use_list = self
             .use_list
             .iter()
-            .filter(|x| eq(x.as_ref(), inst.as_ref()))
+            .filter(|x| !eq(x.as_ref(), inst.as_ref()))
             .cloned()
             .collect();
     }

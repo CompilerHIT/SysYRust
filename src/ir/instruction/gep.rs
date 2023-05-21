@@ -1,6 +1,8 @@
 ///! 此模块为 GEP 指令提供了实现
 use super::*;
-impl Inst {
+use crate::utility::ObjPool;
+
+impl ObjPool<Inst> {
     /// 构造一个 GEP 指令
     ///
     /// # Arguments
@@ -8,14 +10,16 @@ impl Inst {
     /// * 'offset' - 偏移量
     /// # Returns
     /// 构造好的 GEP 指令
-    pub fn make_gep(ptr: ObjPtr<Inst>, offset: ObjPtr<Inst>) -> Inst {
-        Inst::new(
+    pub fn make_gep(&mut self, ptr: ObjPtr<Inst>, offset: ObjPtr<Inst>) -> ObjPtr<Inst> {
+        self.put(Inst::new(
             crate::ir::ir_type::IrType::IntPtr,
             InstKind::Gep,
             vec![ptr, offset],
-        )
+        ))
     }
+}
 
+impl Inst {
     /// 获得 GEP 指令的指针
     pub fn get_gep_ptr(&self) -> ObjPtr<Inst> {
         self.user.get_operand(0)

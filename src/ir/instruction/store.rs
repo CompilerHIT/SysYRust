@@ -1,19 +1,19 @@
 ///! 本文件为 store 指令的实现
 use super::*;
 
-impl Inst {
+impl ObjPool<Inst> {
     /// 存储一个int值
     /// # Arguments
     /// * 'dest' - 指向被存储空间的指针
     /// * 'value' - 需要存储的值'
     /// # Return
     /// 返回一个Inst实例
-    pub fn make_int_store(dest: ObjPtr<Inst>, value: ObjPtr<Inst>) -> Self {
-        Self::new(
+    pub fn make_int_store(&mut self, dest: ObjPtr<Inst>, value: ObjPtr<Inst>) -> ObjPtr<Inst> {
+        self.put(Inst::new(
             crate::ir::ir_type::IrType::Void,
             InstKind::Store,
             vec![dest, value],
-        )
+        ))
     }
 
     /// 存储一个float值
@@ -22,14 +22,16 @@ impl Inst {
     /// * 'value' - 需要存储的值'
     /// # Return
     /// 返回一个Inst实例
-    pub fn make_float_store(dest: ObjPtr<Inst>, value: ObjPtr<Inst>) -> Self {
-        Self::new(
+    pub fn make_float_store(&mut self, dest: ObjPtr<Inst>, value: ObjPtr<Inst>) -> ObjPtr<Inst> {
+        self.put(Inst::new(
             crate::ir::ir_type::IrType::Void,
             InstKind::Store,
             vec![dest, value],
-        )
+        ))
     }
+}
 
+impl Inst {
     /// 获得存储的目标地址
     /// # Return
     /// 目标地址指令的引用
