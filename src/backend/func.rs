@@ -1,8 +1,12 @@
 pub use std::collections::{HashSet, VecDeque};
+use std::vec::Vec;
 pub use std::fs::File;
 pub use std::hash::{Hash, Hasher};
 pub use std::io::{Result, Write};
 
+use lazy_static::__Deref;
+
+use crate::ir::basicblock::BasicBlock;
 use crate::ir::function::Function;
 use crate::utility::{ScalarType, ObjPool, ObjPtr};
 use crate::backend::operand::Reg;
@@ -19,10 +23,11 @@ pub struct Func {
     stack_addr: Vec<ObjPtr<StackSlot>>,
     caller_stack_addr: Vec<ObjPtr<StackSlot>>,
     params: Vec<ObjPtr<Reg>>,
-    pub entry: Option<BB>,
+    pub entry: Option<ObjPtr<BB>>,
 
     reg_def: Vec<HashSet<CurInstrInfo>>,
     reg_use: Vec<HashSet<CurInstrInfo>>,
+    reg_num: i32,
     fregs: HashSet<Reg>,
 
     context: Option<ObjPtr<Context>>,
@@ -31,7 +36,8 @@ pub struct Func {
 }
 
 
-
+/// reg_num, stack_addr, caller_stack_addr考虑借助回填实现
+/// 是否需要caller_stack_addr？caller函数sp保存在s0中
 impl Func {
     pub fn new(name: &str) -> Self {
         Self {
@@ -43,6 +49,7 @@ impl Func {
             entry: None,
             reg_def: Vec::new(),
             reg_use: Vec::new(),
+            reg_num: 0,
             fregs: HashSet::new(),
 
             context: None,
@@ -59,17 +66,61 @@ impl Func {
     pub fn construct(&mut self, module: &AsmModule, ir_func: &Function, func_seq: i32, ) {
         //FIXME: temporary
         // more infos to add
-        self.entry = Some(BB::new(&self.label));
-        module.push_block(&self.label, &self.entry.unwrap());
-        let mut block = ir_func.get_head().as_ref();
-        loop {
-            let label = format!(".L");
-            let mut bb = BB::new(&block.get)
-            
+        let mut info = Mapping::new();
+        
+        // entry shouldn't generate for asm, called label for entry should always be false
+        let label = &self.label;
+        let entry = self.blocks_mpool.put(BB::new(&format!(".entry_{label}")));
+        self.entry = Some(entry);
+        self.blocks.push(self.entry.unwrap());
+
+        // 第一遍pass
+        let mut fblock = ir_func.get_head();
+        let mut ir_block_set: HashSet<ObjPtr<BasicBlock>> = HashSet::new();
+        let first_block = self.blocks_mpool.put(BB::new(&label));
+        info.ir_block_map.insert(fblock, first_block);
+        info.block_ir_map.insert(first_block, fblock);
+        ir_block_set.insert(fblock);
+
+        let mut tmp = VecDeque::new();
+        tmp.push_back(fblock);
+        
+        let mut block_seq = 0;
+        
+        while let Some(fblock) = tmp.pop_front() {
+            let next_blocks = fblock.as_ref().get_next_bb();
+            next_blocks.iter().for_each(|block|tmp.push_back(block.clone()));
+            if block_seq == 0 {
+                block_seq += 1;
+                continue;
+            }
+            if ir_block_set.insert(fblock) {
+                let label = format!(".LBB{func_seq}_{block_seq}");
+                let block = self.blocks_mpool.put(BB::new(&label));
+                info.ir_block_map.insert(fblock, block);
+                info.block_ir_map.insert(block, fblock);
+                self.blocks.push(block);
+                block_seq += 1;
+            }
         }
-        // 需要遍历block的接口
-        // self.borrow_mut().blocks.push(Pointer::new(self.entry));
-            
+        handle_parameters();
+        // 第二遍pass
+        let mut first_block = info.ir_block_map.get(&ir_func.get_head()).unwrap();
+        self.entry.unwrap().as_mut().out_edge.push(*first_block);
+        first_block.as_mut().in_edge.push(self.entry.unwrap());
+        let mut i = 0;
+        self.blocks.iter().for_each(|block| {
+            if *block != self.entry.unwrap() {
+                let basicblock = info.block_ir_map.get(block).unwrap();
+                if i + 1 < self.blocks.len() {
+                    let next_block = Some(self.blocks[i + 1]);
+                    block.as_mut().construct(&self,*basicblock, next_block, &info);
+                } else {
+                    block.as_mut().construct(&self,*basicblock, None, &info);
+                }
+                i += 1;
+            }
+        });
     }
 
     // 移除指定id的寄存器的使用信息
@@ -90,6 +141,21 @@ impl Func {
         for reg in inst.as_ref().get_reg_def() {
             self.reg_def[reg.get_id() as usize].insert(cur_info.clone());
         }
+    }
+
+    pub fn build_reg_info(&mut self) {
+        self.reg_def.clear();   self.reg_use.clear();
+        self.reg_def.resize(self.reg_num as usize, HashSet::new());
+        self.reg_use.resize(self.reg_num as usize, HashSet::new());
+        let mut p : CurInstrInfo = CurInstrInfo::new(0);
+        self.blocks.iter().for_each(|block| {
+            p.band_block(*block);
+            for inst in block.as_ref().insts.iter() {
+                p.insts_it = Some(*inst);
+                self.add_inst_reg(&p, *inst);
+                p.pos += 1;
+            }
+        });
     }
 
     pub fn calc_live(&mut self) {
@@ -131,21 +197,22 @@ impl Func {
 
     pub fn allocate_reg(&mut self, f: &'static mut File) {
         // 函数返回地址保存在ra中
-        //FIXME: 暂时使用固定的寄存器ra、a0与s0，即r1, r8, r10
-        //FIXME:暂时只考虑int型
-        let reg_int = vec![Reg::new(1, ScalarType::Int), Reg::new(8, ScalarType::Int)];
+        let fp = Reg::new(8, ScalarType::Int);
+        let reg_int = vec![Reg::new(1, ScalarType::Int), fp];
 
         let mut stack_size = 0;
         for it in self.stack_addr.iter().rev() {
             it.as_mut().set_pos(stack_size);
             stack_size += it.as_ref().get_size();
         }
-
+        
+        // 寄存器够用，不需要开栈。若够用则优先将r0值保存在寄存器中
         let mut reg_int_res = Vec::from(reg_int);
         let mut reg_int_res_cl = reg_int_res.clone();
         let reg_int_size = reg_int_res.len();
         
-        //TODO:栈对齐 - 调用func时sp需按16字节对齐
+        //栈对齐 - 调用func时sp需按16字节对齐
+        stack_size = stack_size / 16 * 16 + 16;
 
         let mut offset = stack_size;
         let mut f1 = f.try_clone().unwrap();
@@ -158,6 +225,7 @@ impl Func {
                     offset -= 8;
                     builder.sd(&src.to_string(), "sp", offset, false);
                 }
+                builder.addi(&fp.to_string(), &fp.to_string(), stack_size);
             });
             let mut offset = stack_size;
             contxt.as_mut().set_epilogue_event(move||{
@@ -166,7 +234,7 @@ impl Func {
                     offset -= 8;
                     builder.ld("sp", &src.to_string(), offset, false);
                 }
-                builder.addi("sp", "sp", offset);
+                builder.addi("sp", "sp", stack_size);
             });
         }
         
@@ -192,4 +260,16 @@ impl GenerateAsm for Func {
         }
         Ok(())
     }
+}
+
+fn set_append(blocks: &Vec<ObjPtr<BasicBlock>>) -> HashSet<ObjPtr<BasicBlock>> {
+    let mut set = HashSet::new();
+    for block in blocks.iter() {
+        set.insert(block.clone());
+    }
+    set
+}
+
+fn handle_parameters() {
+    //TODO:
 }
