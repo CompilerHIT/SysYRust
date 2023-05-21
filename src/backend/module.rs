@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{Result, Write};
+use std::hash::{Hash, Hasher};
 
 use crate::ir::basicblock::BasicBlock;
 use crate::ir::module::Module;
@@ -21,8 +22,8 @@ pub struct AsmModule {
     global_var_list: Vec<GlobalVar>,
 
     // const_array_mapping: HashMap<String, ArrayConst>,
-    func_map: HashMap<&'static str, &'static Func>,
-    block_map: HashMap<&'static str, &'static BB>,
+    func_map: HashMap<ObjPtr<Function>, &'static Func>,
+    upper_module: &'static Module,
 }
 
 impl AsmModule {
@@ -33,30 +34,33 @@ impl AsmModule {
             global_var_list,
             // global_fvar_list,
             func_map: HashMap::new(),
-            block_map: HashMap::new(),
+            upper_module: ir_module,
         }
     }
     
-    pub fn build_lir(&self, ir_module: &Module) {
+    pub fn build_lir(&self) {
         let mut func_seq = 0;
-        for (name, iter) in ir_module.function {
-            func_seq += 1;
+        for (name, iter) in self.upper_module.function {
             let ir_func = iter.as_ref();
             let mut func = Func::new(name);
             func.construct(&self, ir_func, func_seq);
-            self.func_map.insert(name, &func);
+            self.func_map.insert(iter, &func);
+            func_seq += 1;
         }
-    } 
-
-    pub fn push_block(&self, label: &str, block: &BB) {
-        self.block_map.insert(label, block);
     }
 
     pub fn generator(&mut self, f: &mut File) -> Result<()> {
+        self.build_lir();
+        self.allocate_reg(f);
         self.generate_global_var(f)?;
         Ok(())
     }
 
+    fn allocate_reg(&self, f: &mut File) {
+        self.func_map.iter_mut().for_each(|(_, func)| {
+            func.allocate_reg(f);
+        });
+    }
 
     fn get_global(ir_module: &Module) -> Vec<GlobalVar> {
         let map = ir_module.global_variable;
@@ -97,4 +101,17 @@ impl AsmModule {
         }
         Ok(())
     }
+}
+
+impl PartialEq for ObjPtr<Function> {
+    fn eq(&self, other: &Self) -> bool {
+        std::ptr::eq(self.as_ref(), other.as_ref())
+    }
+}
+impl Eq for ObjPtr<Function> {}
+
+impl Hash for ObjPtr<Function> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        std::ptr::hash(self.as_ref(), state)
+    }    
 }

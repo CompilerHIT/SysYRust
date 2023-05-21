@@ -11,6 +11,7 @@ use crate::backend::operand::{Reg, IImm, FImm};
 use crate::backend::instrs::{LIRInst, InstrsType, SingleOp};
 use crate::backend::instrs::Operand;
 
+use crate::backend::func::Func;
 use super::structs::*;
 
 
@@ -52,12 +53,27 @@ impl BB {
         self.insts_mpool.free_all()
     }
 
-    pub fn construct(&mut self, block: ObjPtr<BasicBlock>, next_block: ObjPtr<BB>) {
+    /// 寄存器分配时决定开栈大小、栈对象属性(size(4/8 bytes), pos)，回填func的stack_addr
+    /// 尽量保证程序顺序执行，并满足首次遇分支向后跳转的原则？
+    //FIXME: b型指令长跳转(目标地址偏移量为+-4KiB)，若立即数非法是否需要增添一个jal块实现间接跳转？
+    pub fn construct(&mut self, func: &Func, block: ObjPtr<BasicBlock>, next_blocks: Option<ObjPtr<BB>>, map_info: &Mapping) {
         let mut ir_block_inst = block.as_ref().get_head_inst();
         loop {
             let inst_ref = ir_block_inst.as_ref();
             // translate ir to lir, use match
             match inst_ref.get_kind() {
+                InstKind::Binary(op) => {
+                    let lhs = inst_ref.get_lhs();
+                    let rhs = inst_ref.get_rhs();
+                    let mut lhsReg : Operand;
+                    let mut rhsReg : Operand;
+                    let mut dstReg : Operand;
+                    // match op {
+                    //     BinOp::Add => {
+                            
+                    //     }
+                    // }
+                }
                 InstKind::Return => {
                     match inst_ref.get_ir_type() {
                         ir_type::IrType::Void => self.insts.push(
@@ -91,6 +107,9 @@ impl BB {
             }
             if let Some(ir_block_inst) = ir_block_inst.as_ref().get_next() {} 
             else {
+                break;
+            }
+            if ir_block_inst == block.as_ref().get_tail_inst() {
                 break;
             }
         }
@@ -140,3 +159,24 @@ impl GenerateAsm for BB {
         Ok(())
     }
 }
+
+impl PartialEq for BB {
+    fn eq(&self, other: &Self) -> bool {
+        self.label == other.label
+    }
+}
+
+impl Eq for BB {}
+
+impl Hash for BB {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.label.hash(state);
+    }
+}
+
+impl PartialEq for ObjPtr<Inst> {
+    fn eq(&self, other: &Self) -> bool {
+        std::ptr::eq(self.as_ref(), other.as_ref())
+    }
+}
+impl Eq for ObjPtr<Inst> {}
