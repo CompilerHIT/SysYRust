@@ -3,7 +3,7 @@
 ///! 所有Inst类型的公有方法和Head的简单实现。特定的
 ///! inst的相关实现放在当前目录下的其他文件中。
 use super::{ir_type::IrType, user::User, IList};
-use crate::utility::ObjPtr;
+use crate::utility::{ObjPool, ObjPtr};
 mod alloca;
 mod binary;
 mod branch;
@@ -105,8 +105,19 @@ impl Inst {
         self.kind
     }
 
+    /// 获得使用该Inst的列表
     pub fn get_use_list(&self) -> &mut Vec<ObjPtr<Inst>> {
         self.user.get_use_list()
+    }
+
+    /// 增加user
+    pub fn add_user(&mut self, inst: &Inst) {
+        self.user.add_user(inst);
+    }
+
+    /// 删除user
+    pub fn remove_user(&mut self, inst: &Inst) {
+        self.user.delete_user(inst);
     }
 
     // 链表行为
@@ -128,21 +139,13 @@ impl Inst {
     }
 
     /// 获得当前指令的前一条指令。若为第一条指令，则返回None
-    pub fn get_prev(&self) -> Option<ObjPtr<Inst>> {
-        if self.is_head() {
-            None
-        } else {
-            Some(self.list.get_prev())
-        }
+    pub fn get_prev(&self) -> ObjPtr<Inst> {
+        self.list.get_prev()
     }
 
     /// 获得当前指令的下一条指令。若为最后一条指令，则返回None
-    pub fn get_next(&self) -> Option<ObjPtr<Inst>> {
-        if self.is_tail() {
-            None
-        } else {
-            Some(self.list.get_next())
-        }
+    pub fn get_next(&self) -> ObjPtr<Inst> {
+        self.list.get_next()
     }
 
     /// 在当前指令之前插入一条指令
