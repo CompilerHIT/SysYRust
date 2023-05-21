@@ -183,33 +183,6 @@ pub struct Mapping {
     pub block_ir_map: HashMap<ObjPtr<BB>, ObjPtr<BasicBlock>>,
 }
 
-impl PartialEq for ObjPtr<BasicBlock> {
-    fn eq(&self, other: &Self) -> bool {
-        std::ptr::eq(self.as_ref(), other.as_ref())
-    }
-}
-impl Eq for ObjPtr<BasicBlock> {}
-
-impl Hash for ObjPtr<BasicBlock> {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        std::ptr::hash(self.as_ref(), state)
-    }
-}
-
-impl PartialEq for ObjPtr<BB> {
-    fn eq(&self, other: &Self) -> bool {
-        std::ptr::eq(self.as_ref(), other.as_ref())
-    }
-}
-
-impl Eq for ObjPtr<BB> {}
-
-impl Hash for ObjPtr<BB> {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        std::ptr::hash(self.as_ref(), state)
-    }
-}
-
 impl Mapping {
     pub fn new() -> Self {
         Self {

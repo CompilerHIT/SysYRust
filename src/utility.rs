@@ -1,5 +1,7 @@
 use std::{
     fmt::Debug,
+    hash::Hash,
+    ptr::eq,
     {pin::Pin, ptr::NonNull},
 };
 
@@ -31,6 +33,20 @@ impl<T> ObjPtr<T> {
 impl<T> Clone for ObjPtr<T> {
     fn clone(&self) -> Self {
         ObjPtr(self.0.clone())
+    }
+}
+
+impl<T> PartialEq for ObjPtr<T> {
+    fn eq(&self, other: &Self) -> bool {
+        eq(self.as_ref(), other.as_ref())
+    }
+}
+
+impl <T> Eq for ObjPtr<T> {}
+
+impl<T> Hash for ObjPtr<T> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        std::ptr::hash(self.as_ref(), state);
     }
 }
 
