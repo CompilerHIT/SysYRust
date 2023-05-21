@@ -1,6 +1,5 @@
 use std::collections::HashSet;
 use std::collections::HashMap;
-use std::cmp::Ordering;
 
 #[derive(Clone)]
 pub struct RegUsedStat{
@@ -52,8 +51,12 @@ impl RegUsedStat {
 
         if self.iregs_used&(1<<3)==0 {
             // gp寄存器x3,后面可能保留不分配用来做优化
-            return Some(3)
+            return Some(3);
         }
+        if self.iregs_used&(1<<8)==0 {
+            return Some(8);
+        }
+
         for i in 5..=9 {
             if self.iregs_used&(1<<i)==0 {
                 return Some(i)
