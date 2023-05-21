@@ -1,6 +1,6 @@
 //! src/ir/ir_type/mod.rs
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum IrType {
     Void,
     Bool,
