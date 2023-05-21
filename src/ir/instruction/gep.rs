@@ -11,11 +11,17 @@ impl ObjPool<Inst> {
     /// # Returns
     /// 构造好的 GEP 指令
     pub fn make_gep(&mut self, ptr: ObjPtr<Inst>, offset: ObjPtr<Inst>) -> ObjPtr<Inst> {
-        self.put(Inst::new(
+        let inst = self.put(Inst::new(
             crate::ir::ir_type::IrType::IntPtr,
             InstKind::Gep,
             vec![ptr, offset],
-        ))
+        ));
+
+        // 设置use_list
+        ptr.as_mut().add_user(inst.as_ref());
+        offset.as_mut().add_user(inst.as_ref());
+
+        inst
     }
 }
 
@@ -27,6 +33,10 @@ impl Inst {
 
     /// 设置 GEP 指令的指针
     pub fn set_gep_ptr(&mut self, ptr: ObjPtr<Inst>) {
+        // 设置use_list
+        self.user.get_operand(0).as_mut().remove_user(self);
+        ptr.as_mut().add_user(self);
+
         self.user.set_operand(0, ptr);
     }
 
@@ -37,6 +47,10 @@ impl Inst {
 
     /// 设置 GEP 指令的偏移量
     pub fn set_gep_offset(&mut self, offset: ObjPtr<Inst>) {
+        // 设置use_list
+        self.user.get_operand(1).as_mut().remove_user(self);
+        offset.as_mut().add_user(self);
+
         self.user.set_operand(1, offset);
     }
 }

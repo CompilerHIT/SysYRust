@@ -51,16 +51,16 @@ impl User {
     }
 
     /// 表示当前指令被使用，将其加入use list
-    pub fn used(&mut self, inst: ObjPtr<Inst>) {
-        self.use_list.push(inst);
+    pub fn add_user(&mut self, inst: &Inst) {
+        self.use_list.push(ObjPtr::new(inst));
     }
 
     /// 当前指令不再被使用，删除将对方从use list中删除
-    pub fn un_unsed(&mut self, inst: ObjPtr<Inst>) {
+    pub fn delete_user(&mut self, inst: &Inst) {
         self.use_list = self
             .use_list
             .iter()
-            .filter(|x| !eq(x.as_ref(), inst.as_ref()))
+            .filter(|x| !eq(x.as_ref(), inst))
             .cloned()
             .collect();
     }

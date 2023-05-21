@@ -25,6 +25,9 @@ impl Inst {
     /// 向phi指令中添加一个操作数
     pub fn add_operand(&mut self, operand: ObjPtr<Inst>) {
         self.user.push_operand(operand);
+
+        // 更新操作数的使用者
+        operand.as_mut().add_user(self)
     }
 
     /// 获得phi指令的操作数列表
