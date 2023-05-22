@@ -42,9 +42,6 @@ pub fn irgen(
 ) {
     let mut pool_scope = ObjPool::new();
     let context_mut = pool_scope.put(Context::make_context(module_mut)).as_mut();
-    let s = "0".to_string();
-    let bb_head = pool_bb_mut.put(BasicBlock::new(s.as_str()));
-    let bb_now_mut = bb_head.clone();
     let mut kit_mut = &mut Kit {
         context_mut,
         pool_inst_mut,
