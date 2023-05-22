@@ -197,8 +197,7 @@ impl Func {
 
     pub fn allocate_reg(&mut self, f: &'static mut File) {
         // 函数返回地址保存在ra中
-        let fp = Reg::new(8, ScalarType::Int);
-        let reg_int = vec![Reg::new(1, ScalarType::Int), fp];
+        let reg_int = vec![Reg::new(1, ScalarType::Int)];
 
         let mut stack_size = 0;
         for it in self.stack_addr.iter().rev() {
@@ -206,7 +205,6 @@ impl Func {
             stack_size += it.as_ref().get_size();
         }
         
-        // 寄存器够用，不需要开栈。若够用则优先将r0值保存在寄存器中
         let mut reg_int_res = Vec::from(reg_int);
         let mut reg_int_res_cl = reg_int_res.clone();
         let reg_int_size = reg_int_res.len();
@@ -225,7 +223,6 @@ impl Func {
                     offset -= 8;
                     builder.sd(&src.to_string(), "sp", offset, false);
                 }
-                builder.addi(&fp.to_string(), &fp.to_string(), stack_size);
             });
             let mut offset = stack_size;
             contxt.as_mut().set_epilogue_event(move||{

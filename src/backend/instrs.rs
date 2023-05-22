@@ -1,5 +1,5 @@
 pub use std::io::Result;
-// use std::collections::HashSet;
+use std::collections::HashMap;
 use std::vec;
 use std::cmp::min;
 
@@ -28,7 +28,7 @@ pub enum BinaryOp {
     Sub,
     Mul,
     Div,
-    Mod,
+    Rem,
     And,
     Or,
     Xor,
@@ -42,9 +42,14 @@ pub enum BinaryOp {
 
 /// 单目运算符
 pub enum SingleOp {
-    // Li, Lui, MvReg
-    Mov,
-    Not,
+    Li,
+    Lui,
+    IMv,
+    FMv,
+    INot,
+    INeg,
+    //FIXME: whether fnot exist
+    FNot,
     FNeg,
     I2F,
     F2I,
@@ -144,6 +149,21 @@ impl LIRInst {
         }
     }
 
+    pub fn v_to_phy(&mut self, regs: Vec<Reg>, map: HashMap<i32, i32>) {
+        for operand in self.operands {
+            match operand {
+                Operand::Reg(mut reg) => {
+                    if let Some(id) = map.get(&reg.get_id()) {
+                        reg.map_id(id.clone());
+                    } else {
+                        panic!("not find physic mapping");
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+
     // instr's def/use regs
     pub fn get_reg_def(&self) -> Vec<Reg> {
         match self.inst_type {
@@ -161,7 +181,7 @@ impl LIRInst {
                 let mut n = cnt;
                 while n > 0 {
                     let ireg = Reg::new(cnt - n, ScalarType::Int);
-                    if ireg.is_caller_save() && !ireg.is_special() {
+                    if ireg.is_caller_save() {
                         set.push(ireg);
                     }
                     let freg = Reg::new(cnt - n, ScalarType::Float);
@@ -176,8 +196,8 @@ impl LIRInst {
 
             InstrsType::Ret(re_type) => {
                 match re_type {
-                    ScalarType::Int => vec![Reg::new(0, ScalarType::Int)],
-                    ScalarType::Float => vec![Reg::new(0, ScalarType::Float)],
+                    ScalarType::Int => vec![Reg::new(10, ScalarType::Int)],
+                    ScalarType::Float => vec![Reg::new(10, ScalarType::Float)],
                     ScalarType::Void => vec![],
                 }
             }
@@ -218,8 +238,8 @@ impl LIRInst {
             }
             InstrsType::Ret(re_type) => {
                 match re_type {
-                    ScalarType::Int => vec![Reg::new(0, ScalarType::Int)],
-                    ScalarType::Float => vec![Reg::new(0, ScalarType::Float)],
+                    ScalarType::Int => vec![Reg::new(10, ScalarType::Int)],
+                    ScalarType::Float => vec![Reg::new(10, ScalarType::Float)],
                     ScalarType::Void => vec![],
                 }
             }
