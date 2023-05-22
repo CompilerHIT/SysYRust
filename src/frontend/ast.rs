@@ -193,8 +193,9 @@ pub enum PrimaryExp {
 }
 
 #[derive(Debug)]
-pub struct Number {
-    pub int_const: IntConst,
+pub enum Number {
+    IntConst(IntConst),
+    FloatConst(FloatConst),
 }
 
 #[derive(Debug)]
@@ -206,12 +207,13 @@ pub struct OptionFuncFParams {
 pub enum UnaryExp {
     PrimaryExp(Box<PrimaryExp>),
     FuncCall((Ident, OptionFuncFParams)),
-    AddUnaryExp(Box<UnaryExp>),
+    // AddUnaryExp(Box<UnaryExp>),
     OpUnary((UnaryOp, Box<UnaryExp>)),
 }
 
 #[derive(Debug)]
 pub enum UnaryOp {
+    Add,
     Minus,
     Exclamation,
 }
@@ -282,3 +284,4 @@ pub enum LOrExp {
 pub type Ident = String;
 
 pub type IntConst = i32;
+pub type FloatConst = f32;

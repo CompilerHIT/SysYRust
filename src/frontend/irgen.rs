@@ -1,7 +1,6 @@
-use super::actionscope::Type;
-use super::{actionscope::ActionScope, ast::*};
+use super::context::Type;
+use super::{context::Context, ast::*};
 use crate::frontend::error::Error;
-use crate::global_lalrpop::{IN_FUNC, MODULE};
 use crate::ir::basicblock::BasicBlock;
 use crate::ir::function::Function;
 use crate::ir::instruction::Inst;
@@ -13,51 +12,25 @@ use std::thread::LocalKey;
 use std::{self};
 
 struct Kit {
-    module_mut: &'static mut Module,
-    scope_mut: &'static mut ActionScope,
+    context_mut: &'static mut Context,
     pool_inst_mut: &'static mut ObjPool<Inst>,
     pool_func_mut: &'static mut ObjPool<Function>,
     pool_bb_mut: &'static mut ObjPool<BasicBlock>,
-    bb_now_mut: InfuncChoice,
 }
 
 impl Kit {
     pub fn push_inst(&self, inst_ptr: ObjPtr<Inst>) {
-        match self.bb_now_mut {
-            InfuncChoice::InFunc(bb) => bb.push_back(inst_ptr),
-            InfuncChoice::NInFunc() => {}
-        }
+        self.context_mut.push_inst_bb(inst_ptr);
     }
-
-    // pub get_layer(&self)->i64{
-    //     return self.scope_
-    // }
 
     pub fn add_var(&self, s: &'static str, tp: Type, is_array: bool, dimension: Vec<i64>) {
-        self.scope_mut.add_var(s, tp, is_array, dimension);
+        self.context_mut.add_var(s, tp, is_array, dimension);
     }
 
-    pub fn update_var(&self, s: &str, bbname: &str, inst: ObjPtr<Inst>) -> bool {
-        self.update_var(s, bbname, inst)
+    pub fn update_var(&self, s: &str, inst: ObjPtr<Inst>) -> bool {
+        self.context_mut.update_var_scope(s, inst)
     }
 
-    pub fn push_globalvar(&self, name: &'static str, inst_ptr: ObjPtr<Inst>) {
-        match self.bb_now_mut {
-            InfuncChoice::InFunc(bb) => {}
-            InfuncChoice::NInFunc() => self.module_mut.push_var(name, inst_ptr),
-        }
-    }
-
-    pub fn push_function(&self, name: &'static str, func_ptr: ObjPtr<Function>) {
-        match self.bb_now_mut {
-            InfuncChoice::InFunc(bb) => {}
-            InfuncChoice::NInFunc() => self.module_mut.push_function(name, func_ptr),
-        }
-    }
-
-    pub fn bb_now_set(&self, bb: &mut BasicBlock) {
-        self.bb_now_mut = InfuncChoice::InFunc(bb);
-    }
 }
 
 pub fn irgen(
@@ -68,17 +41,15 @@ pub fn irgen(
     pool_func_mut: &mut ObjPool<Function>,
 ) {
     let mut pool_scope = ObjPool::new();
-    let scope_mut = pool_scope.put(ActionScope::new()).as_mut();
+    let context_mut = pool_scope.put(Context::make_context(module_mut)).as_mut();
     let s = "0".to_string();
     let bb_head = pool_bb_mut.put(BasicBlock::new(s.as_str()));
     let bb_now_mut = bb_head.clone();
     let mut kit_mut = &mut Kit {
-        module_mut,
-        scope_mut,
+        context_mut,
         pool_inst_mut,
         pool_bb_mut,
         pool_func_mut,
-        bb_now_mut: InfuncChoice::NInFunc(),
     };
     compunit.process(1, kit_mut);
 }
@@ -88,39 +59,6 @@ pub enum InfuncChoice {
     NInFunc(),
 }
 
-// pub trait Process {
-//     type Ret;
-//     type Message;
-//     fn process(
-//         &self,
-//         input: Self::Message,
-//         module: &mut Module,
-//         scope: &mut ActionScope,
-//         pool_inst: &mut ObjPool<Inst>,
-//         pool_bb: &mut ObjPool<BasicBlock>,
-//         bb_now_mut: ObjPtr<BasicBlock>,
-//         // pool: ObjPool<>,
-//     ) -> Result<Self::Ret, Error>;
-// }
-
-// impl Process for CompUnit {
-//     type Ret = i32;
-//     type Message = (i32);
-//     fn process(
-//         &self,
-//         input: Self::Message,
-//         module: &mut Module,
-//         scope: &mut ActionScope,
-//         pool_inst: &mut ObjPool<Inst>,
-//         pool_bb: &mut ObjPool<BasicBlock>,
-//         bb_now_mut: ObjPtr<BasicBlock>,
-//     ) -> Result<Self::Ret, Error> {
-//         for item in self.global_items {
-//             item.process(1, module, scope, pool_inst, pool_bb, bb_now_mut);
-//         }
-//         Ok(1)
-//     }
-// }
 
 pub trait Process {
     type Ret;
@@ -129,7 +67,6 @@ pub trait Process {
         &self,
         input: Self::Message,
         kit_mut: &mut Kit,
-        // pool: ObjPool<>,
     ) -> Result<Self::Ret, Error>;
 }
 
@@ -165,9 +102,6 @@ impl Process for Decl {
     type Message = (i32);
 
     fn process(&self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
-        // let in_func = input;
-        // match in_func {
-        //     InfuncChoice::InFunc(bb) =>
         match self {
             Self::ConstDecl(decl) => {}
             Self::VarDecl(vardef) => match vardef.btype {
@@ -175,15 +109,13 @@ impl Process for Decl {
                     for def in vardef.var_def_vec {
                         match def {
                             VarDef::NonArrayInit((id, val)) => match val {
-                                InitVal::Exp(exp) => {}
+                                InitVal::Exp(exp) => {
+                                    let inst_ptr = exp.process(input, kit_mut);
+                                }
                                 InitVal::InitValVec(val_vec) => {}
                             },
                             VarDef::NonArray((id)) => {
-                                // let inst_ptr = pool_inst.put(Inst::make_int_const(0));
                                 kit_mut.add_var(id.as_str(), Type::Int, false, vec![]);
-                                // let inst_ptr = kit_mut.pool_inst_mut.make_global_int(0);
-                                // bb.push_back(inst.clone());
-                                // kit_mut.push_inst(inst_ptr);
                             }
                             VarDef::ArrayInit((id, exp_vec, val)) => {}
                             VarDef::Array((id, exp_vec)) => {
@@ -273,8 +205,8 @@ impl Process for FuncDef {
                     FuncType::Int => func_mut.set_return_type(IrType::Int),
                     FuncType::Float => func_mut.set_return_type(IrType::Float),
                 }
-                kit_mut.bb_now_set(bb.as_mut());
-                kit_mut.push_function(id.as_str(), func_ptr);
+                kit_mut.context_mut.bb_now_set(bb.as_mut());
+                kit_mut.context_mut.push_func_module(id.as_str(), func_ptr);
                 blk.process(1, kit_mut);
             }
             Self::ParameterFuncDef(pf) => {}
@@ -310,11 +242,11 @@ impl Process for Block {
     type Ret = i32;
     type Message = (i32);
     fn process(&self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
-        kit_mut.scope_mut.add_layer();
+        kit_mut.context_mut.add_layer();
         for item in self.block_vec {
             item.process(input, kit_mut);
         }
-        kit_mut.scope_mut.delete_layer();
+        kit_mut.context_mut.delete_layer();
         Ok(1)
     }
 }
@@ -405,10 +337,10 @@ impl Process for Return {
     }
 }
 impl Process for Exp {
-    type Ret = i32;
+    type Ret = ObjPtr<Inst>;
     type Message = (i32);
     fn process(&self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
-        Ok(1)
+        self.add_exp.process(input, kit_mut)
     }
 }
 
@@ -428,17 +360,41 @@ impl Process for LVal {
 }
 
 impl Process for PrimaryExp {
-    type Ret = i32;
+    type Ret = ObjPtr<Inst>;
     type Message = (i32);
     fn process(&self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
-        Ok(1)
+        match self {
+            PrimaryExp::Exp(exp) => exp.process(input, kit_mut),
+            PrimaryExp::LVal(lval) => Err(Error::Todo),
+            PrimaryExp::Number(num) => num.process(input, kit_mut),
+        }
+        // Err(Error::Todo)
     }
 }
 impl Process for Number {
-    type Ret = i32;
+    type Ret = ObjPtr<Inst>;
     type Message = (i32);
     fn process(&self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
-        Ok(1)
+        match self {
+            Number::FloatConst(f) => {
+                if let Some(inst) = kit_mut.context_mut.get_const_float(*f){
+                    return Ok(inst);
+                }else{
+                    let inst = kit_mut.pool_inst_mut.make_float_const(*f);
+                    kit_mut.context_mut.add_const_float(*f, inst);
+                    return Ok(inst);
+                }
+            }
+            Number::IntConst(i) => {
+                if let Some(inst) = kit_mut.context_mut.get_const_int(*i){
+                    return Ok(inst);
+                }else{
+                    let inst = kit_mut.pool_inst_mut.make_int_const(*i);
+                    kit_mut.context_mut.add_const_int(*i, inst);
+                    return Ok(inst);
+                }
+            }
+        }
     }
 }
 
@@ -450,10 +406,37 @@ impl Process for OptionFuncFParams {
     }
 }
 impl Process for UnaryExp {
-    type Ret = i32;
+    type Ret = ObjPtr<Inst>;
     type Message = (i32);
     fn process(&self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
-        Ok(1)
+        match self {
+            UnaryExp::PrimaryExp(primaryexp) => {
+                let inst_ptr = primaryexp.process(input, kit_mut);
+                Err(Error::Todo)
+            }
+            UnaryExp::OpUnary((unaryop, unaryexp)) => match unaryop {
+                UnaryOp::Add => {
+                    let inst_u = unaryexp.as_ref().process(input, kit_mut).unwrap();
+                    let inst = kit_mut.pool_inst_mut.make_pos(inst_u);
+                    kit_mut.context_mut.push_inst_bb(inst);
+                    Ok(inst)
+                }
+                UnaryOp::Minus => {
+                    let inst_u = unaryexp.as_ref().process(input, kit_mut).unwrap();
+                    let inst = kit_mut.pool_inst_mut.make_neg(inst_u);
+                    kit_mut.context_mut.push_inst_bb(inst);
+                    Ok(inst)
+                }
+                UnaryOp::Exclamation => {
+                    let inst_u = unaryexp.as_ref().process(input, kit_mut).unwrap();
+                    let inst = kit_mut.pool_inst_mut.make_not(inst_u);
+                    kit_mut.context_mut.push_inst_bb(inst);
+                    Ok(inst)
+                }
+            },
+            UnaryExp::FuncCall((funcname, funcparams)) => {Err(Error::Todo)}
+        }
+        // Ok(1)
     }
 }
 
@@ -474,10 +457,34 @@ impl Process for FuncRParams {
 }
 
 impl Process for MulExp {
-    type Ret = i32;
+    type Ret = ObjPtr<Inst>;
     type Message = (i32);
     fn process(&self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
-        Ok(1)
+        match self {
+            MulExp::UnaryExp(unaryexp) => unaryexp.process(input, kit_mut),
+            MulExp::MulExp((mulexp, unaryexp)) => {
+                let inst_left = mulexp.as_ref().process(input, kit_mut).unwrap();
+                let inst_right = unaryexp.process(input, kit_mut).unwrap();
+                let inst = kit_mut.pool_inst_mut.make_mul(inst_left, inst_right);
+                kit_mut.context_mut.push_inst_bb(inst);
+                Ok(inst)
+            }
+            MulExp::DivExp((mulexp, unaryexp)) => {
+                let inst_left = mulexp.as_ref().process(input, kit_mut).unwrap();
+                let inst_right = unaryexp.process(input, kit_mut).unwrap();
+                let inst = kit_mut.pool_inst_mut.make_div(inst_left, inst_right);
+                kit_mut.context_mut.push_inst_bb(inst);
+                Ok(inst)
+            }
+            MulExp::ModExp((mulexp, unaryexp)) => {
+                let inst_left = mulexp.as_ref().process(input, kit_mut).unwrap();
+                let inst_right = unaryexp.process(input, kit_mut).unwrap();
+                let inst = kit_mut.pool_inst_mut.make_rem(inst_left, inst_right);
+                kit_mut.context_mut.push_inst_bb(inst);
+                Ok(inst)
+            }
+        }
+        // Ok(1)
     }
 }
 impl Process for AddOp {
@@ -489,10 +496,31 @@ impl Process for AddOp {
 }
 
 impl Process for AddExp {
-    type Ret = i32;
+    type Ret = ObjPtr<Inst>;
     type Message = (i32);
     fn process(&self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
-        Ok(1)
+        match self {
+            AddExp::MulExp(mulexp) => {
+                mulexp.as_ref().process(input, kit_mut)
+            }
+            AddExp::OpExp((opexp, op, mulexp)) => match op {
+                AddOp::Add => {
+                    let inst_left = opexp.process(input, kit_mut).unwrap();
+                    let inst_right = opexp.process(input, kit_mut).unwrap();
+                    let inst = kit_mut.pool_inst_mut.make_add(inst_left, inst_right);
+                    kit_mut.context_mut.push_inst_bb(inst);
+                    Ok(inst)
+                }
+                AddOp::Minus => {
+                    let inst_left = opexp.process(input, kit_mut).unwrap();
+                    let inst_right = opexp.process(input, kit_mut).unwrap();
+                    let inst = kit_mut.pool_inst_mut.make_add(inst_left, inst_right);
+                    kit_mut.context_mut.push_inst_bb(inst);
+                    Ok(inst)
+                }
+            },
+        }
+        // Ok(1)
     }
 }
 impl Process for RelOp {
