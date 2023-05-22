@@ -6,8 +6,10 @@ use crate::backend::func::Func;
 use crate::backend::block::BB;
 use crate::backend::regalloc::structs::{FuncAllocStat,RegUsedStat};
 use crate::backend::regalloc::regalloc::Regalloc;
+use crate::container::bitmap::Bitmap;
 use std::cmp::Ordering;
 use crate::container::prioritydeque::PriorityDeque;
+use crate::algorithm::graphalgo;
 use crate::algorithm::graphalgo::Graph;
 
 
@@ -60,7 +62,7 @@ impl Ord for RegInterval {
 }
 
 struct BlockGraph {
-    pub graph:Graph,    //图
+    pub graph:Graph<Bitmap>,    //图
     pub from:i32,  //记录起点节点
     pub to:HashSet<i32> //记录终点节点
 }
@@ -142,7 +144,7 @@ impl Allocator {
     
     pub fn countStackSize(func:&Func) ->usize {
         let mut graph=Allocator::funcToGraph(func);
-        graph.graph.countMaxNodeCostPath(graph.from, graph.to) as usize
+        graph.graph.countMaxNodeCostPath(graph.from, graph.to).count() as usize
     }
 
     // 基于剩余interval长度贪心的线性扫描寄存器分配
