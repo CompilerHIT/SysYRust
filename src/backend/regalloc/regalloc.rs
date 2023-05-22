@@ -8,3 +8,4 @@ pub trait Regalloc {
     fn alloc(&mut self,func :& Func)->FuncAllocStat;
 }
 
+
