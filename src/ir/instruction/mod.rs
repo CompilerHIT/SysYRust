@@ -106,7 +106,7 @@ impl Inst {
     }
 
     /// 获得使用该Inst的列表
-    pub fn get_use_list(&self) -> &mut Vec<ObjPtr<Inst>> {
+    pub fn get_use_list(&self) -> &Vec<ObjPtr<Inst>> {
         self.user.get_use_list()
     }
 

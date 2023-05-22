@@ -8,6 +8,12 @@ impl ObjPool<Inst> {
     /// # Returns
     /// 返回创建的条件跳转指令
     pub fn make_br(&mut self, cond: ObjPtr<Inst>) -> ObjPtr<Inst> {
+        // 正确性检查
+        debug_assert!(
+            cond.as_ref().get_ir_type() == IrType::Int
+                || cond.as_ref().get_ir_type() == IrType::ConstInt
+        );
+
         let ir_type = IrType::Void;
         let kind = InstKind::Branch;
         let operands = vec![cond];
@@ -35,22 +41,37 @@ impl ObjPool<Inst> {
 impl Inst {
     /// 判断是否为条件跳转指令
     pub fn is_br(&self) -> bool {
-        match self.kind {
-            InstKind::Branch => self.user.get_operands_size() == 1,
-            _ => panic!("InstKind is not Branch"),
-        }
+        // 正确性检查
+        if let InstKind::Branch = self.kind {
+            debug_assert!(self.user.get_operands_size() <= 1);
+        } else {
+            unreachable!("Inst::is_br")
+        };
+
+        self.user.get_operands_size() == 1
     }
 
     /// 判断是否为无条件跳转指令
     pub fn is_jmp(&self) -> bool {
-        match self.kind {
-            InstKind::Branch => self.user.get_operands_size() == 0,
-            _ => panic!("InstKind is not Branch"),
-        }
+        // 正确性检查
+        if let InstKind::Branch = self.kind {
+            debug_assert!(self.user.get_operands_size() <= 1);
+        } else {
+            unreachable!("Inst::is_jmp")
+        };
+
+        self.user.get_operands_size() == 0
     }
 
     /// 获得条件跳转指令的条件
     pub fn get_br_cond(&self) -> ObjPtr<Inst> {
+        // 正确性检查
+        if let InstKind::Branch = self.kind {
+            debug_assert!(self.is_br());
+        } else {
+            unreachable!("Inst::get_br_cond")
+        };
+
         self.user.get_operand(0)
     }
 
@@ -58,6 +79,17 @@ impl Inst {
     /// # Arguments
     /// * `cond` - 条件
     pub fn set_br_cond(&mut self, cond: ObjPtr<Inst>) {
+        // 正确性检查
+        if let InstKind::Branch = self.kind {
+            debug_assert!(self.is_br());
+            debug_assert!(
+                cond.as_ref().get_ir_type() == IrType::Int
+                    || cond.as_ref().get_ir_type() == IrType::ConstInt
+            );
+        } else {
+            unreachable!("Inst::set_br_cond")
+        };
+
         // 修改use_list
         self.user.get_operand(0).as_mut().remove_user(self);
         cond.as_mut().add_user(self);

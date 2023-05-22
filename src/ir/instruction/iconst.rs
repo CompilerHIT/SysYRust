@@ -69,7 +69,7 @@ impl Inst {
             InstKind::GlobalInt(i) => i,
             InstKind::ConstInt(i) => i,
             InstKind::GlobalConstInt(i) => i,
-            _ => panic!("Inst::get_int_bond: not a int type"),
+            _ => unreachable!("Inst::get_int_bond: not a int type"),
         }
     }
 
@@ -79,7 +79,7 @@ impl Inst {
             InstKind::GlobalFloat(f) => f,
             InstKind::ConstFloat(f) => f,
             InstKind::GlobalConstFloat(f) => f,
-            _ => panic!("Inst::get_float_bond: not a float type"),
+            _ => unreachable!("Inst::get_float_bond: not a float type"),
         }
     }
 }

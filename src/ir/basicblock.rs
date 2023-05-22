@@ -49,14 +49,16 @@ impl BasicBlock {
     }
 
     /// 获取BasicBlock的第一条指令
+    /// 请确保BasicBlock不为空再使用
     pub fn get_head_inst(&self) -> ObjPtr<Inst> {
-        assert_eq!(self.is_empty(), false);
+        debug_assert_eq!(self.is_empty(), false);
         self.inst_head.get_next()
     }
 
     /// 获取BasicBlock的最后一条指令
+    /// 请确保BasicBlock不为空再使用
     pub fn get_tail_inst(&self) -> ObjPtr<Inst> {
-        assert_eq!(self.is_empty(), false);
+        debug_assert_eq!(self.is_empty(), false);
         self.inst_head.get_prev()
     }
 
@@ -82,9 +84,7 @@ impl BasicBlock {
     /// 添加下一个BB
     pub fn add_next_bb(&mut self, bb: ObjPtr<BasicBlock>) {
         // 正确性检查
-        if self.next_bb.len() > 1 {
-            panic!("BasicBlock has more than one next bb");
-        }
+        debug_assert!(self.next_bb.len() <= 1, "BB已经存在两个后继BB",);
 
         // 给下一个BB添加上一个BB
         bb.as_mut().add_up_bb(self);

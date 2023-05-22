@@ -52,6 +52,9 @@ impl ObjPool<Inst> {
 impl Inst {
     /// 获得一元指令的操作数
     pub fn get_unary_operand(&self) -> ObjPtr<Inst> {
+        // 正确性检查
+        self.self_check_unary();
+
         self.user.get_operand(0)
     }
 
@@ -59,10 +62,20 @@ impl Inst {
     /// # Arguments
     /// * `operand` - 操作数
     pub fn set_unary_operand(&mut self, operand: ObjPtr<Inst>) {
+        // 正确性检查
+        self.self_check_unary();
+
         // 设置use_list
         self.user.get_operand(0).as_mut().remove_user(self);
         operand.as_mut().add_user(self);
 
         self.user.set_operand(0, operand);
+    }
+
+    fn self_check_unary(&self) {
+        if let InstKind::Unary(_) = self.kind {
+        } else {
+            unreachable!("Inst::self_check")
+        }
     }
 }
