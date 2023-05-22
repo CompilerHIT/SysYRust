@@ -7,7 +7,8 @@ use crate::backend::block::BB;
 use crate::backend::regalloc::structs::{FuncAllocStat,RegUsedStat};
 use crate::backend::regalloc::regalloc::Regalloc;
 use std::cmp::Ordering;
-use crate::prioritydeque::PriorityDeque;
+use crate::container::prioritydeque::PriorityDeque;
+use crate::algorithm::graphalgo::Graph;
 
 
 // 摆烂的深度优先指令编码简单实现的线性扫描寄存器分配
@@ -56,6 +57,12 @@ impl Ord for RegInterval {
     // fn clamp(self, min: Self, max: Self) -> Self{
         
     // }
+}
+
+struct BlockGraph {
+    pub graph:Graph,    //图
+    pub from:i32,  //记录起点节点
+    pub to:HashSet<i32> //记录终点节点
 }
 
 
@@ -120,25 +127,28 @@ impl Allocator {
                 }
                 use_set.insert(reg.get_id(), i);
             }
-            // for reg in inst.get_reg_def() {
-            //     let reg_id =reg.get_id();
-            //     if let Some(end)=use_set.get(&reg_id) {
-            //         // self.intervals.insert(reg_id, v)
-            //     }else{
-            //         // 否则就是定义了但是不会使用的寄存器,实际上不应该存在，因为理论上编译器前端会把这样的无用
-            //         // 指令给消除
-            //         // undo
-            //     }
-            // }
         }
 
     }
 
+    // 从函数得到图
+    fn funcToGraph(func:&Func)->BlockGraph{
+        let mut out=BlockGraph{graph:Graph::new(),from:0,to:HashSet::new()};
+        // TODO ,具体从函数来构建图的操作
+        out
+    }
+
+
+    
+    pub fn countStackSize(func:&Func) ->usize {
+        let mut graph=Allocator::funcToGraph(func);
+        graph.graph.countMaxNodeCostPath(graph.from, graph.to) as usize
+    }
+
     // 基于剩余interval长度贪心的线性扫描寄存器分配
-    fn alloc(&mut self)->FuncAllocStat{
-        let mut out=FuncAllocStat::new();
-        let spillings=&mut out.spillings;
-        let dstr=&mut out.dstr;
+    fn allocRegister(&mut self)->(HashSet<i32>,HashMap<i32,i32>){
+        let mut spillings:HashSet<i32>=HashSet::new();
+        let mut dstr:HashMap<i32,i32>=HashMap::new();
         // 寄存器分配的长度限制
         // 可用寄存器
         let mut regUsedStat=RegUsedStat::new();
@@ -181,7 +191,29 @@ impl Allocator {
                 }
             }
         }
-        out
+        (spillings,dstr)
+    }
+
+
+    // 统计一个块中spilling的寄存器数量
+    fn count_block_spillings(bb:&BB,spillings:HashSet<i32>)->usize {
+        let mut set:HashSet<i32>=HashSet::new();
+        for inst in bb.insts {
+            let inst=inst.as_ref();
+            for reg in inst.get_reg_def() {
+                let id=reg.get_id();
+                if spillings.contains(&id) {
+                    set.insert(id);
+                }
+            }
+            for reg in inst.get_reg_use() {
+                let id=reg.get_id();
+                if spillings.contains(&id) {
+                    set.insert(id);
+                }
+            }
+        }
+        set.len() 
     }
 
 }
@@ -190,14 +222,17 @@ impl Allocator {
 impl Regalloc for Allocator {
     fn alloc(&mut self,func :& Func)->FuncAllocStat {
         // TODO第一次遍历，块深度标记
-        self.dfs_bbs(&func.entry.unwrap());
+        self.dfs_bbs(&func.entry.unwrap().as_ref());
         // 第二次遍历,指令深度标记
         self.passed.clear();
-        self.inst_record(&func.entry.unwrap());
+        self.inst_record(&func.entry.unwrap().as_ref());
         self.passed.clear();
         // 第三次遍历,指令遍历，寄存器interval标记
         self.interval_anaylise();
         // 第四次遍历，堆滑动窗口更新获取FuncAllocStat
-        self.alloc()
+        let (spillings,dstr)=self.allocRegister();
+        let stack_size=Allocator::countStackSize(func);
+        let stack_size=Allocator::countStackSize(func);
+        FuncAllocStat { stack_size, spillings, dstr}
     }
 }

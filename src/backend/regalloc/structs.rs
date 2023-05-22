@@ -100,6 +100,7 @@ impl RegUsedStat {
 }
 
 pub struct FuncAllocStat{
+    pub stack_size:usize,
     pub spillings :HashSet<i32>,    //spilling regs
     pub dstr: HashMap<i32,i32>, //distribute regs
 }
@@ -107,7 +108,7 @@ pub struct FuncAllocStat{
 
 impl FuncAllocStat {
     pub fn new()->FuncAllocStat {
-        FuncAllocStat { spillings: HashSet::new(), dstr: HashMap::new() }
+        FuncAllocStat { spillings: HashSet::new(),stack_size:0, dstr: HashMap::new() }
     }
 }
 

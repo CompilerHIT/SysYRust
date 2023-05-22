@@ -1,5 +1,5 @@
 use crate::cfgir::instruction_cfg::binary_inst_cfg;
-use crate::utility::Pointer;
+// use crate::utility::Pointer;
 use crate::{cfgir::module_cfg::CfgModule, utility};
 use lazy_static::lazy_static;
 use std::{
