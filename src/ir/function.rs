@@ -49,12 +49,13 @@ impl Function {
 
     /// 将第一个BB加入到函数中
     pub fn insert_first_bb(&mut self, bb: ObjPtr<BasicBlock>) {
-        debug_assert_eq!(self.head_block.is_none(), true);
+        debug_assert_eq!(self.head_block.is_none(), true, "函数中已经有了BB");
         self.head_block = Some(bb);
     }
 
     /// 获得第一个块，默认为非空块
     pub fn get_head(&self) -> ObjPtr<BasicBlock> {
+        debug_assert_ne!(self.head_block.is_none(), true, "函数中没有BB");
         match self.head_block {
             Some(bb) => bb,
             None => panic!("尝试获得一个空的BB"),

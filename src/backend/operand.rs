@@ -3,8 +3,9 @@ use crate::utility::ScalarType;
 pub const REG_COUNT: i32 = 32;
 pub const ARG_REG_COUNT: i32 = 8;
 pub const REG_SP: i32 = 2;
-const IMM_12Bs: i32 = 2047;
-const IMM_20Bs: i32 = 524287;
+const IMM_12_Bs: i32 = 2047;
+const IMM_20_Bs: i32 = 524287;
+pub static mut REG_ID : i32 = 0;
 
 #[derive(Clone, Copy, PartialEq, Hash, Eq)]
 pub struct Reg {
@@ -39,29 +40,13 @@ impl FImm {
         self.data
     }
 }
-pub trait ImmBs {
-    fn is_imm_20bs(&self) -> bool;
-    fn is_imm_12bs(&self) -> bool;
-}
 
-impl ImmBs for IImm {
-    fn is_imm_20bs(&self) -> bool {
-        self.data >= -IMM_20Bs && self.data <= IMM_20Bs
-    }
-    fn is_imm_12bs(&self) -> bool {
-        self.data >= -IMM_12Bs && self.data <= IMM_12Bs
-    }
-}
 
-impl ImmBs for FImm {
-    fn is_imm_20bs(&self) -> bool {
-        true
-        // self.data >= -524288.0 && self.data <= 524287.0
-    }
-    fn is_imm_12bs(&self) -> bool {
-        true
-        // self.data >= -2048.0 && self.data <= 2047.0
-    }
+pub fn is_imm_20bs(imm: i32) -> bool {
+    imm >= -IMM_20_Bs - 1 && imm <= IMM_20_Bs
+}
+pub fn is_imm_12bs(imm: i32) -> bool {
+    imm >= -IMM_12_Bs - 1 && imm <= IMM_12_Bs
 }
 
 #[derive(Clone, PartialEq, Hash, Eq)]
@@ -108,6 +93,35 @@ impl Reg {
             r_type
         }
     }
+    pub fn init(r_type: ScalarType) -> Self {
+        match r_type {
+            ScalarType::Int => {
+                unsafe {
+                    let mut id = REG_ID;
+                    REG_ID += 1;
+                    match id {
+                        0 | 2 | 4 => id = REG_ID,
+                        _ => {}
+                    }
+                    Self {
+                        id,
+                        r_type
+                    }
+                }
+            },
+            ScalarType::Float => {
+                unsafe {
+                    let id = REG_ID;
+                    REG_ID += 1;
+                    Self {
+                        id,
+                        r_type
+                    }
+                }
+            },
+            _ => panic!("Wrong Type")
+        }
+    }
     pub fn to_string(&self) -> String {
         if self.r_type == ScalarType::Int {
             match self.id {
@@ -136,11 +150,16 @@ impl Reg {
         }
     }
 
+    pub fn map_id(&mut self, dst: i32) {
+        self.id = dst;
+    }
+
     // ra, t0, t1-2, a0-1, a2-7, t3-6
     // f0-7, f10-17, f28-31
+    //FIXME: ABI是否对gp(x3)进行了规定？
     pub fn is_caller_save(&self) -> bool {
         match self.r_type {
-            ScalarType::Int => self.id == 1
+            ScalarType::Int => self.id == 1 || self.id == 3
                                 || (self.id >= 5 && self.id <= 7)
                                 || (self.id >= 10 && self.id <= 17)
                                 || (self.id >= 28 && self.id <= 31),
@@ -165,8 +184,12 @@ impl Reg {
 
     // sp for both callee and special
     // zero, sp, gp, tp
+    //FIXME: ABI是否对gp进行了规定？
     pub fn is_special(&self) -> bool {
-        self.id == 0 || (self.id >= 2 && self.id <= 4)
+        if self.r_type == ScalarType::Float {
+            return false;
+        }
+        self.id == 0 || self.id == 2 || self.id == 4
     }
 
     pub fn is_allocable(&self) -> bool {

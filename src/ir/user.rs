@@ -22,12 +22,13 @@ impl User {
     pub fn get_operands(&self) -> &Vec<ObjPtr<Inst>> {
         &self.operands
     }
-    pub fn get_operands_mut(&mut self) -> &mut Vec<ObjPtr<Inst>> {
-        &mut self.operands
-    }
 
     pub fn get_operand(&self, index: usize) -> ObjPtr<Inst> {
         self.operands[index]
+    }
+
+    pub fn find_operand(&self, inst: &Inst) -> Option<usize> {
+        self.operands.iter().position(|x| eq(x.as_ref(), inst))
     }
 
     pub fn get_operands_size(&self) -> usize {
@@ -46,22 +47,32 @@ impl User {
         self.operands.push(operand)
     }
 
-    pub fn get_use_list(&mut self) -> &mut Vec<ObjPtr<Inst>> {
+    pub fn get_use_list(&self) -> &Vec<ObjPtr<Inst>> {
         &mut self.use_list
     }
 
     /// 表示当前指令被使用，将其加入use list
+    /// 一个指令可能被一个指令重复使用两次，所以可能存在有相同的指令
     pub fn add_user(&mut self, inst: &Inst) {
         self.use_list.push(ObjPtr::new(inst));
     }
 
+    // 找到当前指令在use list中的位置
+    fn find_use(&self, inst: &Inst) -> usize {
+        self.use_list
+            .iter()
+            .position(|x| eq(x.as_ref(), inst))
+            .unwrap()
+    }
+
     /// 当前指令不再被使用，删除将对方从use list中删除
     pub fn delete_user(&mut self, inst: &Inst) {
-        self.use_list = self
-            .use_list
-            .iter()
-            .filter(|x| !eq(x.as_ref(), inst))
-            .cloned()
-            .collect();
+        debug_assert!(
+            !self.use_list.contains(&ObjPtr::new(inst)),
+            "当前指令不在use list中",
+            line!()
+        );
+        let index = self.find_use(inst);
+        self.use_list.remove(index);
     }
 }
