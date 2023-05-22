@@ -5,14 +5,14 @@ pub use std::io::{Result, Write};
 
 use crate::utility::{ScalarType, ObjPool, ObjPtr};
 use crate::ir::basicblock::BasicBlock;
-use crate::ir::instruction::{Inst, InstKind, BinOp};
+use crate::ir::instruction::{Inst, InstKind, BinOp, UnOp};
 use crate::ir::ir_type::IrType;
 use crate::backend::operand::{Reg, IImm, FImm};
 use crate::backend::instrs::{LIRInst, InstrsType, SingleOp, BinaryOp};
 use crate::backend::instrs::Operand;
 
 use crate::backend::func::Func;
-use crate::backend::operand::ImmBs;
+use crate::backend::operand;
 use super::structs::*;
 
 
@@ -70,15 +70,15 @@ impl BB {
                     let mut rhs_reg : Operand;
                     let mut dst_reg : Operand = self.resolve_operand(ir_block_inst, true);
                     match op {
+                        //TODO: Float Binary
                         BinOp::Add => {
                             let mut inst_kind = InstrsType::Binary(BinaryOp::Add);
                             match lhs.as_ref().get_ir_type() {
                                 IrType::ConstInt => {
                                     // 负数范围比正数大，使用subi代替addi
                                     let imm = lhs.as_ref().get_int_bond();
-                                    let iimm = IImm::new(-imm);
                                     lhs_reg = self.resolve_operand(rhs, true);
-                                    if iimm.is_imm_12bs() {
+                                    if operand::is_imm_12bs(-imm) {
                                         inst_kind = InstrsType::Binary(BinaryOp::Sub);
                                         rhs_reg = self.resolve_iimm(-imm);
                                     } else {
@@ -95,8 +95,7 @@ impl BB {
                                     match rhs.as_ref().get_ir_type() {
                                         IrType::ConstInt => {
                                             let imm = rhs.as_ref().get_int_bond();
-                                            let iimm = IImm::new(-imm);
-                                            if iimm.is_imm_12bs() {
+                                            if operand::is_imm_12bs(-imm) {
                                                 inst_kind = InstrsType::Binary(BinaryOp::Sub);
                                                 rhs_reg = self.resolve_iimm(-imm);
                                             }
@@ -122,7 +121,7 @@ impl BB {
                                     lhs_reg = self.resolve_operand(lhs, true);
                                     let imm = rhs.as_ref().get_int_bond();
                                     let iimm = IImm::new(-imm);
-                                    if iimm.is_imm_12bs() {
+                                    if operand::is_imm_12bs(-imm) {
                                         inst_kind = InstrsType::Binary(BinaryOp::Add);
                                         rhs_reg = self.resolve_iimm(-imm);
                                     } else {
@@ -140,7 +139,7 @@ impl BB {
                                         IrType::ConstInt => {
                                             let imm = rhs.as_ref().get_int_bond();
                                             let iimm = IImm::new(-imm);
-                                            if iimm.is_imm_12bs() {
+                                            if operand::is_imm_12bs(-imm) {
                                                 inst_kind = InstrsType::Binary(BinaryOp::Add);
                                                 rhs_reg = self.resolve_iimm(-imm);
                                             } else {
@@ -193,16 +192,58 @@ impl BB {
                                 self.resolve_opt_div(dst_reg, lhs_reg, rhs.as_ref().get_int_bond());
                             } else {
                                 rhs_reg = self.resolve_operand(rhs, true);
-                                self.insts_mpool.put(
-                                    LIRInst::new(InstrsType::Binary(BinaryOp::Div), vec![dst_reg, lhs_reg, rhs_reg])
+                                self.insts.push(
+                                    self.insts_mpool.put(
+                                        LIRInst::new(InstrsType::Binary(BinaryOp::Div), vec![dst_reg, lhs_reg, rhs_reg])
+                                    )
                                 );
+                                
                             }
                         },
                         BinOp::Rem => {
                             // x % y == x - (x / y) *y
                             // % 0 % 1 % 2^n 特殊判断
                             if rhs.as_ref().get_ir_type() == IrType::ConstInt {
-                                //TODO:
+                                let imm = rhs.as_ref().get_int_bond();
+                                match imm {
+                                    0 => {
+                                        lhs_reg = self.resolve_operand(lhs, true);
+                                        self.insts.push(
+                                            self.insts_mpool.put(
+                                                LIRInst::new(InstrsType::OpReg(SingleOp::IMv), vec![dst_reg, lhs_reg])
+                                            )
+                                        );
+                                    },
+                                    1 | -1 => {
+                                        self.insts.push(
+                                            self.insts_mpool.put(
+                                                LIRInst::new(InstrsType::OpReg(SingleOp::IMv), vec![dst_reg, Operand::IImm(IImm::new(0))])
+                                            )
+                                        );
+                                    },
+                                    _ => {
+                                        if is_opt_num(imm) || is_opt_num(-imm) {
+                                            //TODO: 
+                                            self.resolve_opt_rem(dst_reg, lhs, rhs);
+                                        } else {
+                                            lhs_reg = self.resolve_operand(lhs, true);
+                                            rhs_reg = self.resolve_operand(rhs, false);
+                                            self.insts.push(
+                                                self.insts_mpool.put(
+                                                    LIRInst::new(InstrsType::Binary(BinaryOp::Rem), vec![dst_reg, lhs_reg, rhs_reg])
+                                                )
+                                            );
+                                        }
+                                    }
+                                }
+                            } else {
+                                lhs_reg = self.resolve_operand(lhs, true);
+                                rhs_reg = self.resolve_operand(rhs, false);
+                                self.insts.push(
+                                    self.insts_mpool.put(
+                                        LIRInst::new(InstrsType::Binary(BinaryOp::Rem), vec![dst_reg, lhs_reg, rhs_reg])
+                                    )
+                                );
                             }
                         },
                         _ => {
@@ -210,6 +251,77 @@ impl BB {
                             panic!("more binary op to resolve");
                         }
                     }
+                },
+                InstKind::Unary(op) => {
+                    let dst_reg = self.resolve_operand(ir_block_inst, true);
+                    let src = ir_block_inst.as_ref().get_unary_operand();
+                    let src_reg = self.resolve_operand(src, false);
+                    match op {
+                        UnOp::Neg => {
+                            match src.as_ref().get_ir_type() {
+                                IrType::ConstInt => {
+                                    let imm = src.as_ref().get_int_bond();
+                                    let iimm = self.resolve_iimm(-imm);
+                                    self.insts.push(self.insts_mpool.put(
+                                        LIRInst::new(InstrsType::OpReg(SingleOp::Li), vec![dst_reg, iimm])
+                                    ))
+                                },
+                                IrType::Int => {
+                                    self.insts.push(self.insts_mpool.put(
+                                        LIRInst::new(InstrsType::OpReg(SingleOp::INeg), vec![dst_reg, src_reg])
+                                    ))
+                                }
+                                IrType::Float => {
+                                    self.insts.push(self.insts_mpool.put(
+                                        LIRInst::new(InstrsType::OpReg(SingleOp::FNeg), vec![dst_reg, src_reg])
+                                    ))
+                                }
+                                _ => { panic!("invalid unary type for neg"); }
+                            }
+                        },
+                        UnOp::Not => {
+                            match src.as_ref().get_ir_type() {
+                                IrType::ConstInt => {
+                                    let imm = src.as_ref().get_int_bond();
+                                    let iimm = self.resolve_iimm(!imm);
+                                    self.insts.push(self.insts_mpool.put(
+                                        LIRInst::new(InstrsType::OpReg(SingleOp::Li), vec![dst_reg, iimm])
+                                    ));
+                                },
+                                IrType::Int => {
+                                    self.insts.push(self.insts_mpool.put(
+                                        LIRInst::new(InstrsType::OpReg(SingleOp::INot), vec![dst_reg, src_reg])
+                                    ));
+                                },
+                                _ => { panic!("invalid unary type for not"); }
+                            }
+                        }
+                        UnOp::Pos => {
+                            match src.as_ref().get_ir_type() {
+                                IrType::ConstInt => {
+                                    let imm = src.as_ref().get_int_bond();
+                                    let iimm = self.resolve_iimm(imm);
+                                    self.insts.push(self.insts_mpool.put(
+                                        LIRInst::new(InstrsType::OpReg(SingleOp::Li), vec![dst_reg, iimm])
+                                    ));
+                                },
+                                IrType::Int => {
+                                    self.insts.push(self.insts_mpool.put(
+                                        LIRInst::new(InstrsType::OpReg(SingleOp::IMv), vec![dst_reg, src_reg])
+                                    ));
+                                },
+                                IrType::Float => {
+                                    self.insts.push(self.insts_mpool.put(
+                                        LIRInst::new(InstrsType::OpReg(SingleOp::FMv), vec![dst_reg, src_reg])
+                                    ));
+                                },
+                                _ => { panic!("invalid unary type for pos"); }
+                            }
+                        }
+                    }
+                }
+                InstKind::Load => {
+
                 }
                 InstKind::Return => {
                     match inst_ref.get_ir_type() {
@@ -223,7 +335,7 @@ impl BB {
                             let src_operand = self.resolve_operand(src, false);
                             self.insts.push(
                                 self.insts_mpool.put(
-                                    LIRInst::new(InstrsType::OpReg(SingleOp::Mov), vec![src_operand])
+                                    LIRInst::new(InstrsType::OpReg(SingleOp::IMv), vec![src_operand])
                                 )
                             );
                             self.insts.push(
@@ -286,8 +398,9 @@ impl BB {
     }
 
     fn resolve_iimm(&self, imm: i32) -> Operand {
+        //TODO: if type > i32
         let res = IImm::new(imm);
-        if res.is_imm_12bs() {
+        if operand::is_imm_12bs(imm) {
             Operand::IImm(res)
         } else {
             self.load_iimm_to_ireg(imm)
@@ -299,8 +412,15 @@ impl BB {
     }
 
     fn load_iimm_to_ireg(&self, imm: i32) -> Operand {
-        //TODO:
-        Operand::IImm(IImm::new(0))
+        let reg = Operand::Reg(Reg::init(ScalarType::Int));
+        let iimm = Operand::IImm(IImm::new(imm));
+        if operand::is_imm_12bs(imm) {
+            self.insts.push(self.insts_mpool.put(LIRInst::new(InstrsType::OpReg(SingleOp::Li), vec![reg, iimm])));
+        } else {
+            self.insts.push(self.insts_mpool.put(LIRInst::new(InstrsType::OpReg(SingleOp::Lui), vec![reg, iimm])));
+            self.insts.push(self.insts_mpool.put(LIRInst::new(InstrsType::Binary(BinaryOp::Add), vec![reg, reg, iimm])));
+        }
+        reg
     }
 
     fn load_fimm_to_freg(&self, imm: f32) -> Operand {
@@ -310,9 +430,14 @@ impl BB {
 
     fn resolve_opt_mul(&mut self, dst: Operand, src: Operand, imm: i32) {
         //TODO:
+
     }
 
     fn resolve_opt_div(&mut self, dst: Operand, src: Operand, imm: i32) {
+        //TODO:
+    }
+
+    fn resolve_opt_rem(&mut self, dst: Operand, lhs: ObjPtr<Inst>, rhs: ObjPtr<Inst>) {
         //TODO:
     }
 
@@ -354,4 +479,9 @@ impl Hash for BB {
 fn is_opt_mul(imm: i32) -> bool {
     //TODO:
     false
+}
+
+//FIXME: ConstInt instance of i32 not i64?
+fn is_opt_num(imm: i32) -> bool {
+    (imm & (imm - 1)) == 0
 }
