@@ -14,7 +14,7 @@ use super::structs::StackSlot;
 
 #[derive(Clone, PartialEq)]
 pub enum Operand {
-    Addr(ObjPtr<StackSlot>),
+    Addr(StackSlot),
     IImm(IImm),
     FImm(FImm),
     Reg(Reg),
@@ -221,18 +221,16 @@ impl LIRInst {
             InstrsType::Call => {
                 let mut set = Vec::new();
                 let (iarg_cnt, farg_cnt) = self.param_cnt;
-                let icnt: i32 = min(iarg_cnt, ARG_REG_COUNT);
-                let mut ni = icnt;
-                while ni > 0 {
+                let mut ni = 0;
+                while ni < min(iarg_cnt, REG_COUNT) {
                     // if 
-                    set.push(Reg::new(icnt - ni, ScalarType::Int));
-                    ni -= 1;
+                    set.push(Reg::new(ni, ScalarType::Int));
+                    ni += 1;
                 }
-                let fcnt: i32 = min(farg_cnt, ARG_REG_COUNT);
-                let mut nf = fcnt;
-                while nf > 0 {
-                    set.push(Reg::new(fcnt - nf, ScalarType::Float));
-                    nf -= 1;
+                let mut nf = 0;
+                while nf < min(farg_cnt, REG_COUNT) {
+                    set.push(Reg::new(nf, ScalarType::Float));
+                    nf += 1;
                 } 
                 set
             }
@@ -254,6 +252,17 @@ impl LIRInst {
     pub fn set_func(&mut self, func: ObjPtr<Func>, func_name: String) {
         self.func = Some(func);
         self.func_name = func_name;
+    }
+
+    pub fn get_param_cnts(&self) -> (i32, i32) {
+        self.param_cnt
+    }
+
+    pub fn get_func(&self) -> ObjPtr<Func> {
+        match self.func {
+            Some(func) => func,
+            None => panic!("call instr must have func"),
+        }
     }
 
     // // ChangeSp:

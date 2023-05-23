@@ -20,8 +20,8 @@ use super::structs::*;
 pub struct Func {
     label: String,
     blocks: Vec<ObjPtr<BB>>,
-    stack_addr: Vec<ObjPtr<StackSlot>>,
-    caller_stack_addr: Vec<ObjPtr<StackSlot>>,
+    pub stack_addr: Vec<&'static StackSlot>,
+    caller_stack_addr: Vec<&'static StackSlot>,
     params: Vec<ObjPtr<Reg>>,
     pub entry: Option<ObjPtr<BB>>,
 
@@ -114,9 +114,9 @@ impl Func {
                 let basicblock = info.block_ir_map.get(block).unwrap();
                 if i + 1 < self.blocks.len() {
                     let next_block = Some(self.blocks[i + 1]);
-                    block.as_mut().construct(&self,*basicblock, next_block, &info);
+                    block.as_mut().construct(&self,*basicblock, next_block, &mut info);
                 } else {
-                    block.as_mut().construct(&self,*basicblock, None, &info);
+                    block.as_mut().construct(&self,*basicblock, None, &mut info);
                 }
                 i += 1;
             }
@@ -201,8 +201,8 @@ impl Func {
 
         let mut stack_size = 0;
         for it in self.stack_addr.iter().rev() {
-            it.as_mut().set_pos(stack_size);
-            stack_size += it.as_ref().get_size();
+            it.set_pos(stack_size);
+            stack_size += it.get_size();
         }
         
         let mut reg_int_res = Vec::from(reg_int);

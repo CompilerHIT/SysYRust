@@ -57,7 +57,7 @@ impl BB {
     /// 寄存器分配时决定开栈大小、栈对象属性(size(4/8 bytes), pos)，回填func的stack_addr
     /// 尽量保证程序顺序执行，并满足首次遇分支向后跳转的原则？
     //FIXME: b型指令长跳转(目标地址偏移量为+-4KiB)，若立即数非法是否需要增添一个jal块实现间接跳转？
-    pub fn construct(&mut self, func: &Func, block: ObjPtr<BasicBlock>, next_blocks: Option<ObjPtr<BB>>, map_info: &Mapping) {
+    pub fn construct(&mut self, func: &Func, block: ObjPtr<BasicBlock>, next_blocks: Option<ObjPtr<BB>>, map_info: &mut Mapping) {
         let mut ir_block_inst = block.as_ref().get_head_inst();
         loop {
             let inst_ref = ir_block_inst.as_ref();
@@ -320,9 +320,43 @@ impl BB {
                         }
                     }
                 }
+                
+                //TODO: load/store float 
                 InstKind::Load => {
-
+                    let addr = inst_ref.get_ptr();
+                    //TODO: if global var
+                    let dst_reg = self.resolve_operand(ir_block_inst, true);
+                    let src_reg = self.resolve_operand(addr, false);
+                    self.insts.push(self.insts_mpool.put(LIRInst::new(InstrsType::Load, 
+                            vec![dst_reg, src_reg, Operand::IImm(IImm::new(0))])));
+                },
+                InstKind::Store => {
+                    let addr = inst_ref.get_dest();
+                    let value = inst_ref.get_value();
+                    let addr_reg = self.resolve_operand(addr, false);
+                    let value_reg = self.resolve_operand(value, true);
+                    self.insts.push(self.insts_mpool.put(LIRInst::new(InstrsType::Store, 
+                        vec![value_reg, addr_reg])));
+                },
+                InstKind::Alloca => {
+                    //TODO: 数组的优化使用
+                    let dst = self.resolve_operand(ir_block_inst, false);
+                    let slot = func.stack_addr[func.stack_addr.len()-1];
+                    let pos = slot.get_pos() + slot.get_size();
+                    let size = inst_ref.get_array_length().as_ref().get_int_bond();
+                    func.stack_addr.push(&StackSlot::new(pos, size));
+                    self.insts.push(self.insts_mpool.put(LIRInst::new(InstrsType::StoreToStack, 
+                        vec![dst, Operand::IImm(IImm::new(pos))])));
                 }
+                InstKind::Gep => {
+                    // type(8B) * index 
+                    let offset = inst_ref.get_offset().as_ref().get_int_bond() * 8;
+                    let dst_reg = self.resolve_operand(ir_block_inst, true);
+                    let src_reg = self.resolve_operand(inst_ref.get_ptr(), true);
+                    //TODO:判断地址合法
+                    self.insts.push(self.insts_mpool.put(LIRInst::new(InstrsType::Load, 
+                            vec![dst_reg, src_reg, Operand::IImm(IImm::new(offset))])));
+                },
                 InstKind::Return => {
                     match inst_ref.get_ir_type() {
                         IrType::Void => self.insts.push(
