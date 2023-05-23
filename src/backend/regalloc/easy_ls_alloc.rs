@@ -1,6 +1,8 @@
 
+use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::collections::HashSet;
+use std::collections::VecDeque;
 use crate::backend::instrs::LIRInst;
 use crate::backend::func::Func;
 use crate::backend::block::BB;
@@ -142,9 +144,49 @@ impl Allocator {
 
 
     
-    pub fn countStackSize(func:&Func) ->usize {
-        let mut graph=Allocator::funcToGraph(func);
-        graph.graph.countMaxNodeCostPath(graph.from, graph.to).count() as usize
+    pub fn countStackSize(func:&Func,spillings:&HashSet<i32>) ->usize {
+        // 遍历所有块,找到每个块中的spillings大小,返回其中大小的最大值,
+        let mut stackSize:usize;
+        let mut passed:HashSet<&BB>=HashSet::new();
+        let mut walk:VecDeque<&BB>=VecDeque::new();
+        walk.push_back(func.entry.unwrap().as_ref());
+        passed.insert(func.entry.unwrap().as_ref());
+        // TOTEST
+        while !walk.is_empty() {
+            let cur=walk.pop_front().unwrap();
+            let mut bbspillings:HashSet<i32>=HashSet::new();
+            for reg in cur.live_in {
+                if spillings.contains(&reg.get_id()) {
+                    bbspillings.insert(reg.get_id());
+                }
+            }
+            // 统计spilling数量
+            for inst in cur.insts {
+                for reg in inst.as_ref().get_reg_def() {
+                    if spillings.contains(&reg.get_id()) {
+                        bbspillings.insert(reg.get_id());
+                    }
+                }
+                for reg in inst.as_ref().get_reg_use() {
+                    if spillings.contains(&reg.get_id()) {
+                        bbspillings.insert(reg.get_id());
+                    }
+                }
+                if bbspillings.len()>stackSize {
+                    stackSize=bbspillings.len();
+                }
+            }
+            
+            // 扩展未扩展的节点
+            for bb in cur.out_edge {
+                if passed.contains(bb.as_ref()) {
+                    continue
+                }
+                passed.insert(bb.as_ref());
+                walk.push_back(bb.as_ref());
+            }
+        }
+        stackSize
     }
 
     // 基于剩余interval长度贪心的线性扫描寄存器分配
@@ -197,8 +239,9 @@ impl Allocator {
     }
 
 
+
     // 统计一个块中spilling的寄存器数量
-    fn count_block_spillings(bb:&BB,spillings:HashSet<i32>)->usize {
+    fn count_block_spillings(bb:&BB,spillings:&HashSet<i32>)->usize {
         let mut set:HashSet<i32>=HashSet::new();
         for inst in bb.insts {
             let inst=inst.as_ref();
@@ -233,8 +276,8 @@ impl Regalloc for Allocator {
         self.interval_anaylise();
         // 第四次遍历，堆滑动窗口更新获取FuncAllocStat
         let (spillings,dstr)=self.allocRegister();
-        let stack_size=Allocator::countStackSize(func);
-        let stack_size=Allocator::countStackSize(func);
+        let stack_size=Allocator::countStackSize(func,&spillings);
+        // let stack_size=spillings.len(); //TO REMOVE
         FuncAllocStat { stack_size, spillings, dstr}
     }
 }

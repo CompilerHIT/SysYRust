@@ -36,7 +36,13 @@ impl Bitmap {
         }
         out
     }
+
+    
+
 }
+
+
+
 
 impl Bitmap {
     pub fn new()->Bitmap {

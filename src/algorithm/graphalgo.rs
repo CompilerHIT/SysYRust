@@ -1,26 +1,50 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet,VecDeque};
 
 use crate::{container::bitmap::Bitmap, utility::ObjPtr};
 
+// 值需要能够比较大小
 pub trait Value {
-    fn add(&mut self, other: &Self) -> Self;
+    fn add(& self, other: &Self) -> Self;
+    fn less(&self,other:&Self)->bool;
+    fn new()->Self;
 }
 
 impl Value for i32 {
-    fn add(&mut self, other: &Self) -> Self {
+    fn add(&self, other: &Self) -> Self {
         *self + other
     }
+
+    fn new()->Self{
+        0
+    }
+
+    fn less(&self,other:&Self)->bool {
+        self<other
+    }
+
 }
 
+
 impl Value for Bitmap {
-    fn add(&mut self, other: &Self) -> Self {
+
+    fn add(&self, other: &Self) -> Self {
         Bitmap::or(self, other)
     }
+
+    fn new()->Self {
+        return Bitmap::new();
+    }
+
+    fn less(&self,other:&Self)->bool {
+        self.count()<other.count()
+    }
+    
 }
 
 pub struct Graph<T: Value> {
     nodes: HashMap<i32, Node<T>>,
 }
+
 
 impl<T: Value> Graph<T> {
     pub fn new() -> Graph<T> {
@@ -40,82 +64,79 @@ impl<T: Value> Graph<T> {
         false
     }
 
-    // 合并相邻节点,如果一个图中,两个节点之间互相有边指向对方的话,合并两个节点得到一个新节点
-    // 新节点继承两个边的所有出入关系,而且新节点的值为旧两个节点的值的和
-    pub fn mergeNeighbors(&mut self) {
-        // TODO
+    // 合并环,如果一个图中,合并环中的所有节点为一个新节点
+    // 新节点继承环上所有点的所有出入关系,且值为旧环上所有点的值的集合
+    pub fn mergeCycles(&mut self) {
+        // TODO,环融合,找到图中所有的环,进行融合
+        loop {
+            // 循环直到消去所有环为止
+            //TODO 从头开始层次遍历,直到发现一个环,每次发现环就退出循环,对于
+            let mut que:VecDeque<i32>=VecDeque::new();
+        }
     }
 
     // 对于这个图,计算从起点from,到达任意终点集合时的最大代价路径,(只统计节点的代价,而且每个节点的代价只统计一次)
-    pub fn countMaxNodeCostPath(&mut self, from: i32, ends: HashSet<i32>) -> T {
-        // TODO
-        let out: T = self.nodes.get(&from).unwrap().v; //先加入起点的值
-        let mut serials: HashSet<i32> = HashSet::new(); //串点集合
-        let mut ranges: Vec<(i32, i32, usize)> = Vec::new(); //记录并行区域,以及区域中节点的数量e.m. [(from,to,num),...]
-        let mut counted: HashSet<i32> = HashSet::new(); //已经统计过的点的集合
-                                                        //TODO 分析节点的不平行关系,分成多个串行区
-
-        // 获取串点集合
-        for i in self.nodes {
-            if self.isSerial(i.0) {
-                serials.insert(i.0);
-            }
+    pub fn countMaxNodeValuePath(&mut self, from: i32, tos: HashSet<i32>) -> T {
+        // TODO,计算最大节点价值路径的值
+        self.mergeCycles();
+        //根据节点数量判断
+        // 节点数量多,使用层次遍历获得一个估计路径节点值估计上限
+        // 节点数量少,使用带减枝的深度优先遍历,来获取实际上的最大可能路径值
+        if self.nodes.len()<10000 {
+            self.dfs_findMaxNodeValuePath(from, tos)
         }
-        // 把终点都加入串点
-        for v in ends {
-            serials.insert(v);
+        // 
+        else{
+            self.bfs_estimateMaxNodeValuePath(from, tos)
         }
-        // 获取串行区,该部分时间复杂度为O(n**2)
-        serials.insert(from);
-        for end in serials {
-            if end == from {
-                continue;
-            }
-            // 以每个串行点为终点往前统计直到遇到另外一个串行点
-            // 从end出发,沿着in-edge不断往前遍历直到遍历到遇到另一个串点,把另一个串点记录为起点
-            let mut st = end;
-            let mut toWalk: Vec<i32> = Vec::new();
-            toWalk.push(end);
-            let mut pos = 0; //从st位置开始遍历
-            let mut walkPassed: HashSet<i32> = HashSet::new();
-            walkPassed.insert(end);
-            while pos < toWalk.len() {
-                let walk = toWalk.get(pos).unwrap();
-                if let Some(node) = self.nodes.get(&walk) {
-                    // 然后从in_edge中找到前继,
-                    for inedge in node.inedges {
-                        let inedge = inedge.as_ref();
-                        let fromId = inedge.from.as_ref().id;
-                        if walkPassed.contains(&fromId) {
-                            continue;
-                        }
-                        if serials.contains(&fromId) {
-                            st = fromId;
-                        }
-                        toWalk.push(fromId);
-                        walkPassed.insert(fromId);
-                    }
-                }
-                pos += 1;
-            }
-            //遍历完后,walkPasssed的大小就是该子图的大小
-            ranges.push((st, end, walkPassed.len()));
-        }
-
-        // 计算每个串行区的大小
-
-        // 把末尾集合加入到串行块集合中
-
-        // 对于串行点与串行点之间的部分
-        // 一个设置为源点，一个为汇点
-        // 如果之间的部分的数量小于一个阈值k,那么进行剪枝的深度优先搜索，处理所有可能
-        // 找到最小代价
-
-        // 如果之间的部分的数量大于等于k:
-        // 从源点出发，进行广度优先搜索,找到一个步数最短路径到达汇点
-        // 但是这个路径并不一定是最大收获路径
-        out
     }
+
+    // 深度优先搜索找到起点到终点中的最大节点价值路径的价值，时间复杂度O(2**n),注意，该操作需要在去掉环之后进行
+    pub fn dfs_findMaxNodeValuePath(&mut self,from:i32,tos:HashSet<i32>)->T{
+        let mut out:T=T::new();
+        let mut stack:VecDeque<(i32,i32,T)>=VecDeque::new();    //(adder,self,pathvalue) (把该节点压入栈的节点,该节点,该状态下对应的之前的路径价值,不包括该节点的价值)
+        let mut passed:HashMap<i32,usize>=HashMap::new();  //记录某个节点压入过栈中的后继节点的数量,(也是压入下标)
+        stack.push_back((-1,from,T::new().add(&self.nodes.get(&from).unwrap().v)));
+        // 遍历栈,深度优先搜索所有路径
+        while !stack.is_empty() {
+            let (adder,cur,val)=stack.pop_back().unwrap();
+            // 把所有可能扩展加入路径,
+            if passed.contains_key(&cur) && *passed.get(&cur).unwrap()>=self.nodes.get(&cur).unwrap().outedges.len() {
+                // 说明该节点的所有后继已经经历过了，移出栈
+                passed.insert(cur, 0);
+                continue
+            }
+            if passed.contains_key(&cur) {
+                // 如果不是第一次遍历
+                passed.insert(cur, 0);
+            }else{
+                // 如果是第一次遍历,判断是否是终点
+                if tos.contains(&cur) {
+                    if out.less(&val) {
+                        out=val;
+                    }
+                    continue
+                }
+            }
+            let i=passed.get(&cur).unwrap();
+            let next_node=self.nodes.get(&cur).unwrap().outedges.get(*i).unwrap().as_ref().to.as_ref();
+            passed.insert(cur,i+1);
+            let adder=cur;
+            let cur=next_node.id;
+            let val=val.add(&next_node.v);
+            stack.push_back((adder,cur,val));
+        }
+        out
+    }   
+
+    // 层次遍历，用每层的最大节点的值来代替该并行部分的可能最大值,来累加计算得到估计最大路径长度上限
+    // 时间复杂度O(n)
+    pub fn bfs_estimateMaxNodeValuePath(&mut self,from:i32,tos:HashSet<i32>)->T{
+        T::new()
+    }
+
+
+
 }
 
 // 节点的价值要实现一个合并接口
