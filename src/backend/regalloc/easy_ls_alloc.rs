@@ -144,9 +144,10 @@ impl Allocator {
 
 
     
-    pub fn countStackSize(func:&Func,spillings:&HashSet<i32>) ->usize {
+    pub fn countStackSize(func:&Func,spillings:&HashSet<i32>) ->(usize,HashMap<&'static BB,usize>) {
         // 遍历所有块,找到每个块中的spillings大小,返回其中大小的最大值,
         let mut stackSize:usize;
+        let mut bb_stack_sizes:HashMap<&'static BB,usize>=HashMap::new();
         let mut passed:HashSet<&BB>=HashSet::new();
         let mut walk:VecDeque<&BB>=VecDeque::new();
         walk.push_back(func.entry.unwrap().as_ref());
@@ -160,6 +161,8 @@ impl Allocator {
                     bbspillings.insert(reg.get_id());
                 }
             }
+            
+            bb_stack_sizes.insert(cur, bbspillings.len());
             // 统计spilling数量
             for inst in cur.insts {
                 for reg in inst.as_ref().get_reg_def() {
@@ -186,7 +189,7 @@ impl Allocator {
                 walk.push_back(bb.as_ref());
             }
         }
-        stackSize
+        (stackSize,bb_stack_sizes)
     }
 
     // 基于剩余interval长度贪心的线性扫描寄存器分配
@@ -276,8 +279,8 @@ impl Regalloc for Allocator {
         self.interval_anaylise();
         // 第四次遍历，堆滑动窗口更新获取FuncAllocStat
         let (spillings,dstr)=self.allocRegister();
-        let stack_size=Allocator::countStackSize(func,&spillings);
+        let (stack_size,bb_stack_sizes)=Allocator::countStackSize(func,&spillings);
         // let stack_size=spillings.len(); //TO REMOVE
-        FuncAllocStat { stack_size, spillings, dstr}
+        FuncAllocStat { stack_size, bb_stack_sizes,spillings, dstr}
     }
 }
