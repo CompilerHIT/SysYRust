@@ -12,7 +12,7 @@ use crate::backend::operand::*;
 
 use super::structs::StackSlot;
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, Copy, PartialEq)]
 pub enum Operand {
     Addr(StackSlot),
     IImm(IImm),
@@ -41,6 +41,7 @@ pub enum BinaryOp {
 }
 
 /// 单目运算符
+#[derive(Copy, Clone)]
 pub enum SingleOp {
     Li,
     Lui,
@@ -58,6 +59,7 @@ pub enum SingleOp {
 }
 
 /// 比较运算符
+#[derive(Copy, Clone)]
 enum CmpOp {
     Ne,
     Eq,
@@ -67,6 +69,7 @@ enum CmpOp {
     Le,
 }
 
+#[derive(Copy, Clone)]
 pub enum InstrsType {
     // dst: reg = lhs: operand op rhs: operand
     // 默认左操作数为寄存器，为此需要进行常量折叠 / 交换(前端完成？)
@@ -150,7 +153,7 @@ impl LIRInst {
     }
 
     pub fn v_to_phy(&mut self, regs: Vec<Reg>, map: HashMap<i32, i32>) {
-        for operand in self.operands {
+        for operand in &self.operands {
             match operand {
                 Operand::Reg(mut reg) => {
                     if let Some(id) = map.get(&reg.get_id()) {

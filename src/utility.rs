@@ -44,11 +44,6 @@ impl<T> PartialEq for ObjPtr<T> {
 
 impl <T> Eq for ObjPtr<T> {}
 
-impl<T> Hash for ObjPtr<T> {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        std::ptr::hash(self.as_ref(), state);
-    }
-}
 
 impl<T> Copy for ObjPtr<T> {}
 

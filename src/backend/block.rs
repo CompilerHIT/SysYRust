@@ -50,7 +50,7 @@ impl BB {
     }
 
     // 删除BB时清空当前块维护的内存池
-    pub fn del(&self) {
+    pub fn del(&mut self) {
         self.insts_mpool.free_all()
     }
 
@@ -343,14 +343,15 @@ impl BB {
                     let dst = self.resolve_operand(ir_block_inst, false);
                     let slot = func.stack_addr[func.stack_addr.len()-1];
                     let pos = slot.get_pos() + slot.get_size();
-                    let size = inst_ref.get_array_length().as_ref().get_int_bond();
+                    let size = inst_ref.get_array_length().as_ref().get_int_bond() * 4;
                     func.stack_addr.push(&StackSlot::new(pos, size));
                     self.insts.push(self.insts_mpool.put(LIRInst::new(InstrsType::StoreToStack, 
                         vec![dst, Operand::IImm(IImm::new(pos))])));
                 }
                 InstKind::Gep => {
-                    // type(8B) * index 
-                    let offset = inst_ref.get_offset().as_ref().get_int_bond() * 8;
+                    // type(4B) * index 
+                    // 数组成员若是int型则不超过32位，使用word
+                    let offset = inst_ref.get_gep_offset().as_ref().get_int_bond() * 4;
                     let dst_reg = self.resolve_operand(ir_block_inst, true);
                     let src_reg = self.resolve_operand(inst_ref.get_ptr(), true);
                     //TODO:判断地址合法
@@ -403,7 +404,7 @@ impl BB {
         self.insts.append(inst);
     }
 
-    fn resolve_operand(&self, src: ObjPtr<Inst>, is_left: bool) -> Operand {
+    fn resolve_operand(&mut self, src: ObjPtr<Inst>, is_left: bool) -> Operand {
         //TODO: ObjPtr match
         if !is_left {
             match src.as_ref().get_kind() {
@@ -431,7 +432,7 @@ impl BB {
         
     }
 
-    fn resolve_iimm(&self, imm: i32) -> Operand {
+    fn resolve_iimm(&mut self, imm: i32) -> Operand {
         //TODO: if type > i32
         let res = IImm::new(imm);
         if operand::is_imm_12bs(imm) {
@@ -445,7 +446,7 @@ impl BB {
         Operand::FImm(FImm::new(imm))
     }
 
-    fn load_iimm_to_ireg(&self, imm: i32) -> Operand {
+    fn load_iimm_to_ireg(&mut self, imm: i32) -> Operand {
         let reg = Operand::Reg(Reg::init(ScalarType::Int));
         let iimm = Operand::IImm(IImm::new(imm));
         if operand::is_imm_12bs(imm) {

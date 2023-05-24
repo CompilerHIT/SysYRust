@@ -12,39 +12,38 @@ use crate::backend::structs::{IGlobalVar, FGlobalVar, GlobalVar};
 use crate::backend::func::Func;
 use crate::backend::block::BB;
 use crate::backend::operand::ToString;
-use crate::utility::{ScalarType, ObjPtr};
+use crate::utility::{ScalarType, ObjPtr, ObjPool};
 
 
-#[derive(Clone)]    
 pub struct AsmModule {
     reg_map: HashMap<i32, Reg>,
 
     global_var_list: Vec<GlobalVar>,
 
     // const_array_mapping: HashMap<String, ArrayConst>,
-    func_map: HashMap<ObjPtr<Function>, &'static Func>,
+    func_map: Vec<(ObjPtr<Function>, &'static Func)>,
     upper_module: &'static Module,
 }
 
 impl AsmModule {
-    pub fn new(ir_module: &Module) -> Self {
+    pub fn new(ir_module: &'static Module) -> Self {
         let global_var_list = Self::get_global(ir_module);
         Self {
             reg_map: HashMap::new(),
             global_var_list,
             // global_fvar_list,
-            func_map: HashMap::new(),
+            func_map: Vec::new(),
             upper_module: ir_module,
         }
     }
     
-    pub fn build_lir(&self) {
+    pub fn build_lir(&mut self) {
         let mut func_seq = 0;
-        for (name, iter) in self.upper_module.function {
+        for (name, iter) in &self.upper_module.function {
             let ir_func = iter.as_ref();
             let mut func = Func::new(name);
             func.construct(&self, ir_func, func_seq);
-            self.func_map.insert(iter, &func);
+            self.func_map.push((iter.clone(), &func));
             func_seq += 1;
         }
     }
@@ -56,14 +55,14 @@ impl AsmModule {
         Ok(())
     }
 
-    fn allocate_reg(&self, f: &mut File) {
+    fn allocate_reg(&mut self, f: &mut File) {
         self.func_map.iter_mut().for_each(|(_, func)| {
             func.allocate_reg(f);
         });
     }
 
     fn get_global(ir_module: &Module) -> Vec<GlobalVar> {
-        let map = ir_module.global_variable;
+        let map = &ir_module.global_variable;
         let mut list = Vec::with_capacity(map.len());
         for (name, iter) in map {
             //TODO: update ir translation，to use ObjPtr match

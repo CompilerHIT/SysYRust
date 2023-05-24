@@ -59,7 +59,7 @@ impl Func {
     }
 
     // 或许不会删除函数？
-    pub fn del(&self) {
+    pub fn del(&mut self) {
         self.blocks_mpool.free_all()
     }
 
@@ -78,7 +78,7 @@ impl Func {
         let mut fblock = ir_func.get_head();
         let mut ir_block_set: HashSet<ObjPtr<BasicBlock>> = HashSet::new();
         let first_block = self.blocks_mpool.put(BB::new(&label));
-        info.ir_block_map.insert(fblock, first_block);
+        info.ir_block_map.insert(fblock,first_block);
         info.block_ir_map.insert(first_block, fblock);
         ir_block_set.insert(fblock);
 
@@ -269,4 +269,15 @@ fn set_append(blocks: &Vec<ObjPtr<BasicBlock>>) -> HashSet<ObjPtr<BasicBlock>> {
 
 fn handle_parameters() {
     //TODO:
+}
+
+impl Hash for ObjPtr<BB> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.as_ref().label.hash(state);
+    }
+}
+impl Hash for ObjPtr<BasicBlock> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.as_ref().get_name().hash(state);
+    }
 }

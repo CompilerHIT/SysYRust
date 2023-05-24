@@ -31,7 +31,7 @@ pub enum GlobalVar {
     FGlobalVar(FGlobalVar)
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, Copy, PartialEq)]
 pub struct StackSlot {
     pos: i32,
     size: i32,
