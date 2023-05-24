@@ -60,7 +60,7 @@ pub enum SingleOp {
 
 /// 比较运算符
 #[derive(Copy, Clone)]
-enum CmpOp {
+pub enum CmpOp {
     Ne,
     Eq,
     Gt,

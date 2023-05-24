@@ -270,7 +270,7 @@ PrimaryExp:PrimaryExp = {
 
 Number:Number = {
     <int_const:IntConst> =>{
-        Number{<>}
+        Number::IntConst(1)
     },
     //floatConst =>{
 

@@ -67,8 +67,8 @@ impl BB {
                 InstKind::Binary(op) => {
                     let lhs = inst_ref.get_lhs();
                     let rhs = inst_ref.get_rhs();
-                    let mut lhs_reg : Operand;
-                    let mut rhs_reg : Operand;
+                    let mut lhs_reg : Operand = Operand::IImm(IImm::new(0));
+                    let mut rhs_reg : Operand = Operand::IImm(IImm::new(0));
                     let mut dst_reg : Operand = self.resolve_operand(ir_block_inst, true);
                     match op {
                         //TODO: Float Binary
@@ -342,7 +342,7 @@ impl BB {
                 InstKind::Alloca => {
                     //TODO: 数组的优化使用
                     let dst = self.resolve_operand(ir_block_inst, false);
-                    let slot = func.stack_addr[func.stack_addr.len()-1];
+                    let slot = map_info.stack_slot_set[map_info.stack_slot_set.len()-1];
                     let pos = slot.get_pos() + slot.get_size();
                     let size = inst_ref.get_array_length().as_ref().get_int_bond() * 4;
                     map_info.stack_slot_set.push(StackSlot::new(pos, size));
@@ -358,6 +358,12 @@ impl BB {
                     //TODO:判断地址合法
                     self.insts.push(self.insts_mpool.put(LIRInst::new(InstrsType::Load, 
                             vec![dst_reg, src_reg, Operand::IImm(IImm::new(offset))])));
+                },
+                InstKind::Branch => {
+                    
+                },
+                InstKind::Call(func_label) => {
+
                 },
                 InstKind::Return => {
                     match inst_ref.get_ir_type() {
@@ -388,6 +394,7 @@ impl BB {
                 }
                 _ => {
                 // TODO: ir translation.
+                    unreachable!("cannot reach, ir translation false")
                 }
             }
             if ir_block_inst == block.as_ref().get_tail_inst() {
