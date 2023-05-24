@@ -124,7 +124,7 @@ impl Inst {
     /// 判断是否为当前bb的第一条指令
     pub fn is_head(&self) -> bool {
         match self.list.get_prev().as_ref().get_kind() {
-            Head => true,
+            InstKind::Head => true,
             _ => false,
         }
     }
@@ -133,7 +133,7 @@ impl Inst {
     pub fn is_tail(&self) -> bool {
         // 同上
         match self.list.get_next().as_ref().get_kind() {
-            Head => true,
+            InstKind::Head => true,
             _ => false,
         }
     }
@@ -184,7 +184,7 @@ impl Inst {
     }
     /// 初始化Head
     pub fn init_head(&mut self) {
-        if let Head = self.kind {
+        if let InstKind::Head = self.kind {
             self.list.set_prev(ObjPtr::new(self));
             self.list.set_next(ObjPtr::new(self));
         } else {

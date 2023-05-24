@@ -8,7 +8,7 @@ use crate::ir::ir_type::IrType;
 use crate::ir::module::Module;
 use crate::utility::{ObjPool, ObjPtr};
 
-struct Kit {
+pub struct Kit {
     context_mut: &'static mut Context,
     pool_inst_mut: &'static mut ObjPool<Inst>,
     pool_func_mut: &'static mut ObjPool<Function>,

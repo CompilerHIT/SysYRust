@@ -11,7 +11,7 @@ impl ObjPool<Inst> {
     pub fn make_int_load(&mut self, ptr: ObjPtr<Inst>) -> ObjPtr<Inst> {
         // 正确性检查
         match ptr.as_ref().get_ir_type() {
-            IntPtr => {}
+            IrType::IntPtr => {}
             _ => unreachable!("ObjPool::make_int_load: ptr must be a pointer"),
         }
         let inst = self.put(Inst::new(
@@ -60,7 +60,7 @@ impl ObjPool<Inst> {
     pub fn make_int_array_load(&mut self, ptr: ObjPtr<Inst>) -> ObjPtr<Inst> {
         // 正确性检查
         match ptr.as_ref().get_ir_type() {
-            IntPtr => {}
+            IrType::IntPtr => {}
             _ => unreachable!("ObjPool::make_int_array_load: ptr must be a pointer"),
         }
 
