@@ -14,7 +14,6 @@ use super::structs::StackSlot;
 
 #[derive(Clone, Copy, PartialEq)]
 pub enum Operand {
-    Addr(StackSlot),
     IImm(IImm),
     FImm(FImm),
     Reg(Reg),
@@ -243,7 +242,7 @@ impl LIRInst {
                     ScalarType::Float => vec![Reg::new(10, ScalarType::Float)],
                     ScalarType::Void => vec![],
                 }
-            }
+            },
         }
     }
 

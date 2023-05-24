@@ -16,6 +16,7 @@ use crate::backend::func::Func;
 use crate::backend::operand;
 use super::{structs::*, FILE_PATH};
 
+pub static mut ARRAY_NUM: i32 = 0;
 
 pub struct BB {
     pub label: String,
@@ -339,19 +340,31 @@ impl BB {
                     self.insts.push(self.insts_mpool.put(LIRInst::new(InstrsType::Store, 
                         vec![value_reg, addr_reg])));
                 },
+                //FIXME:获取数组名
                 InstKind::Alloca => {
-                    //TODO: 数组的优化使用
-                    let dst = self.resolve_operand(ir_block_inst, false);
-                    let slot = map_info.stack_slot_set[map_info.stack_slot_set.len()-1];
-                    let pos = slot.get_pos() + slot.get_size();
-                    let size = inst_ref.get_array_length().as_ref().get_int_bond() * 4;
-                    map_info.stack_slot_set.push(StackSlot::new(pos, size));
-                    self.insts.push(self.insts_mpool.put(LIRInst::new(InstrsType::StoreToStack, 
-                        vec![dst, Operand::IImm(IImm::new(pos))])));
+                    unsafe {
+                        let label = format!(".LC{ARRAY_NUM}");
+                        ARRAY_NUM += 1;
+                        //FIXME: 暂时认为数组未初始化
+                        //将发生分配的数组装入map_info中：记录数组结构、占用栈空间
+                        let size = inst_ref.get_array_length().as_ref().get_int_bond();
+                        let alloca = IntArray::new(size, false, vec![]);
+                        map_info.int_array_map.insert(label.to_string(), alloca);
+                        let last = map_info.stack_slot_set.pop_back().unwrap();
+                        let pos = last.get_pos() + last.get_size();
+                        map_info.stack_slot_set.push_back(last);
+                        map_info.stack_slot_set.push_back(StackSlot::new(pos, size * 4))
+                    }
                 }
                 InstKind::Gep => {
+                    //TODO: 数组的优化使用
                     // type(4B) * index 
                     // 数组成员若是int型则不超过32位，使用word
+                    //lla dst1 label
+                    // offset = gep_offset / 2 * 2
+                    //ld dst2 4 * offset(dst1)
+                    //sw src 4 * (gep_offset%2)(dst2)
+                    //gep-get_ptr 取得数组首地址 - 需要知道数组名
                     let offset = inst_ref.get_gep_offset().as_ref().get_int_bond() * 4;
                     let dst_reg = self.resolve_operand(ir_block_inst, true);
                     let src_reg = self.resolve_operand(inst_ref.get_ptr(), true);

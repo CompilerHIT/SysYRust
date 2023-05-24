@@ -158,8 +158,12 @@ impl GenerateAsm for LIRInst {
                 let mut builder = AsmBuilder::new(f.clone());
                 builder.ret()?;
                 Ok(())
-            }
+            },
         }
-        
+        //InstrsType::GenerateArray => {
+                //TODO: generate array
+                // .LC + {array_num}    .word {array_num} ...
+             //   Ok(())
+            //}
     }
 }

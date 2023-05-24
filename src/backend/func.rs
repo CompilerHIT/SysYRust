@@ -1,3 +1,4 @@
+use std::collections::LinkedList;
 pub use std::collections::{HashSet, VecDeque};
 use std::vec::Vec;
 pub use std::fs::File;
@@ -21,8 +22,8 @@ use super::{structs::*, FILE_PATH};
 pub struct Func {
     label: String,
     blocks: Vec<ObjPtr<BB>>,
-    pub stack_addr: Vec<StackSlot>,
-    caller_stack_addr: Vec<StackSlot>,
+    pub stack_addr: LinkedList<StackSlot>,
+    caller_stack_addr: LinkedList<StackSlot>,
     params: Vec<ObjPtr<Reg>>,
     pub entry: Option<ObjPtr<BB>>,
 
@@ -44,8 +45,8 @@ impl Func {
         Self {
             label: name.to_string(),
             blocks: Vec::new(),
-            stack_addr: Vec::new(),
-            caller_stack_addr: Vec::new(),
+            stack_addr: LinkedList::new(),
+            caller_stack_addr: LinkedList::new(),
             params: Vec::new(),
             entry: None,
             reg_def: Vec::new(),

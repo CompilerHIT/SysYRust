@@ -1,3 +1,4 @@
+use std::collections::LinkedList;
 pub use std::collections::{HashSet, VecDeque};
 pub use std::collections::HashMap;
 pub use std::fs::File;
@@ -176,7 +177,7 @@ impl StackSlot {
     pub fn set_pos(&mut self, pos: i32) {
         self.pos = pos
     } 
-    fn set_size(&mut self, size: i32) {
+    pub fn set_size(&mut self, size: i32) {
         self.size = size
     }
 }   
@@ -184,7 +185,9 @@ impl StackSlot {
 pub struct Mapping {
     pub ir_block_map: HashMap<ObjPtr<BasicBlock>, ObjPtr<BB>>,
     pub block_ir_map: HashMap<ObjPtr<BB>, ObjPtr<BasicBlock>>,
-    pub stack_slot_set: Vec<StackSlot>
+    pub stack_slot_set: LinkedList<StackSlot>,
+    //TODO:for float
+    pub int_array_map: HashMap<String, IntArray>
 }
 
 impl Mapping {
@@ -192,7 +195,31 @@ impl Mapping {
         Self {
             ir_block_map: HashMap::new(),
             block_ir_map: HashMap::new(),
-            stack_slot_set: Vec::new(),
+            stack_slot_set: LinkedList::new(),
+            int_array_map: HashMap::new(),
         }
     }
 }
+
+pub struct IntArray {
+    pub size: i32,
+    pub init: bool,
+    pub value: Vec<i32>,
+}
+
+impl IntArray {
+    pub fn new(size: i32, init: bool, value: Vec<i32>) -> Self {
+        Self { size, init, value }
+    }
+    pub fn set_use(&mut self, used: bool) {
+        self.init = used;
+    }
+    pub fn get_use(&self) -> bool {
+        self.init
+    }
+    pub fn get_value(&self, index: i32) -> i32 {
+        self.value[index as usize]
+    }
+}
+
+//TODO: generate array
