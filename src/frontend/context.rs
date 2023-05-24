@@ -1,4 +1,3 @@
-use core::panic;
 use std::collections::HashMap;
 
 use crate::{
@@ -56,7 +55,7 @@ impl Context {
         }
     }
 
-    pub fn push_var_bb(&mut self, name: &'static str, inst_ptr: ObjPtr<Inst>) {
+    pub fn push_var_bb(&mut self, name: String, inst_ptr: ObjPtr<Inst>) {
         match &mut self.bb_now_mut {
             // InfuncChoice::InFunc(bb) => *bb.push_back(inst_ptr),
             InfuncChoice::InFunc(bb) => bb.push_back(inst_ptr),
@@ -64,14 +63,14 @@ impl Context {
         }
     }
 
-    pub fn push_phi(&mut self, name: &'static str, inst_ptr: ObjPtr<Inst>) {
+    pub fn push_phi(&mut self, name: String, inst_ptr: ObjPtr<Inst>) {
         match &mut self.bb_now_mut {
             InfuncChoice::InFunc(bb) => bb.push_front(inst_ptr),
             InfuncChoice::NInFunc() => self.module_mut.push_var(name, inst_ptr),
         }
     }
 
-    pub fn bb_now_set(&mut self, bb: &mut BasicBlock) {
+    pub fn bb_now_set(&mut self, bb: &'static mut BasicBlock) {
         self.bb_now_mut = InfuncChoice::InFunc(bb);
     }
 
@@ -79,11 +78,11 @@ impl Context {
     /*                               for module_mut                               */
     /* -------------------------------------------------------------------------- */
 
-    pub fn push_func_module(&mut self, name: &'static str, func_ptr: ObjPtr<Function>) {
+    pub fn push_func_module(&mut self, name: String, func_ptr: ObjPtr<Function>) {
         self.module_mut.push_function(name, func_ptr);
     }
 
-    pub fn push_globalvar_module(&mut self, name: &'static str, var_ptr: ObjPtr<Inst>) {
+    pub fn push_globalvar_module(&mut self, name: String, var_ptr: ObjPtr<Inst>) {
         self.module_mut.push_var(name, var_ptr);
     }
 
@@ -101,20 +100,18 @@ impl Context {
     // }
 
     pub fn get_var_bbname(&self, s: &str, bbname: &str) -> Option<(ObjPtr<Inst>, &Symbol)> {
-        let mut name_;
         if let Some(vec_temp) = self.var_map.get(s.clone()) {
             if let Some((last_element0, _last_element1)) = vec_temp.last() {
-                name_ = last_element0.clone();
-            }
-        }
-        let symbol;
-        if let Some(symbol_temp) = self.symbol_table.get(&name_) {
-            symbol = symbol_temp.clone();
-        }
-        if let Some(var_inst_map) = self.bb_map.get(bbname) {
-            if let Some(inst) = var_inst_map.get(s.clone()) {
-                let ret_inst = inst.clone();
-                return Option::Some((ret_inst, symbol));
+                let name = last_element0.clone();
+                if let Some(symbol_temp) = self.symbol_table.get(&name) {
+                    let symbol = symbol_temp.clone();
+                    if let Some(var_inst_map) = self.bb_map.get(bbname) {
+                        if let Some(inst) = var_inst_map.get(s.clone()) {
+                            let ret_inst = inst.clone();
+                            return Option::Some((ret_inst, symbol));
+                        }
+                    }
+                }
             }
         }
         Option::None
@@ -149,19 +146,16 @@ impl Context {
         false
     }
 
-    pub fn add_const_int(&mut self, i: i32, inst: ObjPtr<Inst>) -> Option<(ObjPtr<Inst>)> {
+    pub fn add_const_int(&mut self, i: i32, inst: ObjPtr<Inst>) -> Option<ObjPtr<Inst>> {
         let s = "@".to_string() + i.to_string().as_str();
         let mut v = vec![];
         let temps = self.add_prefix(s.clone());
-        let lay;
         match &mut self.bb_now_mut {
             InfuncChoice::InFunc(bb) => {
                 bb.push_back(inst);
-                lay = 1;
             }
             InfuncChoice::NInFunc() => {
-                self.push_globalvar_module(&temps, inst);
-                lay = 0;
+                self.push_globalvar_module(temps.clone(), inst);
             }
         }
         v.push((temps.clone(), 1));
@@ -313,18 +307,17 @@ impl Context {
 
     pub fn delete_layer(&mut self) {
         //todo:遍历所有变量，删除layer==layer_now的所有变量
-        for (key, vec) in &mut self.var_map {
-            let mut index_now = 0;
-            for (name_changed, layer_) in vec {
-                if *layer_ == self.layer {
-                    vec.remove(index_now);
-                    self.symbol_table.remove(name_changed);
-                    for (bbname, mut inst_map) in self.bb_map {
-                        inst_map.remove(name_changed);
+        for (_, vec) in &mut self.var_map {
+            loop {
+                if let Some(index) = vec.iter().position(|(_, layer)| *layer == self.layer) {
+                    let (name_changed, _) = vec.remove(index);
+                    self.symbol_table.remove(&name_changed);
+                    for (_, inst_map) in &mut self.bb_map {
+                        inst_map.remove(&name_changed);
                     }
+                } else {
                     break;
                 }
-                index_now = index_now + 1;
             }
         }
         self.layer = self.layer - 1;
