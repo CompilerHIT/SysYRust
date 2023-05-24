@@ -1,7 +1,8 @@
 pub use std::collections::{HashSet, VecDeque};
 pub use std::fs::File;
 pub use std::hash::{Hash, Hasher};
-pub use std::io::{Result, Write};
+pub use std::io::Result;
+pub use std::fs::write;
 
 use crate::utility::{ScalarType, ObjPool, ObjPtr};
 use crate::ir::basicblock::BasicBlock;
@@ -13,7 +14,7 @@ use crate::backend::instrs::Operand;
 
 use crate::backend::func::Func;
 use crate::backend::operand;
-use super::structs::*;
+use super::{structs::*, FILE_PATH};
 
 
 pub struct BB {
@@ -160,7 +161,7 @@ impl BB {
                         },
                         BinOp::Mul => {
                             let mut op_flag = false;
-                            let mut src : Operand;
+                            let mut src : Operand = Operand::IImm(IImm::new(0));
                             let mut imm = 0;
                             if lhs.as_ref().get_ir_type() == IrType::ConstInt || rhs.as_ref().get_ir_type() == IrType::ConstInt {
                                 if lhs.as_ref().get_ir_type() == IrType::ConstInt && is_opt_mul(lhs.as_ref().get_int_bond()) {
@@ -484,13 +485,13 @@ impl BB {
     // }
 }
 impl GenerateAsm for BB {
-    fn generate(&self, context: ObjPtr<Context>,f: &mut File) -> Result<()> {
+    fn generate(&self, context: ObjPtr<Context>,f: FILE_PATH) -> Result<()> {
         if self.called {
-            writeln!(f, "{}:", self.label)?;
+            write(&f, format!("{}:\n", self.label))?;
         }
 
         for inst in self.insts.iter() {
-            inst.as_ref().generate(context.clone(), f)?;
+            inst.as_ref().generate(context.clone(), f.clone())?;
         }
 
         Ok(())

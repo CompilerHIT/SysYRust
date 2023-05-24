@@ -14,67 +14,67 @@
 // FIXME: divi使用srli替代
 // FIXME: 是否使用addiw而非addi
 // use super::func::FunctionInfo;
-use std::fs::File;
-use std::io::{Result, Write};
+use std::io::Result;
+use std::fs::write;
 
 /// Assembly builder.
-pub struct AsmBuilder<'f> {
-    f: &'f mut File,
+pub struct AsmBuilder {
+    f: String,
 }
 
-impl<'f> AsmBuilder<'f> {
+impl AsmBuilder {
     /// Creates a new assembly builder.
-    pub fn new(f: &'f mut File) -> Self {
+    pub fn new(f:  String) -> Self {
         Self { f }
     }
 
     pub fn li(&mut self, dest: &str, imm: i32) -> Result<()> {
-        writeln!(self.f, "  li {dest}, {imm}")
+        write(&self.f, format!("  li {dest}, {imm}\n"))
     }
 
     pub fn la(&mut self, dest: &str, address: &str) -> Result<()> {
-        writeln!(self.f, "  la {dest}, {address}")
+        write(&self.f, format!("  la {dest}, {address}\n"))
     }
 
     pub fn mv(&mut self, dest: &str, src: &str) -> Result<()> {
         if dest != src {
-            writeln!(self.f, "  mv {dest}, {src}")
+            write(&self.f, format!("  mv {dest}, {src}\n"))
         } else {
             Ok(())
         }
     }
 
     pub fn ret(&mut self) -> Result<()> {
-        writeln!(self.f, "  ret")
+        write(&self.f, "  ret\n")
     }
 
     pub fn bz(&mut self, act: &str, cond: &str, label: &str) -> Result<()> {
-        writeln!(self.f, "  {act} {cond}, {label}")
+        write(&self.f, format!("  {act} {cond}, {label}\n"))
     }
 
     pub fn neg(&mut self, dest: &str, src: &str) -> Result<()> {
-        writeln!(self.f, "  neg {dest}, {src}")
+        write(&self.f, format!("  neg {dest}, {src}\n"))
     }
 
     pub fn op2(&mut self, op: &str, dest: &str, lhs: &str, rhs: &str) -> Result<()> {
-        writeln!(self.f, "  {op} {dest}, {lhs}, {rhs}")
+        write(&self.f, format!("  {op} {dest}, {lhs}, {rhs}\n"))
     }
 
     pub fn op1(&mut self, op: &str, dest: &str, src: &str) -> Result<()> {
-        writeln!(self.f, "  {op} {dest}, {src}")
+        write(&self.f, format!("  {op} {dest}, {src}\n"))
     }
 
     pub fn addi(&mut self, dest: &str, opr: &str, imm: i32) -> Result<()> {
-        writeln!(self.f, "  addi {dest}, {opr}, {imm}")
+        write(&self.f, format!("  addi {dest}, {opr}, {imm}\n"))
         
     }
 
     pub fn slli(&mut self, dest: &str, opr: &str, imm: i32) -> Result<()> {
-        writeln!(self.f, "  slli {dest}, {opr}, {imm}")
+        write(&self.f, format!("  slli {dest}, {opr}, {imm}"))
     }
 
     pub fn srai(&mut self, dest: &str, opr: &str, imm: i32) -> Result<()> {
-        writeln!(self.f, "  srai {dest}, {opr}, {imm}")
+        write(&self.f, format!("  srai {dest}, {opr}, {imm}\n"))
     }
 
     //TODO: optimize mul and div
@@ -127,43 +127,43 @@ impl<'f> AsmBuilder<'f> {
 
     pub fn sd(&mut self, src: &str, addr: &str, offset: i32, is_float: bool) -> Result<()> {
         if is_float {
-            writeln!(self.f, "  fsd {src}, {offset}({addr})")
+            write(&self.f, format!("  fsd {src}, {offset}({addr})\n"))
         } else {
-            writeln!(self.f, "  sd {src}, {offset}({addr})")
+            write(&self.f, format!("  sd {src}, {offset}({addr})\n"))
         }
     }
 
     pub fn ld(&mut self, dest: &str, addr: &str, offset: i32, is_float: bool) -> Result<()> {
         if is_float {
-            writeln!(self.f, "  fld {dest}, {offset}({addr})")
+            write(&self.f, format!("  fld {dest}, {offset}({addr})\n"))
         } else {
-            writeln!(self.f, "  ld {dest}, {offset}({addr})")
+            write(&self.f, format!("  ld {dest}, {offset}({addr})\n"))
         }
         
     }
 
     pub fn j(&mut self, label: &str) -> Result<()> {
-        writeln!(self.f, "  j {label}")
+        write(&self.f, format!("  j {label}\n"))
     }
 
     pub fn call(&mut self, func: &str) -> Result<()> {
-        writeln!(self.f, "  call {func}")
+        write(&self.f, format!("  call {func}\n"))
     }
 
     pub fn show_func(&mut self, label: &str) -> Result<()> {
-        writeln!(self.f, "{label}:")
+        write(&self.f, format!("{label}:\n"))
     }
 
     pub fn load_global(&mut self, tmp_reg: &str, target_reg: &str, global_label: &str, block_label: &str) -> Result<()> {
-        writeln!(self.f, "        auipc   {tmp_reg}, %pcrel_hi({global_label})")?;
-        writeln!(self.f, "        addi    {target_reg}, {tmp_reg}, %pcrel_lo{block_label}")
+        write(&self.f, format!("        auipc   {tmp_reg}, %pcrel_hi({global_label})\n"))?;
+        write(&self.f, format!("        addi    {target_reg}, {tmp_reg}, %pcrel_lo{block_label}\n"))
     }
     //TODO: for function
     // pub fn prologue(&mut self, func_name: &str, info: &FunctionInfo) -> Result<()> {
     //     // declaration
-    //     writeln!(self.f, "  .text")?;
-    //     writeln!(self.f, "  .globl {}", &func_name[1..])?;
-    //     writeln!(self.f, "{}:", &func_name[1..])?;
+    //     write(self.f, "  .text")?;
+    //     write(self.f, "  .globl {}", &func_name[1..])?;
+    //     write(self.f, "{}:", &func_name[1..])?;
     //     // prologue
     //     let offset = info.sp_offset() as i32;
     //     if offset != 0 {
@@ -183,6 +183,6 @@ impl<'f> AsmBuilder<'f> {
     //         }
     //         self.addi("sp", "sp", offset)?;
     //     }
-    //     writeln!(self.f, "  ret")
+    //     write(self.f, "  ret")
     // }
 }

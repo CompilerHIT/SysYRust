@@ -63,13 +63,13 @@ impl Function {
     }
 
     /// 为函数增加参数
-    pub fn set_parameter(&mut self, name: &str, parameter: ObjPtr<Inst>) {
+    pub fn set_parameter(&mut self, name: &'static str, parameter: ObjPtr<Inst>) {
         self.parameters.insert(name, parameter);
     }
 
     /// 获得参数
     /// 默认参数存在
-    pub fn get_parameter(&self, name: &str) -> ObjPtr<Inst> {
+    pub fn get_parameter(&self, name: &'static str) -> ObjPtr<Inst> {
         match self.parameters.get(name) {
             Some(p) => *p,
             None => panic!("尝试获得不存在的参数"),

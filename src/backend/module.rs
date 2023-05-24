@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::fs::File;
-use std::io::{Result, Write};
+use std::io::Result;
+use std::fs::write;
 use std::hash::{Hash, Hasher};
 
 use crate::ir::basicblock::BasicBlock;
@@ -14,6 +15,7 @@ use crate::backend::block::BB;
 use crate::backend::operand::ToString;
 use crate::utility::{ScalarType, ObjPtr, ObjPool};
 
+use crate::backend::FILE_PATH;
 
 pub struct AsmModule {
     reg_map: HashMap<i32, Reg>,
@@ -51,16 +53,16 @@ impl AsmModule {
         }
     }
 
-    pub fn generator(&mut self, f: &mut File) -> Result<()> {
+    pub fn generator(&mut self, f: FILE_PATH) -> Result<()> {
         self.build_lir();
-        self.allocate_reg(f);
-        self.generate_global_var(f)?;
+        self.allocate_reg(f.clone());
+        self.generate_global_var(f.clone())?;
         Ok(())
     }
 
-    fn allocate_reg(&mut self, f: &'static mut File) {
+    fn allocate_reg<'a>(&mut self, f: FILE_PATH) {
         self.func_map.iter_mut().for_each(|(_, func)| {
-            func.as_mut().allocate_reg(f);
+            func.as_mut().allocate_reg(f.clone());
         });
     }
 
@@ -85,19 +87,19 @@ impl AsmModule {
         list
     }
 
-    fn generate_global_var(&self, f: &mut File) -> Result<()> {
+    fn generate_global_var(&self, f: FILE_PATH) -> Result<()> {
         for iter in self.global_var_list.iter() {
             match iter {
                 GlobalVar::IGlobalVar(ig) => {
                     let name = ig.get_name();
                     let value = ig.get_init().to_string();
-                    writeln!(f, "{name}:\n        .word:   {value}")?;
-                    writeln!(f, "    {value}")?;
+                    write(&f, format!("{name}:\n        .word:   {value}\n"))?;
+                    write(&f, format!("    {value}\n"))?;
                 }
                 GlobalVar::FGlobalVar(fg) => {
                     let name = fg.get_name();
                     let value = fg.get_init().to_hex_string();
-                    writeln!(f, "{name}:\n        .word:   {value}")?;
+                    write(&f, format!("{name}:\n        .word:   {value}\n"))?;
                 }
             }
         }
