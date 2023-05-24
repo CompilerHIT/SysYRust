@@ -17,15 +17,15 @@ pub enum ScalarType {
 pub struct ObjPtr<T>(NonNull<T>);
 
 impl<T> ObjPtr<T> {
-    pub fn as_ref(self) -> &'static T {
+    pub fn as_ref<'a>(self) -> &'a T {
         unsafe { self.0.as_ref() }
     }
 
-    pub fn as_mut(mut self) -> &'static mut T {
+    pub fn as_mut<'a>(mut self) -> &'a mut T {
         unsafe { self.0.as_mut() }
     }
 
-    pub fn new(ptr: &'static T) -> Self {
+    pub fn new(ptr: &T) -> Self {
         unsafe { Self(NonNull::new_unchecked(ptr as *const _ as *mut _)) }
     }
 }
@@ -42,8 +42,7 @@ impl<T> PartialEq for ObjPtr<T> {
     }
 }
 
-impl <T> Eq for ObjPtr<T> {}
-
+impl<T: 'static> Eq for ObjPtr<T> {}
 
 impl<T> Copy for ObjPtr<T> {}
 
