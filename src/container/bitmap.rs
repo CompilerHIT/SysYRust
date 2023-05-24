@@ -27,8 +27,8 @@ impl Bitmap {
     
     pub fn count(&self) -> usize{
         let mut out=0;
-        for v in self.arr {
-            let mut tmp =v;
+        for v in &self.arr {
+            let mut tmp =*v;
             for _ in 0..64 {
                 if tmp%2==1 {out+=1}
                 tmp/=2;
@@ -55,7 +55,7 @@ impl Bitmap {
         while i /64 >=self.arr.len() {
             self.arr.push(0);
         }
-        let mut v=&self.arr[i/64];
+        let mut v=&mut self.arr[i/64];
         *v=*v | (i as u64%64)
     }
     

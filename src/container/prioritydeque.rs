@@ -3,7 +3,6 @@
 
 use std::cmp::Ordering;
 
-use crate::frontend::ast::Break;
 
 pub struct PriorityDeque<T:Ord> {
     arr:Vec<T>
@@ -22,9 +21,7 @@ where T:Ord {
 
     // 交换两个位置的元素
     fn swap(&mut self,i:usize,j:usize) {
-        let tmp=self.arr[i];
-        self.arr[i]=self.arr[j ];
-        self.arr[j]=tmp;
+        self.arr.swap(i, j)
     }
 
     pub fn pop_front(&mut self)->Option<T>{

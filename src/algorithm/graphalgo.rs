@@ -41,7 +41,7 @@ impl Value for Bitmap {
     
 }
 
-pub struct Graph<T: Value> {
+pub struct Graph<T: Value+'static> {
     nodes: HashMap<i32, Node<T>>,
 }
 

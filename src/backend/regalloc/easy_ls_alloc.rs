@@ -84,7 +84,7 @@ impl Allocator {
         self.depths.insert(bb,self.base);
         self.base+=1;
         // 深度优先遍历后面的块
-        for next in bb.out_edge {
+        for next in &bb.out_edge {
             self.dfs_bbs(next.as_ref())
         }
     }
@@ -94,7 +94,7 @@ impl Allocator {
         if self.passed.contains(&bb) {
             return ;
         }
-        for line in bb.insts {
+        for line in &bb.insts {
             self.lines.push(line.as_ref())
         }
         // then choice a block to go through 
@@ -146,7 +146,7 @@ impl Allocator {
     
     pub fn countStackSize(func:&Func,spillings:&HashSet<i32>) ->(usize,HashMap<&'static BB,usize>) {
         // 遍历所有块,找到每个块中的spillings大小,返回其中大小的最大值,
-        let mut stackSize:usize;
+        let mut stackSize:usize=0;
         let mut bb_stack_sizes:HashMap<&'static BB,usize>=HashMap::new();
         let mut passed:HashSet<&BB>=HashSet::new();
         let mut walk:VecDeque<&BB>=VecDeque::new();
@@ -156,7 +156,7 @@ impl Allocator {
         while !walk.is_empty() {
             let cur=walk.pop_front().unwrap();
             let mut bbspillings:HashSet<i32>=HashSet::new();
-            for reg in cur.live_in {
+            for reg in &cur.live_in {
                 if spillings.contains(&reg.get_id()) {
                     bbspillings.insert(reg.get_id());
                 }
@@ -164,7 +164,7 @@ impl Allocator {
             
             bb_stack_sizes.insert(cur, bbspillings.len());
             // 统计spilling数量
-            for inst in cur.insts {
+            for inst in &cur.insts {
                 for reg in inst.as_ref().get_reg_def() {
                     if spillings.contains(&reg.get_id()) {
                         bbspillings.insert(reg.get_id());
@@ -181,7 +181,7 @@ impl Allocator {
             }
             
             // 扩展未扩展的节点
-            for bb in cur.out_edge {
+            for bb in &cur.out_edge {
                 if passed.contains(bb.as_ref()) {
                     continue
                 }
@@ -223,19 +223,30 @@ impl Allocator {
                     dstr.insert(id, ereg);
                     iwindow.push(RegInterval::new(id,end))
                 }else{
-                    // 否则判断哪个的inerval更长,去掉更长的
-                    if let Some(max)=iwindow.back() {
-                        if max.end>end {
-                            iwindow.pop_back();
-                            dstr.insert(id, *dstr.get(&max.id).unwrap());
-                            dstr.remove(&max.id);
-                            iwindow.push(RegInterval::new(id,end))
-                        }else{
-                            spillings.insert(id);
-                        }
+                    let max=iwindow.borrow().back();
+                    let mut maxID=0;
+                    let mut ifSpilling=false;
+                    match max {
+                        Some(max)=>{
+                            if max.end>end {
+                                ifSpilling=false;
+                                maxID=max.id;
+                            }else{
+                                ifSpilling=true;
+                            }
+                        },
+                        None=>(),
                     }
-                    // spillings.insert(id);
+                    if ifSpilling {
+                        spillings.insert(id);
+                    }else{
+                        iwindow.pop_back();
+                        dstr.insert(id, *dstr.get(&maxID).unwrap());
+                        dstr.remove(&maxID);
+                        iwindow.push(RegInterval::new(id,end))
+                    }
                 }
+                
             }
         }
         (spillings,dstr)
@@ -246,7 +257,7 @@ impl Allocator {
     // 统计一个块中spilling的寄存器数量
     fn count_block_spillings(bb:&BB,spillings:&HashSet<i32>)->usize {
         let mut set:HashSet<i32>=HashSet::new();
-        for inst in bb.insts {
+        for inst in &bb.insts {
             let inst=inst.as_ref();
             for reg in inst.get_reg_def() {
                 let id=reg.get_id();
