@@ -344,7 +344,7 @@ impl BB {
                     let slot = func.stack_addr[func.stack_addr.len()-1];
                     let pos = slot.get_pos() + slot.get_size();
                     let size = inst_ref.get_array_length().as_ref().get_int_bond() * 4;
-                    func.stack_addr.push(&StackSlot::new(pos, size));
+                    map_info.stack_slot_set.push(StackSlot::new(pos, size));
                     self.insts.push(self.insts_mpool.put(LIRInst::new(InstrsType::StoreToStack, 
                         vec![dst, Operand::IImm(IImm::new(pos))])));
                 }

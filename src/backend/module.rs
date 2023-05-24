@@ -21,8 +21,9 @@ pub struct AsmModule {
     global_var_list: Vec<GlobalVar>,
 
     // const_array_mapping: HashMap<String, ArrayConst>,
-    func_map: Vec<(ObjPtr<Function>, &'static Func)>,
+    func_map: Vec<(ObjPtr<Function>, ObjPtr<Func>)>,
     upper_module: &'static Module,
+    func_mpool: ObjPool<Func>,
 }
 
 impl AsmModule {
@@ -34,6 +35,7 @@ impl AsmModule {
             // global_fvar_list,
             func_map: Vec::new(),
             upper_module: ir_module,
+            func_mpool: ObjPool::new(),
         }
     }
     
@@ -43,7 +45,8 @@ impl AsmModule {
             let ir_func = iter.as_ref();
             let mut func = Func::new(name);
             func.construct(&self, ir_func, func_seq);
-            self.func_map.push((iter.clone(), &func));
+            let func_ptr = self.func_mpool.put(func);
+            self.func_map.push((iter.clone(), func_ptr));
             func_seq += 1;
         }
     }
@@ -55,9 +58,9 @@ impl AsmModule {
         Ok(())
     }
 
-    fn allocate_reg(&mut self, f: &mut File) {
+    fn allocate_reg(&mut self, f: &'static mut File) {
         self.func_map.iter_mut().for_each(|(_, func)| {
-            func.allocate_reg(f);
+            func.as_mut().allocate_reg(f);
         });
     }
 

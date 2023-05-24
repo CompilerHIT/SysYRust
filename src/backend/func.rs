@@ -20,8 +20,8 @@ use super::structs::*;
 pub struct Func {
     label: String,
     blocks: Vec<ObjPtr<BB>>,
-    pub stack_addr: Vec<&'static StackSlot>,
-    caller_stack_addr: Vec<&'static StackSlot>,
+    pub stack_addr: Vec<StackSlot>,
+    caller_stack_addr: Vec<StackSlot>,
     params: Vec<ObjPtr<Reg>>,
     pub entry: Option<ObjPtr<BB>>,
 
@@ -105,10 +105,11 @@ impl Func {
         }
         handle_parameters();
         // 第二遍pass
-        let mut first_block = info.ir_block_map.get(&ir_func.get_head()).unwrap();
+        let first_block = info.ir_block_map.get(&ir_func.get_head()).unwrap();
         self.entry.unwrap().as_mut().out_edge.push(*first_block);
         first_block.as_mut().in_edge.push(self.entry.unwrap());
         let mut i = 0;
+
         self.blocks.iter().for_each(|block| {
             if *block != self.entry.unwrap() {
                 let basicblock = info.block_ir_map.get(block).unwrap();
@@ -121,6 +122,8 @@ impl Func {
                 i += 1;
             }
         });
+
+        self.stack_addr = info.stack_slot_set.clone();
     }
 
     // 移除指定id的寄存器的使用信息
@@ -148,14 +151,14 @@ impl Func {
         self.reg_def.resize(self.reg_num as usize, HashSet::new());
         self.reg_use.resize(self.reg_num as usize, HashSet::new());
         let mut p : CurInstrInfo = CurInstrInfo::new(0);
-        self.blocks.iter().for_each(|block| {
-            p.band_block(*block);
+        for block in self.blocks.clone() {
+            p.band_block(block);
             for inst in block.as_ref().insts.iter() {
                 p.insts_it = Some(*inst);
                 self.add_inst_reg(&p, *inst);
                 p.pos += 1;
             }
-        });
+        }
     }
 
     pub fn calc_live(&mut self) {
@@ -195,13 +198,14 @@ impl Func {
         }
     }
 
-    pub fn allocate_reg(&mut self, f: &'static mut File) {
+    pub fn allocate_reg<'a>(&mut self, f: &'a mut File) {
         // 函数返回地址保存在ra中
         let reg_int = vec![Reg::new(1, ScalarType::Int)];
 
         let mut stack_size = 0;
-        for it in self.stack_addr.iter().rev() {
-            it.set_pos(stack_size);
+        
+        for it in self.stack_addr.iter_mut().rev() {
+            // it.set_pos(stack_size);
             stack_size += it.get_size();
         }
         

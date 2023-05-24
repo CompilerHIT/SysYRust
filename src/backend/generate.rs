@@ -154,7 +154,7 @@ impl GenerateAsm for LIRInst {
                 Ok(())
             },
             InstrsType::Ret(..) => {
-                context.as_ref().call_epilogue_event();
+                context.as_mut().call_epilogue_event();
                 let mut builder = AsmBuilder::new(f);
                 builder.ret()?;
                 Ok(())

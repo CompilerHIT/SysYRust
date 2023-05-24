@@ -181,6 +181,7 @@ impl StackSlot {
 pub struct Mapping {
     pub ir_block_map: HashMap<ObjPtr<BasicBlock>, ObjPtr<BB>>,
     pub block_ir_map: HashMap<ObjPtr<BB>, ObjPtr<BasicBlock>>,
+    pub stack_slot_set: Vec<StackSlot>
 }
 
 impl Mapping {
@@ -188,6 +189,7 @@ impl Mapping {
         Self {
             ir_block_map: HashMap::new(),
             block_ir_map: HashMap::new(),
+            stack_slot_set: Vec::new(),
         }
     }
 }

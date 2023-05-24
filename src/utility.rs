@@ -36,13 +36,13 @@ impl<T> Clone for ObjPtr<T> {
     }
 }
 
-impl<T> PartialEq for ObjPtr<T> {
+impl<T: 'static> PartialEq for ObjPtr<T> {
     fn eq(&self, other: &Self) -> bool {
         eq(self.as_ref(), other.as_ref())
     }
 }
 
-impl <T> Eq for ObjPtr<T> {}
+impl <T: 'static> Eq for ObjPtr<T> {}
 
 
 impl<T> Copy for ObjPtr<T> {}
