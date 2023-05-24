@@ -1,5 +1,5 @@
 use super::context::Type;
-use super::{context::Context, ast::*};
+use super::{ast::*, context::Context};
 use crate::frontend::error::Error;
 use crate::ir::basicblock::BasicBlock;
 use crate::ir::function::Function;
@@ -30,7 +30,6 @@ impl Kit {
     pub fn update_var(&self, s: &str, inst: ObjPtr<Inst>) -> bool {
         self.context_mut.update_var_scope(s, inst)
     }
-
 }
 
 pub fn irgen(
@@ -56,15 +55,10 @@ pub enum InfuncChoice {
     NInFunc(),
 }
 
-
 pub trait Process {
     type Ret;
     type Message;
-    fn process(
-        &self,
-        input: Self::Message,
-        kit_mut: &mut Kit,
-    ) -> Result<Self::Ret, Error>;
+    fn process(&self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error>;
 }
 
 impl Process for CompUnit {
@@ -374,18 +368,18 @@ impl Process for Number {
     fn process(&self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
         match self {
             Number::FloatConst(f) => {
-                if let Some(inst) = kit_mut.context_mut.get_const_float(*f){
+                if let Some(inst) = kit_mut.context_mut.get_const_float(*f) {
                     return Ok(inst);
-                }else{
+                } else {
                     let inst = kit_mut.pool_inst_mut.make_float_const(*f);
                     kit_mut.context_mut.add_const_float(*f, inst);
                     return Ok(inst);
                 }
             }
             Number::IntConst(i) => {
-                if let Some(inst) = kit_mut.context_mut.get_const_int(*i){
+                if let Some(inst) = kit_mut.context_mut.get_const_int(*i) {
                     return Ok(inst);
-                }else{
+                } else {
                     let inst = kit_mut.pool_inst_mut.make_int_const(*i);
                     kit_mut.context_mut.add_const_int(*i, inst);
                     return Ok(inst);
@@ -431,7 +425,7 @@ impl Process for UnaryExp {
                     Ok(inst)
                 }
             },
-            UnaryExp::FuncCall((funcname, funcparams)) => {Err(Error::Todo)}
+            UnaryExp::FuncCall((funcname, funcparams)) => Err(Error::Todo),
         }
         // Ok(1)
     }
@@ -497,9 +491,7 @@ impl Process for AddExp {
     type Message = (i32);
     fn process(&self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
         match self {
-            AddExp::MulExp(mulexp) => {
-                mulexp.as_ref().process(input, kit_mut)
-            }
+            AddExp::MulExp(mulexp) => mulexp.as_ref().process(input, kit_mut),
             AddExp::OpExp((opexp, op, mulexp)) => match op {
                 AddOp::Add => {
                     let inst_left = opexp.process(input, kit_mut).unwrap();

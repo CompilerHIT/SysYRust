@@ -1,7 +1,10 @@
 use core::panic;
 use std::collections::HashMap;
 
-use crate::{ir::{instruction::Inst, module::Module, basicblock::BasicBlock, function::Function}, utility::ObjPtr};
+use crate::{
+    ir::{basicblock::BasicBlock, function::Function, instruction::Inst, module::Module},
+    utility::ObjPtr,
+};
 
 use super::irgen::InfuncChoice;
 
@@ -23,15 +26,15 @@ pub enum Type {
 pub struct Symbol {
     tp: Type,
     is_array: bool,
-    layer:i64,
+    layer: i64,
     dimension: Vec<i64>,
 }
 
 impl Context {
-/* -------------------------------------------------------------------------- */
-/*                               constructor                                  */
-/* -------------------------------------------------------------------------- */
-    pub fn make_context(module_mut:&'static mut Module) -> Context {
+    /* -------------------------------------------------------------------------- */
+    /*                               constructor                                  */
+    /* -------------------------------------------------------------------------- */
+    pub fn make_context(module_mut: &'static mut Module) -> Context {
         Context {
             var_map: HashMap::new(),
             bb_map: HashMap::new(),
@@ -43,51 +46,51 @@ impl Context {
         }
     }
 
-
-/* -------------------------------------------------------------------------- */
-/*                               for bb_now_mut                               */
-/* -------------------------------------------------------------------------- */
-    pub fn push_inst_bb(&self, inst_ptr: ObjPtr<Inst>) {
-        match self.bb_now_mut {
+    /* -------------------------------------------------------------------------- */
+    /*                               for bb_now_mut                               */
+    /* -------------------------------------------------------------------------- */
+    pub fn push_inst_bb(&mut self, inst_ptr: ObjPtr<Inst>) {
+        match &mut self.bb_now_mut {
             InfuncChoice::InFunc(bb) => bb.push_back(inst_ptr),
             InfuncChoice::NInFunc() => {}
         }
     }
 
-    pub fn push_var_bb(&self, name: &'static str, inst_ptr: ObjPtr<Inst>) {
-        match self.bb_now_mut {
+    pub fn push_var_bb(&mut self, name: &'static str, inst_ptr: ObjPtr<Inst>) {
+        match &mut self.bb_now_mut {
+            // InfuncChoice::InFunc(bb) => *bb.push_back(inst_ptr),
             InfuncChoice::InFunc(bb) => bb.push_back(inst_ptr),
             InfuncChoice::NInFunc() => self.module_mut.push_var(name, inst_ptr),
         }
     }
 
-    pub fn push_phi(&self, name: &'static str, inst_ptr: ObjPtr<Inst>) {
-        match self.bb_now_mut {
+    pub fn push_phi(&mut self, name: &'static str, inst_ptr: ObjPtr<Inst>) {
+        match &mut self.bb_now_mut {
             InfuncChoice::InFunc(bb) => bb.push_front(inst_ptr),
             InfuncChoice::NInFunc() => self.module_mut.push_var(name, inst_ptr),
         }
     }
 
-    pub fn bb_now_set(&self, bb: &mut BasicBlock) {
+    pub fn bb_now_set(&mut self, bb: &mut BasicBlock) {
         self.bb_now_mut = InfuncChoice::InFunc(bb);
     }
 
-/* -------------------------------------------------------------------------- */
-/*                               for module_mut                               */
-/* -------------------------------------------------------------------------- */
+    /* -------------------------------------------------------------------------- */
+    /*                               for module_mut                               */
+    /* -------------------------------------------------------------------------- */
 
-    pub fn push_func_module(&self, name: &'static str, func_ptr: ObjPtr<Function>) {
+    pub fn push_func_module(&mut self, name: &'static str, func_ptr: ObjPtr<Function>) {
         self.module_mut.push_function(name, func_ptr);
     }
 
-    pub fn push_globalvar_module(&self, name: &'static str, var_ptr: ObjPtr<Inst>) {
+    pub fn push_globalvar_module(&mut self, name: &'static str, var_ptr: ObjPtr<Inst>) {
         self.module_mut.push_var(name, var_ptr);
     }
 
-/* -------------------------------------------------------------------------- */
-/*                               for actionscope                              */
-/* -------------------------------------------------------------------------- */
-    pub fn get_var(&self, s: &str, bbname: &str){}
+    /* -------------------------------------------------------------------------- */
+    /*                               for actionscope                              */
+    /* -------------------------------------------------------------------------- */
+    pub fn get_var(&self, s: &str, bbname: &str) {}
 
     // pub fn get_var_changed_name(&self, s: &str) -> String {
     //     if let Some(vec_temp) = self.var_map.get(s.clone()) {
@@ -96,7 +99,7 @@ impl Context {
     //         }
     //     }
     // }
-    
+
     pub fn get_var_bbname(&self, s: &str, bbname: &str) -> Option<(ObjPtr<Inst>, &Symbol)> {
         let mut name_;
         if let Some(vec_temp) = self.var_map.get(s.clone()) {
@@ -116,15 +119,14 @@ impl Context {
         }
         Option::None
     }
-    
 
-    pub fn update_var_scope(&self, s: &str, inst: ObjPtr<Inst>) -> bool {
+    pub fn update_var_scope(&mut self, s: &str, inst: ObjPtr<Inst>) -> bool {
         let bbname;
-        match self.bb_now_mut{
-            InfuncChoice::InFunc(bbn)=>{
+        match &mut self.bb_now_mut {
+            InfuncChoice::InFunc(bbn) => {
                 bbname = bbn.get_name();
             }
-            InfuncChoice::NInFunc() =>{
+            InfuncChoice::NInFunc() => {
                 bbname = "notinblock";
             }
         }
@@ -147,31 +149,30 @@ impl Context {
         false
     }
 
-    
-
-    pub fn add_const_int(&self,i: i32,inst: ObjPtr<Inst>) -> Option<(ObjPtr<Inst>)> {
-        let s = "@".to_string()+i.to_string().as_str();
+    pub fn add_const_int(&mut self, i: i32, inst: ObjPtr<Inst>) -> Option<(ObjPtr<Inst>)> {
+        let s = "@".to_string() + i.to_string().as_str();
         let mut v = vec![];
-        let temps = self.add_prefix(s);
+        let temps = self.add_prefix(s.clone());
         let lay;
-        match self.bb_now_mut{
-            InfuncChoice::InFunc(bb) =>{
+        match &mut self.bb_now_mut {
+            InfuncChoice::InFunc(bb) => {
                 bb.push_back(inst);
                 lay = 1;
             }
-            InfuncChoice::NInFunc()=>{
+            InfuncChoice::NInFunc() => {
                 self.push_globalvar_module(&temps, inst);
                 lay = 0;
             }
         }
-        v.push((temps, 1));
-        self.var_map.insert(s, v);
+        v.push((temps.clone(), 1));
+        let stemp = s.clone();
+        self.var_map.insert(stemp, v);
         self.symbol_table.insert(
             temps.clone(),
             Symbol {
                 tp: Type::Int,
                 is_array: false,
-                layer:self.layer,
+                layer: self.layer,
                 dimension: vec![],
             },
         );
@@ -179,24 +180,24 @@ impl Context {
         self.get_const_int(i)
     }
 
-    pub fn add_const_float(&self,f: f32,inst: ObjPtr<Inst>,) -> Option<(ObjPtr<Inst>)> {
-        let s = "%".to_string()+f.to_string().as_str();
+    pub fn add_const_float(&mut self, f: f32, inst: ObjPtr<Inst>) -> Option<(ObjPtr<Inst>)> {
+        let s = "%".to_string() + f.to_string().as_str();
         let mut v = vec![];
-        let temps = self.add_prefix(s);
+        let temps = self.add_prefix(s.clone());
         let lay;
-        if self.layer==0{
+        if self.layer == 0 {
             lay = 0;
-        }else{
+        } else {
             lay = 1;
         }
-        v.push((temps, 1));
-        self.var_map.insert(s, v);
+        v.push((temps.clone(), 1));
+        self.var_map.insert(s.clone(), v);
         self.symbol_table.insert(
             temps.clone(),
             Symbol {
                 tp: Type::Float,
                 is_array: false,
-                layer:self.layer,
+                layer: self.layer,
                 dimension: vec![],
             },
         );
@@ -205,46 +206,45 @@ impl Context {
     }
 
     pub fn get_const_int(&self, i: i32) -> Option<(ObjPtr<Inst>)> {
-       if self.layer>0{
-                let iname = "@".to_string()+i.to_string().as_str();
-                if let Some(vec) = self.var_map.get(&iname){
-                    for (name_changed, layer_) in vec {
-                        if *layer_ ==1 {
-                            for ((bbname,inst_vec)) in self.bb_map{
-                                if let Some(inst) = inst_vec.get(name_changed){
-                                    return Option::Some(*inst);
-                                }
+        if self.layer > 0 {
+            let iname = "@".to_string() + i.to_string().as_str();
+            if let Some(vec) = self.var_map.get(&iname) {
+                for (name_changed, layer_) in vec {
+                    if *layer_ == 1 {
+                        for ((bbname, inst_vec)) in &self.bb_map {
+                            if let Some(inst) = inst_vec.get(name_changed) {
+                                return Option::Some(*inst);
                             }
                         }
                     }
                 }
-                return Option::None;
-        }else{
-            let iname = "@".to_string()+i.to_string().as_str();
-                if let Some(vec) = self.var_map.get(&iname){
-                    for (name_changed, layer_) in vec {
-                        if *layer_ ==0 {
-                            if let Some(inst_vec) = self.bb_map.get("notinblock"){
-                                if let Some(inst) = inst_vec.get(name_changed){
-                                    return Option::Some(*inst);
-                                }
+            }
+            return Option::None;
+        } else {
+            let iname = "@".to_string() + i.to_string().as_str();
+            if let Some(vec) = self.var_map.get(&iname) {
+                for (name_changed, layer_) in vec {
+                    if *layer_ == 0 {
+                        if let Some(inst_vec) = self.bb_map.get("notinblock") {
+                            if let Some(inst) = inst_vec.get(name_changed) {
+                                return Option::Some(*inst);
                             }
                         }
                     }
                 }
-                return Option::None;
+            }
+            return Option::None;
         }
     }
 
-
     pub fn get_const_float(&self, f: f32) -> Option<(ObjPtr<Inst>)> {
-        if self.layer>0{
-            let iname = "%".to_string()+f.to_string().as_str();
-            if let Some(vec) = self.var_map.get(&iname){
+        if self.layer > 0 {
+            let iname = "%".to_string() + f.to_string().as_str();
+            if let Some(vec) = self.var_map.get(&iname) {
                 for (name_changed, layer_) in vec {
-                    if *layer_ ==1 {
-                        for ((bbname,inst_vec)) in self.bb_map{
-                            if let Some(inst) = inst_vec.get(name_changed){
+                    if *layer_ == 1 {
+                        for ((bbname, inst_vec)) in &self.bb_map {
+                            if let Some(inst) = inst_vec.get(name_changed) {
                                 return Option::Some(*inst);
                             }
                         }
@@ -252,13 +252,13 @@ impl Context {
                 }
             }
             return Option::None;
-    }else{
-        let iname = "%".to_string()+f.to_string().as_str();
-            if let Some(vec) = self.var_map.get(&iname){
+        } else {
+            let iname = "%".to_string() + f.to_string().as_str();
+            if let Some(vec) = self.var_map.get(&iname) {
                 for (name_changed, layer_) in vec {
-                    if *layer_ ==0 {
-                        if let Some(inst_vec) = self.bb_map.get("notinblock"){
-                            if let Some(inst) = inst_vec.get(name_changed){
+                    if *layer_ == 0 {
+                        if let Some(inst_vec) = self.bb_map.get("notinblock") {
+                            if let Some(inst) = inst_vec.get(name_changed) {
                                 return Option::Some(*inst);
                             }
                         }
@@ -266,39 +266,40 @@ impl Context {
                 }
             }
             return Option::None;
-    }
+        }
     }
 
-    pub fn add_var(&self, s: &str, tp: Type, is_array: bool, dimension: Vec<i64>) -> bool {
+    pub fn add_var(&mut self, s: &str, tp: Type, is_array: bool, dimension: Vec<i64>) -> bool {
         let s1 = s.clone();
         if (self.has_var_now(s1)) {
             return false;
         }
+        let temps = self.add_prefix(s.to_string());
         if self.var_map.contains_key(s) {
             if let Some(vec) = self.var_map.get_mut(s) {
-                let temps = self.add_prefix(s.to_string()).as_str();
+                // let temps = self.add_prefix(s.to_string()).as_str();
                 vec.push((temps.to_string(), self.layer));
                 self.symbol_table.insert(
                     temps.clone().to_string(),
                     Symbol {
                         tp,
                         is_array,
-                        layer:self.layer,
+                        layer: self.layer,
                         dimension,
                     },
                 );
             }
         } else {
             let mut v = vec![];
-            let temps = self.add_prefix(s.to_string());
-            v.push((temps, self.layer));
+            // let temps = self.add_prefix(s.to_string());
+            v.push((temps.to_string(), self.layer));
             self.var_map.insert(s.to_string(), v);
             self.symbol_table.insert(
-                temps.clone(),
+                temps.to_string(),
                 Symbol {
                     tp,
                     is_array,
-                    layer:self.layer,
+                    layer: self.layer,
                     dimension,
                 },
             );
@@ -306,20 +307,20 @@ impl Context {
         true
     }
 
-    pub fn add_layer(&self) {
+    pub fn add_layer(&mut self) {
         self.layer = self.layer + 1;
     }
 
-    pub fn delete_layer(&self) {
+    pub fn delete_layer(&mut self) {
         //todo:遍历所有变量，删除layer==layer_now的所有变量
-        for (key, mut vec) in self.var_map {
+        for (key, vec) in &mut self.var_map {
             let mut index_now = 0;
             for (name_changed, layer_) in vec {
-                if layer_ == self.layer {
+                if *layer_ == self.layer {
                     vec.remove(index_now);
-                    self.symbol_table.remove(&name_changed);
+                    self.symbol_table.remove(name_changed);
                     for (bbname, mut inst_map) in self.bb_map {
-                        inst_map.remove(&name_changed);
+                        inst_map.remove(name_changed);
                     }
                     break;
                 }
@@ -344,7 +345,7 @@ impl Context {
         return self.layer;
     }
 
-    pub fn add_prefix(&self, s: String) -> String {
+    pub fn add_prefix(&mut self, s: String) -> String {
         self.index = self.index + 1;
         self.index.to_string() + s.as_str()
     }
