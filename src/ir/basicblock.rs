@@ -10,7 +10,7 @@ pub struct BasicBlock {
 
 impl ObjPool<BasicBlock> {
     /// 创建一个新的BasicBlock
-    pub fn new_basic_block(&mut self, name: &str) -> ObjPtr<BasicBlock> {
+    pub fn new_basic_block(&mut self, name: &'static str) -> ObjPtr<BasicBlock> {
         let bb = BasicBlock::new(name);
         let bb = self.put(bb);
 
@@ -22,7 +22,7 @@ impl ObjPool<BasicBlock> {
 
 impl BasicBlock {
     /// 构造一个空的BasicBlock
-    pub fn new(name: &str) -> BasicBlock {
+    pub fn new(name: &'static str) -> BasicBlock {
         BasicBlock {
             name,
             value: Value::new(IrType::BBlock),

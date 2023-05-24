@@ -5,9 +5,9 @@ impl ObjPool<Inst> {
     /// # Arguments
     /// * `callee` - 被调用的函数
     /// * `args` - 参数列表
-    pub fn make_int_call(&mut self, callee: &str, args: Vec<ObjPtr<Inst>>) -> ObjPtr<Inst> {
+    pub fn make_int_call(&mut self, callee: &'static str, args: Vec<ObjPtr<Inst>>) -> ObjPtr<Inst> {
         // 正确性检查
-        for arg in args.iter() {
+        for arg in args.clone().iter() {
             let arg = arg.as_ref();
             if let InstKind::Parameter = arg.get_kind() {
             } else {
@@ -15,7 +15,7 @@ impl ObjPool<Inst> {
             }
         }
 
-        let inst = self.put(Inst::new(IrType::Int, InstKind::Call(callee), args));
+        let inst = self.put(Inst::new(IrType::Int, InstKind::Call(callee), args.clone()));
 
         // 设置use_list
         for arg in args {
@@ -28,9 +28,13 @@ impl ObjPool<Inst> {
     /// # Arguments
     /// * `callee` - 被调用的函数
     /// * `args` - 参数列表
-    pub fn make_void_call(&mut self, callee: &str, args: Vec<ObjPtr<Inst>>) -> ObjPtr<Inst> {
+    pub fn make_void_call(
+        &mut self,
+        callee: &'static str,
+        args: Vec<ObjPtr<Inst>>,
+    ) -> ObjPtr<Inst> {
         // 正确性检查
-        for arg in args.iter() {
+        for arg in args.clone().iter() {
             let arg = arg.as_ref();
             if let InstKind::Parameter = arg.get_kind() {
             } else {
@@ -38,7 +42,11 @@ impl ObjPool<Inst> {
             }
         }
 
-        let inst = self.put(Inst::new(IrType::Void, InstKind::Call(callee), args));
+        let inst = self.put(Inst::new(
+            IrType::Void,
+            InstKind::Call(callee),
+            args.clone(),
+        ));
 
         // 设置use_list
         for arg in args {
@@ -51,9 +59,13 @@ impl ObjPool<Inst> {
     /// # Arguments
     /// * `callee` - 被调用的函数
     /// * `args` - 参数列表
-    pub fn make_float_call(&mut self, callee: &str, args: Vec<ObjPtr<Inst>>) -> ObjPtr<Inst> {
+    pub fn make_float_call(
+        &mut self,
+        callee: &'static str,
+        args: Vec<ObjPtr<Inst>>,
+    ) -> ObjPtr<Inst> {
         // 正确性检查
-        for arg in args.iter() {
+        for arg in args.clone().iter() {
             let arg = arg.as_ref();
             if let InstKind::Parameter = arg.get_kind() {
             } else {
@@ -61,7 +73,11 @@ impl ObjPool<Inst> {
             }
         }
 
-        let inst = self.put(Inst::new(IrType::Float, InstKind::Call(callee), args));
+        let inst = self.put(Inst::new(
+            IrType::Float,
+            InstKind::Call(callee),
+            args.clone(),
+        ));
 
         // 设置use_list
         for arg in args {

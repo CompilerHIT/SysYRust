@@ -48,7 +48,7 @@ impl User {
     }
 
     pub fn get_use_list(&self) -> &Vec<ObjPtr<Inst>> {
-        &mut self.use_list
+        &self.use_list
     }
 
     /// 表示当前指令被使用，将其加入use list

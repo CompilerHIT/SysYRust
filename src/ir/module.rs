@@ -15,7 +15,7 @@ impl Module {
     }
 
     /// 将申请的全局变量放入module中
-    pub fn push_var(&mut self, name: &str, variable: ObjPtr<Inst>) {
+    pub fn push_var(&mut self, name: &'static str, variable: ObjPtr<Inst>) {
         if let None = self.global_variable.get(name) {
             self.global_variable.insert(name, variable);
         } else {
@@ -24,7 +24,7 @@ impl Module {
     }
 
     /// 将新建的函数加入module中
-    pub fn push_function(&mut self, name: &str, function: ObjPtr<Function>) {
+    pub fn push_function(&mut self, name: &'static str, function: ObjPtr<Function>) {
         if let None = self.function.get(name) {
             self.function.insert(name, function);
         } else {
