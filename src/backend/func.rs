@@ -2,7 +2,8 @@ pub use std::collections::{HashSet, VecDeque};
 use std::vec::Vec;
 pub use std::fs::File;
 pub use std::hash::{Hash, Hasher};
-pub use std::io::{Result, Write};
+pub use std::io::Result;
+pub use std::fs::write;
 
 use lazy_static::__Deref;
 
@@ -14,7 +15,7 @@ use crate::backend::instrs::LIRInst;
 use crate::backend::asm_builder::AsmBuilder;
 use crate::backend::module::AsmModule;
 use crate::backend::block::*;
-use super::structs::*;
+use super::{structs::*, FILE_PATH};
 
 // #[derive(Clone)]
 pub struct Func {
@@ -198,7 +199,7 @@ impl Func {
         }
     }
 
-    pub fn allocate_reg<'a>(&mut self, f: &'a mut File) {
+    pub fn allocate_reg(&mut self, f: FILE_PATH) {
         // 函数返回地址保存在ra中
         let reg_int = vec![Reg::new(1, ScalarType::Int)];
 
@@ -217,10 +218,10 @@ impl Func {
         stack_size = stack_size / 16 * 16 + 16;
 
         let mut offset = stack_size;
-        let mut f1 = f.try_clone().unwrap();
+        let mut f1 = f.clone();
         if let Some(contxt) = &self.context {
             contxt.as_mut().set_prologue_event(move||{
-                let mut builder = AsmBuilder::new(f);
+                let mut builder = AsmBuilder::new(f.clone());
                 // addi sp -stack_size
                 builder.addi("sp", "sp", -offset);
                 for src in reg_int_res.iter() {
@@ -230,7 +231,7 @@ impl Func {
             });
             let mut offset = stack_size;
             contxt.as_mut().set_epilogue_event(move||{
-                let mut builder = AsmBuilder::new(&mut f1);
+                let mut builder = AsmBuilder::new(f1.clone());
                 for src in reg_int_res_cl.iter() {
                     offset -= 8;
                     builder.ld("sp", &src.to_string(), offset, false);
@@ -251,12 +252,12 @@ impl Func {
 }
 
 impl GenerateAsm for Func {
-    fn generate(&self, _: ObjPtr<Context>, f: &mut File) -> Result<()> {
-        AsmBuilder::new(f).show_func(&self.label);
+    fn generate(&self, _: ObjPtr<Context>, f: FILE_PATH) -> Result<()> {
+        AsmBuilder::new(f.clone()).show_func(&self.label);
         if let Some(contxt) = &self.context {
             contxt.as_mut().call_prologue_event();
             for block in self.blocks.iter() {
-                block.as_ref().generate(contxt.clone(), f)?;
+                block.as_ref().generate(contxt.clone(), f.clone())?;
             }
         }
         Ok(())

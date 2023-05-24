@@ -13,6 +13,9 @@ use std::fs::File;
 
 use crate::backend::module::AsmModule;
 
+pub type FILE_PATH = String;
+
 pub fn generate_asm(path: &str, module: &mut AsmModule) -> Result<()> {
-    module.generator(&mut File::create(path)?)
+    module.generator(String::from(path))?;
+    Ok(())
 }

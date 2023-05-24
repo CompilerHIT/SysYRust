@@ -2,13 +2,16 @@ pub use std::collections::{HashSet, VecDeque};
 pub use std::collections::HashMap;
 pub use std::fs::File;
 pub use std::hash::{Hash, Hasher};
-pub use std::io::{Result, Write};
+pub use std::io::Result;
+pub use std::fs::write;
 
 use crate::utility::ObjPtr;
 use crate::backend::operand::{IImm, FImm};
 use crate::backend::instrs::LIRInst;
 use crate::backend::block::BB;
 use crate::ir::basicblock::BasicBlock;
+
+use super::FILE_PATH;
 
 
 #[derive(Clone)]
@@ -139,8 +142,8 @@ impl FGlobalVar {
 }
 
 pub trait GenerateAsm {
-    fn generate(&self, _: ObjPtr<Context>, f: &mut File) -> Result<()> {
-        writeln!(f, "unreachable")?;
+    fn generate(&self, _: ObjPtr<Context>, f: FILE_PATH) -> Result<()> {
+        write(&f, "unreachable")?;
         Ok(())
     }
 }

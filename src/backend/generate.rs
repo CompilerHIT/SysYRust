@@ -1,9 +1,9 @@
-use super::{instrs::*, operand};
+use super::{instrs::*, operand, FILE_PATH};
 use crate::backend::operand::ToString;
 //FIXME: virtue id to real id
 impl GenerateAsm for LIRInst { 
-    fn generate(&self, context: ObjPtr<Context>, f: &mut std::fs::File) -> Result<()> {
-        let mut builder = AsmBuilder::new(f);
+    fn generate(&self, context: ObjPtr<Context>, f: FILE_PATH) -> Result<()> {
+        let mut builder = AsmBuilder::new(f.clone());
         match self.get_type() {
             InstrsType::Binary(op) => {
                 let op = match op {
@@ -69,7 +69,7 @@ impl GenerateAsm for LIRInst {
             // },
             InstrsType::Load => {
                 //FIXME: only call ld -- lw...to implement
-                let mut builder = AsmBuilder::new(f);
+                let mut builder = AsmBuilder::new(f.clone());
                 let offset = self.get_offset();
                 if !operand::is_imm_12bs(offset.get_data()) {
                     panic!("illegal offset");
@@ -88,7 +88,7 @@ impl GenerateAsm for LIRInst {
             },
             InstrsType::Store => {
                 //FIXME: only call sd -- sw...to implement
-                let mut builder = AsmBuilder::new(f);
+                let mut builder = AsmBuilder::new(f.clone());
                 let offset = self.get_offset();
                 if !operand::is_imm_12bs(offset.get_data()) {
                     panic!("illegal offset");
@@ -106,7 +106,7 @@ impl GenerateAsm for LIRInst {
             },
 
             InstrsType::StoreToStack => {
-                let mut builder = AsmBuilder::new(f);
+                let mut builder = AsmBuilder::new(f.clone());
                 if !operand::is_imm_12bs(self.get_offset().get_data()) {
                     panic!("illegal offset");
                 }
@@ -123,7 +123,7 @@ impl GenerateAsm for LIRInst {
                 Ok(())
             },
             InstrsType::LoadFromStack | InstrsType::LoadParamFromStack => {
-                let mut builder = AsmBuilder::new(f);
+                let mut builder = AsmBuilder::new(f.clone());
                 if !operand::is_imm_12bs(self.get_offset().get_data()) {
                     panic!("illegal offset");
                 }
@@ -155,7 +155,7 @@ impl GenerateAsm for LIRInst {
             },
             InstrsType::Ret(..) => {
                 context.as_mut().call_epilogue_event();
-                let mut builder = AsmBuilder::new(f);
+                let mut builder = AsmBuilder::new(f.clone());
                 builder.ret()?;
                 Ok(())
             }
