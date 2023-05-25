@@ -9,7 +9,7 @@ use crate::ir::basicblock::BasicBlock;
 use crate::ir::instruction::{Inst, InstKind, BinOp, UnOp};
 use crate::ir::ir_type::IrType;
 use crate::backend::operand::{Reg, IImm, FImm};
-use crate::backend::instrs::{LIRInst, InstrsType, SingleOp, BinaryOp};
+use crate::backend::instrs::{LIRInst, InstrsType, SingleOp, BinaryOp, CmpOp};
 use crate::backend::instrs::Operand;
 
 use crate::backend::func::Func;
@@ -73,6 +73,7 @@ impl BB {
                     let mut dst_reg : Operand = self.resolve_operand(ir_block_inst, true);
                     match op {
                         //TODO: Float Binary
+                        //TODO: 判断右操作数是否为常数，若是则使用i型指令
                         BinOp::Add => {
                             let mut inst_kind = InstrsType::Binary(BinaryOp::Add);
                             match lhs.as_ref().get_ir_type() {
@@ -248,9 +249,27 @@ impl BB {
                                 );
                             }
                         },
+                        BinOp::And => {
+                            lhs_reg = self.resolve_operand(lhs, true);
+                            rhs_reg = self.resolve_operand(rhs, false);
+                            self.insts.push(
+                                self.insts_mpool.put(
+                                    LIRInst::new(InstrsType::Binary(BinaryOp::And), vec![dst_reg, lhs_reg, rhs_reg])
+                                )
+                            );
+                        },
+                        BinOp::Or => {
+                            lhs_reg = self.resolve_operand(lhs, true);
+                            rhs_reg = self.resolve_operand(rhs, false);
+                            self.insts.push(
+                                self.insts_mpool.put(
+                                    LIRInst::new(InstrsType::Binary(BinaryOp::Or), vec![dst_reg, lhs_reg, rhs_reg])
+                                )
+                            );
+                        },
                         _ => {
                             //TODO:
-                            panic!("more binary op to resolve");
+                            unreachable!("more binary op to resolve");
                         }
                     }
                 },
@@ -369,7 +388,7 @@ impl BB {
                         // array: offset~offset+size(8字节对齐)
                         // map_key: array_name
                         map_info.int_array_map.insert(label.clone(), alloca);
-                        map_info.array_slot_map.insert(label, offset);
+                        map_info.array_slot_map.insert(ir_block_inst, offset);
                     }
                 }
                 InstKind::Gep => {
@@ -378,25 +397,107 @@ impl BB {
                     // 数组成员若是int型则不超过32位，使用word
                     // ld dst array_offset(sp)
                     // lw dst 4 * gep_offset(dst)
-                    //gep-get_ptr 取得数组首地址 - 需要知道数组名
                     let offset = inst_ref.get_gep_offset().as_ref().get_int_bond() * 4;
                     let dst_reg = self.resolve_operand(ir_block_inst, true);
-                    //FIXME: 
-                    // let array_name = inst_ref.get_ptr().get_array_name(); offset如[2][3]是否为6？
-                    // if let Some(head) = map_info.array_slot_map.get(&array_name){
+                    let index = inst_ref.get_ptr();
+                    if let Some(head) = map_info.array_slot_map.get(&index){
                         //TODO:判断地址合法
-                        // let mut load = LIRInst::new(InstrsType::LoadParamFromStack, 
-                        //     vec![dst_reg.clone(), Operand::IImm(IImm::new(offset))]);
-                        // load.set_double();
-                        // self.insts.push(self.insts_mpool.put(load));
-                        // self.insts.push(self.insts_mpool.put(LIRInst::new(InstrsType::Load, 
-                        //     vec![dst_reg, dst_reg, Operand::IImm(IImm::new(offset))])));
-                    // } else {
-                    //  panic!("array not found");
-                    // }
+                        let mut load = LIRInst::new(InstrsType::LoadParamFromStack, 
+                            vec![dst_reg.clone(), Operand::IImm(IImm::new(*head))]);
+                        load.set_double();
+                        self.insts.push(self.insts_mpool.put(load));
+                        self.insts.push(self.insts_mpool.put(LIRInst::new(InstrsType::Load, 
+                            vec![dst_reg.clone(), dst_reg.clone(), Operand::IImm(IImm::new(offset))])));
+                    } else {
+                     panic!("array not found");
+                    }
                 },
                 InstKind::Branch => {
+                    // if jump
+                    if inst_ref.is_jmp() {
+                        let next_bb = block.as_ref().get_next_bb()[0];
+                        let jump_block = match map_info.ir_block_map.get(&next_bb) {
+                            Some(block) => block,
+                            None => panic!("jump block not found"),
+                        };
+                        if *jump_block != next_blocks.unwrap() {
+                            self.insts.push(self.insts_mpool.put(
+                                LIRInst::new(InstrsType::Jump, 
+                                    vec![Operand::Addr(next_bb.as_ref().get_name().to_string())])
+                            ));
+                        }
+                        jump_block.as_mut().in_edge.push(ObjPtr::new(self));
+                        self.out_edge.push(*jump_block);
+                        break;
+                    }
+
+                    // if branch
+                    let cond_ref = inst_ref.get_br_cond().as_ref();
+
+                    let true_bb = block.as_ref().get_next_bb()[0];
+                    let false_bb = block.as_ref().get_next_bb()[1];
+                    let true_block = match map_info.ir_block_map.get(&true_bb) {
+                        Some(block) => block,
+                        None => unreachable!("true block not found"),
+                    };
+                    let false_block = match map_info.ir_block_map.get(&false_bb) {
+                        Some(block) => block,
+                        None => unreachable!("false block not found"),
+                    };
                     
+                    match cond_ref.get_kind() {
+                        InstKind::Binary(cond) => {
+                            let lhs_reg = self.resolve_operand(cond_ref.get_lhs(), true);
+                            let rhs_reg = self.resolve_operand(cond_ref.get_rhs(), true);
+                            match cond {
+                                BinOp::Eq => {
+                                    self.insts.push(self.insts_mpool.put(
+                                        LIRInst::new(InstrsType::Branch(CmpOp::Eq),
+                                            vec![Operand::Addr(true_bb.as_ref().get_name().to_string()), lhs_reg, rhs_reg])
+                                    ));
+                                },
+                                BinOp::Ne => {
+                                    self.insts.push(self.insts_mpool.put(
+                                        LIRInst::new(InstrsType::Branch(CmpOp::Ne),
+                                            vec![Operand::Addr(true_bb.as_ref().get_name().to_string()), lhs_reg, rhs_reg])
+                                    ));
+                                },
+                                BinOp::Ge => {
+                                    self.insts.push(self.insts_mpool.put(
+                                        LIRInst::new(InstrsType::Branch(CmpOp::Ge),
+                                            vec![Operand::Addr(true_bb.as_ref().get_name().to_string()), lhs_reg, rhs_reg])
+                                    ));
+                                },
+                                BinOp::Le => {
+                                    self.insts.push(self.insts_mpool.put(
+                                        LIRInst::new(InstrsType::Branch(CmpOp::Le),
+                                            vec![Operand::Addr(true_bb.as_ref().get_name().to_string()), lhs_reg, rhs_reg])
+                                    ));
+                                },
+                                BinOp::Gt => {
+                                    self.insts.push(self.insts_mpool.put(
+                                        LIRInst::new(InstrsType::Branch(CmpOp::Gt),
+                                            vec![Operand::Addr(true_bb.as_ref().get_name().to_string()), lhs_reg, rhs_reg])
+                                    ));
+                                },
+                                BinOp::Lt => {
+                                    self.insts.push(self.insts_mpool.put(
+                                        LIRInst::new(InstrsType::Branch(CmpOp::Lt),
+                                            vec![Operand::Addr(true_bb.as_ref().get_name().to_string()), lhs_reg, rhs_reg])
+                                    ));
+                                },
+                                _ => { unreachable!("no condition match") }
+                            }
+                            self.insts.push(self.insts_mpool.put(
+                                LIRInst::new(InstrsType::Jump, 
+                                    vec![Operand::Addr(false_bb.as_ref().get_name().to_string())])
+                            ));
+                            true_block.as_mut().in_edge.push(ObjPtr::new(self));
+                            false_block.as_mut().in_edge.push(ObjPtr::new(self));
+                            self.out_edge.append(vec![*true_block, *false_block].as_mut());
+                        }
+                        _ => { unreachable!("cond is not binary condition judgement, to improve") }
+                    }
                 },
                 InstKind::Call(func_label) => {
 

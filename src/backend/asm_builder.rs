@@ -28,40 +28,26 @@ impl AsmBuilder {
         Self { f }
     }
 
-    pub fn li(&mut self, dest: &str, imm: i32) -> Result<()> {
-        write(&self.f, format!("  li {dest}, {imm}\n"))
-    }
-
-    pub fn la(&mut self, dest: &str, address: &str) -> Result<()> {
-        write(&self.f, format!("  la {dest}, {address}\n"))
-    }
-
-    pub fn mv(&mut self, dest: &str, src: &str) -> Result<()> {
-        if dest != src {
-            write(&self.f, format!("  mv {dest}, {src}\n"))
-        } else {
-            Ok(())
-        }
-    }
-
     pub fn ret(&mut self) -> Result<()> {
         write(&self.f, "  ret\n")
     }
 
-    pub fn bz(&mut self, act: &str, cond: &str, label: &str) -> Result<()> {
-        write(&self.f, format!("  {act} {cond}, {label}\n"))
+    
+
+    pub fn op2(&mut self, op: &str, dest: &str, lhs: &str, rhs: &str, is_imm: bool) -> Result<()> {
+        if is_imm {
+            write(&self.f, format!("  {op}i {dest}, {lhs}, {rhs}\n"))
+        } else {
+            write(&self.f, format!("  {op} {dest}, {lhs}, {rhs}\n"))
+        }
     }
 
-    pub fn neg(&mut self, dest: &str, src: &str) -> Result<()> {
-        write(&self.f, format!("  neg {dest}, {src}\n"))
-    }
-
-    pub fn op2(&mut self, op: &str, dest: &str, lhs: &str, rhs: &str) -> Result<()> {
-        write(&self.f, format!("  {op} {dest}, {lhs}, {rhs}\n"))
-    }
-
-    pub fn op1(&mut self, op: &str, dest: &str, src: &str) -> Result<()> {
-        write(&self.f, format!("  {op} {dest}, {src}\n"))
+    pub fn op1(&mut self, op: &str, dest: &str, src: &str, is_imm: bool) -> Result<()> {
+        if is_imm{
+            write(&self.f, format!("  {op}i {dest}, {src}\n"))
+        } else {
+            write(&self.f, format!("  {op} {dest}, {src}\n"))
+        }
     }
 
     pub fn addi(&mut self, dest: &str, opr: &str, imm: i32) -> Result<()> {
@@ -157,8 +143,12 @@ impl AsmBuilder {
         }
     }
 
+    pub fn b(&mut self, cond: &str, lhs: &str, rhs: &str, label: &str) -> Result<()> {
+        write(&self.f, format!("    {cond}    {lhs}, {rhs}, {label}\n"))
+    }
+
     pub fn j(&mut self, label: &str) -> Result<()> {
-        write(&self.f, format!("  j {label}\n"))
+        write(&self.f, format!("	j {label}\n"))
     }
 
     pub fn call(&mut self, func: &str) -> Result<()> {

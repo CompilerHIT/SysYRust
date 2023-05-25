@@ -103,8 +103,6 @@ pub struct LIRInst {
     operands: Vec<Operand>,
     // param cnts in call instruction: (ints, floats)
     param_cnt: (i32, i32),
-    // b/j型指令的跳转目标
-    block: Option<ObjPtr<BB>>,
     // call指令的跳转到函数
     func: Option<ObjPtr<Func>>,
     func_name: String,
@@ -114,13 +112,12 @@ pub struct LIRInst {
 impl LIRInst {
     // 通用
     pub fn new(inst_type: InstrsType, operands: Vec<Operand>) -> Self {
-        Self { inst_type, operands, param_cnt: (0, 0), block: None, func: None, func_name: String::new(), double: false }
+        Self { inst_type, operands, param_cnt: (0, 0), func: None, func_name: String::new(), double: false }
     }
     pub fn get_type(&self) -> InstrsType {
         self.inst_type
     }
 
-    // call指令中operands为空，不允许调用dst, lhs, rhs
     pub fn get_dst(&self) -> &Operand {
         &self.operands[0]
     }
@@ -288,13 +285,10 @@ impl LIRInst {
             _ => unreachable!("only support imm sp offset"),
         }
     }
-    
+
     // Branch, Jump:
-    pub fn set_block(&mut self, block: ObjPtr<BB>) {
-        self.block = Some(block);
-    }
-    pub fn get_block(&self) -> Option<ObjPtr<BB>> {
-        self.block
+    pub fn get_label(&self) -> &Operand {
+        &self.operands[0]
     }
 
     // LoadFromStack, StoreToStack

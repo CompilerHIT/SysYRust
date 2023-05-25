@@ -19,6 +19,7 @@ impl GenerateAsm for LIRInst {
                     BinaryOp::Shr => "srl",
                     BinaryOp::Sar => "sra",
                 };
+                let mut is_imm = false;
                 let dst = match self.get_dst(){
                     Operand::Reg(reg) => reg.to_string(),
                     _ => panic!("dst of binary op must be reg, to improve"),
@@ -29,11 +30,17 @@ impl GenerateAsm for LIRInst {
                 };
                 let rhs = match self.get_rhs() {
                     Operand::Reg(reg) => reg.to_string(),
-                    Operand::FImm(fimm) => fimm.to_string(),
-                    Operand::IImm(iimm) => iimm.to_string(),
+                    Operand::FImm(fimm) => {
+                        is_imm = true;
+                        fimm.to_string()
+                    },
+                    Operand::IImm(iimm) => {
+                        is_imm = true;
+                        iimm.to_string()
+                    },
                     _ => panic!("rhs of binary op must be reg or imm, to improve"),
                 };
-                builder.op2(op, &dst, &lhs, &rhs)?;
+                builder.op2(op, &dst, &lhs, &rhs, is_imm)?;
                 Ok(())
             },
             InstrsType::OpReg(op) => {
@@ -54,13 +61,17 @@ impl GenerateAsm for LIRInst {
                     Operand::Reg(reg) => reg.to_string(),
                     _ => panic!("dst of single op must be reg, to improve"),
                 };
+                let mut is_imm = false;
                 let src = match self.get_lhs() {
                     Operand::Reg(reg) => reg.to_string(),
-                    Operand::IImm(iimm) => iimm.to_string(),
+                    Operand::IImm(iimm) => {
+                        is_imm = true;
+                        iimm.to_string()
+                    },
                     Operand::Addr(addr) => addr.to_string(),
                     _ => unreachable!("src of single op must be reg or imm, to improve"),
                 };
-                builder.op1(op, &dst, &src)?;
+                builder.op1(op, &dst, &src, is_imm)?;
                 Ok(())
             },
             // InstrsType::ChangeSp => {
@@ -184,12 +195,38 @@ impl GenerateAsm for LIRInst {
                 Ok(())
             }
             // 判断！是否需要多插入一条j，间接跳转到
-            InstrsType::Branch(..) => {
-                //TODO:
+            InstrsType::Branch(cond) => {
+                let mut builder = AsmBuilder::new(f.clone());
+                let label = match self.get_label() {
+                    Operand::Addr(label) => label.to_string(),
+                    _ => unreachable!("branch block's label must be string"),
+                };
+                let cond = match cond {
+                    CmpOp::Eq => "eq",
+                    CmpOp::Ne => "ne",
+                    CmpOp::Lt => "lt",
+                    CmpOp::Le => "le",
+                    CmpOp::Gt => "gt",
+                    CmpOp::Ge => "ge",
+                };
+                let lhs = match self.get_lhs() {
+                    Operand::Reg(reg) => reg.to_string(),
+                    _ => unreachable!("branch block's lhs must be reg"),
+                };
+                let rhs = match self.get_rhs() {
+                    Operand::Reg(reg) => reg.to_string(),
+                    _ => unreachable!("branch block's rhs must be reg"),
+                };
+                builder.b(cond, &lhs, &rhs, &label)?;
                 Ok(())
             },
             InstrsType::Jump => {
-                //TODO:
+                let mut builder = AsmBuilder::new(f.clone());
+                let label = match self.get_label() {
+                    Operand::Addr(label) => label.to_string(),
+                    _ => unreachable!("jump block's label must be string"),
+                };
+                builder.j(&label)?;
                 Ok(())
             }
             InstrsType::Call => {

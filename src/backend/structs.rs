@@ -11,6 +11,7 @@ use crate::backend::operand::{IImm, FImm};
 use crate::backend::instrs::LIRInst;
 use crate::backend::block::BB;
 use crate::ir::basicblock::BasicBlock;
+use crate::ir::instruction::Inst;
 
 use super::FILE_PATH;
 
@@ -188,7 +189,7 @@ pub struct Mapping {
     pub stack_slot_set: LinkedList<StackSlot>,
     //TODO:for float
     pub int_array_map: HashMap<String, IntArray>,
-    pub array_slot_map: HashMap<String, i32>,
+    pub array_slot_map: HashMap<ObjPtr<Inst>, i32>,
 }
 
 impl Mapping {
@@ -200,6 +201,12 @@ impl Mapping {
             int_array_map: HashMap::new(),
             array_slot_map: HashMap::new(),
         }
+    }
+}
+
+impl Hash for ObjPtr<Inst> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        std::ptr::hash(self.as_ref(), state);
     }
 }
 
