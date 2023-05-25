@@ -48,6 +48,7 @@ impl GenerateAsm for LIRInst {
                     SingleOp::FNeg => "fneg",
                     SingleOp::I2F => "fcvt.s.w",
                     SingleOp::F2I => "fcvt.w.s",
+                    SingleOp::LoadAddr => "la",
                 };
                 let dst = match self.get_dst() {
                     Operand::Reg(reg) => reg.to_string(),
@@ -56,7 +57,8 @@ impl GenerateAsm for LIRInst {
                 let src = match self.get_lhs() {
                     Operand::Reg(reg) => reg.to_string(),
                     Operand::IImm(iimm) => iimm.to_string(),
-                    _ => panic!("src of single op must be reg or imm, to improve"),
+                    Operand::Addr(addr) => addr.to_string(),
+                    _ => unreachable!("src of single op must be reg or imm, to improve"),
                 };
                 builder.op1(op, &dst, &src)?;
                 Ok(())
@@ -83,7 +85,7 @@ impl GenerateAsm for LIRInst {
                     _ => panic!("src of load must be reg, to improve"),
                 };
                 
-                builder.ld(&dst, &addr, offset.get_data(), false);
+                builder.l(&dst, &addr, offset.get_data(), false, self.is_double())?;
                 Ok(())
             },
             InstrsType::Store => {
@@ -101,7 +103,7 @@ impl GenerateAsm for LIRInst {
                     Operand::Reg(reg) => reg.to_string(),
                     _ => panic!("dst of store must be reg, to improve"),
                 };
-                builder.sd(&src, &addr, offset.get_data(), false);
+                builder.s(&src, &addr, offset.get_data(), false, self.is_double())?;
                 Ok(())
             },
 
@@ -115,14 +117,16 @@ impl GenerateAsm for LIRInst {
                     _ => panic!("src of store must be reg, to improve"),
                 };
                 let offset =  self.get_offset().get_data();
+                //FIXME: 判断寄存器中存的是否是地址，如果只是简单的数值，则可以使用sw替代
+                //FIXME: *4 or *8
                 match src.get_type() {
-                    ScalarType::Int => builder.sd(&src.to_string(), "sp", offset, false)?,
-                    ScalarType::Float => builder.sd(&src.to_string(), "sp", offset, true)?,
+                    ScalarType::Int => builder.s(&src.to_string(), "sp", offset, false, self.is_double())?,
+                    ScalarType::Float => builder.s(&src.to_string(), "sp", offset, true, self.is_double())?,
                     _ => panic!("illegal type"),
                 }
                 Ok(())
             },
-            InstrsType::LoadFromStack | InstrsType::LoadParamFromStack => {
+            InstrsType::LoadFromStack => {
                 let mut builder = AsmBuilder::new(f.clone());
                 if !operand::is_imm_12bs(self.get_offset().get_data()) {
                     panic!("illegal offset");
@@ -132,14 +136,53 @@ impl GenerateAsm for LIRInst {
                     _ => panic!("dst of load must be reg, to improve"),
                 };
                 // let inst_off = self.get_offset().
+                //FIXME: *4 or *8
                 let offset = self.get_offset().get_data();
                 match dst.get_type() {
-                    ScalarType::Int => builder.ld(&dst.to_string(), "sp", offset, false)?,
-                    ScalarType::Float => builder.ld(&dst.to_string(), "sp", offset, true)?,
+                    ScalarType::Int => builder.l(&dst.to_string(), "sp", offset, false, self.is_double())?,
+                    ScalarType::Float => builder.l(&dst.to_string(), "sp", offset, true, self.is_double())?,
                     _ => panic!("illegal type"),
                 }
                 Ok(())
             },
+            InstrsType::LoadParamFromStack => {
+                let mut builder = AsmBuilder::new(f.clone());
+
+                let true_offset = context.as_ref().get_offset() - self.get_offset().get_data();
+                if !operand::is_imm_12bs(true_offset) {
+                    panic!("illegal offset");
+                }
+                let dst = match self.get_dst() {
+                    Operand::Reg(reg) => reg,
+                    _ => panic!("dst of load must be reg, to improve"),
+                };
+                
+                match dst.get_type() {
+                    ScalarType::Int => builder.l(&dst.to_string(), "sp", true_offset, false, self.is_double())?,
+                    ScalarType::Float => builder.l(&dst.to_string(), "sp", true_offset, true, self.is_double())?,
+                    _ => unreachable!("illegal type"),
+                }
+                Ok(())
+            },
+
+            InstrsType::StoreParamToStack => {
+                let mut builder = AsmBuilder::new(f.clone());
+                let true_offset = context.as_ref().get_offset() - self.get_offset().get_data();
+                if !operand::is_imm_12bs(true_offset) {
+                    panic!("illegal offset");
+                }
+                let dst = match self.get_dst() {
+                    Operand::Reg(reg) => reg,
+                    _ => panic!("dst of load must be reg, to improve"),
+                };
+                
+                match dst.get_type() {
+                    ScalarType::Int => builder.s(&dst.to_string(), "sp", true_offset, false, self.is_double())?,
+                    ScalarType::Float => builder.s(&dst.to_string(), "sp", true_offset, true, self.is_double())?,
+                    _ => unreachable!("illegal type"),
+                }
+                Ok(())
+            }
             // 判断！是否需要多插入一条j，间接跳转到
             InstrsType::Branch(..) => {
                 //TODO:

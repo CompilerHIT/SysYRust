@@ -187,7 +187,8 @@ pub struct Mapping {
     pub block_ir_map: HashMap<ObjPtr<BB>, ObjPtr<BasicBlock>>,
     pub stack_slot_set: LinkedList<StackSlot>,
     //TODO:for float
-    pub int_array_map: HashMap<String, IntArray>
+    pub int_array_map: HashMap<String, IntArray>,
+    pub array_slot_map: HashMap<String, i32>,
 }
 
 impl Mapping {
@@ -197,6 +198,7 @@ impl Mapping {
             block_ir_map: HashMap::new(),
             stack_slot_set: LinkedList::new(),
             int_array_map: HashMap::new(),
+            array_slot_map: HashMap::new(),
         }
     }
 }

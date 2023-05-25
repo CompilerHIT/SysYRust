@@ -59,7 +59,7 @@ impl BB {
     /// 寄存器分配时决定开栈大小、栈对象属性(size(4/8 bytes), pos)，回填func的stack_addr
     /// 尽量保证程序顺序执行，并满足首次遇分支向后跳转的原则？
     //FIXME: b型指令长跳转(目标地址偏移量为+-4KiB)，若立即数非法是否需要增添一个jal块实现间接跳转？
-    pub fn construct(&mut self, func: &Func, block: ObjPtr<BasicBlock>, next_blocks: Option<ObjPtr<BB>>, map_info: &mut Mapping) {
+    pub fn construct(&mut self, block: ObjPtr<BasicBlock>, next_blocks: Option<ObjPtr<BB>>, map_info: &mut Mapping) {
         let mut ir_block_inst = block.as_ref().get_head_inst();
         loop {
             let inst_ref = ir_block_inst.as_ref();
@@ -347,30 +347,53 @@ impl BB {
                         ARRAY_NUM += 1;
                         //FIXME: 暂时认为数组未初始化
                         //将发生分配的数组装入map_info中：记录数组结构、占用栈空间
+                        //TODO:la dst label    sd dst (offset)sp
+                        //TODO: 大数组而装填因子过低的压缩问题
                         let size = inst_ref.get_array_length().as_ref().get_int_bond();
                         let alloca = IntArray::new(size, false, vec![]);
-                        map_info.int_array_map.insert(label.to_string(), alloca);
-                        let last = map_info.stack_slot_set.pop_back().unwrap();
+                        let last = map_info.stack_slot_set.pop_front().unwrap();
                         let pos = last.get_pos() + last.get_size();
-                        map_info.stack_slot_set.push_back(last);
-                        map_info.stack_slot_set.push_back(StackSlot::new(pos, size * 4))
+                        map_info.stack_slot_set.push_front(last);
+                        map_info.stack_slot_set.push_front(StackSlot::new(pos, (size * 4 / 8 + 1) * 8));
+
+                        let dst_reg = self.resolve_operand(ir_block_inst, true);
+                        let offset = pos;
+                        self.insts.push(self.insts_mpool.put(LIRInst::new(InstrsType::OpReg(SingleOp::LoadAddr), 
+                            vec![dst_reg.clone(), Operand::Addr(label.clone())])));
+                        
+                        let mut store = LIRInst::new(InstrsType::StoreParamToStack, 
+                            vec![dst_reg.clone(), Operand::IImm(IImm::new(offset))]);
+                        store.set_double();
+                        self.insts.push(self.insts_mpool.put(store));
+                        
+                        // array: offset~offset+size(8字节对齐)
+                        // map_key: array_name
+                        map_info.int_array_map.insert(label.clone(), alloca);
+                        map_info.array_slot_map.insert(label, offset);
                     }
                 }
                 InstKind::Gep => {
                     //TODO: 数组的优化使用
                     // type(4B) * index 
                     // 数组成员若是int型则不超过32位，使用word
-                    //lla dst1 label
-                    // offset = gep_offset / 2 * 2
-                    //ld dst2 4 * offset(dst1)
-                    //sw src 4 * (gep_offset%2)(dst2)
+                    // ld dst array_offset(sp)
+                    // lw dst 4 * gep_offset(dst)
                     //gep-get_ptr 取得数组首地址 - 需要知道数组名
                     let offset = inst_ref.get_gep_offset().as_ref().get_int_bond() * 4;
                     let dst_reg = self.resolve_operand(ir_block_inst, true);
-                    let src_reg = self.resolve_operand(inst_ref.get_ptr(), true);
-                    //TODO:判断地址合法
-                    self.insts.push(self.insts_mpool.put(LIRInst::new(InstrsType::Load, 
-                            vec![dst_reg, src_reg, Operand::IImm(IImm::new(offset))])));
+                    //FIXME: 
+                    // let array_name = inst_ref.get_ptr().get_array_name(); offset如[2][3]是否为6？
+                    // if let Some(head) = map_info.array_slot_map.get(&array_name){
+                        //TODO:判断地址合法
+                        // let mut load = LIRInst::new(InstrsType::LoadParamFromStack, 
+                        //     vec![dst_reg.clone(), Operand::IImm(IImm::new(offset))]);
+                        // load.set_double();
+                        // self.insts.push(self.insts_mpool.put(load));
+                        // self.insts.push(self.insts_mpool.put(LIRInst::new(InstrsType::Load, 
+                        //     vec![dst_reg, dst_reg, Operand::IImm(IImm::new(offset))])));
+                    // } else {
+                    //  panic!("array not found");
+                    // }
                 },
                 InstKind::Branch => {
                     
@@ -471,10 +494,10 @@ impl BB {
         let reg = Operand::Reg(Reg::init(ScalarType::Int));
         let iimm = Operand::IImm(IImm::new(imm));
         if operand::is_imm_12bs(imm) {
-            self.insts.push(self.insts_mpool.put(LIRInst::new(InstrsType::OpReg(SingleOp::Li), vec![reg, iimm])));
+            self.insts.push(self.insts_mpool.put(LIRInst::new(InstrsType::OpReg(SingleOp::Li), vec![reg.clone(), iimm.clone()])));
         } else {
-            self.insts.push(self.insts_mpool.put(LIRInst::new(InstrsType::OpReg(SingleOp::Lui), vec![reg, iimm])));
-            self.insts.push(self.insts_mpool.put(LIRInst::new(InstrsType::Binary(BinaryOp::Add), vec![reg, reg, iimm])));
+            self.insts.push(self.insts_mpool.put(LIRInst::new(InstrsType::OpReg(SingleOp::Lui), vec![reg.clone(), iimm.clone()])));
+            self.insts.push(self.insts_mpool.put(LIRInst::new(InstrsType::Binary(BinaryOp::Add), vec![reg.clone(), reg.clone(), iimm.clone()])));
         }
         reg
     }

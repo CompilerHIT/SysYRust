@@ -10,13 +10,12 @@ pub use crate::utility::{ScalarType, ObjPtr};
 pub use crate::backend::asm_builder::AsmBuilder;
 use crate::backend::operand::*;
 
-use super::structs::StackSlot;
-
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub enum Operand {
     IImm(IImm),
     FImm(FImm),
     Reg(Reg),
+    Addr(String)
 }
 
 //TODO:浮点数运算
@@ -53,6 +52,7 @@ pub enum SingleOp {
     FNeg,
     I2F,
     F2I,
+    LoadAddr,
     // F2D,
     // D2F,
 }
@@ -83,6 +83,7 @@ pub enum InstrsType {
     StoreToStack,
     // src: stackslot, dst: reg, offset: iimm
     LoadParamFromStack,
+    StoreParamToStack,
     // dst: reg, src: iimm(reg)
     Load,
     // dst: iimm(reg), src: reg
@@ -107,12 +108,13 @@ pub struct LIRInst {
     // call指令的跳转到函数
     func: Option<ObjPtr<Func>>,
     func_name: String,
+    double: bool,
 }
 
 impl LIRInst {
     // 通用
     pub fn new(inst_type: InstrsType, operands: Vec<Operand>) -> Self {
-        Self { inst_type, operands, param_cnt: (0, 0), block: None, func: None, func_name: String::new() }
+        Self { inst_type, operands, param_cnt: (0, 0), block: None, func: None, func_name: String::new(), double: false }
     }
     pub fn get_type(&self) -> InstrsType {
         self.inst_type
@@ -151,6 +153,7 @@ impl LIRInst {
         }
     }
 
+    // mapping virtual reg_id to physic reg_id
     pub fn v_to_phy(&mut self, regs: Vec<Reg>, map: HashMap<i32, i32>) {
         for operand in &self.operands {
             match operand {
@@ -194,7 +197,7 @@ impl LIRInst {
                 }
                 set
             }
-            InstrsType::StoreToStack | InstrsType::Jump | InstrsType::Branch(..) => vec![],
+            InstrsType::StoreToStack | InstrsType::StoreParamToStack | InstrsType::Jump | InstrsType::Branch(..) => vec![],
 
             InstrsType::Ret(re_type) => {
                 match re_type {
@@ -209,7 +212,7 @@ impl LIRInst {
         match self.inst_type {
             InstrsType::Binary(..) | InstrsType::OpReg(..) | InstrsType::Load |
             InstrsType::Store | InstrsType::LoadFromStack | InstrsType::StoreToStack | InstrsType::Branch(..) |
-            InstrsType::Jump | InstrsType::LoadParamFromStack => {
+            InstrsType::Jump | InstrsType::LoadParamFromStack | InstrsType::StoreParamToStack => {
                 let mut regs = self.operands.clone();
                 let mut res = Vec::new();
                 while let Some(operand) = regs.pop() {
@@ -263,7 +266,7 @@ impl LIRInst {
     pub fn get_func(&self) -> ObjPtr<Func> {
         match self.func {
             Some(func) => func,
-            None => panic!("call instr must have func"),
+            None => unreachable!("call instr must have func"),
         }
     }
 
@@ -275,14 +278,14 @@ impl LIRInst {
     //     }
     // }
 
-    // LoadFromStack, StoreToStack, Load, Store:
+    // Load, Store:
     pub fn set_offset(&mut self, offset: IImm) {
         self.operands[2] = Operand::IImm(offset);
     }
     pub fn get_offset(&self) -> IImm {
         match self.operands[2] {
             Operand::IImm(offset) => offset,
-            _ => panic!("only support imm sp offset"),
+            _ => unreachable!("only support imm sp offset"),
         }
     }
     
@@ -293,6 +296,35 @@ impl LIRInst {
     pub fn get_block(&self) -> Option<ObjPtr<BB>> {
         self.block
     }
+
+    // LoadFromStack, StoreToStack
+    pub fn set_stack_offset(&mut self, offset: IImm) {
+        self.operands[1] = Operand::IImm(offset);
+    }
+    pub fn get_stack_offset(&self) -> IImm {
+        match self.operands[1] {
+            Operand::IImm(offset) => offset,
+            _ => unreachable!("only support imm sp offset"),
+        }
+    }
+
+    pub fn set_double(&mut self) {
+        self.double = true;
+    }
+    pub fn is_double(&self) -> bool {
+        self.double
+    }
+
+    // LoadParamFromStack(include alloca):
+    // pub fn set_true_offset(&mut self, offset: i32) {
+    //     self.operands[1] = Operand::IImm(IImm::new(offset));
+    // }
+    // pub fn get_true_offset(&self) -> IImm {
+    //     match self.operands[1].clone() {
+    //         Operand::IImm(iimm) => iimm,
+    //         _ => unreachable!("only support imm sp offset"),
+    //     }
+    // }
 
     // TODO: maybe todo
     // for reg alloc

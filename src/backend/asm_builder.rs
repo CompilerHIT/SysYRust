@@ -125,21 +125,36 @@ impl AsmBuilder {
     //     }
     // }
 
-    pub fn sd(&mut self, src: &str, addr: &str, offset: i32, is_float: bool) -> Result<()> {
-        if is_float {
-            write(&self.f, format!("  fsd {src}, {offset}({addr})\n"))
+    pub fn s(&mut self, src: &str, addr: &str, offset: i32, is_float: bool, is_double: bool) -> Result<()> {
+        if !is_double {
+            if is_float {
+                write(&self.f, format!("	fsw {src}, {offset}({addr})\n"))
+            } else {
+                write(&self.f, format!("	sw {src}, {offset}({addr})\n"))
+            }
         } else {
-            write(&self.f, format!("  sd {src}, {offset}({addr})\n"))
+            if is_float {
+                write(&self.f, format!("	fsw {src}, {offset}({addr})\n"))
+            } else {
+                write(&self.f, format!("	sw {src}, {offset}({addr})\n"))
+            }
         }
     }
 
-    pub fn ld(&mut self, dest: &str, addr: &str, offset: i32, is_float: bool) -> Result<()> {
-        if is_float {
-            write(&self.f, format!("  fld {dest}, {offset}({addr})\n"))
+    pub fn l(&mut self, dest: &str, addr: &str, offset: i32, is_float: bool, is_double: bool) -> Result<()> {
+        if !is_double {
+            if is_float {
+                write(&self.f, format!("	flw {dest}, {offset}({addr})\n"))
+            } else {
+                write(&self.f, format!("	lw {dest}, {offset}({addr})\n"))
+            }
         } else {
-            write(&self.f, format!("  ld {dest}, {offset}({addr})\n"))
+            if is_float {
+                write(&self.f, format!("	fld {dest}, {offset}({addr})\n"))
+            } else {
+                write(&self.f, format!("	ld {dest}, {offset}({addr})\n"))
+            }
         }
-        
     }
 
     pub fn j(&mut self, label: &str) -> Result<()> {
@@ -147,7 +162,7 @@ impl AsmBuilder {
     }
 
     pub fn call(&mut self, func: &str) -> Result<()> {
-        write(&self.f, format!("  call {func}\n"))
+        write(&self.f, format!("	call {func}\n"))
     }
 
     pub fn show_func(&mut self, label: &str) -> Result<()> {
@@ -155,8 +170,8 @@ impl AsmBuilder {
     }
 
     pub fn load_global(&mut self, tmp_reg: &str, target_reg: &str, global_label: &str, block_label: &str) -> Result<()> {
-        write(&self.f, format!("        auipc   {tmp_reg}, %pcrel_hi({global_label})\n"))?;
-        write(&self.f, format!("        addi    {target_reg}, {tmp_reg}, %pcrel_lo{block_label}\n"))
+        write(&self.f, format!("	auipc   {tmp_reg}, %pcrel_hi({global_label})\n"))?;
+        write(&self.f, format!("	addi    {target_reg}, {tmp_reg}, %pcrel_lo{block_label}\n"))
     }
     //TODO: for function
     // pub fn prologue(&mut self, func_name: &str, info: &FunctionInfo) -> Result<()> {

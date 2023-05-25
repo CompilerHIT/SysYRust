@@ -32,7 +32,7 @@ pub struct Func {
     reg_num: i32,
     fregs: HashSet<Reg>,
 
-    context: Option<ObjPtr<Context>>,
+    pub context: Option<ObjPtr<Context>>,
 
     blocks_mpool: ObjPool<BB>,
 }
@@ -117,9 +117,9 @@ impl Func {
                 let basicblock = info.block_ir_map.get(block).unwrap();
                 if i + 1 < self.blocks.len() {
                     let next_block = Some(self.blocks[i + 1]);
-                    block.as_mut().construct(&self,*basicblock, next_block, &mut info);
+                    block.as_mut().construct(*basicblock, next_block, &mut info);
                 } else {
-                    block.as_mut().construct(&self,*basicblock, None, &mut info);
+                    block.as_mut().construct(*basicblock, None, &mut info);
                 }
                 i += 1;
             }
@@ -227,7 +227,7 @@ impl Func {
                 builder.addi("sp", "sp", -offset);
                 for src in reg_int_res.iter() {
                     offset -= 8;
-                    builder.sd(&src.to_string(), "sp", offset, false);
+                    builder.s(&src.to_string(), "sp", offset, false, false);
                 }
             });
             let mut offset = stack_size;
@@ -235,7 +235,7 @@ impl Func {
                 let mut builder = AsmBuilder::new(f1.clone());
                 for src in reg_int_res_cl.iter() {
                     offset -= 8;
-                    builder.ld("sp", &src.to_string(), offset, false);
+                    builder.l("sp", &src.to_string(), offset, false, false);
                 }
                 builder.addi("sp", "sp", stack_size);
             });
