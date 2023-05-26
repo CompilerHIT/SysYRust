@@ -21,6 +21,7 @@ pub struct Inst {
     user: User,
     list: IList<Inst>,
     kind: InstKind,
+    init: (Vec<i32>, Vec<f32>),
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -94,6 +95,7 @@ impl Inst {
                 next: None,
             },
             kind,
+            init: (vec![], vec![]),
         }
     }
 
