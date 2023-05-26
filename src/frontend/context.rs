@@ -7,21 +7,23 @@ use crate::{
 
 use super::irgen::InfuncChoice;
 
-pub struct Context {
-    var_map: HashMap<String, Vec<(String, i64)>>,
-    symbol_table: HashMap<String, Symbol>,
-    bb_map: HashMap<String, HashMap<String, ObjPtr<Inst>>>,
-    bb_now_mut: InfuncChoice,
-    module_mut: &'static mut Module,
+pub struct Context<'a> {
+    pub var_map: HashMap<String, Vec<(String, i64)>>,
+    pub symbol_table: HashMap<String, Symbol>,
+    pub bb_map: HashMap<String, HashMap<String, ObjPtr<Inst>>>,
+    pub bb_now_mut: InfuncChoice,
+    module_mut: &'a mut Module,
     index: i64,
     layer: i64,
 }
 
+#[derive(Debug, Clone, Copy)]
 pub enum Type {
     Int,
     Float,
 }
 
+#[derive(Clone)]
 pub struct Symbol {
     tp: Type,
     is_array: bool,
@@ -29,11 +31,11 @@ pub struct Symbol {
     dimension: Vec<i64>,
 }
 
-impl Context {
+impl Context<'_> {
     /* -------------------------------------------------------------------------- */
     /*                               constructor                                  */
     /* -------------------------------------------------------------------------- */
-    pub fn make_context(module_mut: &'static mut Module) -> Context {
+    pub fn make_context(module_mut: &mut Module) -> Context {
         Context {
             var_map: HashMap::new(),
             bb_map: HashMap::new(),
@@ -49,29 +51,46 @@ impl Context {
     /*                               for bb_now_mut                               */
     /* -------------------------------------------------------------------------- */
     pub fn push_inst_bb(&mut self, inst_ptr: ObjPtr<Inst>) {
-        match &mut self.bb_now_mut {
-            InfuncChoice::InFunc(bb) => bb.push_back(inst_ptr),
+        match self.bb_now_mut {
+            InfuncChoice::InFunc(bbptr) => {
+                let bb = bbptr.as_mut();
+                bb.push_back(inst_ptr)
+            }
             InfuncChoice::NInFunc() => {}
         }
     }
 
     pub fn push_var_bb(&mut self, name: String, inst_ptr: ObjPtr<Inst>) {
-        match &mut self.bb_now_mut {
+        match self.bb_now_mut {
             // InfuncChoice::InFunc(bb) => *bb.push_back(inst_ptr),
-            InfuncChoice::InFunc(bb) => bb.push_back(inst_ptr),
+            InfuncChoice::InFunc(bbptr) => {
+                let bb = bbptr.as_mut();
+                bb.push_back(inst_ptr)
+            }
             InfuncChoice::NInFunc() => self.module_mut.push_var(name, inst_ptr),
         }
     }
 
-    pub fn push_phi(&mut self, name: String, inst_ptr: ObjPtr<Inst>) {
-        match &mut self.bb_now_mut {
-            InfuncChoice::InFunc(bb) => bb.push_front(inst_ptr),
-            InfuncChoice::NInFunc() => self.module_mut.push_var(name, inst_ptr),
-        }
-    }
-
-    pub fn bb_now_set(&mut self, bb: &'static mut BasicBlock) {
+    pub fn bb_now_set(&mut self, bb: ObjPtr<BasicBlock>) {
         self.bb_now_mut = InfuncChoice::InFunc(bb);
+    }
+
+    // pub fn get_bb_now_ref(&mut self) ->&'static BasicBlock{
+    //     match & self.bb_now_mut{
+    //         InfuncChoice::InFunc(&bb){
+
+    //         }
+    //     }
+    // }
+
+    pub fn get_bb_now_name(&mut self) -> String {
+        match self.bb_now_mut {
+            InfuncChoice::InFunc(bbptr) => {
+                let bb = bbptr.as_mut();
+                bb.get_name().to_string()
+            }
+            InfuncChoice::NInFunc() => "global".to_string(),
+        }
     }
 
     /* -------------------------------------------------------------------------- */
@@ -99,7 +118,7 @@ impl Context {
     //     }
     // }
 
-    pub fn get_var_bbname(&self, s: &str, bbname: &str) -> Option<(ObjPtr<Inst>, &Symbol)> {
+    pub fn get_var_bbname(&self, s: &str, bbname: &str) -> Option<(ObjPtr<Inst>, Symbol)> {
         if let Some(vec_temp) = self.var_map.get(s.clone()) {
             if let Some((last_element0, _last_element1)) = vec_temp.last() {
                 let name = last_element0.clone();
@@ -117,10 +136,15 @@ impl Context {
         Option::None
     }
 
-    pub fn update_var_scope(&mut self, s: &str, inst: ObjPtr<Inst>) -> bool {
-        let bbname;
-        match &mut self.bb_now_mut {
-            InfuncChoice::InFunc(bbn) => {
+    pub fn update_var_scope_now(&mut self, s: &str, inst: ObjPtr<Inst>) -> bool {
+        self.update_var_scope(s, inst, self.bb_now_mut)
+    }
+
+    pub fn update_var_scope(&mut self, s: &str, inst: ObjPtr<Inst>, bb: InfuncChoice) -> bool {
+        let mut bbname = " ";
+        match bb {
+            InfuncChoice::InFunc(bbptr) => {
+                let bbn = bbptr.as_mut();
                 bbname = bbn.get_name();
             }
             InfuncChoice::NInFunc() => {
@@ -151,7 +175,8 @@ impl Context {
         let mut v = vec![];
         let temps = self.add_prefix(s.clone());
         match &mut self.bb_now_mut {
-            InfuncChoice::InFunc(bb) => {
+            InfuncChoice::InFunc(bbptr) => {
+                let bb = bbptr.as_mut();
                 bb.push_back(inst);
             }
             InfuncChoice::NInFunc() => {
@@ -170,7 +195,7 @@ impl Context {
                 dimension: vec![],
             },
         );
-        self.update_var_scope(&s, inst);
+        self.update_var_scope_now(&s, inst);
         self.get_const_int(i)
     }
 
@@ -195,7 +220,7 @@ impl Context {
                 dimension: vec![],
             },
         );
-        self.update_var_scope(&s, inst);
+        self.update_var_scope_now(&s, inst);
         self.get_const_float(f)
     }
 

@@ -1,6 +1,8 @@
 use lalrpop_util::lalrpop_mod;
 use std::collections::HashMap;
-use sysylib;
+use sysylib::frontend::irgen::irgen;
+use sysylib::ir::instruction::Inst;
+use sysylib::{self, ir::module::Module, utility::ObjPool};
 lalrpop_mod! {
   #[allow(clippy::all)]
   SysYRust
@@ -41,6 +43,23 @@ fn run_main() {
 #[test]
 fn test() {
     let file = std::fs::read_to_string("src/input.txt").unwrap();
-    let mut compunit = SysYRust::CompUnitParser::new().parse(file.as_str());
+    let mut pool_module = ObjPool::new();
+    let module_mut = pool_module.put(Module::new()).as_mut();
+    let mut pool_inst: ObjPool<Inst> = ObjPool::new();
+    let mut pool_inst_mut = &mut pool_inst;
+    let mut compunit = SysYRust::CompUnitParser::new()
+        .parse(file.as_str())
+        .unwrap();
+    let mut pool_bb = ObjPool::new();
+    let mut pool_bb_mut = &mut pool_bb;
+    let mut pool_func = ObjPool::new();
+    let mut pool_func_mut = &mut pool_func;
+    irgen(
+        &mut compunit,
+        module_mut,
+        pool_inst_mut,
+        pool_bb_mut,
+        pool_func_mut,
+    );
     println!("{:#?}", compunit);
 }

@@ -1,9 +1,5 @@
-int a;
-    int main(int num1,int num2){
-        int a;
-        int b[3];
-        int c[3];
-        int d,e,f;
+
+    int main(){
+        return 3;
     
     }
-    int add(int num3,int num4){}
