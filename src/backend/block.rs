@@ -366,12 +366,13 @@ impl BB {
                     unsafe {
                         let label = format!(".LC{ARRAY_NUM}");
                         ARRAY_NUM += 1;
-                        //FIXME: 暂时认为数组未初始化
                         //将发生分配的数组装入map_info中：记录数组结构、占用栈空间
                         //TODO:la dst label    sd dst (offset)sp
                         //TODO: 大数组而装填因子过低的压缩问题
+                        //FIXME: 未考虑数组全零数组，仅考虑int数组
                         let size = inst_ref.get_array_length().as_ref().get_int_bond();
-                        let alloca = IntArray::new(size, false, vec![]);
+                        let alloca = IntArray::new(label.clone(), size, true,
+                                                             inst_ref.get_int_init().clone());
                         let last = map_info.stack_slot_set.front().unwrap();
                         let pos = last.get_pos() + last.get_size();
                         map_info.stack_slot_set.push_front(StackSlot::new(pos, (size * 4 / 8 + 1) * 8));
@@ -388,7 +389,7 @@ impl BB {
                         
                         // array: offset~offset+size(8字节对齐)
                         // map_key: array_name
-                        map_info.int_array_map.insert(label.clone(), alloca);
+                        map_info.int_array_map.insert(alloca);
                         map_info.array_slot_map.insert(ir_block_inst, offset);
                     }
                 }
@@ -714,7 +715,6 @@ fn is_opt_mul(imm: i32) -> bool {
     false
 }
 
-//FIXME: ConstInt instance of i32 not i64?
 fn is_opt_num(imm: i32) -> bool {
     (imm & (imm - 1)) == 0
 }
