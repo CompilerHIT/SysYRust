@@ -3,6 +3,7 @@ pub use std::fs::File;
 pub use std::hash::{Hash, Hasher};
 pub use std::io::Result;
 pub use std::fs::write;
+use std::cmp::max;
 
 use crate::utility::{ScalarType, ObjPool, ObjPtr};
 use crate::ir::basicblock::BasicBlock;
@@ -14,6 +15,7 @@ use crate::backend::instrs::Operand;
 
 use crate::backend::func::Func;
 use crate::backend::operand;
+use super::operand::{REG_COUNT, ARG_REG_COUNT};
 use super::{structs::*, FILE_PATH};
 
 pub static mut ARRAY_NUM: i32 = 0;
@@ -370,9 +372,8 @@ impl BB {
                         //TODO: 大数组而装填因子过低的压缩问题
                         let size = inst_ref.get_array_length().as_ref().get_int_bond();
                         let alloca = IntArray::new(size, false, vec![]);
-                        let last = map_info.stack_slot_set.pop_front().unwrap();
+                        let last = map_info.stack_slot_set.front().unwrap();
                         let pos = last.get_pos() + last.get_size();
-                        map_info.stack_slot_set.push_front(last);
                         map_info.stack_slot_set.push_front(StackSlot::new(pos, (size * 4 / 8 + 1) * 8));
 
                         let dst_reg = self.resolve_operand(ir_block_inst, true);
@@ -449,45 +450,19 @@ impl BB {
                         InstKind::Binary(cond) => {
                             let lhs_reg = self.resolve_operand(cond_ref.get_lhs(), true);
                             let rhs_reg = self.resolve_operand(cond_ref.get_rhs(), true);
-                            match cond {
-                                BinOp::Eq => {
-                                    self.insts.push(self.insts_mpool.put(
-                                        LIRInst::new(InstrsType::Branch(CmpOp::Eq),
-                                            vec![Operand::Addr(true_bb.as_ref().get_name().to_string()), lhs_reg, rhs_reg])
-                                    ));
-                                },
-                                BinOp::Ne => {
-                                    self.insts.push(self.insts_mpool.put(
-                                        LIRInst::new(InstrsType::Branch(CmpOp::Ne),
-                                            vec![Operand::Addr(true_bb.as_ref().get_name().to_string()), lhs_reg, rhs_reg])
-                                    ));
-                                },
-                                BinOp::Ge => {
-                                    self.insts.push(self.insts_mpool.put(
-                                        LIRInst::new(InstrsType::Branch(CmpOp::Ge),
-                                            vec![Operand::Addr(true_bb.as_ref().get_name().to_string()), lhs_reg, rhs_reg])
-                                    ));
-                                },
-                                BinOp::Le => {
-                                    self.insts.push(self.insts_mpool.put(
-                                        LIRInst::new(InstrsType::Branch(CmpOp::Le),
-                                            vec![Operand::Addr(true_bb.as_ref().get_name().to_string()), lhs_reg, rhs_reg])
-                                    ));
-                                },
-                                BinOp::Gt => {
-                                    self.insts.push(self.insts_mpool.put(
-                                        LIRInst::new(InstrsType::Branch(CmpOp::Gt),
-                                            vec![Operand::Addr(true_bb.as_ref().get_name().to_string()), lhs_reg, rhs_reg])
-                                    ));
-                                },
-                                BinOp::Lt => {
-                                    self.insts.push(self.insts_mpool.put(
-                                        LIRInst::new(InstrsType::Branch(CmpOp::Lt),
-                                            vec![Operand::Addr(true_bb.as_ref().get_name().to_string()), lhs_reg, rhs_reg])
-                                    ));
-                                },
+                            let inst_kind = match cond {
+                                BinOp::Eq => InstrsType::Branch(CmpOp::Eq),
+                                BinOp::Ne => InstrsType::Branch(CmpOp::Ne),
+                                BinOp::Ge => InstrsType::Branch(CmpOp::Ge),
+                                BinOp::Le => InstrsType::Branch(CmpOp::Le),
+                                BinOp::Gt => InstrsType::Branch(CmpOp::Gt),
+                                BinOp::Lt => InstrsType::Branch(CmpOp::Lt),
                                 _ => { unreachable!("no condition match") }
-                            }
+                            };
+                            self.insts.push(self.insts_mpool.put(
+                                LIRInst::new(inst_kind, 
+                                    vec![Operand::Addr(false_bb.as_ref().get_name().to_string()), lhs_reg, rhs_reg])
+                            ));
                             self.insts.push(self.insts_mpool.put(
                                 LIRInst::new(InstrsType::Jump, 
                                     vec![Operand::Addr(false_bb.as_ref().get_name().to_string())])
@@ -500,7 +475,85 @@ impl BB {
                     }
                 },
                 InstKind::Call(func_label) => {
+                    let arg_list = inst_ref.get_args();
+                    let mut icnt = 0;
+                    let mut fcnt = 0;
+                    for arg in arg_list {
+                        assert!(arg.as_ref().get_ir_type() == IrType::Parameter);
+                        if arg.as_ref().get_param_type() == IrType::Int {
+                            icnt += 1
+                        } else if arg.as_ref().get_param_type() == IrType::Float {
+                            fcnt += 1
+                        } else {
+                            unreachable!("call arg type not match, either be int or float")
+                        }
+                    }
 
+                    let mut lir_inst = LIRInst::new(InstrsType::Call,
+                        vec![Operand::Addr(func_label.to_string())]);
+                    lir_inst.set_param_cnts(icnt, fcnt);
+                    self.insts.push(self.insts_mpool.put(lir_inst));
+
+                    // set stack slot
+                    let mut pos = 0;
+                    let mut size = 0;
+                    if let Some(last_slot) = map_info.stack_slot_set.back() {
+                        pos = last_slot.get_pos() + last_slot.get_size();
+                        size = max(0, icnt - ARG_REG_COUNT) + max(0, fcnt - ARG_REG_COUNT);
+                        //FIXME: 是否需要对齐
+                        if size % 2 == 1 {
+                            size += 1;
+                        }
+                        size *= 4;
+                        map_info.stack_slot_set.push_back(StackSlot::new(pos, size));
+                    } else {
+                        unreachable!("stack slot set is empty");
+                    }
+                    
+                    for arg in arg_list.iter().rev() {
+                        match arg.as_ref().get_param_type() {
+                            IrType::Int => {
+                                icnt -= 1;
+                                if icnt >= ARG_REG_COUNT {
+                                    let src_reg = self.resolve_operand(*arg, true);
+                                    // 这里用于存到栈上的参数是从后往前的
+                                    let offset = Operand::IImm(IImm::new(pos + size - icnt * 4));
+                                    self.insts.push(self.insts_mpool.put(
+                                        LIRInst::new(InstrsType::StoreParamToStack,
+                                            vec![src_reg, offset])
+                                    ));
+                                } else {
+                                    // 保存在寄存器中的参数，从前往后
+                                    let src_reg = self.resolve_operand(*arg, true);
+                                    let dst_reg = Operand::Reg(Reg::new(icnt, ScalarType::Int));
+                                    self.insts.push(self.insts_mpool.put(
+                                        LIRInst::new(InstrsType::OpReg(SingleOp::IMv), 
+                                            vec![dst_reg, src_reg])
+                                    ));
+                                }
+                            },
+                            IrType::Float => {
+                                fcnt -= 1;
+                                if fcnt >= ARG_REG_COUNT {
+                                    let src_reg = self.resolve_operand(*arg, true);
+                                    // 这里用于存到栈上的参数是从后往前的
+                                    let offset = Operand::IImm(IImm::new(pos + size - fcnt * 4));
+                                    self.insts.push(self.insts_mpool.put(
+                                        LIRInst::new(InstrsType::StoreParamToStack,
+                                            vec![src_reg, offset])
+                                    ));
+                                } else {
+                                    let src_reg = self.resolve_operand(*arg, true);
+                                    let dst_reg = Operand::Reg(Reg::new(fcnt, ScalarType::Int));
+                                    self.insts.push(self.insts_mpool.put(
+                                        LIRInst::new(InstrsType::OpReg(SingleOp::IMv), 
+                                            vec![dst_reg, src_reg])
+                                    ));
+                                }
+                            },
+                            _ => unreachable!("call arg type not match, either be int or float")
+                        }
+                    }
                 },
                 InstKind::Return => {
                     match inst_ref.get_ir_type() {

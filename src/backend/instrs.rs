@@ -251,20 +251,9 @@ impl LIRInst {
     pub fn set_param_cnts(&mut self, int_cnt: i32, float_cnt: i32) {
         self.param_cnt = (int_cnt, float_cnt);
     }
-    pub fn set_func(&mut self, func: ObjPtr<Func>, func_name: String) {
-        self.func = Some(func);
-        self.func_name = func_name;
-    }
 
     pub fn get_param_cnts(&self) -> (i32, i32) {
         self.param_cnt
-    }
-
-    pub fn get_func(&self) -> ObjPtr<Func> {
-        match self.func {
-            Some(func) => func,
-            None => unreachable!("call instr must have func"),
-        }
     }
 
     // // ChangeSp:
