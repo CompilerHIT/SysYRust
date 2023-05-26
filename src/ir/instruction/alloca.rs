@@ -19,6 +19,7 @@ impl ObjPool<Inst> {
             InstKind::Alloca,
             vec![length],
         ));
+        inst.as_mut().set_int_init(init);
 
         // 设置use list
         length.as_mut().add_user(inst.as_ref());
@@ -31,7 +32,7 @@ impl ObjPool<Inst> {
     /// * 'length' - 要申请的数组的长度
     /// # Returns
     /// 构造好的数组指令，其值为Floatptr
-    pub fn make_float_array(&mut self, length: ObjPtr<Inst>) -> ObjPtr<Inst> {
+    pub fn make_float_array(&mut self, length: ObjPtr<Inst>, init: Vec<f32>) -> ObjPtr<Inst> {
         // 正确性检查
         // 数组长度必须为整数
         let ir_type = length.as_ref().get_ir_type();
@@ -42,6 +43,7 @@ impl ObjPool<Inst> {
             InstKind::Alloca,
             vec![length],
         ));
+        inst.as_mut().set_float_init(init);
 
         // 设置use list
         length.as_mut().add_user(inst.as_ref());
