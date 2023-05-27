@@ -1,7 +1,7 @@
 use super::{instruction::Inst, ir_type::IrType, value::Value};
 use crate::utility::{ObjPool, ObjPtr};
 pub struct BasicBlock {
-    name: &'static str,
+    name: String,
     value: Value,
     inst_head: Inst,
     up_bb: Vec<ObjPtr<BasicBlock>>,
@@ -10,7 +10,7 @@ pub struct BasicBlock {
 
 impl ObjPool<BasicBlock> {
     /// 创建一个新的BasicBlock
-    pub fn new_basic_block(&mut self, name: &'static str) -> ObjPtr<BasicBlock> {
+    pub fn new_basic_block(&mut self, name: String) -> ObjPtr<BasicBlock> {
         let bb = BasicBlock::new(name);
         let bb = self.put(bb);
 
@@ -22,7 +22,7 @@ impl ObjPool<BasicBlock> {
 
 impl BasicBlock {
     /// 构造一个空的BasicBlock
-    pub fn new(name: &'static str) -> BasicBlock {
+    pub fn new(name: String) -> BasicBlock {
         BasicBlock {
             name,
             value: Value::new(IrType::BBlock),
@@ -34,7 +34,7 @@ impl BasicBlock {
 
     /// 获取BasicBlock的名字
     pub fn get_name(&self) -> &str {
-        self.name
+        self.name.as_str()
     }
 
     /// 检查是否为空的BasicBlock
