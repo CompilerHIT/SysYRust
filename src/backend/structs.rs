@@ -8,7 +8,7 @@ pub use std::fs::write;
 
 use crate::utility::ObjPtr;
 use crate::backend::operand::{IImm, FImm};
-use crate::backend::instrs::LIRInst;
+use crate::backend::instrs::{LIRInst, Operand};
 use crate::backend::block::BB;
 use crate::ir::basicblock::BasicBlock;
 use crate::ir::instruction::Inst;
@@ -191,6 +191,11 @@ pub struct Mapping {
     //TODO:for float
     pub int_array_map: HashSet<IntArray>,
     pub array_slot_map: HashMap<ObjPtr<Inst>, i32>,
+
+    pub val_map: HashMap<ObjPtr<Inst>, Operand>,
+
+    pub func_imm_map: HashMap<Operand, ObjPtr<LIRInst>>
+    // pub func_
 }
 
 impl Mapping {
@@ -201,9 +206,12 @@ impl Mapping {
             stack_slot_set: LinkedList::new(),
             int_array_map: HashSet::new(),
             array_slot_map: HashMap::new(),
+            val_map: HashMap::new(),
+            func_imm_map: HashMap::new(),
         }
     }
 }
+
 
 impl Hash for ObjPtr<Inst> {
     fn hash<H: Hasher>(&self, state: &mut H) {

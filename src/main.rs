@@ -2,7 +2,8 @@ use lalrpop_util::lalrpop_mod;
 use std::collections::HashMap;
 use sysylib::frontend::irgen::irgen;
 use sysylib::ir::instruction::Inst;
-use sysylib::{self, ir::module::Module, utility::ObjPool};
+use sysylib::backend::module::AsmModule;
+use sysylib::{self, ir::module::Module, utility::ObjPool, backend::generate_asm};
 lalrpop_mod! {
   #[allow(clippy::all)]
   SysYRust
@@ -57,4 +58,5 @@ fn run_main() {
         pool_func_mut,
     );
     // TODO 后端解析
+    generate_asm(output, &mut AsmModule::new(module_mut));
 }
