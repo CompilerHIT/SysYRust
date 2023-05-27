@@ -38,20 +38,19 @@ fn run_main() {
     let file = std::fs::read_to_string(filename).unwrap();
 
     // TODO 生成IR
-    let mut compunit = SysYRust::CompUnitParser::new().parse(file.as_str());
-    let file = std::fs::read_to_string("src/input.txt").unwrap();
+    let file = std::fs::read_to_string(filename).unwrap();
     let mut pool_module = ObjPool::new();
     let module_ptr = pool_module.put(Module::new()); //module的指针
     let module_mut = module_ptr.as_mut();
     let mut pool_inst: ObjPool<Inst> = ObjPool::new();
-    let mut pool_inst_mut = &mut pool_inst;
+    let pool_inst_mut = &mut pool_inst;
     let mut compunit = SysYRust::CompUnitParser::new()
         .parse(file.as_str())
         .unwrap();
     let mut pool_bb = ObjPool::new();
-    let mut pool_bb_mut = &mut pool_bb;
+    let pool_bb_mut = &mut pool_bb;
     let mut pool_func = ObjPool::new();
-    let mut pool_func_mut = &mut pool_func;
+    let pool_func_mut = &mut pool_func;
     irgen(
         &mut compunit,
         module_mut,
