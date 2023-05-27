@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Result;
-use std::fs::write;
 use std::hash::{Hash, Hasher};
 
 use crate::frontend::context::Context;

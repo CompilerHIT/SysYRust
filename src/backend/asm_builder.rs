@@ -15,52 +15,50 @@
 // FIXME: 是否使用addiw而非addi
 // use super::func::FunctionInfo;
 use std::io::Result;
-use std::fs::write;
+use std::io::prelude::*;
+use std::fs::File;
+use std::fs::OpenOptions;
 
 /// Assembly builder.
 pub struct AsmBuilder {
-    f: String,
+    f: File,
 }
 
 impl AsmBuilder {
     /// Creates a new assembly builder.
     pub fn new(f:  String) -> Self {
-        Self { f }
+        Self { f: OpenOptions::new().append(true).open(f).expect("Unable to open file") }
     }
 
     pub fn ret(&mut self) -> Result<()> {
-        write(&self.f, "  ret\n")
+        writeln!(&self.f, "    ret")
     }
 
     
 
     pub fn op2(&mut self, op: &str, dest: &str, lhs: &str, rhs: &str, is_imm: bool) -> Result<()> {
         if is_imm {
-            write(&self.f, format!("  {op}i {dest}, {lhs}, {rhs}\n"))
+            writeln!(&self.f, "  {op}i {dest}, {lhs}, {rhs}")
         } else {
-            write(&self.f, format!("  {op} {dest}, {lhs}, {rhs}\n"))
+            writeln!(&self.f, "  {op} {dest}, {lhs}, {rhs}")
         }
     }
 
-    pub fn op1(&mut self, op: &str, dest: &str, src: &str, is_imm: bool) -> Result<()> {
-        if is_imm{
-            write(&self.f, format!("  {op}i {dest}, {src}\n"))
-        } else {
-            write(&self.f, format!("  {op} {dest}, {src}\n"))
-        }
+    pub fn op1(&mut self, op: &str, dest: &str, src: &str) -> Result<()> {
+        writeln!(&self.f, "    {op} {dest}, {src}")
     }
 
     pub fn addi(&mut self, dest: &str, opr: &str, imm: i32) -> Result<()> {
-        write(&self.f, format!("  addi {dest}, {opr}, {imm}\n"))
+        writeln!(&self.f, "    addi {dest}, {opr}, {imm}")
         
     }
 
     pub fn slli(&mut self, dest: &str, opr: &str, imm: i32) -> Result<()> {
-        write(&self.f, format!("  slli {dest}, {opr}, {imm}"))
+        writeln!(&self.f, "    slli {dest}, {opr}, {imm}")
     }
 
     pub fn srai(&mut self, dest: &str, opr: &str, imm: i32) -> Result<()> {
-        write(&self.f, format!("  srai {dest}, {opr}, {imm}\n"))
+        writeln!(&self.f, "    srai {dest}, {opr}, {imm}")
     }
 
     //TODO: optimize mul and div
@@ -114,15 +112,15 @@ impl AsmBuilder {
     pub fn s(&mut self, src: &str, addr: &str, offset: i32, is_float: bool, is_double: bool) -> Result<()> {
         if !is_double {
             if is_float {
-                write(&self.f, format!("	fsw {src}, {offset}({addr})\n"))
+                writeln!(&self.f, "	fsw {src}, {offset}({addr})")
             } else {
-                write(&self.f, format!("	sw {src}, {offset}({addr})\n"))
+                writeln!(&self.f, "	sw {src}, {offset}({addr})")
             }
         } else {
             if is_float {
-                write(&self.f, format!("	fsw {src}, {offset}({addr})\n"))
+                writeln!(&self.f, "	fsd {src}, {offset}({addr})")
             } else {
-                write(&self.f, format!("	sw {src}, {offset}({addr})\n"))
+                writeln!(&self.f, "	sd {src}, {offset}({addr})")
             }
         }
     }
@@ -130,72 +128,45 @@ impl AsmBuilder {
     pub fn l(&mut self, dest: &str, addr: &str, offset: i32, is_float: bool, is_double: bool) -> Result<()> {
         if !is_double {
             if is_float {
-                write(&self.f, format!("	flw {dest}, {offset}({addr})\n"))
+                writeln!(&self.f, "	flw {dest}, {offset}({addr})")
             } else {
-                write(&self.f, format!("	lw {dest}, {offset}({addr})\n"))
+                writeln!(&self.f, "	lw {dest}, {offset}({addr})")
             }
         } else {
             if is_float {
-                write(&self.f, format!("	fld {dest}, {offset}({addr})\n"))
+                writeln!(&self.f, "	fld {dest}, {offset}({addr})")
             } else {
-                write(&self.f, format!("	ld {dest}, {offset}({addr})\n"))
+                writeln!(&self.f, "	ld {dest}, {offset}({addr})")
             }
         }
     }
 
     pub fn b(&mut self, cond: &str, lhs: &str, rhs: &str, label: &str) -> Result<()> {
-        write(&self.f, format!("    {cond}    {lhs}, {rhs}, {label}\n"))
+        writeln!(&self.f, "    {cond}    {lhs}, {rhs}, {label}")
     }
 
     pub fn j(&mut self, label: &str) -> Result<()> {
-        write(&self.f, format!("	j {label}\n"))
+        writeln!(&self.f, "	j {label}")
     }
 
     pub fn call(&mut self, func: &str) -> Result<()> {
-        write(&self.f, format!("	call {func}\n"))
+        writeln!(&self.f, "	call {func}")
     }
 
     pub fn show_func(&mut self, label: &str) -> Result<()> {
-        write(&self.f, format!("{label}:\n"))
+        writeln!(&self.f, "{label}:")
     }
 
     pub fn load_global(&mut self, tmp_reg: &str, target_reg: &str, global_label: &str, block_label: &str) -> Result<()> {
-        write(&self.f, format!("	auipc   {tmp_reg}, %pcrel_hi({global_label})\n"))?;
-        write(&self.f, format!("	addi    {target_reg}, {tmp_reg}, %pcrel_lo{block_label}\n"))
+        writeln!(&self.f, "	auipc   {tmp_reg}, %pcrel_hi({global_label})")?;
+        writeln!(&self.f, "	addi    {target_reg}, {tmp_reg}, %pcrel_lo{block_label}")
     }
 
     pub fn print_array(&mut self, array: &Vec<i32>, name: String) -> Result<()> {
-        write(&self.f, format!(".{name}:\n"))?;
+        writeln!(&self.f, ".{name}:")?;
         for i in array {
-            write(&self.f, format!("	.word	{i}\n"))?;
+            writeln!(&self.f, "	.word	{i}")?;
         }
         Ok(())
     }
-    //TODO: for function
-    // pub fn prologue(&mut self, func_name: &str, info: &FunctionInfo) -> Result<()> {
-    //     // declaration
-    //     write(self.f, "  .text")?;
-    //     write(self.f, "  .globl {}", &func_name[1..])?;
-    //     write(self.f, "{}:", &func_name[1..])?;
-    //     // prologue
-    //     let offset = info.sp_offset() as i32;
-    //     if offset != 0 {
-    //         self.addi("sp", "sp", -offset)?;
-    //         if !info.is_leaf() {
-    //             self.sd("ra", "sp", offset - 8)?;
-    //         }
-    //     }
-    //     Ok(())
-    // }
-
-    // pub fn epilogue(&mut self, info: &FunctionInfo) -> Result<()> {
-    //     let offset = info.sp_offset() as i32;
-    //     if offset != 0 {
-    //         if !info.is_leaf() {
-    //             self.ld("ra", "sp", offset - 8)?;
-    //         }
-    //         self.addi("sp", "sp", offset)?;
-    //     }
-    //     write(self.f, "  ret")
-    // }
 }

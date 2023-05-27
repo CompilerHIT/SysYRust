@@ -4,7 +4,7 @@ pub use std::collections::HashMap;
 pub use std::fs::File;
 pub use std::hash::{Hash, Hasher};
 pub use std::io::Result;
-pub use std::fs::write;
+use std::io::prelude::*;
 
 use crate::utility::ObjPtr;
 use crate::backend::operand::{IImm, FImm};
@@ -145,8 +145,9 @@ impl FGlobalVar {
 }
 
 pub trait GenerateAsm {
-    fn generate(&self, _: ObjPtr<Context>, f: FILE_PATH) -> Result<()> {
-        write(&f, "unreachable")?;
+    fn generate(&mut self, _: ObjPtr<Context>, f: FILE_PATH) -> Result<()> {
+        let mut buffer = File::create(f)?;
+        writeln!(&buffer, "unreachable")?;
         Ok(())
     }
 }
@@ -246,7 +247,7 @@ impl IntArray {
 
 //TODO: generate array
 impl GenerateAsm for IntArray {
-    fn generate(&self, _: ObjPtr<Context>, f: FILE_PATH) -> Result<()> {
+    fn generate(&mut self, _: ObjPtr<Context>, f: FILE_PATH) -> Result<()> {
         let mut builder = AsmBuilder::new(f);
         builder.print_array(&self.value, self.name.clone());
         Ok(())

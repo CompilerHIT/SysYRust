@@ -2,7 +2,7 @@ pub use std::collections::{HashSet, VecDeque};
 pub use std::fs::File;
 pub use std::hash::{Hash, Hasher};
 pub use std::io::Result;
-pub use std::fs::write;
+use std::io::prelude::*;
 use std::cmp::max;
 
 use crate::utility::{ScalarType, ObjPool, ObjPtr};
@@ -65,6 +65,7 @@ impl BB {
         let mut ir_block_inst = block.as_ref().get_head_inst();
         loop {
             let inst_ref = ir_block_inst.as_ref();
+            println!("inst_ref: {:?}", inst_ref.get_kind());
             // translate ir to lir, use match
             match inst_ref.get_kind() {
                 InstKind::Binary(op) => {
@@ -584,7 +585,8 @@ impl BB {
                             let src_operand = self.resolve_operand(src, false, map_info);
                             self.insts.push(
                                 self.insts_mpool.put(
-                                    LIRInst::new(InstrsType::OpReg(SingleOp::IMv), vec![src_operand])
+                                    LIRInst::new(InstrsType::OpReg(SingleOp::Li), 
+                                        vec![Operand::Reg(Reg::new(10, ScalarType::Int)) ,src_operand])
                                 )
                             );
                             self.insts.push(
@@ -598,11 +600,15 @@ impl BB {
                         },
                         _ => panic!("cannot reach, Return false")
                     }
-                }
-                _ => {
-                // TODO: ir translation.
-                    unreachable!("cannot reach, ir translation false")
-                }
+                },
+                InstKind::ConstFloat(..) | InstKind::ConstInt(..) | InstKind::GlobalConstFloat(..) | InstKind::GlobalConstInt(..) | InstKind::GlobalFloat(..) |
+                InstKind::GlobalInt(..) | InstKind::Head | InstKind::Parameter | InstKind::Phi => {
+                    // do nothing
+                },
+                // _ => {
+                // // TODO: ir translation.
+                //     unreachable!("cannot reach, ir translation false")
+                // }
             }
             if ir_block_inst == block.as_ref().get_tail_inst() {
                 break;
@@ -711,13 +717,14 @@ impl BB {
     // }
 }
 impl GenerateAsm for BB {
-    fn generate(&self, context: ObjPtr<Context>, f: FILE_PATH) -> Result<()> {
+    fn generate(&mut self, context: ObjPtr<Context>, f: FILE_PATH) -> Result<()> {
         if self.called {
             print!("{}:\n", self.label);
         }
-
+        println!("generate bb\n");
         for inst in self.insts.iter() {
-            inst.as_ref().generate(context.clone(), f.clone())?;
+            print!("inst here\n");
+            inst.as_mut().generate(context.clone(), f.clone())?;
         }
         Ok(())
     }

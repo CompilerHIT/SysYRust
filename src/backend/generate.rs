@@ -2,7 +2,7 @@ use super::{instrs::*, operand, FILE_PATH};
 use crate::backend::operand::ToString;
 //FIXME: virtue id to real id
 impl GenerateAsm for LIRInst { 
-    fn generate(&self, context: ObjPtr<Context>, f: FILE_PATH) -> Result<()> {
+    fn generate(&mut self, context: ObjPtr<Context>, f: FILE_PATH) -> Result<()> {
         let mut builder = AsmBuilder::new(f.clone());
         match self.get_type() {
             InstrsType::Binary(op) => {
@@ -61,17 +61,13 @@ impl GenerateAsm for LIRInst {
                     Operand::Reg(reg) => reg.to_string(),
                     _ => panic!("dst of single op must be reg, to improve"),
                 };
-                let mut is_imm = false;
                 let src = match self.get_lhs() {
                     Operand::Reg(reg) => reg.to_string(),
-                    Operand::IImm(iimm) => {
-                        is_imm = true;
-                        iimm.to_string()
-                    },
+                    Operand::IImm(iimm) => iimm.to_string(),
                     Operand::Addr(addr) => addr.to_string(),
                     _ => unreachable!("src of single op must be reg or imm, to improve"),
                 };
-                builder.op1(op, &dst, &src, is_imm)?;
+                builder.op1(op, &dst, &src)?;
                 Ok(())
             },
             // InstrsType::ChangeSp => {
@@ -231,6 +227,12 @@ impl GenerateAsm for LIRInst {
             }
             InstrsType::Call => {
                 //TODO:
+                let mut builder = AsmBuilder::new(f.clone());
+                let func_name = match self.get_label() {
+                    Operand::Addr(label) => label.to_string(),
+                    _ => unreachable!("call block's label must be string"),
+                };
+                builder.call(&func_name)?;
                 Ok(())
             },
             InstrsType::Ret(..) => {

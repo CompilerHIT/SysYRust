@@ -4,9 +4,8 @@ use std::vec::Vec;
 pub use std::fs::File;
 pub use std::hash::{Hash, Hasher};
 pub use std::io::Result;
-pub use std::fs::write;
 
-use lazy_static::__Deref;
+use std::io::prelude::*;
 
 use crate::ir::basicblock::BasicBlock;
 use crate::ir::function::Function;
@@ -32,7 +31,7 @@ pub struct Func {
     reg_num: i32,
     fregs: HashSet<Reg>,
 
-    pub context: Option<ObjPtr<Context>>,
+    pub context: Context,
 
     blocks_mpool: ObjPool<BB>,
 }
@@ -54,7 +53,7 @@ impl Func {
             reg_num: 0,
             fregs: HashSet::new(),
 
-            context: None,
+            context: Context::new(),
 
             blocks_mpool: ObjPool::new(),
         }
@@ -88,6 +87,7 @@ impl Func {
         tmp.push_back(fblock);
         
         let mut block_seq = 0;
+        self.blocks.push(first_block);
         
         while let Some(fblock) = tmp.pop_front() {
             let next_blocks = fblock.as_ref().get_next_bb();
@@ -220,26 +220,25 @@ impl Func {
 
         let mut offset = stack_size;
         let mut f1 = f.clone();
-        if let Some(contxt) = &self.context {
-            contxt.as_mut().set_prologue_event(move||{
-                let mut builder = AsmBuilder::new(f.clone());
-                // addi sp -stack_size
-                builder.addi("sp", "sp", -offset);
-                for src in reg_int_res.iter() {
-                    offset -= 8;
-                    builder.s(&src.to_string(), "sp", offset, false, false);
-                }
-            });
-            let mut offset = stack_size;
-            contxt.as_mut().set_epilogue_event(move||{
-                let mut builder = AsmBuilder::new(f1.clone());
-                for src in reg_int_res_cl.iter() {
-                    offset -= 8;
-                    builder.l("sp", &src.to_string(), offset, false, false);
-                }
-                builder.addi("sp", "sp", stack_size);
-            });
-        }
+        self.context.set_prologue_event(move||{
+            let mut builder = AsmBuilder::new(f.clone());
+            // addi sp -stack_size
+            builder.addi("sp", "sp", -offset);
+            for src in reg_int_res.iter() {
+                offset -= 8;
+                builder.s(&src.to_string(), "sp", offset, false, true);
+            }
+        });
+
+        let mut offset = stack_size;
+        self.context.set_epilogue_event(move||{
+            let mut builder = AsmBuilder::new(f1.clone());
+            for src in reg_int_res_cl.iter() {
+                offset -= 8;
+                builder.l("sp", &src.to_string(), offset, false, true);
+            }
+            builder.addi("sp", "sp", stack_size);
+        });
         
 
         //TODO: for caller
@@ -253,13 +252,11 @@ impl Func {
 }
 
 impl GenerateAsm for Func {
-    fn generate(&self, _: ObjPtr<Context>, f: FILE_PATH) -> Result<()> {
-        AsmBuilder::new(f.clone()).show_func(&self.label);
-        if let Some(contxt) = &self.context {
-            contxt.as_mut().call_prologue_event();
-            for block in self.blocks.iter() {
-                block.as_ref().generate(contxt.clone(), f.clone())?;
-            }
+    fn generate(&mut self, _: ObjPtr<Context>, f: FILE_PATH) -> Result<()> {
+        AsmBuilder::new(f.clone()).show_func(&self.label)?;
+        self.context.call_prologue_event();
+        for block in self.blocks.iter() {
+            block.as_mut().generate(ObjPtr::new(&self.context), f.clone())?;
         }
         Ok(())
     }
