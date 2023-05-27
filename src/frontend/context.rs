@@ -178,12 +178,14 @@ impl Context<'_> {
             InfuncChoice::InFunc(bbptr) => {
                 let bb = bbptr.as_mut();
                 bb.push_back(inst);
+                v.push((temps.clone(), 1));
             }
             InfuncChoice::NInFunc() => {
                 self.push_globalvar_module(temps.clone(), inst);
+                v.push((temps.clone(), 0));
             }
         }
-        v.push((temps.clone(), 1));
+        // v.push((temps.clone(), 1));
         let stemp = s.clone();
         self.var_map.insert(stemp, v);
         self.symbol_table.insert(
@@ -203,14 +205,20 @@ impl Context<'_> {
         let s = "%".to_string() + f.to_string().as_str();
         let mut v = vec![];
         let temps = self.add_prefix(s.clone());
-        let lay;
-        if self.layer == 0 {
-            lay = 0;
-        } else {
-            lay = 1;
+        match &mut self.bb_now_mut {
+            InfuncChoice::InFunc(bbptr) => {
+                let bb = bbptr.as_mut();
+                bb.push_back(inst);
+                v.push((temps.clone(), 1));
+            }
+            InfuncChoice::NInFunc() => {
+                self.push_globalvar_module(temps.clone(), inst);
+                v.push((temps.clone(), 0));
+            }
         }
-        v.push((temps.clone(), 1));
-        self.var_map.insert(s.clone(), v);
+        // v.push((temps.clone(), 1));
+        let stemp = s.clone();
+        self.var_map.insert(stemp, v);
         self.symbol_table.insert(
             temps.clone(),
             Symbol {

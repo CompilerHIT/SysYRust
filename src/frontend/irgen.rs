@@ -548,6 +548,7 @@ impl Process for Number {
                 } else {
                     let inst = kit_mut.pool_inst_mut.make_int_const(*i);
                     kit_mut.context_mut.add_const_int(*i, inst);
+                    println!("intconst:{}", i);
                     return Ok(inst);
                 }
             }
