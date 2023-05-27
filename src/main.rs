@@ -37,14 +37,10 @@ fn run_main() {
 
     // TODO 生成IR
     let mut compunit = SysYRust::CompUnitParser::new().parse(file.as_str());
-    // TODO 后端解析
-}
-
-#[test]
-fn test() {
     let file = std::fs::read_to_string("src/input.txt").unwrap();
     let mut pool_module = ObjPool::new();
-    let module_mut = pool_module.put(Module::new()).as_mut();
+    let module_ptr = pool_module.put(Module::new()); //module的指针
+    let module_mut = module_ptr.as_mut();
     let mut pool_inst: ObjPool<Inst> = ObjPool::new();
     let mut pool_inst_mut = &mut pool_inst;
     let mut compunit = SysYRust::CompUnitParser::new()
@@ -61,5 +57,5 @@ fn test() {
         pool_bb_mut,
         pool_func_mut,
     );
-    println!("{:#?}", compunit);
+    // TODO 后端解析
 }

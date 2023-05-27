@@ -160,7 +160,7 @@ impl Process for CompUnit {
         for item in &mut self.global_items {
             item.process(1, kit_mut);
         }
-        todo!();
+        return Ok(1);
         todo!();
     }
 }
@@ -314,7 +314,7 @@ impl Process for FuncDef {
             Self::NonParameterFuncDef((tp, id, blk)) => {
                 let func_ptr = kit_mut.pool_func_mut.new_function();
                 let func_mut = func_ptr.as_mut();
-                let bb = kit_mut.pool_bb_mut.put(BasicBlock::new("test_first"));
+                let bb = kit_mut.pool_bb_mut.new_basic_block(id.clone());
                 func_mut.insert_first_bb(bb);
                 match tp {
                     FuncType::Void => func_mut.set_return_type(IrType::Void),
@@ -326,6 +326,7 @@ impl Process for FuncDef {
                     .context_mut
                     .push_func_module(id.to_string(), func_ptr);
                 blk.process(1, kit_mut);
+                return Ok(1);
             }
             Self::ParameterFuncDef(pf) => {
                 todo!()
@@ -378,9 +379,11 @@ impl Process for BlockItem {
         match self {
             BlockItem::Decl(decl) => {
                 decl.process(input, kit_mut);
+                return Ok(1);
             }
             BlockItem::Stmt(stmt) => {
                 stmt.process(input, kit_mut);
+                return Ok(1);
             }
         }
         todo!();
@@ -453,7 +456,7 @@ impl Process for If {
 impl Process for While {
     type Ret = i32;
     type Message = (i32);
-    fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
+    fn process(&mut self, _input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
         todo!();
     }
 }
@@ -564,10 +567,7 @@ impl Process for UnaryExp {
     type Message = (i32);
     fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
         match self {
-            UnaryExp::PrimaryExp(primaryexp) => {
-                let inst_ptr = primaryexp.process(input, kit_mut);
-                todo!();
-            }
+            UnaryExp::PrimaryExp(primaryexp) => primaryexp.process(input, kit_mut),
             UnaryExp::OpUnary((unaryop, unaryexp)) => match unaryop {
                 UnaryOp::Add => {
                     let inst_u = unaryexp.as_mut().process(input, kit_mut).unwrap();
@@ -657,14 +657,14 @@ impl Process for AddExp {
             AddExp::OpExp((opexp, op, mulexp)) => match op {
                 AddOp::Add => {
                     let inst_left = opexp.process(input, kit_mut).unwrap();
-                    let inst_right = opexp.process(input, kit_mut).unwrap();
+                    let inst_right = mulexp.process(input, kit_mut).unwrap();
                     let inst = kit_mut.pool_inst_mut.make_add(inst_left, inst_right);
                     kit_mut.context_mut.push_inst_bb(inst);
                     Ok(inst)
                 }
                 AddOp::Minus => {
                     let inst_left = opexp.process(input, kit_mut).unwrap();
-                    let inst_right = opexp.process(input, kit_mut).unwrap();
+                    let inst_right = mulexp.process(input, kit_mut).unwrap();
                     let inst = kit_mut.pool_inst_mut.make_add(inst_left, inst_right);
                     kit_mut.context_mut.push_inst_bb(inst);
                     Ok(inst)

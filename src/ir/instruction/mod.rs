@@ -156,7 +156,7 @@ impl Inst {
         self.list.set_prev(inst);
         p.list.set_next(inst);
         inst.as_mut().list.set_prev(ObjPtr::new(p));
-        inst.as_mut().list.set_next(ObjPtr::new(p));
+        inst.as_mut().list.set_next(ObjPtr::new(self));
     }
 
     /// 在当前指令之后插入一条指令
