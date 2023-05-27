@@ -163,6 +163,14 @@ impl AsmBuilder {
         write(&self.f, format!("	auipc   {tmp_reg}, %pcrel_hi({global_label})\n"))?;
         write(&self.f, format!("	addi    {target_reg}, {tmp_reg}, %pcrel_lo{block_label}\n"))
     }
+
+    pub fn print_array(&mut self, array: &Vec<i32>, name: String) -> Result<()> {
+        write(&self.f, format!(".{name}:\n"))?;
+        for i in array {
+            write(&self.f, format!("	.word	{i}\n"))?;
+        }
+        Ok(())
+    }
     //TODO: for function
     // pub fn prologue(&mut self, func_name: &str, info: &FunctionInfo) -> Result<()> {
     //     // declaration

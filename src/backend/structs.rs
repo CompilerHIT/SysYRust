@@ -14,6 +14,7 @@ use crate::ir::basicblock::BasicBlock;
 use crate::ir::instruction::Inst;
 
 use super::FILE_PATH;
+use super::asm_builder::AsmBuilder;
 
 
 #[derive(Clone)]
@@ -188,7 +189,7 @@ pub struct Mapping {
     pub block_ir_map: HashMap<ObjPtr<BB>, ObjPtr<BasicBlock>>,
     pub stack_slot_set: LinkedList<StackSlot>,
     //TODO:for float
-    pub int_array_map: HashMap<String, IntArray>,
+    pub int_array_map: HashSet<IntArray>,
     pub array_slot_map: HashMap<ObjPtr<Inst>, i32>,
 }
 
@@ -198,7 +199,7 @@ impl Mapping {
             ir_block_map: HashMap::new(),
             block_ir_map: HashMap::new(),
             stack_slot_set: LinkedList::new(),
-            int_array_map: HashMap::new(),
+            int_array_map: HashSet::new(),
             array_slot_map: HashMap::new(),
         }
     }
@@ -211,14 +212,15 @@ impl Hash for ObjPtr<Inst> {
 }
 
 pub struct IntArray {
+    pub name: String,
     pub size: i32,
     pub init: bool,
     pub value: Vec<i32>,
 }
 
 impl IntArray {
-    pub fn new(size: i32, init: bool, value: Vec<i32>) -> Self {
-        Self { size, init, value }
+    pub fn new(name: String,size: i32, init: bool, value: Vec<i32>) -> Self {
+        Self { name, size, init, value }
     }
     pub fn set_use(&mut self, used: bool) {
         self.init = used;
@@ -229,6 +231,30 @@ impl IntArray {
     pub fn get_value(&self, index: i32) -> i32 {
         self.value[index as usize]
     }
+    pub fn get_array(&self)  -> &Vec<i32> {
+        &self.value
+    }
 }
 
 //TODO: generate array
+impl GenerateAsm for IntArray {
+    fn generate(&self, _: ObjPtr<Context>, f: FILE_PATH) -> Result<()> {
+        let mut builder = AsmBuilder::new(f);
+        builder.print_array(&self.value, self.name.clone());
+        Ok(())
+    }
+}
+
+impl Hash for IntArray {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.name.hash(state);
+    }
+}
+
+impl PartialEq for IntArray {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name
+    }
+}
+
+impl Eq for IntArray {}
