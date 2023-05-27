@@ -4,7 +4,6 @@ use std::io::Result;
 use std::fs::write;
 use std::hash::{Hash, Hasher};
 
-use crate::frontend::context::Context;
 use crate::ir::basicblock::BasicBlock;
 use crate::ir::module::Module;
 use crate::ir::instruction::{Inst, InstKind};
@@ -16,8 +15,7 @@ use crate::backend::block::BB;
 use crate::backend::operand::ToString;
 use crate::utility::{ScalarType, ObjPtr, ObjPool};
 
-
-use super::structs::GenerateAsm;
+use crate::backend::FILE_PATH;
 
 pub struct AsmModule {
     reg_map: HashMap<i32, Reg>,
@@ -55,16 +53,16 @@ impl AsmModule {
         }
     }
 
-    pub fn generator(&mut self) {
+    pub fn generator(&mut self, f: FILE_PATH) -> Result<()> {
         self.build_lir();
-        self.allocate_reg();
-        // self.generate_global_var(f.clone())?;
-        self.generate_asm();
+        self.allocate_reg(f.clone());
+        self.generate_global_var(f.clone())?;
+        Ok(())
     }
 
-    fn allocate_reg<'a>(&mut self) {
+    fn allocate_reg<'a>(&mut self, f: FILE_PATH) {
         self.func_map.iter_mut().for_each(|(_, func)| {
-            func.as_mut().allocate_reg();
+            func.as_mut().allocate_reg(f.clone());
         });
     }
 
@@ -89,28 +87,22 @@ impl AsmModule {
         list
     }
 
-    fn generate_global_var(&self) -> Result<()> {
+    fn generate_global_var(&self, f: FILE_PATH) -> Result<()> {
         for iter in self.global_var_list.iter() {
             match iter {
                 GlobalVar::IGlobalVar(ig) => {
                     let name = ig.get_name();
                     let value = ig.get_init().to_string();
-                    print!("{name}:\n        .word:   {value}\n");
-                    print!("    {value}\n");
+                    write(&f, format!("{name}:\n        .word:   {value}\n"))?;
+                    write(&f, format!("    {value}\n"))?;
                 }
                 GlobalVar::FGlobalVar(fg) => {
                     let name = fg.get_name();
                     let value = fg.get_init().to_hex_string();
-                    print!("{name}:\n        .word:   {value}\n");
+                    write(&f, format!("{name}:\n        .word:   {value}\n"))?;
                 }
             }
         }
         Ok(())
-    }
-
-    fn generate_asm(&mut self){
-        self.func_map.iter_mut().for_each(|(_, func)| {
-            func.as_mut().generate(ObjPtr::new(&crate::backend::structs::Context::new()));
-        });
     }
 }

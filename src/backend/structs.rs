@@ -13,8 +13,8 @@ use crate::backend::block::BB;
 use crate::ir::basicblock::BasicBlock;
 use crate::ir::instruction::Inst;
 
+use super::FILE_PATH;
 use super::asm_builder::AsmBuilder;
-use super::instrs::Operand;
 
 
 #[derive(Clone)]
@@ -145,8 +145,9 @@ impl FGlobalVar {
 }
 
 pub trait GenerateAsm {
-    fn generate(&self, _: ObjPtr<Context>){
-        println!("unreachable");
+    fn generate(&self, _: ObjPtr<Context>, f: FILE_PATH) -> Result<()> {
+        write(&f, "unreachable")?;
+        Ok(())
     }
 }
 
@@ -190,11 +191,6 @@ pub struct Mapping {
     //TODO:for float
     pub int_array_map: HashSet<IntArray>,
     pub array_slot_map: HashMap<ObjPtr<Inst>, i32>,
-
-    pub val_map: HashMap<ObjPtr<Inst>, Operand>,
-
-    pub func_imm_map: HashMap<Operand, ObjPtr<LIRInst>>
-    // pub func_
 }
 
 impl Mapping {
@@ -205,8 +201,6 @@ impl Mapping {
             stack_slot_set: LinkedList::new(),
             int_array_map: HashSet::new(),
             array_slot_map: HashMap::new(),
-            val_map: HashMap::new(),
-            func_imm_map: HashMap::new(),
         }
     }
 }
@@ -244,9 +238,10 @@ impl IntArray {
 
 //TODO: generate array
 impl GenerateAsm for IntArray {
-    fn generate(&self, _: ObjPtr<Context>) {
-        let mut builder = AsmBuilder::new();
+    fn generate(&self, _: ObjPtr<Context>, f: FILE_PATH) -> Result<()> {
+        let mut builder = AsmBuilder::new(f);
         builder.print_array(&self.value, self.name.clone());
+        Ok(())
     }
 }
 
