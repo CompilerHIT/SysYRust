@@ -9,6 +9,7 @@ use crate::backend::block::BB;
 use crate::backend::regalloc::structs::{FuncAllocStat,RegUsedStat};
 use crate::backend::regalloc::regalloc::Regalloc;
 use crate::container::bitmap::Bitmap;
+use crate::utility::ObjPtr;
 use std::cmp::Ordering;
 use crate::container::prioritydeque::PriorityDeque;
 use crate::algorithm::graphalgo;
@@ -18,9 +19,9 @@ use crate::algorithm::graphalgo::Graph;
 // 摆烂的深度优先指令编码简单实现的线性扫描寄存器分配
 pub struct Allocator{
     func :Option<Box<Func>>,
-    depths: HashMap<&'static BB,usize>,
-    passed:HashSet<Box<&'static BB>>,
-    lines:Vec<&'static LIRInst>,
+    depths: HashMap<ObjPtr<BB>,usize>,
+    passed:HashSet<ObjPtr<BB>>,
+    lines:Vec<ObjPtr<LIRInst>>,
     intervals:HashMap<i32,i32>,   //key,val=虚拟寄存器号，周期结尾指令号
     base:usize, //用于分配指令号
 }
@@ -76,7 +77,7 @@ impl Allocator {
     }
 
     // 深度分配
-    fn dfs_bbs(&mut self,bb :&'static BB) {
+    fn dfs_bbs(&mut self,bb :ObjPtr<BB> ) {
         if self.passed.contains(&bb) {
             return 
         }
@@ -84,40 +85,40 @@ impl Allocator {
         self.depths.insert(bb,self.base);
         self.base+=1;
         // 深度优先遍历后面的块
-        for next in &bb.out_edge {
-            self.dfs_bbs(next.as_ref())
+        for next in &bb.as_ref().out_edge {
+            self.dfs_bbs(next.clone())
         }
     }
     // 指令编号
-    fn inst_record(&mut self,bb:&'static BB) {
+    fn inst_record(&mut self,bb:ObjPtr<BB>) {
         // 根据块深度分配的结果启发对指令进行编号
         if self.passed.contains(&bb) {
             return ;
         }
-        for line in &bb.insts {
-            self.lines.push(line.as_ref())
+        for line in &bb.as_ref().insts {
+            self.lines.push(line.clone())
         }
         // then choice a block to go through 
         let mut set:HashSet<usize> =HashSet::new();
         loop {
-            let mut toPass:usize=bb.out_edge.len();
-            for (i,next) in bb.out_edge.iter().enumerate() {
+            let mut toPass:usize=bb.as_ref().out_edge.len();
+            for (i,next) in bb.as_ref().out_edge.iter().enumerate() {
                 if set.contains(&toPass) {
                     continue;
                 }
-                if toPass==bb.out_edge.len() {
+                if toPass==bb.as_ref().out_edge.len() {
                     toPass=i;
                 }else{
-                    if self.depths.get(next.as_ref())<self.depths.get(bb.out_edge.get(toPass).unwrap().as_ref()) {
+                    if self.depths.get(next)<self.depths.get(bb.as_ref().out_edge.get(toPass).unwrap()) {
                         toPass=i;
                     }
                 }
             }
-            if toPass== bb.out_edge.len() {
+            if toPass== bb.as_ref().out_edge.len() {
                 break;
             }
             set.insert(toPass) ;
-            self.inst_record(bb.out_edge.get(toPass).unwrap().as_ref())
+            self.inst_record(bb.as_ref().out_edge.get(toPass).unwrap().clone())
         }
     }
 
@@ -125,7 +126,7 @@ impl Allocator {
     fn interval_anaylise(&mut self){
         let mut use_set:HashMap<i32,usize> =HashMap::new();
         for (i,inst) in self.lines.iter().enumerate() {
-            for reg in inst.get_reg_use() {
+            for reg in inst.as_ref().get_reg_use() {
                 if !reg.is_allocable() {
                     continue;
                 }
@@ -144,19 +145,19 @@ impl Allocator {
 
 
     
-    pub fn countStackSize(func:&Func,spillings:&HashSet<i32>) ->(usize,HashMap<&'static BB,usize>) {
+    pub fn countStackSize(func:&Func,spillings:&HashSet<i32>) ->(usize,HashMap<ObjPtr<BB>,usize>) {
         // 遍历所有块,找到每个块中的spillings大小,返回其中大小的最大值,
         let mut stackSize:usize=0;
-        let mut bb_stack_sizes:HashMap<&'static BB,usize>=HashMap::new();
-        let mut passed:HashSet<&BB>=HashSet::new();
-        let mut walk:VecDeque<&BB>=VecDeque::new();
-        walk.push_back(func.entry.unwrap().as_ref());
-        passed.insert(func.entry.unwrap().as_ref());
+        let mut bb_stack_sizes:HashMap<ObjPtr<BB>,usize>=HashMap::new();
+        let mut passed:HashSet<ObjPtr<BB>>=HashSet::new();
+        let mut walk:VecDeque<ObjPtr<BB>>=VecDeque::new();
+        walk.push_back(func.entry.unwrap().clone());
+        passed.insert(func.entry.unwrap());
         // TOTEST
         while !walk.is_empty() {
             let cur=walk.pop_front().unwrap();
             let mut bbspillings:HashSet<i32>=HashSet::new();
-            for reg in &cur.live_in {
+            for reg in &cur.as_ref().live_in {
                 if spillings.contains(&reg.get_id()) {
                     bbspillings.insert(reg.get_id());
                 }
@@ -164,7 +165,7 @@ impl Allocator {
             
             bb_stack_sizes.insert(cur, bbspillings.len());
             // 统计spilling数量
-            for inst in &cur.insts {
+            for inst in &cur.as_ref().insts {
                 for reg in inst.as_ref().get_reg_def() {
                     if spillings.contains(&reg.get_id()) {
                         bbspillings.insert(reg.get_id());
@@ -181,12 +182,12 @@ impl Allocator {
             }
             
             // 扩展未扩展的节点
-            for bb in &cur.out_edge {
-                if passed.contains(bb.as_ref()) {
+            for bb in &cur.as_ref().out_edge {
+                if passed.contains(&bb) {
                     continue
                 }
-                passed.insert(bb.as_ref());
-                walk.push_back(bb.as_ref());
+                passed.insert(bb.clone());
+                walk.push_back(bb.clone());
             }
         }
         (stackSize,bb_stack_sizes)
@@ -211,7 +212,7 @@ impl Allocator {
                 }
             }
 
-            for reg in it.get_reg_def() {
+            for reg in it.as_ref().get_reg_def() {
                 if !reg.is_allocable() {continue;}
                 let id=reg.get_id();
                 if dstr.contains_key(&id) {
@@ -281,10 +282,10 @@ impl Allocator {
 impl Regalloc for Allocator {
     fn alloc(&mut self,func :& Func)->FuncAllocStat {
         // TODO第一次遍历，块深度标记
-        self.dfs_bbs(&func.entry.unwrap().as_ref());
+        self.dfs_bbs(func.entry.unwrap());
         // 第二次遍历,指令深度标记
         self.passed.clear();
-        self.inst_record(&func.entry.unwrap().as_ref());
+        self.inst_record(func.entry.unwrap());
         self.passed.clear();
         // 第三次遍历,指令遍历，寄存器interval标记
         self.interval_anaylise();
