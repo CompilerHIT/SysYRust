@@ -238,8 +238,21 @@ impl LIRInst {
             }
             InstrsType::Ret(re_type) => {
                 match re_type {
-                    ScalarType::Int => vec![Reg::new(10, ScalarType::Int)],
-                    ScalarType::Float => vec![Reg::new(10, ScalarType::Float)],
+                    ScalarType::Int => {
+                        let src_reg = match self.operands[1] {
+                            Operand::Reg(reg) => reg,
+                            _ => panic!("ret src must be reg")
+                        };
+                        
+                        vec![Reg::new(10, ScalarType::Int), src_reg]
+                    },
+                    ScalarType::Float => {
+                        let src_reg = match self.operands[1] {
+                            Operand::Reg(reg) => reg,
+                            _ => panic!("ret src must be reg")
+                        };
+                        vec![Reg::new(10, ScalarType::Float)]
+                    },
                     ScalarType::Void => vec![],
                 }
             },
