@@ -151,7 +151,7 @@ impl LIRInst {
     }
 
     // mapping virtual reg_id to physic reg_id
-    pub fn v_to_phy(&mut self, regs: Vec<Reg>, map: HashMap<i32, i32>) {
+    pub fn v_to_phy(&mut self, map: HashMap<i32, i32>) {
         for operand in &self.operands {
             match operand {
                 Operand::Reg(mut reg) => {

@@ -151,7 +151,11 @@ impl Reg {
     }
 
     pub fn map_id(&mut self, dst: i32) {
-        self.id = dst;
+        self.id = match self.get_type() {
+            ScalarType::Int => dst,
+            ScalarType::Float => dst - 32,
+            _ => panic!("Wrong Type")
+        }
     }
 
     // ra, t0, t1-2, a0-1, a2-7, t3-6
