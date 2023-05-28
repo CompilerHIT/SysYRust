@@ -2,7 +2,6 @@ pub use std::collections::{HashSet, VecDeque};
 pub use std::fs::File;
 pub use std::hash::{Hash, Hasher};
 pub use std::io::Result;
-use std::io::prelude::*;
 use std::cmp::max;
 
 use crate::utility::{ScalarType, ObjPool, ObjPtr};
@@ -13,9 +12,8 @@ use crate::backend::operand::{Reg, IImm, FImm};
 use crate::backend::instrs::{LIRInst, InstrsType, SingleOp, BinaryOp, CmpOp};
 use crate::backend::instrs::Operand;
 
-use crate::backend::func::Func;
 use crate::backend::operand;
-use super::operand::{REG_COUNT, ARG_REG_COUNT, ToString};
+use super::operand::ARG_REG_COUNT;
 use super::structs::*;
 
 pub static mut ARRAY_NUM: i32 = 0;
@@ -582,10 +580,10 @@ impl BB {
                         ),
                         IrType::Int => {
                             let src = inst_ref.get_return_value();
-                            let src_operand = self.resolve_operand(src, false, map_info);
+                            let src_operand = self.resolve_operand(src, true, map_info);
                             self.insts.push(
                                 self.insts_mpool.put(
-                                    LIRInst::new(InstrsType::OpReg(SingleOp::Li), 
+                                    LIRInst::new(InstrsType::OpReg(SingleOp::IMv), 
                                         vec![Operand::Reg(Reg::new(10, ScalarType::Int)) ,src_operand])
                                 )
                             );
@@ -605,10 +603,6 @@ impl BB {
                 InstKind::GlobalInt(..) | InstKind::Head | InstKind::Parameter | InstKind::Phi => {
                     // do nothing
                 },
-                // _ => {
-                // // TODO: ir translation.
-                //     unreachable!("cannot reach, ir translation false")
-                // }
             }
             if ir_block_inst == block.as_ref().get_tail_inst() {
                 break;
@@ -626,7 +620,6 @@ impl BB {
     }
 
     fn resolve_operand(&mut self, src: ObjPtr<Inst>, is_left: bool, map: &mut Mapping) -> Operand {
-        //TODO: ObjPtr match
         if is_left {
             match src.as_ref().get_kind() {
                 InstKind::ConstInt(iimm) => return self.load_iimm_to_ireg(iimm),
@@ -634,20 +627,29 @@ impl BB {
             }
         }
 
+        if map.val_map.contains_key(&src) {
+            return map.val_map.get(&src).unwrap().clone();
+        }
+
         match src.as_ref().get_kind() {
             InstKind::ConstInt(iimm) => self.resolve_iimm(iimm),
             InstKind::ConstFloat(fimm) => self.resolve_fimm(fimm),
             InstKind::Parameter => self.resolve_param(src, map),
-            // InstKind::GlobalConstInt(_) => resolveGlobalVar(src),
-            // InstKind::GlobalConstFloat(_) => resolveGlobalVar(src),
+            InstKind::GlobalConstInt(_) | InstKind::GlobalInt(..) => panic!("todo global int"),
+            InstKind::GlobalConstFloat(_) | InstKind::GlobalFloat(..) => panic!("todo global float"),
             _ => {
-                panic!("more operand-ir_inst to resolve");
+                let op : Operand = match src.as_ref().get_ir_type() {
+                    IrType::Int => Operand::Reg(Reg::init(ScalarType::Int)),
+                    IrType::Float => Operand::Reg(Reg::init(ScalarType::Float)),
+                    _ => unreachable!("cannot reach, resolve_operand false")
+                };
+                map.val_map.insert(src, op.clone());
+                op
             }
         }
     }
 
     fn resolve_iimm(&mut self, imm: i32) -> Operand {
-        //TODO: if type > i32
         let res = IImm::new(imm);
         if operand::is_imm_12bs(imm) {
             Operand::IImm(res)
