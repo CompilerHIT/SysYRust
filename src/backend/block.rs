@@ -16,7 +16,7 @@ use crate::backend::instrs::Operand;
 use crate::backend::func::Func;
 use crate::backend::operand;
 use super::operand::{REG_COUNT, ARG_REG_COUNT, ToString};
-use super::{structs::*, FILE_PATH};
+use super::structs::*;
 
 pub static mut ARRAY_NUM: i32 = 0;
 
@@ -717,14 +717,14 @@ impl BB {
     // }
 }
 impl GenerateAsm for BB {
-    fn generate(&mut self, context: ObjPtr<Context>, f: FILE_PATH) -> Result<()> {
+    fn generate(&mut self, context: ObjPtr<Context>, f: &mut File) -> Result<()> {
         if self.called {
             print!("{}:\n", self.label);
         }
         println!("generate bb\n");
         for inst in self.insts.iter() {
             print!("inst here\n");
-            inst.as_mut().generate(context.clone(), f.clone())?;
+            inst.as_mut().generate(context.clone(), f)?;
         }
         Ok(())
     }

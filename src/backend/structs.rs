@@ -13,7 +13,6 @@ use crate::backend::block::BB;
 use crate::ir::basicblock::BasicBlock;
 use crate::ir::instruction::Inst;
 
-use super::FILE_PATH;
 use super::asm_builder::AsmBuilder;
 
 
@@ -145,9 +144,8 @@ impl FGlobalVar {
 }
 
 pub trait GenerateAsm {
-    fn generate(&mut self, _: ObjPtr<Context>, f: FILE_PATH) -> Result<()> {
-        let mut buffer = File::create(f)?;
-        writeln!(&buffer, "unreachable")?;
+    fn generate(&mut self, _: ObjPtr<Context>, f: &mut File) -> Result<()> {
+        writeln!(f, "unreachable")?;
         Ok(())
     }
 }
@@ -247,7 +245,7 @@ impl IntArray {
 
 //TODO: generate array
 impl GenerateAsm for IntArray {
-    fn generate(&mut self, _: ObjPtr<Context>, f: FILE_PATH) -> Result<()> {
+    fn generate(&mut self, _: ObjPtr<Context>, f: &mut File) -> Result<()> {
         let mut builder = AsmBuilder::new(f);
         builder.print_array(&self.value, self.name.clone());
         Ok(())

@@ -5,8 +5,6 @@ pub use std::fs::File;
 pub use std::hash::{Hash, Hasher};
 pub use std::io::Result;
 
-use std::io::prelude::*;
-
 use crate::ir::basicblock::BasicBlock;
 use crate::ir::function::Function;
 use crate::utility::{ScalarType, ObjPool, ObjPtr};
@@ -15,7 +13,7 @@ use crate::backend::instrs::LIRInst;
 use crate::backend::asm_builder::AsmBuilder;
 use crate::backend::module::AsmModule;
 use crate::backend::block::*;
-use super::{structs::*, FILE_PATH};
+use super::structs::*;
 
 // #[derive(Clone)]
 pub struct Func {
@@ -200,7 +198,7 @@ impl Func {
         }
     }
 
-    pub fn allocate_reg(&mut self, f: FILE_PATH) {
+    pub fn allocate_reg(&mut self, f: &mut File) {
         // 函数返回地址保存在ra中
         let reg_int = vec![Reg::new(1, ScalarType::Int)];
 
@@ -219,9 +217,16 @@ impl Func {
         stack_size = stack_size / 16 * 16 + 16;
 
         let mut offset = stack_size;
-        let mut f1 = f.clone();
+        let mut f1 = match f.try_clone() {
+            Ok(f) => f,
+            Err(e) => panic!("Error: {}", e),
+        };
+        let mut f2 = match f.try_clone() {
+            Ok(f) => f,
+            Err(e) => panic!("Error: {}", e),
+        };
         self.context.set_prologue_event(move||{
-            let mut builder = AsmBuilder::new(f.clone());
+            let mut builder = AsmBuilder::new(&mut f1);
             // addi sp -stack_size
             builder.addi("sp", "sp", -offset);
             for src in reg_int_res.iter() {
@@ -232,7 +237,7 @@ impl Func {
 
         let mut offset = stack_size;
         self.context.set_epilogue_event(move||{
-            let mut builder = AsmBuilder::new(f1.clone());
+            let mut builder = AsmBuilder::new(&mut f2);
             for src in reg_int_res_cl.iter() {
                 offset -= 8;
                 builder.l("sp", &src.to_string(), offset, false, true);
@@ -252,11 +257,11 @@ impl Func {
 }
 
 impl GenerateAsm for Func {
-    fn generate(&mut self, _: ObjPtr<Context>, f: FILE_PATH) -> Result<()> {
-        AsmBuilder::new(f.clone()).show_func(&self.label)?;
+    fn generate(&mut self, _: ObjPtr<Context>, f: &mut File) -> Result<()> {
+        AsmBuilder::new(f).show_func(&self.label)?;
         self.context.call_prologue_event();
         for block in self.blocks.iter() {
-            block.as_mut().generate(ObjPtr::new(&self.context), f.clone())?;
+            block.as_mut().generate(ObjPtr::new(&self.context), f)?;
         }
         Ok(())
     }

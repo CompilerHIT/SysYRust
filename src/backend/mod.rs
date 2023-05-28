@@ -8,13 +8,15 @@ pub mod structs;
 pub mod module;
 pub mod regalloc;
 
-use std::io::Result;
 use std::fs::File;
 
 use crate::backend::module::AsmModule;
 
-pub type FILE_PATH = String;
 
-pub fn generate_asm(path: &str, module: &mut AsmModule){
-    module.generator(String::from(path));
+pub fn generate_asm(path: &str, module: &mut AsmModule) {
+    let mut file = match File::create(path) {
+        Ok(f) => f,
+        Err(e) => panic!("Create output path error: {}", e),
+    };
+    module.generator(&mut file)
 }

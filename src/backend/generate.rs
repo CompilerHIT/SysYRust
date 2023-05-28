@@ -1,9 +1,10 @@
-use super::{instrs::*, operand, FILE_PATH};
+use super::{instrs::*, operand};
+use std::fs::File;
 use crate::backend::operand::ToString;
 //FIXME: virtue id to real id
 impl GenerateAsm for LIRInst { 
-    fn generate(&mut self, context: ObjPtr<Context>, f: FILE_PATH) -> Result<()> {
-        let mut builder = AsmBuilder::new(f.clone());
+    fn generate(&mut self, context: ObjPtr<Context>, f: &mut File) -> Result<()> {
+        let mut builder = AsmBuilder::new(f);
         match self.get_type() {
             InstrsType::Binary(op) => {
                 let op = match op {
@@ -78,7 +79,7 @@ impl GenerateAsm for LIRInst {
             // },
             InstrsType::Load => {
                 //FIXME: only call ld -- lw...to implement
-                let mut builder = AsmBuilder::new(f.clone());
+                let mut builder = AsmBuilder::new(f);
                 let offset = self.get_offset();
                 if !operand::is_imm_12bs(offset.get_data()) {
                     panic!("illegal offset");
@@ -97,7 +98,7 @@ impl GenerateAsm for LIRInst {
             },
             InstrsType::Store => {
                 //FIXME: only call sd -- sw...to implement
-                let mut builder = AsmBuilder::new(f.clone());
+                let mut builder = AsmBuilder::new(f);
                 let offset = self.get_offset();
                 if !operand::is_imm_12bs(offset.get_data()) {
                     panic!("illegal offset");
@@ -115,7 +116,7 @@ impl GenerateAsm for LIRInst {
             },
 
             InstrsType::StoreToStack => {
-                let mut builder = AsmBuilder::new(f.clone());
+                let mut builder = AsmBuilder::new(f);
                 if !operand::is_imm_12bs(self.get_offset().get_data()) {
                     panic!("illegal offset");
                 }
@@ -134,7 +135,7 @@ impl GenerateAsm for LIRInst {
                 Ok(())
             },
             InstrsType::LoadFromStack => {
-                let mut builder = AsmBuilder::new(f.clone());
+                let mut builder = AsmBuilder::new(f);
                 if !operand::is_imm_12bs(self.get_offset().get_data()) {
                     panic!("illegal offset");
                 }
@@ -153,7 +154,7 @@ impl GenerateAsm for LIRInst {
                 Ok(())
             },
             InstrsType::LoadParamFromStack => {
-                let mut builder = AsmBuilder::new(f.clone());
+                let mut builder = AsmBuilder::new(f);
 
                 let true_offset = context.as_ref().get_offset() - self.get_offset().get_data();
                 if !operand::is_imm_12bs(true_offset) {
@@ -173,7 +174,7 @@ impl GenerateAsm for LIRInst {
             },
 
             InstrsType::StoreParamToStack => {
-                let mut builder = AsmBuilder::new(f.clone());
+                let mut builder = AsmBuilder::new(f);
                 let true_offset = context.as_ref().get_offset() - self.get_offset().get_data();
                 if !operand::is_imm_12bs(true_offset) {
                     panic!("illegal offset");
@@ -192,7 +193,7 @@ impl GenerateAsm for LIRInst {
             }
             // 判断！是否需要多插入一条j，间接跳转到
             InstrsType::Branch(cond) => {
-                let mut builder = AsmBuilder::new(f.clone());
+                let mut builder = AsmBuilder::new(f);
                 let label = match self.get_label() {
                     Operand::Addr(label) => label.to_string(),
                     _ => unreachable!("branch block's label must be string"),
@@ -217,7 +218,7 @@ impl GenerateAsm for LIRInst {
                 Ok(())
             },
             InstrsType::Jump => {
-                let mut builder = AsmBuilder::new(f.clone());
+                let mut builder = AsmBuilder::new(f);
                 let label = match self.get_label() {
                     Operand::Addr(label) => label.to_string(),
                     _ => unreachable!("jump block's label must be string"),
@@ -227,7 +228,7 @@ impl GenerateAsm for LIRInst {
             }
             InstrsType::Call => {
                 //TODO:
-                let mut builder = AsmBuilder::new(f.clone());
+                let mut builder = AsmBuilder::new(f);
                 let func_name = match self.get_label() {
                     Operand::Addr(label) => label.to_string(),
                     _ => unreachable!("call block's label must be string"),
@@ -237,7 +238,7 @@ impl GenerateAsm for LIRInst {
             },
             InstrsType::Ret(..) => {
                 context.as_mut().call_epilogue_event();
-                let mut builder = AsmBuilder::new(f.clone());
+                let mut builder = AsmBuilder::new(f);
                 builder.ret()?;
                 Ok(())
             },
