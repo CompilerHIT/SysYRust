@@ -685,9 +685,9 @@ impl BB {
         reg
     }
 
-    fn resolve_param(&self, src: ObjPtr<Inst>, func: ObjPtr<Func>, map: &mut Mapping) -> Operand {
+    fn resolve_param(&mut self, src: ObjPtr<Inst>, func: ObjPtr<Func>, map: &mut Mapping) -> Operand {
         if !map.val_map.contains_key(&src) {
-            let params = func.as_ref().params;
+            let params = &func.as_ref().params;
             let (icnt, fcnt) = func.as_ref().param_cnt;
             let reg = match src.as_ref().get_param_type() {
                 IrType::Int => Operand::Reg(Reg::init(ScalarType::Int)),
@@ -699,7 +699,7 @@ impl BB {
             for p in params {
                 match p.as_ref().get_param_type() {
                     IrType::Int => {
-                        if src == p {
+                        if src == *p {
                             if inum < ARG_REG_COUNT {
                                 let inst = LIRInst::new(InstrsType::OpReg(SingleOp::IMv),
                                     vec![reg.clone(), Operand::Reg(Reg::new(inum, ScalarType::Int))]);
@@ -713,7 +713,7 @@ impl BB {
                         inum += 1;
                     },
                     IrType::Float => {
-                        if src == p {
+                        if src == *p {
                             if fnum < ARG_REG_COUNT {
                                 let inst = LIRInst::new(InstrsType::OpReg(SingleOp::FMv),
                                     vec![reg.clone(), Operand::Reg(Reg::new(fnum, ScalarType::Float))]);
