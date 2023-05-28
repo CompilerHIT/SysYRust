@@ -13,6 +13,7 @@ use crate::backend::instrs::LIRInst;
 use crate::backend::asm_builder::AsmBuilder;
 use crate::backend::module::AsmModule;
 use crate::backend::block::*;
+use crate::backend::regalloc::{regalloc::Regalloc, easy_ls_alloc::Allocator};
 use super::structs::*;
 
 // #[derive(Clone)]
@@ -202,12 +203,12 @@ impl Func {
         // 函数返回地址保存在ra中
         let reg_int = vec![Reg::new(1, ScalarType::Int)];
 
-        let mut stack_size = 0;
-        
-        for it in self.stack_addr.iter_mut().rev() {
-            // it.set_pos(stack_size);
-            stack_size += it.get_size();
-        }
+        self.calc_live();
+        let mut allocator = Allocator::new();
+        let alloc_stat = allocator.alloc(self);
+        self.context.set_reg_map(&alloc_stat.dstr);
+
+        let mut stack_size = alloc_stat.stack_size as i32;
         
         let mut reg_int_res = Vec::from(reg_int);
         let mut reg_int_res_cl = reg_int_res.clone();

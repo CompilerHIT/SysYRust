@@ -5,6 +5,7 @@ use crate::backend::operand::ToString;
 impl GenerateAsm for LIRInst { 
     fn generate(&mut self, context: ObjPtr<Context>, f: &mut File) -> Result<()> {
         let mut builder = AsmBuilder::new(f);
+        self.v_to_phy(context.as_ref().get_reg_map().clone());
         match self.get_type() {
             InstrsType::Binary(op) => {
                 let op = match op {

@@ -44,6 +44,7 @@ pub struct StackSlot {
 
 pub struct Context {
     stack_offset: i32,
+    reg_info: HashMap<i32, i32>,
     epilogue: Option<Box<dyn FnMut()>>,
     prologue: Option<Box<dyn FnMut()>>,
 }
@@ -61,9 +62,18 @@ impl Context {
     pub fn new() -> Self {
         Self {
             stack_offset: 0,
+            reg_info: HashMap::new(),
             epilogue: None,
             prologue: None,
         }
+    }
+
+    pub fn set_reg_map(&mut self, map: &HashMap<i32, i32>) {
+        self.reg_info = map.clone();
+    }
+
+    pub fn get_reg_map(&self) -> &HashMap<i32, i32> {
+        &self.reg_info
     }
 
     pub fn set_epilogue_event<F: FnMut() + 'static>(&mut self, callback: F) {

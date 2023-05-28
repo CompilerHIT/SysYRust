@@ -2,6 +2,7 @@ use std::collections::HashSet;
 use std::collections::HashMap;
 
 use crate::backend::block::BB;
+use crate::utility::ObjPtr;
 
 #[derive(Clone)]
 pub struct RegUsedStat{
@@ -64,6 +65,15 @@ impl RegUsedStat {
                 return Some(i)
             }
         }
+        // 参数寄存器x10也就是a0保留
+
+        // 但是a1-a7自由使用
+        for i in 11..=17 {
+            if self.iregs_used&(1<<i)==0 {
+                return Some(i)
+            }
+        }
+
         for i in 18..=31 {
             if self.iregs_used&(1<<i)==0 {
                 return Some(i)
@@ -103,7 +113,7 @@ impl RegUsedStat {
 
 pub struct FuncAllocStat{
     pub stack_size:usize,
-    pub bb_stack_sizes:HashMap<&'static BB,usize>,  //统计翻译bb的时候前面已经用过的栈空间
+    pub bb_stack_sizes:HashMap<ObjPtr<BB>,usize>,  //统计翻译bb的时候前面已经用过的栈空间
     pub spillings :HashSet<i32>,    //spilling regs
     pub dstr: HashMap<i32,i32>, //distribute regs
 }
@@ -111,7 +121,11 @@ pub struct FuncAllocStat{
 
 impl FuncAllocStat {
     pub fn new()->FuncAllocStat {
-        FuncAllocStat { spillings: HashSet::new(),stack_size:0,bb_stack_sizes:HashMap::new(), dstr: HashMap::new() }
+        let mut out=FuncAllocStat { spillings: HashSet::new(), stack_size:0, bb_stack_sizes:HashMap::new(), dstr: HashMap::new() };
+        for i in 0..=63 {
+            out.dstr.insert(i, i);
+        }
+        out
     }
 }
 
