@@ -111,7 +111,7 @@ pub struct FuncAllocStat{
 
 impl FuncAllocStat {
     pub fn new()->FuncAllocStat {
-        FuncAllocStat { spillings: HashSet::new(),stack_size:0,bb_stack_sizes:HashMap::new(), dstr: HashMap::new() }
+        FuncAllocStat { spillings: HashSet::new(), stack_size:0, bb_stack_sizes:HashMap::new(), dstr: HashMap::new() }
     }
 }
 

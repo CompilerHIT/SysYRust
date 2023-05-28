@@ -71,7 +71,7 @@ struct BlockGraph {
 
 
 impl Allocator {
-    fn new()->Allocator {
+    pub fn new()->Allocator {
         Allocator { func: Option::None, passed: HashSet::new(), lines: Vec::new(), base: 0, depths: HashMap::new(), intervals: HashMap::new() }
     }
 

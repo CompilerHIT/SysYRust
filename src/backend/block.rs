@@ -732,20 +732,6 @@ impl GenerateAsm for BB {
     }
 }
 
-impl PartialEq for BB {
-    fn eq(&self, other: &Self) -> bool {
-        self.label == other.label
-    }
-}
-
-impl Eq for BB {}
-
-impl Hash for BB {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.label.hash(state);
-    }
-}
-
 fn is_opt_mul(imm: i32) -> bool {
     //TODO:
     false
