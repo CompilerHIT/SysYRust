@@ -7,6 +7,7 @@ pub use std::io::Result;
 
 use crate::ir::basicblock::BasicBlock;
 use crate::ir::function::Function;
+use crate::ir::instruction::{Inst, InstKind};
 use crate::utility::{ScalarType, ObjPool, ObjPtr};
 use crate::backend::operand::Reg;
 use crate::backend::instrs::LIRInst;
@@ -21,8 +22,10 @@ pub struct Func {
     label: String,
     blocks: Vec<ObjPtr<BB>>,
     pub stack_addr: LinkedList<StackSlot>,
-    caller_stack_addr: LinkedList<StackSlot>,
-    params: Vec<ObjPtr<Reg>>,
+    pub callee_stack_addr: LinkedList<StackSlot>,
+    pub params: Vec<ObjPtr<Inst>>,
+    pub param_cnt: (i32, i32),  // (int, float)
+
     pub entry: Option<ObjPtr<BB>>,
 
     reg_def: Vec<HashSet<CurInstrInfo>>,
@@ -44,8 +47,9 @@ impl Func {
             label: name.to_string(),
             blocks: Vec::new(),
             stack_addr: LinkedList::new(),
-            caller_stack_addr: LinkedList::new(),
+            callee_stack_addr: LinkedList::new(),
             params: Vec::new(),
+            param_cnt: (0, 0),
             entry: None,
             reg_def: Vec::new(),
             reg_use: Vec::new(),
@@ -104,7 +108,7 @@ impl Func {
                 block_seq += 1;
             }
         }
-        handle_parameters();
+        self.handle_parameters();
         // 第二遍pass
         let first_block = info.ir_block_map.get(&ir_func.get_head()).unwrap();
         self.entry.unwrap().as_mut().out_edge.push(*first_block);
@@ -116,9 +120,9 @@ impl Func {
                 let basicblock = info.block_ir_map.get(block).unwrap();
                 if i + 1 < self.blocks.len() {
                     let next_block = Some(self.blocks[i + 1]);
-                    block.as_mut().construct(*basicblock, next_block, &mut info);
+                    block.as_mut().construct(ObjPtr::new(self), *basicblock, next_block, &mut info);
                 } else {
-                    block.as_mut().construct(*basicblock, None, &mut info);
+                    block.as_mut().construct(ObjPtr::new(self) , *basicblock, None, &mut info);
                 }
                 i += 1;
             }
@@ -255,6 +259,14 @@ impl Func {
         // }
         
     }
+
+    fn handle_parameters(&mut self) {
+        //TODO:
+    }
+
+    pub fn get_first_block(&self) -> ObjPtr<BB> {
+        self.blocks[1].clone()
+    }
 }
 
 impl GenerateAsm for Func {
@@ -274,10 +286,6 @@ fn set_append(blocks: &Vec<ObjPtr<BasicBlock>>) -> HashSet<ObjPtr<BasicBlock>> {
         set.insert(block.clone());
     }
     set
-}
-
-fn handle_parameters() {
-    //TODO:
 }
 
 impl Hash for ObjPtr<BB> {
