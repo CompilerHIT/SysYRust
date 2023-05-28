@@ -491,15 +491,10 @@ impl BB {
                         }
                     }
 
-                    let mut lir_inst = LIRInst::new(InstrsType::Call,
-                        vec![Operand::Addr(func_label.to_string())]);
-                    lir_inst.set_param_cnts(icnt, fcnt);
-                    self.insts.push(self.insts_mpool.put(lir_inst));
-
                     // set stack slot
                     let mut pos = 0;
                     let mut size = 0;
-                    if let Some(last_slot) = map_info.stack_slot_set.back() {
+                    if let Some(last_slot) = func.as_ref().callee_stack_addr.back() {
                         pos = last_slot.get_pos() + last_slot.get_size();
                         size = max(0, icnt - ARG_REG_COUNT) + max(0, fcnt - ARG_REG_COUNT);
                         //FIXME: 是否需要对齐
@@ -507,7 +502,7 @@ impl BB {
                             size += 1;
                         }
                         size *= 4;
-                        map_info.stack_slot_set.push_back(StackSlot::new(pos, size));
+                        func.as_mut().callee_stack_addr.push_back(StackSlot::new(pos, size));
                     } else {
                         unreachable!("stack slot set is empty");
                     }
@@ -518,8 +513,10 @@ impl BB {
                                 icnt -= 1;
                                 if icnt >= ARG_REG_COUNT {
                                     let src_reg = self.resolve_operand(func, *arg, true, map_info);
-                                    // 这里用于存到栈上的参数是从后往前的
-                                    let offset = Operand::IImm(IImm::new(pos + size - icnt * 4));
+                                    // 第后一个溢出参数在最下方（最远离sp位置）
+                                    let offset = Operand::IImm(IImm::new(
+                                        -(pos + (max(0, icnt - ARG_REG_COUNT) + max(0, fcnt - ARG_REG_COUNT)) * 4)
+                                    ));
                                     self.insts.push(self.insts_mpool.put(
                                         LIRInst::new(InstrsType::StoreToStack,
                                             vec![src_reg, offset])
@@ -546,10 +543,12 @@ impl BB {
                                 fcnt -= 1;
                                 if fcnt >= ARG_REG_COUNT {
                                     let src_reg = self.resolve_operand(func, *arg, true, map_info);
-                                    // 这里用于存到栈上的参数是从后往前的
-                                    let offset = Operand::IImm(IImm::new(pos + size - fcnt * 4));
+                                    // 第后一个溢出参数在最下方（最远离sp位置）
+                                    let offset = Operand::IImm(IImm::new(
+                                        -(pos + (max(0, icnt - ARG_REG_COUNT) + max(0, fcnt - ARG_REG_COUNT)) * 4)
+                                    ));
                                     self.insts.push(self.insts_mpool.put(
-                                        LIRInst::new(InstrsType::StoreParamToStack,
+                                        LIRInst::new(InstrsType::StoreToStack,
                                             vec![src_reg, offset])
                                     ));
                                 } else {
@@ -570,6 +569,29 @@ impl BB {
                             },
                             _ => unreachable!("call arg type not match, either be int or float")
                         }
+                    }
+                    let mut lir_inst = LIRInst::new(InstrsType::Call,
+                        vec![Operand::Addr(func_label.to_string())]);
+                    lir_inst.set_param_cnts(icnt, fcnt);
+                    self.insts.push(self.insts_mpool.put(lir_inst));
+
+                    match inst_ref.get_ir_type() {
+                        IrType::Int => {
+                            let dst_reg = self.resolve_operand(func, ir_block_inst, true, map_info);
+                            self.insts.push(self.insts_mpool.put(
+                                LIRInst::new(InstrsType::OpReg(SingleOp::IMv),
+                                    vec![dst_reg, Operand::Reg(Reg::new(10, ScalarType::Int))])
+                            ));
+                        },
+                        IrType::Float => {
+                            let dst_reg = self.resolve_operand(func, ir_block_inst, true, map_info);
+                            self.insts.push(self.insts_mpool.put(
+                                LIRInst::new(InstrsType::OpReg(SingleOp::FMv),
+                                    vec![dst_reg, Operand::Reg(Reg::new(10, ScalarType::Float))])
+                            ));
+                        },
+                        IrType::Void => {},
+                        _ => unreachable!("call return type not match, must be int, float or void")
                     }
                 },
                 InstKind::Return => {

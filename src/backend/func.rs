@@ -22,7 +22,7 @@ pub struct Func {
     label: String,
     blocks: Vec<ObjPtr<BB>>,
     pub stack_addr: LinkedList<StackSlot>,
-    caller_stack_addr: LinkedList<StackSlot>,
+    pub callee_stack_addr: LinkedList<StackSlot>,
     pub params: Vec<ObjPtr<Inst>>,
     pub param_cnt: (i32, i32),  // (int, float)
 
@@ -47,7 +47,7 @@ impl Func {
             label: name.to_string(),
             blocks: Vec::new(),
             stack_addr: LinkedList::new(),
-            caller_stack_addr: LinkedList::new(),
+            callee_stack_addr: LinkedList::new(),
             params: Vec::new(),
             param_cnt: (0, 0),
             entry: None,
