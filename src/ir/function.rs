@@ -6,7 +6,7 @@ use std::collections::HashMap;
 pub struct Function {
     value: Value,
     return_type: IrType,
-    parameters: HashMap<&'static str, ObjPtr<Inst>>,
+    parameters: HashMap<String, ObjPtr<Inst>>,
     head_block: Option<ObjPtr<BasicBlock>>,
 }
 
@@ -63,13 +63,13 @@ impl Function {
     }
 
     /// 为函数增加参数
-    pub fn set_parameter(&mut self, name: &'static str, parameter: ObjPtr<Inst>) {
+    pub fn set_parameter(&mut self, name: String, parameter: ObjPtr<Inst>) {
         self.parameters.insert(name, parameter);
     }
 
     /// 获得参数
     /// 默认参数存在
-    pub fn get_parameter(&self, name: &'static str) -> ObjPtr<Inst> {
+    pub fn get_parameter(&self, name: &String) -> ObjPtr<Inst> {
         match self.parameters.get(name) {
             Some(p) => *p,
             None => panic!("尝试获得不存在的参数"),
