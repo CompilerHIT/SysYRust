@@ -92,7 +92,7 @@ impl RegUsedStat {
         // f0作为特殊浮点寄存器保持0
         for i in 1..=31 {
             if self.iregs_used&(1<<i)==0 {
-                return Some(i)
+                return Some(i+32)
             }
         }
         None

@@ -136,7 +136,7 @@ impl Allocator {
     fn interval_anaylise(&mut self){
         for (i,inst) in self.lines.iter().enumerate() {
             for reg in inst.as_ref().get_reg_use() {
-                if !reg.is_allocable() {
+                if !reg.is_virtual() {
                     continue;
                 }
                 self.intervals.insert(reg.get_id(), i);
@@ -221,7 +221,7 @@ impl Allocator {
             }
 
             for reg in it.as_ref().get_reg_def() {
-                if !reg.is_allocable() {continue;}
+                if !reg.is_virtual() {continue;}
                 let id=reg.get_id();
                 if dstr.contains_key(&id) {
                     continue;
