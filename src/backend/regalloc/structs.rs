@@ -52,6 +52,11 @@ impl RegUsedStat {
         // 对于通用寄存器来说，x0-x4有特殊用途
         // x10-x17用来传递函数参数
 
+        if self.iregs_used&(1<<1)==0 {
+            // 分配ra,也就是x1
+            return Some(1);
+        }
+
         if self.iregs_used&(1<<3)==0 {
             // gp寄存器x3,后面可能保留不分配用来做优化
             return Some(3);

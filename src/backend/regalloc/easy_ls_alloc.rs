@@ -22,18 +22,18 @@ pub struct Allocator{
     depths: HashMap<ObjPtr<BB>,usize>,
     passed:HashSet<ObjPtr<BB>>,
     lines:Vec<ObjPtr<LIRInst>>,
-    intervals:HashMap<i32,i32>,   //key,val=虚拟寄存器号，周期结尾指令号
+    intervals:HashMap<i32,usize>,   //key,val=虚拟寄存器号，周期结尾指令号
     base:usize, //用于分配指令号
 }
 
 #[derive(Eq,PartialEq)]
 struct RegInterval {
     pub id :i32,
-    pub end:i32,
+    pub end:usize,
 }
 
 impl RegInterval {
-    fn new(id:i32,end:i32) ->RegInterval {
+    fn new(id:i32,end:usize) ->RegInterval {
         RegInterval { id, end}
     }
 }
@@ -78,16 +78,22 @@ impl Allocator {
 
     // 深度分配
     fn dfs_bbs(&mut self,bb :ObjPtr<BB> ) {
+        let n=self.passed.len();
+        //println!("bb.length:{n}");
         if self.passed.contains(&bb) {
             return 
         }
         // 遍历块,更新高度
         self.depths.insert(bb,self.base);
+        self.passed.insert(bb.clone());
         self.base+=1;
+        // //println!("before");
         // 深度优先遍历后面的块
         for next in &bb.as_ref().out_edge {
-            self.dfs_bbs(next.clone())
+            self.dfs_bbs(next.clone());
+            //println!("after clone ");
         }
+        //println!("once end");
     }
     // 指令编号
     fn inst_record(&mut self,bb:ObjPtr<BB>) {
@@ -95,6 +101,7 @@ impl Allocator {
         if self.passed.contains(&bb) {
             return ;
         }
+        self.passed.insert(bb.clone());
         for line in &bb.as_ref().insts {
             self.lines.push(line.clone())
         }
@@ -103,7 +110,10 @@ impl Allocator {
         loop {
             let mut toPass:usize=bb.as_ref().out_edge.len();
             for (i,next) in bb.as_ref().out_edge.iter().enumerate() {
-                if set.contains(&toPass) {
+                if set.contains(&i) {
+                    continue;
+                }
+                if self.passed.contains(next) {
                     continue;
                 }
                 if toPass==bb.as_ref().out_edge.len() {
@@ -124,16 +134,14 @@ impl Allocator {
 
     // 指令窗口分析
     fn interval_anaylise(&mut self){
-        let mut use_set:HashMap<i32,usize> =HashMap::new();
         for (i,inst) in self.lines.iter().enumerate() {
             for reg in inst.as_ref().get_reg_use() {
                 if !reg.is_allocable() {
                     continue;
                 }
-                use_set.insert(reg.get_id(), i);
+                self.intervals.insert(reg.get_id(), i);
             }
         }
-
     }
 
     // 从函数得到图
@@ -206,7 +214,7 @@ impl Allocator {
             // 先判断有没有可以释放的寄存器
             while iwindow.len()!=0  {
                 if let Some(min)=iwindow.front() {
-                    if min.end<=i as i32{
+                    if min.end<=i {
                         iwindow.pop_front();
                     }
                 }
@@ -216,6 +224,9 @@ impl Allocator {
                 if !reg.is_allocable() {continue;}
                 let id=reg.get_id();
                 if dstr.contains_key(&id) {
+                    continue;
+                }
+                if spillings.contains(&id) {
                     continue;
                 }
                 let end=*self.intervals.get(&id).unwrap();
@@ -283,12 +294,18 @@ impl Regalloc for Allocator {
     fn alloc(&mut self,func :& Func)->FuncAllocStat {
         // TODO第一次遍历，块深度标记
         self.dfs_bbs(func.entry.unwrap());
+        //print!("pass dfs_bb");
         // 第二次遍历,指令深度标记
         self.passed.clear();
         self.inst_record(func.entry.unwrap());
         self.passed.clear();
+        //print!("pass inst_record");
         // 第三次遍历,指令遍历，寄存器interval标记
         self.interval_anaylise();
+        // for (regid,id) in self.intervals.iter() {
+        //     //println!("{regid},{id}");
+        // }
+        //print!("pass interval analyze");
         // 第四次遍历，堆滑动窗口更新获取FuncAllocStat
         let (spillings,dstr)=self.allocRegister();
         let (stack_size,bb_stack_sizes)=Allocator::countStackSize(func,&spillings);
