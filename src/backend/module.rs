@@ -61,6 +61,7 @@ impl AsmModule {
 
     fn allocate_reg(&mut self, f: &mut File) {
         self.func_map.iter_mut().for_each(|(_, func)| {
+            println!("allocate reg fun: {}", func.as_ref().label);
             func.as_mut().allocate_reg(f);
         });
     }

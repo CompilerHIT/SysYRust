@@ -1,5 +1,4 @@
 use lalrpop_util::lalrpop_mod;
-use std::collections::HashMap;
 use sysylib::frontend::irgen::irgen;
 use sysylib::ir::instruction::Inst;
 use sysylib::backend::module::AsmModule;
@@ -58,5 +57,5 @@ fn run_main() {
         pool_func_mut,
     );
     // TODO 后端解析
-    generate_asm(output, &mut AsmModule::new(module_mut));
+    generate_asm(filename, output, &mut AsmModule::new(module_mut));
 }

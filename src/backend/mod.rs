@@ -14,12 +14,12 @@ use std::fs::File;
 use crate::backend::module::AsmModule;
 
 
-pub fn generate_asm(path: &str, module: &mut AsmModule) {
+pub fn generate_asm(in_path: &str, path: &str, module: &mut AsmModule) {
     let mut file = match File::create(path) {
         Ok(f) => f,
         Err(e) => panic!("Create output path error: {}", e),
     };
-    writeln!(file, "	.file	\"{}\"", path);
+    writeln!(file, "	.file	\"{}\"", in_path);
     writeln!(file, "	.option pic");
     writeln!(file, "    .text");
     module.generator(&mut file);

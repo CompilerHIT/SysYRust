@@ -20,7 +20,7 @@ use super::structs::*;
 
 // #[derive(Clone)]
 pub struct Func {
-    label: String,
+    pub label: String,
     blocks: Vec<ObjPtr<BB>>,
     pub stack_addr: LinkedList<StackSlot>,
     pub callee_stack_addr: LinkedList<StackSlot>,
@@ -207,11 +207,17 @@ impl Func {
     pub fn allocate_reg(&mut self, f: &mut File) {
         // 函数返回地址保存在ra中
         let reg_int = vec![Reg::new(1, ScalarType::Int)];
-
+        
         self.calc_live();
+        println!("cal live end");
         let mut allocator = Allocator::new();
+        println!("start alloc");
         let alloc_stat = allocator.alloc(self);
+        println!("alloc end");
         self.context.set_reg_map(&alloc_stat.dstr);
+        println!("stack_size: {}", alloc_stat.stack_size);
+        println!("alloc result: {:?}", alloc_stat.dstr);
+        assert!(false);
 
         let mut stack_size = alloc_stat.stack_size as i32;
         

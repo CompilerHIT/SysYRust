@@ -604,6 +604,10 @@ impl BB {
                         IrType::Int => {
                             let src = inst_ref.get_return_value();
                             let src_operand = self.resolve_operand(func, src, true, map_info);
+                            let num = match src_operand {
+                                Operand::Reg(reg) => reg.get_id(),
+                                _ => panic!("cannot reach, Return false")
+                            };
                             self.insts.push(
                                 self.insts_mpool.put(
                                     LIRInst::new(InstrsType::OpReg(SingleOp::IMv), 
