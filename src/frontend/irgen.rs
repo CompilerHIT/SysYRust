@@ -1,3 +1,5 @@
+use std::env::var;
+
 use super::context::Type;
 use super::{ast::*, context::Context};
 use crate::frontend::context::Symbol;
@@ -50,12 +52,27 @@ impl Kit<'_> {
             InfuncChoice::NInFunc() => Err(Error::PushPhiInGlobalDomain),
         }
     }
-    pub fn get_var(&mut self, s: &str) -> Result<ObjPtr<Inst>, Error> {
+
+    pub fn get_var_symbol(&mut self,s:&str) ->Result<Symbol,Error>{
+        let sym_opt = self
+            .context_mut
+            .var_map
+            .get(s)
+            .and_then(|vec_temp| vec_temp.last())
+            .and_then(|(last_elm, _)| self.context_mut.symbol_table.get(last_elm))
+            .map(|x| x.clone());
+        if let Some(sym) = sym_opt{
+            return Ok(sym);
+        }
+        Err(Error::VariableNotFound)
+    }
+
+    pub fn get_var(&mut self, s: &str) -> Result<(ObjPtr<Inst>, Symbol), Error> {
         // let bb = self.context_mut.bb_now_mut;
         match self.context_mut.bb_now_mut {
             InfuncChoice::InFunc(bb) => {
                 if let Some((inst, symbol)) = self.get_var_bb(s, bb) {
-                    return Ok(inst);
+                    return Ok((inst, symbol));
                 }
             }
             _ => todo!(),
@@ -87,24 +104,28 @@ impl Kit<'_> {
         //     }
         // }
 
+        let mut name_changed = " ".to_string();
+
         let sym_opt = self
             .context_mut
             .var_map
             .get(s)
             .and_then(|vec_temp| vec_temp.last())
-            .and_then(|(last_elm, _)| self.context_mut.symbol_table.get(last_elm))
+            .and_then(|(last_elm, _)| {name_changed = last_elm.clone();self.context_mut.symbol_table.get(last_elm)})
             .map(|x| x.clone());
 
         let inst_opt = self
             .context_mut
             .bb_map
             .get(bb.as_ref().get_name())
-            .and_then(|var_inst_map| var_inst_map.get(s));
+            .and_then(|var_inst_map| var_inst_map.get(&name_changed));
 
         if let Some(sym) = sym_opt {
+            // println!("找到变量{:?}",s);
             if let Some(inst) = inst_opt {
                 return Some((*inst, sym));
             } else {
+                println!("没找到");
                 //没找到
                 let phiinst = self
                     .push_phi(s.to_string(), InfuncChoice::InFunc(bb))
@@ -189,72 +210,8 @@ impl Process for Decl {
 
     fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
         match self {
-            Self::ConstDecl(_decl) => {}
-            Self::VarDecl(vardef) => match vardef.btype {
-                BType::Int => {
-                    for def in &mut vardef.var_def_vec {
-                        match def {
-                            VarDef::NonArrayInit((id, val)) => match val {
-                                InitVal::Exp(exp) => {
-                                    let inst_ptr = exp.process(input, kit_mut).unwrap();
-                                    kit_mut
-                                        .context_mut
-                                        .add_var(id, Type::Int, false, Vec::new());
-                                    kit_mut.context_mut.update_var_scope_now(id, inst_ptr);
-                                    return Ok(1);
-                                }
-                                InitVal::InitValVec(val_vec) => {
-                                    todo!()
-                                }
-                            },
-                            VarDef::NonArray(id) => {
-                                kit_mut
-                                    .context_mut
-                                    .add_var(id, Type::Int, false, Vec::new());
-                                return Ok(1);
-                            }
-                            VarDef::ArrayInit((id, exp_vec, val)) => {}
-                            VarDef::Array((id, exp_vec)) => {
-                                kit_mut
-                                    .context_mut
-                                    .add_var(id.as_str(), Type::Int, true, vec![]);
-                                return Ok(1);
-                            }
-                        }
-                    }
-                }
-                BType::Float => {
-                    for def in &mut vardef.var_def_vec {
-                        match def {
-                            VarDef::NonArrayInit((id, val)) => match val {
-                                InitVal::Exp(exp) => {
-                                    let inst_ptr = exp.process(input, kit_mut).unwrap();
-                                    kit_mut
-                                        .context_mut
-                                        .add_var(id, Type::Float, false, Vec::new());
-                                    kit_mut.context_mut.update_var_scope_now(id, inst_ptr);
-                                    return Ok(1);
-                                }
-                                InitVal::InitValVec(val_vec) => {
-                                    todo!()
-                                }
-                            },
-                            VarDef::NonArray((id)) => {
-                                kit_mut.add_var(id.as_str(), Type::Float, false, vec![]);
-                                return Ok(1);
-                            }
-                            VarDef::ArrayInit((id, exp_vec, val)) => {
-                                todo!()
-                            }
-                            VarDef::Array((id, exp_vec)) => {
-                                // kit_mut.add_var(id.as_str(), Type::Float, true, vec![]);
-                                // return Ok(1);
-                            }
-                            _ => todo!(),
-                        }
-                    }
-                }
-            },
+            Self::ConstDecl(constdecl) => {return constdecl.process(input, kit_mut);}
+            Self::VarDecl(vardef) => {return vardef.process(input, kit_mut);}
         }
         todo!();
     }
@@ -264,17 +221,85 @@ impl Process for ConstDecl {
     type Ret = i32;
     type Message = (i32);
     fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
-        todo!();
+        match self.btype {
+            BType::Int => {
+                for def in &mut self.const_def_vec {
+                    
+                    // match def {
+                    //     VarDef::NonArrayInit((id, val)) => match val {
+                    //         InitVal::Exp(exp) => {
+                    //             let inst_ptr = exp.process(input, kit_mut).unwrap();
+                    //             kit_mut
+                    //                 .context_mut
+                    //                 .add_var(id, Type::Int, false, Vec::new());
+                    //             kit_mut.context_mut.update_var_scope_now(id, inst_ptr);
+                    //             return Ok(1);
+                    //         }
+                    //         InitVal::InitValVec(val_vec) => {
+                    //             todo!()
+                    //         }
+                    //     },
+                    //     VarDef::NonArray(id) => {
+                    //         kit_mut
+                    //             .context_mut
+                    //             .add_var(id, Type::Int, false, Vec::new());
+                    //         return Ok(1);
+                    //     }
+                    //     VarDef::ArrayInit((id, exp_vec, val)) => {}
+                    //     VarDef::Array((id, exp_vec)) => {
+                    //         kit_mut
+                    //             .context_mut
+                    //             .add_var(id.as_str(), Type::Int, true, vec![]);
+                    //         return Ok(1);
+                    //     }
+                    // }
+                }
+                Ok(1)
+            }
+            BType::Float => {
+                for def in &mut self.const_def_vec {
+                    // match def {
+                    //     VarDef::NonArrayInit((id, val)) => match val {
+                    //         InitVal::Exp(exp) => {
+                    //             let inst_ptr = exp.process(input, kit_mut).unwrap();
+                    //             kit_mut
+                    //                 .context_mut
+                    //                 .add_var(id, Type::Float, false, Vec::new());
+                    //             kit_mut.context_mut.update_var_scope_now(id, inst_ptr);
+                    //             return Ok(1);
+                    //         }
+                    //         InitVal::InitValVec(val_vec) => {
+                    //             todo!()
+                    //         }
+                    //     },
+                    //     VarDef::NonArray((id)) => {
+                    //         kit_mut.add_var(id.as_str(), Type::Float, false, vec![]);
+                    //         return Ok(1);
+                    //     }
+                    //     VarDef::ArrayInit((id, exp_vec, val)) => {
+                    //         todo!()
+                    //     }
+                    //     VarDef::Array((id, exp_vec)) => {
+                    //         // kit_mut.add_var(id.as_str(), Type::Float, true, vec![]);
+                    //         // return Ok(1);
+                    //     }
+                    //     _ => todo!(),
+                    // }
+                }
+                Ok(1)
+            }
+            
+        }
     }
 }
 
-impl Process for BType {
-    type Ret = i32;
-    type Message = (i32);
-    fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
-        todo!();
-    }
-}
+// impl Process for BType {
+//     type Ret = i32;
+//     type Message = (i32);
+//     fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
+//         todo!();
+//     }
+// }
 
 impl Process for ConstInitVal {
     type Ret = i32;
@@ -288,7 +313,74 @@ impl Process for VarDecl {
     type Ret = i32;
     type Message = (i32);
     fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
-        todo!();
+        match self.btype {
+            BType::Int => {
+                for def in &mut self.var_def_vec {
+                    match def {
+                        VarDef::NonArrayInit((id, val)) => match val {
+                            InitVal::Exp(exp) => {
+                                let inst_ptr = exp.process(Type::Int, kit_mut).unwrap();
+                                kit_mut
+                                    .context_mut
+                                    .add_var(id, Type::Int, false, Vec::new());
+                                kit_mut.context_mut.update_var_scope_now(id, inst_ptr);
+                                
+                            }
+                            InitVal::InitValVec(val_vec) => {
+                                todo!()
+                            }
+                        },
+                        VarDef::NonArray(id) => {
+                            kit_mut
+                                .context_mut
+                                .add_var(id, Type::Int, false, Vec::new());
+                            
+                        }
+                        VarDef::ArrayInit((id, exp_vec, val)) => {}
+                        VarDef::Array((id, exp_vec)) => {
+                            kit_mut
+                                .context_mut
+                                .add_var(id.as_str(), Type::Int, true, vec![]);
+                            
+                        }
+                    }
+                }
+                Ok(1)
+            }
+            BType::Float => {
+                for def in &mut self.var_def_vec {
+                    match def {
+                        VarDef::NonArrayInit((id, val)) => match val {
+                            InitVal::Exp(exp) => {
+                                let inst_ptr = exp.process(Type::Float, kit_mut).unwrap();
+                                kit_mut
+                                    .context_mut
+                                    .add_var(id, Type::Float, false, Vec::new());
+                                kit_mut.context_mut.update_var_scope_now(id, inst_ptr);
+                                
+                            }
+                            InitVal::InitValVec(val_vec) => {
+                                todo!()
+                            }
+                        },
+                        VarDef::NonArray((id)) => {
+                            kit_mut.add_var(id.as_str(), Type::Float, false, vec![]);
+                            
+                        }
+                        VarDef::ArrayInit((id, exp_vec, val)) => {
+                            todo!()
+                        }
+                        VarDef::Array((id, exp_vec)) => {
+                            // kit_mut.add_var(id.as_str(), Type::Float, true, vec![]);
+                            // return Ok(1);
+                        }
+                        _ => todo!(),
+                    }
+                }
+                Ok(1)
+            }
+            
+        }
     }
 }
 impl Process for VarDef {
@@ -312,6 +404,7 @@ impl Process for FuncDef {
     fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
         match self {
             Self::NonParameterFuncDef((tp, id, blk)) => {
+                kit_mut.context_mut.add_layer();
                 let func_ptr = kit_mut.pool_func_mut.new_function();
                 let func_mut = func_ptr.as_mut();
                 let bb = kit_mut.pool_bb_mut.new_basic_block(id.clone());
@@ -326,10 +419,31 @@ impl Process for FuncDef {
                     .context_mut
                     .push_func_module(id.to_string(), func_ptr);
                 blk.process(1, kit_mut);
+                kit_mut.context_mut.delete_layer();
                 return Ok(1);
             }
-            Self::ParameterFuncDef(pf) => {
-                todo!()
+            Self::ParameterFuncDef((tp, id, params, blk)) => {
+                kit_mut.context_mut.add_layer();
+                let func_ptr = kit_mut.pool_func_mut.new_function();
+                let func_mut = func_ptr.as_mut();
+                let bb = kit_mut.pool_bb_mut.new_basic_block(id.clone());
+                func_mut.insert_first_bb(bb);
+                match tp {
+                    FuncType::Void => func_mut.set_return_type(IrType::Void),
+                    FuncType::Int => func_mut.set_return_type(IrType::Int),
+                    FuncType::Float => func_mut.set_return_type(IrType::Float),
+                }
+                kit_mut.context_mut.bb_now_set(bb);
+                kit_mut
+                    .context_mut
+                    .push_func_module(id.to_string(), func_ptr);
+                let params_vec = params.process(1, kit_mut).unwrap();
+                for (name, param) in params_vec {
+                    func_mut.set_parameter(name, param); //这里
+                }
+                blk.process(1, kit_mut);
+                kit_mut.context_mut.delete_layer();
+                return Ok(1);
             }
         }
         // module.push_function(name, function);
@@ -337,26 +451,57 @@ impl Process for FuncDef {
     }
 }
 
-impl Process for FuncType {
-    type Ret = i32;
-    type Message = (i32);
-    fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
-        todo!();
-    }
-}
+// impl Process for FuncType {
+//     type Ret = i32;
+//     type Message = (i32);
+//     fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
+//         todo!();
+//     }
+// }
 impl Process for FuncFParams {
-    type Ret = i32;
+    type Ret = Vec<(String, ObjPtr<Inst>)>;
     type Message = (i32);
     fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
-        todo!();
+        let mut vec = vec![];
+        for param in &mut self.func_fparams_vec {
+            let p = param.process(input, kit_mut).unwrap();
+            vec.push(p);
+        }
+        Ok(vec)
     }
 }
 
 impl Process for FuncFParam {
-    type Ret = i32;
+    type Ret = (String, ObjPtr<Inst>);
     type Message = (i32);
     fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
-        todo!();
+        match self {
+            FuncFParam::Array((tp, id, vec)) => {
+                todo!()
+            }
+            // BType::Int => {}
+            // BType::Float => {}
+            // todo!();
+            // },
+            FuncFParam::NonArray((tp, id)) => match tp {
+                BType::Int => {
+                    let param = kit_mut.pool_inst_mut.make_param(IrType::Int);
+                    kit_mut
+                        .context_mut
+                        .add_var(id, Type::Int, false, Vec::new());
+                    //这里
+                    // kit_mut.context_mut.update_var_scope_now(s, inst)
+                    Ok((id.clone(), param))
+                }
+                BType::Float => {
+                    let param = kit_mut.pool_inst_mut.make_param(IrType::Float);
+                    kit_mut
+                        .context_mut
+                        .add_var(id, Type::Float, false, Vec::new());
+                    Ok((id.clone(), param))
+                }
+            },
+        }
     }
 }
 impl Process for Block {
@@ -399,7 +544,7 @@ impl Process for Stmt {
                 Ok(1)
             }
             Stmt::ExpStmt(exp_stmt) => {
-                exp_stmt.process(input, kit_mut);
+                exp_stmt.process(Type::Int, kit_mut);//这里可能有问题
                 Ok(1)
             }
             Stmt::Block(blk) => {
@@ -435,12 +580,27 @@ impl Process for Assign {
     type Ret = i32;
     type Message = (i32);
     fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
-        todo!();
+        let lval = &mut self.lval;
+        let symbol = kit_mut.get_var_symbol(&lval.id).unwrap();
+        // let (_,symbol) = kit_mut.get_var(&lval.id).unwrap();
+        println!("assign stmt");
+        let mut mes = Type::Int;
+        match symbol.tp{
+            Type::ConstFloat =>{mes = Type::Float;}
+            Type::ConstInt =>{mes = Type::Int;}
+            Type::Float =>{mes = Type::Float;}
+            Type::Int =>{mes = Type::Int;}
+        }
+        let inst_r = self.exp.process(mes, kit_mut).unwrap();
+        kit_mut
+            .context_mut
+            .update_var_scope_now(&self.lval.id, inst_r);
+        Ok(1)
     }
 }
 impl Process for ExpStmt {
     type Ret = i32;
-    type Message = (i32);
+    type Message = (Type);
     fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
         todo!();
     }
@@ -481,7 +641,7 @@ impl Process for Return {
     type Message = (i32);
     fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
         if let Some(exp) = &mut self.exp {
-            let inst = exp.process(input, kit_mut).unwrap();
+            let inst = exp.process(Type::Int, kit_mut).unwrap();//这里可能有问题
             let ret_inst = kit_mut.pool_inst_mut.make_return(inst);
             kit_mut.context_mut.push_inst_bb(ret_inst);
             Ok(1)
@@ -495,7 +655,7 @@ impl Process for Return {
 }
 impl Process for Exp {
     type Ret = ObjPtr<Inst>;
-    type Message = (i32);
+    type Message = (Type);
     fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
         self.add_exp.process(input, kit_mut)
     }
@@ -509,20 +669,29 @@ impl Process for Cond {
     }
 }
 impl Process for LVal {
-    type Ret = i32;
-    type Message = (i32);
+    type Ret = ObjPtr<Inst>;
+    type Message = (Type);
     fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
-        todo!();
+        // let id = self.id;
+        // let vec = self.exp_vec;
+        let (var, symbol) = kit_mut.get_var(&self.id).unwrap();
+        println!("var_name:{:?},ir_type:{:?}",&self.id,var.as_ref().get_ir_type());
+        println!("var_name:{:?},ir_type:{:?}",&self.id,var.as_ref().get_kind());
+        if symbol.is_array {
+            todo!();
+        } else {
+            return Ok(var);
+        }
     }
 }
 
 impl Process for PrimaryExp {
     type Ret = ObjPtr<Inst>;
-    type Message = (i32);
+    type Message = (Type);
     fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
         match self {
             PrimaryExp::Exp(exp) => exp.process(input, kit_mut),
-            PrimaryExp::LVal(lval) => todo!(),
+            PrimaryExp::LVal(lval) => lval.process(input, kit_mut),
             PrimaryExp::Number(num) => num.process(input, kit_mut),
         }
         // todo!();
@@ -530,7 +699,7 @@ impl Process for PrimaryExp {
 }
 impl Process for Number {
     type Ret = ObjPtr<Inst>;
-    type Message = (i32);
+    type Message = (Type);
     fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
         match self {
             Number::FloatConst(f) => {
@@ -548,7 +717,7 @@ impl Process for Number {
                 } else {
                     let inst = kit_mut.pool_inst_mut.make_int_const(*i);
                     kit_mut.context_mut.add_const_int(*i, inst);
-                    println!("intconst:{}", i);
+                    // println!("intconst:{}", i);
                     return Ok(inst);
                 }
             }
@@ -565,7 +734,7 @@ impl Process for OptionFuncFParams {
 }
 impl Process for UnaryExp {
     type Ret = ObjPtr<Inst>;
-    type Message = (i32);
+    type Message = (Type);
     fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
         match self {
             UnaryExp::PrimaryExp(primaryexp) => primaryexp.process(input, kit_mut),
@@ -607,13 +776,16 @@ impl Process for FuncRParams {
     type Ret = i32;
     type Message = (i32);
     fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
-        todo!();
+        // match self{
+        //     FuncFParams
+        // }
+        todo!()
     }
 }
 
 impl Process for MulExp {
     type Ret = ObjPtr<Inst>;
-    type Message = (i32);
+    type Message = (Type);
     fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
         match self {
             MulExp::UnaryExp(unaryexp) => unaryexp.process(input, kit_mut),
@@ -651,7 +823,7 @@ impl Process for AddOp {
 
 impl Process for AddExp {
     type Ret = ObjPtr<Inst>;
-    type Message = (i32);
+    type Message = (Type);
     fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
         match self {
             AddExp::MulExp(mulexp) => mulexp.as_mut().process(input, kit_mut),
@@ -666,7 +838,9 @@ impl Process for AddExp {
                 AddOp::Minus => {
                     let inst_left = opexp.process(input, kit_mut).unwrap();
                     let inst_right = mulexp.process(input, kit_mut).unwrap();
-                    let inst = kit_mut.pool_inst_mut.make_add(inst_left, inst_right);
+                    let inst_right_neg = kit_mut.pool_inst_mut.make_neg(inst_right);
+                    let inst = kit_mut.pool_inst_mut.make_add(inst_left, inst_right_neg);
+                    kit_mut.context_mut.push_inst_bb(inst_right_neg);
                     kit_mut.context_mut.push_inst_bb(inst);
                     Ok(inst)
                 }

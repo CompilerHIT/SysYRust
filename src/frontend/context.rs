@@ -21,14 +21,16 @@ pub struct Context<'a> {
 pub enum Type {
     Int,
     Float,
+    ConstInt,
+    ConstFloat,
 }
 
 #[derive(Clone)]
 pub struct Symbol {
-    tp: Type,
-    is_array: bool,
-    layer: i64,
-    dimension: Vec<i64>,
+    pub tp: Type,
+    pub is_array: bool,
+    pub layer: i64,
+    pub dimension: Vec<i64>,
 }
 
 impl Context<'_> {
@@ -42,7 +44,7 @@ impl Context<'_> {
             bb_now_mut: InfuncChoice::NInFunc(),
             module_mut,
             index: 0,
-            layer: 0,
+            layer: -1,
             symbol_table: HashMap::new(),
         }
     }
@@ -182,7 +184,7 @@ impl Context<'_> {
             }
             InfuncChoice::NInFunc() => {
                 self.push_globalvar_module(temps.clone(), inst);
-                v.push((temps.clone(), 0));
+                v.push((temps.clone(), -1));
             }
         }
         // v.push((temps.clone(), 1));
@@ -213,7 +215,7 @@ impl Context<'_> {
             }
             InfuncChoice::NInFunc() => {
                 self.push_globalvar_module(temps.clone(), inst);
-                v.push((temps.clone(), 0));
+                v.push((temps.clone(), -1));
             }
         }
         // v.push((temps.clone(), 1));
@@ -251,7 +253,7 @@ impl Context<'_> {
             let iname = "@".to_string() + i.to_string().as_str();
             if let Some(vec) = self.var_map.get(&iname) {
                 for (name_changed, layer_) in vec {
-                    if *layer_ == 0 {
+                    if *layer_ == -1 {
                         if let Some(inst_vec) = self.bb_map.get("notinblock") {
                             if let Some(inst) = inst_vec.get(name_changed) {
                                 return Option::Some(*inst);
@@ -283,7 +285,7 @@ impl Context<'_> {
             let iname = "%".to_string() + f.to_string().as_str();
             if let Some(vec) = self.var_map.get(&iname) {
                 for (name_changed, layer_) in vec {
-                    if *layer_ == 0 {
+                    if *layer_ == -1 {
                         if let Some(inst_vec) = self.bb_map.get("notinblock") {
                             if let Some(inst) = inst_vec.get(name_changed) {
                                 return Option::Some(*inst);
