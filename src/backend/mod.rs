@@ -8,6 +8,7 @@ pub mod structs;
 pub mod module;
 pub mod regalloc;
 
+use std::io::Write;
 use std::fs::File;
 
 use crate::backend::module::AsmModule;
@@ -18,5 +19,11 @@ pub fn generate_asm(path: &str, module: &mut AsmModule) {
         Ok(f) => f,
         Err(e) => panic!("Create output path error: {}", e),
     };
-    module.generator(&mut file)
+    writeln!(file, "	.file	\"{}\"", path);
+    writeln!(file, "	.option pic");
+    writeln!(file, "    .text");
+    module.generator(&mut file);
+    
+    writeln!(file, "    .ident	\"GCC: (Ubuntu 11.3.0-1ubuntu1~22.04.1) 11.3.0\"");
+    writeln!(file, "    .section	.note.GNU-stack,\"\",@progbits");
 }

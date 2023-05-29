@@ -784,7 +784,7 @@ impl GenerateAsm for BB {
         }
         println!("generate bb\n");
         for inst in self.insts.iter() {
-            print!("inst here\n");
+            println!("inst here\n");
             inst.as_mut().generate(context.clone(), f)?;
         }
         Ok(())

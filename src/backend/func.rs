@@ -4,10 +4,11 @@ use std::vec::Vec;
 pub use std::fs::File;
 pub use std::hash::{Hash, Hasher};
 pub use std::io::Result;
+use std::io::Write;
 
 use crate::ir::basicblock::BasicBlock;
 use crate::ir::function::Function;
-use crate::ir::instruction::{Inst, InstKind};
+use crate::ir::instruction::Inst;
 use crate::utility::{ScalarType, ObjPool, ObjPtr};
 use crate::backend::operand::Reg;
 use crate::backend::instrs::LIRInst;
@@ -276,6 +277,7 @@ impl GenerateAsm for Func {
         for block in self.blocks.iter() {
             block.as_mut().generate(ObjPtr::new(&self.context), f)?;
         }
+        writeln!(f, "	.size	{}, .-{}:", self.label, self.label)?;
         Ok(())
     }
 }
