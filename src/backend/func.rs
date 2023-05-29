@@ -15,7 +15,7 @@ use crate::backend::instrs::LIRInst;
 use crate::backend::asm_builder::AsmBuilder;
 use crate::backend::module::AsmModule;
 use crate::backend::block::*;
-use crate::backend::regalloc::{regalloc::Regalloc, easy_ls_alloc::Allocator};
+use crate::backend::regalloc::{regalloc::Regalloc, easy_ls_alloc::Allocator, structs::FuncAllocStat};
 use super::structs::*;
 
 // #[derive(Clone)]
@@ -37,6 +37,8 @@ pub struct Func {
     pub context: Context,
 
     blocks_mpool: ObjPool<BB>,
+    pub reg_alloc_info: FuncAllocStat,
+    pub spill_stack_map: HashMap<i32, StackSlot>
 }
 
 
@@ -60,6 +62,9 @@ impl Func {
             context: Context::new(),
 
             blocks_mpool: ObjPool::new(),
+
+            reg_alloc_info: FuncAllocStat::new(),
+            spill_stack_map: HashMap::new()
         }
     }
 
@@ -214,12 +219,13 @@ impl Func {
         println!("start alloc");
         let alloc_stat = allocator.alloc(self);
         println!("alloc end");
-        self.context.set_reg_map(&alloc_stat.dstr);
-        println!("stack_size: {}", alloc_stat.stack_size);
-        println!("alloc result: {:?}", alloc_stat.dstr);
-        assert!(false);
 
-        let mut stack_size = alloc_stat.stack_size as i32;
+        self.reg_alloc_info = alloc_stat;
+        self.context.set_reg_map(&self.reg_alloc_info.dstr);
+        println!("stack_size: {}", self.reg_alloc_info.stack_size);
+        println!("alloc result: {:?}", self.reg_alloc_info.dstr);
+
+        let mut stack_size = self.reg_alloc_info.stack_size as i32;
         
         let mut reg_int_res = Vec::from(reg_int);
         let mut reg_int_res_cl = reg_int_res.clone();
@@ -252,7 +258,7 @@ impl Func {
             let mut builder = AsmBuilder::new(&mut f2);
             for src in reg_int_res_cl.iter() {
                 offset -= 8;
-                builder.l("sp", &src.to_string(), offset, false, true);
+                builder.l(&src.to_string(), "sp", offset, false, true);
             }
             builder.addi("sp", "sp", stack_size);
         });
@@ -274,6 +280,19 @@ impl Func {
     pub fn get_first_block(&self) -> ObjPtr<BB> {
         self.blocks[1].clone()
     }
+
+    pub fn handle_spill(&mut self) {
+        for block in self.blocks.iter() {
+            let pos = match self.reg_alloc_info.bb_stack_sizes.get(&block) {
+                //FIXME: handle no spill block
+                Some(pos) => {
+                    *pos as i32
+                },
+                None => continue,
+            };
+            block.as_mut().handle_spill(ObjPtr::new(&self), &self.reg_alloc_info.spillings, pos);
+        }
+    }
 }
 
 impl GenerateAsm for Func {
@@ -283,7 +302,7 @@ impl GenerateAsm for Func {
         for block in self.blocks.iter() {
             block.as_mut().generate(ObjPtr::new(&self.context), f)?;
         }
-        writeln!(f, "	.size	{}, .-{}:", self.label, self.label)?;
+        writeln!(f, "	.size	{}, .-{}", self.label, self.label)?;
         Ok(())
     }
 }

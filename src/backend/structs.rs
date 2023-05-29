@@ -203,7 +203,6 @@ pub struct Mapping {
 
     pub val_map: HashMap<ObjPtr<Inst>, Operand>,
 
-    pub func_imm_map: HashMap<Operand, ObjPtr<LIRInst>>
     // pub func_
 }
 
@@ -216,7 +215,6 @@ impl Mapping {
             int_array_map: HashSet::new(),
             array_slot_map: HashMap::new(),
             val_map: HashMap::new(),
-            func_imm_map: HashMap::new(),
         }
     }
 }

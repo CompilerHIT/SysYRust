@@ -1,5 +1,5 @@
 pub use std::io::Result;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::vec;
 use std::cmp::min;
 
@@ -9,6 +9,8 @@ pub use crate::backend::func::Func;
 pub use crate::utility::{ScalarType, ObjPtr};
 pub use crate::backend::asm_builder::AsmBuilder;
 use crate::backend::operand::*;
+
+use super::operand;
 
 #[derive(Clone, PartialEq)]
 pub enum Operand {
@@ -150,15 +152,45 @@ impl LIRInst {
         }
     }
 
-    // mapping virtual reg_id to physic reg_id
+    // mapping virtual reg_id to physic reg_id, 物理寄存器不映射
     pub fn v_to_phy(&mut self, map: HashMap<i32, i32>) {
         for operand in &self.operands {
             match operand {
                 Operand::Reg(mut reg) => {
+                    if reg.is_physic() {
+                        continue;
+                    }
                     if let Some(id) = map.get(&reg.get_id()) {
                         reg.map_id(id.clone());
                     } else {
                         panic!("not find physic mapping");
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+
+    pub fn is_spill(&self, id: &HashSet<i32>) -> i32 {
+        for op in &self.operands {
+            match op {
+                Operand::Reg(reg) => {
+                    if id.contains(&reg.get_id()) {
+                        return reg.get_id();
+                    }
+                }
+                _ => {}
+            }
+        }
+        -1
+    }
+
+    pub fn replace(&mut self, old: i32, new: i32) {
+        for op in &mut self.operands {
+            match op {
+                Operand::Reg(reg) => {
+                    if reg.get_id() == old {
+                        reg.map_id(new);
                     }
                 }
                 _ => {}

@@ -523,12 +523,13 @@ impl BB {
                                     ));
                                 } else {
                                     // 保存在寄存器中的参数，从前往后
-                                    // FIXME:保存寄存器需要额外的开栈开销
                                     let src_reg = self.resolve_operand(func, *arg, true, map_info);
                                     let dst_reg = Operand::Reg(Reg::new(icnt, ScalarType::Int));
-                                    let pos = map_info.stack_slot_set.back().unwrap().get_pos() + map_info.stack_slot_set.back().unwrap().get_size();
+                                    let pos = map_info.stack_slot_set.front().unwrap().get_pos() + map_info.stack_slot_set.front().unwrap().get_size();
                                     let size = 8;
-                                    map_info.stack_slot_set.push_back(StackSlot::new(pos, size));
+                                    let slot = StackSlot::new(pos, size);
+                                    map_info.stack_slot_set.push_front(slot);
+                                    func.as_mut().spill_stack_map.insert(icnt, slot);
                                     let mut inst = LIRInst::new(InstrsType::StoreToStack,
                                         vec![dst_reg.clone(), Operand::IImm(IImm::new(pos))]);
                                     inst.set_double();
@@ -552,8 +553,9 @@ impl BB {
                                             vec![src_reg, offset])
                                     ));
                                 } else {
+                                    //FIXME:暂时不考虑浮点数参数
                                     let src_reg = self.resolve_operand(func, *arg, true, map_info);
-                                    let dst_reg = Operand::Reg(Reg::new(fcnt, ScalarType::Int));
+                                    let dst_reg = Operand::Reg(Reg::new(fcnt, ScalarType::Float));
                                     let pos = map_info.stack_slot_set.back().unwrap().get_pos() + map_info.stack_slot_set.back().unwrap().get_size();
                                     let size = 8;
                                     map_info.stack_slot_set.push_back(StackSlot::new(pos, size));
@@ -574,6 +576,18 @@ impl BB {
                         vec![Operand::Addr(func_label.to_string())]);
                     lir_inst.set_param_cnts(icnt, fcnt);
                     self.insts.push(self.insts_mpool.put(lir_inst));
+
+                    // restore stack slot
+                    let mut i = 0;
+                    while i < ARG_REG_COUNT {
+                        if let Some(slot) = func.as_ref().spill_stack_map.get(&i) {
+                            let mut inst = LIRInst::new(InstrsType::LoadFromStack,
+                                vec![Operand::Reg(Reg::new(i, ScalarType::Int)), Operand::IImm(IImm::new(slot.get_pos()))]);
+                            inst.set_double();
+                            self.insts.push(self.insts_mpool.put(inst));
+                        }
+                        i += 1;
+                    }
 
                     match inst_ref.get_ir_type() {
                         IrType::Int => {
@@ -644,6 +658,67 @@ impl BB {
 
     pub fn push_back_list(&mut self, inst: &mut Vec<ObjPtr<LIRInst>>) {
         self.insts.append(inst);
+    }
+
+    pub fn handle_spill(&mut self, func: ObjPtr<Func>, spill: &HashSet<i32>, pos: i32) {
+        let mut index = 0;
+        loop {
+            if index >= self.insts.len() {
+                break;
+            }
+            let inst = self.insts[index].as_mut();
+            let id = inst.is_spill(spill);
+            let mut offset = 0;
+            let mut size = 0;
+            if id != -1 {
+                //FIXME:暂时使用double进行栈操作，且未处理浮点数
+                inst.replace(id, 5);
+
+                let mut store = LIRInst::new(InstrsType::StoreToStack, 
+                    vec![Operand::Reg(Reg::new(5, ScalarType::Int)), Operand::IImm(IImm::new(pos))]);
+                store.set_double();
+                self.insts.insert(index, self.insts_mpool.put(store));
+                index += 1;
+
+                //FIXME:直接恢复，故不需存栈信息
+                // func.as_mut().stack_addr.push_back(StackSlot::new(pos, 8));
+
+                match func.as_ref().spill_stack_map.get(&id) {
+                    Some(slot) => {
+                        offset = slot.get_pos();
+                        size = slot.get_size();
+                        let mut load = LIRInst::new(InstrsType::LoadFromStack, 
+                            vec![Operand::Reg(Reg::new(5, ScalarType::Int)), Operand::IImm(IImm::new(offset))]);
+                        if size == 8 {
+                            load.set_double();
+                        } else if size == 4 {
+                        } else {
+                            unreachable!("local variable must be 4 or 8 bytes");
+                        }
+                        self.insts.insert(index, self.insts_mpool.put(load));
+                        index += 1;
+                    },
+                    None => {}
+                }
+
+                index += 1;
+                store = LIRInst::new(InstrsType::StoreToStack, 
+                    vec![Operand::Reg(Reg::new(5, ScalarType::Int)), Operand::IImm(IImm::new(pos))]);
+                store.set_double();
+                self.insts.insert(index, self.insts_mpool.put(store));
+                let slot = StackSlot::new(pos, 8);
+                func.as_mut().stack_addr.push_back(slot);
+                func.as_mut().spill_stack_map.insert(id, slot);
+                
+                index += 1;
+                let mut load = LIRInst::new(InstrsType::LoadFromStack, 
+                    vec![Operand::Reg(Reg::new(5, ScalarType::Int)), Operand::IImm(IImm::new(pos))]);
+                load.set_double();
+                self.insts.insert(index, self.insts_mpool.put(load));
+            } else {
+                index += 1;
+            }
+        }
     }
 
     fn resolve_operand(&mut self, func: ObjPtr<Func>, src: ObjPtr<Inst>, is_left: bool, map: &mut Mapping) -> Operand {

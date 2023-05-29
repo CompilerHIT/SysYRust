@@ -55,6 +55,7 @@ impl AsmModule {
     pub fn generator(&mut self, f: &mut File) {
         self.build_lir();
         self.allocate_reg(f);
+        // self.handle_spill();
         // self.generate_global_var(f);
         self.generate_asm(f);
     }
@@ -63,6 +64,12 @@ impl AsmModule {
         self.func_map.iter_mut().for_each(|(_, func)| {
             println!("allocate reg fun: {}", func.as_ref().label);
             func.as_mut().allocate_reg(f);
+        });
+    }
+
+    fn handle_spill(&mut self) {
+        self.func_map.iter_mut().for_each(|(_, func)| {
+            func.as_mut().handle_spill();
         });
     }
 

@@ -5,7 +5,8 @@ pub const ARG_REG_COUNT: i32 = 8;
 pub const REG_SP: i32 = 2;
 const IMM_12_Bs: i32 = 2047;
 const IMM_20_Bs: i32 = 524287;
-pub static mut REG_ID : i32 = 0;
+pub static mut I_REG_ID : i32 = 0;
+pub static mut F_REG_ID : i32 = 0;
 
 #[derive(Clone, Copy, PartialEq, Hash, Eq)]
 pub struct Reg {
@@ -97,10 +98,10 @@ impl Reg {
         match r_type {
             ScalarType::Int => {
                 unsafe {
-                    let mut id = REG_ID;
-                    REG_ID += 1;
+                    let mut id = I_REG_ID;
+                    I_REG_ID += 1;
                     match id {
-                        0 | 2 | 4 => id = REG_ID,
+                        0 | 2 | 4 => id = I_REG_ID,
                         _ => {}
                     }
                     Self {
@@ -111,8 +112,8 @@ impl Reg {
             },
             ScalarType::Float => {
                 unsafe {
-                    let id = REG_ID;
-                    REG_ID += 1;
+                    let id = F_REG_ID;
+                    F_REG_ID += 1;
                     Self {
                         id,
                         r_type
@@ -151,11 +152,7 @@ impl Reg {
     }
 
     pub fn map_id(&mut self, dst: i32) {
-        self.id = match self.get_type() {
-            ScalarType::Int => dst,
-            ScalarType::Float => dst - 32,
-            _ => panic!("Wrong Type")
-        }
+        self.id = dst;
     }
 
     // ra, t0, t1-2, a0-1, a2-7, t3-6
