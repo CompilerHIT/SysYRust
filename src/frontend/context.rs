@@ -151,6 +151,7 @@ impl Context<'_> {
             }
             InfuncChoice::NInFunc() => {
                 bbname = "notinblock";
+                self.push_var_bb(s.to_string(), inst);
             }
         }
         if self.var_map.contains_key(s) {
@@ -176,18 +177,33 @@ impl Context<'_> {
         let s = "@".to_string() + i.to_string().as_str();
         let mut v = vec![];
         let temps = self.add_prefix(s.clone());
+        
+        // v.push((temps.clone(), 1));
+        // let stemp = s.clone();
+        // self.var_map.insert(stemp, v);
+        // self.symbol_table.insert(
+        //     temps.clone(),
+        //     Symbol {
+        //         tp: Type::Int,
+        //         is_array: false,
+        //         layer: self.layer,
+        //         dimension: vec![],
+        //     },
+        // );
+        
         match &mut self.bb_now_mut {
             InfuncChoice::InFunc(bbptr) => {
                 let bb = bbptr.as_mut();
                 bb.push_back(inst);
                 v.push((temps.clone(), 1));
+                self.update_var_scope_now(&s, inst);//update global会把var存到module变量作用域中
             }
             InfuncChoice::NInFunc() => {
-                self.push_globalvar_module(temps.clone(), inst);
+                // self.push_globalvar_module(temps.clone(), inst);
                 v.push((temps.clone(), -1));
             }
         }
-        // v.push((temps.clone(), 1));
+
         let stemp = s.clone();
         self.var_map.insert(stemp, v);
         self.symbol_table.insert(
@@ -199,7 +215,8 @@ impl Context<'_> {
                 dimension: vec![],
             },
         );
-        self.update_var_scope_now(&s, inst);
+
+        // self.update_var_scope_now(&s, inst);
         self.get_const_int(i)
     }
 
@@ -301,6 +318,7 @@ impl Context<'_> {
     pub fn add_var(&mut self, s: &str, tp: Type, is_array: bool, dimension: Vec<i64>) -> bool {
         let s1 = s.clone();
         if (self.has_var_now(s1)) {
+            println!("当前作用域中已声明过变量{:?}",s);
             return false;
         }
         let temps = self.add_prefix(s.to_string());
@@ -333,6 +351,9 @@ impl Context<'_> {
                 },
             );
         }
+        // if self.layer==-1{
+        //     self.update_var_scope_now(s, inst, bb)
+        // }
         true
     }
 

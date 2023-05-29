@@ -192,7 +192,7 @@ impl Process for GlobalItems {
     fn process(&mut self, _input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
         match self {
             Self::Decl(decl) => {
-                decl.process(1, kit_mut);
+                decl.process(1, kit_mut).unwrap();
                 Ok(1)
             }
             Self::FuncDef(funcdef) => {
@@ -210,8 +210,8 @@ impl Process for Decl {
 
     fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
         match self {
-            Self::ConstDecl(constdecl) => {return constdecl.process(input, kit_mut);}
-            Self::VarDecl(vardef) => {return vardef.process(input, kit_mut);}
+            Self::ConstDecl(constdecl) => {constdecl.process(input, kit_mut).unwrap();return Ok(1);}
+            Self::VarDecl(vardef) => {vardef.process(input, kit_mut).unwrap();return Ok(1);}
         }
         todo!();
     }
@@ -320,9 +320,11 @@ impl Process for VarDecl {
                         VarDef::NonArrayInit((id, val)) => match val {
                             InitVal::Exp(exp) => {
                                 let inst_ptr = exp.process(Type::Int, kit_mut).unwrap();
-                                kit_mut
+                                if !kit_mut
                                     .context_mut
-                                    .add_var(id, Type::Int, false, Vec::new());
+                                    .add_var(id, Type::Int, false, Vec::new()){
+                                        return Err(Error::MultipleDeclaration);
+                                    }
                                 kit_mut.context_mut.update_var_scope_now(id, inst_ptr);
                                 
                             }
@@ -331,16 +333,20 @@ impl Process for VarDecl {
                             }
                         },
                         VarDef::NonArray(id) => {
-                            kit_mut
+                            if !kit_mut
                                 .context_mut
-                                .add_var(id, Type::Int, false, Vec::new());
+                                .add_var(id, Type::Int, false, Vec::new()){
+                                    return Err(Error::MultipleDeclaration);
+                                }
                             
                         }
                         VarDef::ArrayInit((id, exp_vec, val)) => {}
                         VarDef::Array((id, exp_vec)) => {
-                            kit_mut
+                            if !kit_mut
                                 .context_mut
-                                .add_var(id.as_str(), Type::Int, true, vec![]);
+                                .add_var(id.as_str(), Type::Int, true, vec![]){
+                                    return Err(Error::MultipleDeclaration);
+                                }
                             
                         }
                     }
@@ -353,9 +359,11 @@ impl Process for VarDecl {
                         VarDef::NonArrayInit((id, val)) => match val {
                             InitVal::Exp(exp) => {
                                 let inst_ptr = exp.process(Type::Float, kit_mut).unwrap();
-                                kit_mut
+                                if !kit_mut
                                     .context_mut
-                                    .add_var(id, Type::Float, false, Vec::new());
+                                    .add_var(id, Type::Float, false, Vec::new()){
+                                        return Err(Error::MultipleDeclaration);
+                                    }
                                 kit_mut.context_mut.update_var_scope_now(id, inst_ptr);
                                 
                             }
@@ -364,7 +372,9 @@ impl Process for VarDecl {
                             }
                         },
                         VarDef::NonArray((id)) => {
-                            kit_mut.add_var(id.as_str(), Type::Float, false, vec![]);
+                           if !kit_mut.context_mut.add_var(id.as_str(), Type::Float, false, vec![]){
+                            return Err(Error::MultipleDeclaration);
+                        }
                             
                         }
                         VarDef::ArrayInit((id, exp_vec, val)) => {
@@ -583,7 +593,7 @@ impl Process for Assign {
         let lval = &mut self.lval;
         let symbol = kit_mut.get_var_symbol(&lval.id).unwrap();
         // let (_,symbol) = kit_mut.get_var(&lval.id).unwrap();
-        println!("assign stmt");
+        // println!("assign stmt");
         let mut mes = Type::Int;
         match symbol.tp{
             Type::ConstFloat =>{mes = Type::Float;}
@@ -675,8 +685,8 @@ impl Process for LVal {
         // let id = self.id;
         // let vec = self.exp_vec;
         let (var, symbol) = kit_mut.get_var(&self.id).unwrap();
-        println!("var_name:{:?},ir_type:{:?}",&self.id,var.as_ref().get_ir_type());
-        println!("var_name:{:?},ir_type:{:?}",&self.id,var.as_ref().get_kind());
+        // println!("var_name:{:?},ir_type:{:?}",&self.id,var.as_ref().get_ir_type());
+        // println!("var_name:{:?},ir_type:{:?}",&self.id,var.as_ref().get_kind());
         if symbol.is_array {
             todo!();
         } else {
