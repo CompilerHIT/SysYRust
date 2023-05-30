@@ -5,10 +5,12 @@ pub use std::fs::File;
 pub use std::hash::{Hash, Hasher};
 pub use std::io::Result;
 use std::io::Write;
+use std::cmp::max;
 
 use crate::ir::basicblock::BasicBlock;
 use crate::ir::function::Function;
 use crate::ir::instruction::Inst;
+use crate::ir::ir_type::IrType;
 use crate::utility::{ScalarType, ObjPool, ObjPtr};
 use crate::backend::operand::Reg;
 use crate::backend::instrs::LIRInst;
@@ -16,6 +18,7 @@ use crate::backend::asm_builder::AsmBuilder;
 use crate::backend::module::AsmModule;
 use crate::backend::block::*;
 use crate::backend::regalloc::{regalloc::Regalloc, easy_ls_alloc::Allocator, structs::FuncAllocStat};
+use super::operand::ARG_REG_COUNT;
 use super::structs::*;
 
 // #[derive(Clone)]
@@ -23,7 +26,6 @@ pub struct Func {
     pub label: String,
     blocks: Vec<ObjPtr<BB>>,
     pub stack_addr: LinkedList<StackSlot>,
-    pub callee_stack_addr: LinkedList<StackSlot>,
     pub params: Vec<ObjPtr<Inst>>,
     pub param_cnt: (i32, i32),  // (int, float)
 
@@ -50,7 +52,6 @@ impl Func {
             label: name.to_string(),
             blocks: Vec::new(),
             stack_addr: LinkedList::new(),
-            callee_stack_addr: LinkedList::new(),
             params: Vec::new(),
             param_cnt: (0, 0),
             entry: None,
@@ -114,7 +115,7 @@ impl Func {
                 block_seq += 1;
             }
         }
-        self.handle_parameters();
+        self.handle_parameters(ir_func);
         // 第二遍pass
         let first_block = info.ir_block_map.get(&ir_func.get_head()).unwrap();
         self.entry.unwrap().as_mut().out_edge.push(*first_block);
@@ -133,8 +134,6 @@ impl Func {
                 i += 1;
             }
         });
-
-        self.stack_addr = info.stack_slot_set.clone();
     }
 
     // 移除指定id的寄存器的使用信息
@@ -211,7 +210,7 @@ impl Func {
 
     pub fn allocate_reg(&mut self, f: &mut File) {
         // 函数返回地址保存在ra中
-        let reg_int = vec![Reg::new(1, ScalarType::Int)];
+        let ra = Reg::new(1, ScalarType::Int);
         
         self.calc_live();
         println!("cal live end");
@@ -226,10 +225,9 @@ impl Func {
         println!("alloc result: {:?}", self.reg_alloc_info.dstr);
 
         let mut stack_size = self.reg_alloc_info.stack_size as i32;
-        
-        let mut reg_int_res = Vec::from(reg_int);
-        let mut reg_int_res_cl = reg_int_res.clone();
-        let reg_int_size = reg_int_res.len();
+        if let Some(addition_stack_info) = self.stack_addr.front() {
+            stack_size += addition_stack_info.get_pos() + addition_stack_info.get_size();
+        }
         
         //栈对齐 - 调用func时sp需按16字节对齐
         stack_size = stack_size / 16 * 16 + 16;
@@ -247,19 +245,15 @@ impl Func {
             let mut builder = AsmBuilder::new(&mut f1);
             // addi sp -stack_size
             builder.addi("sp", "sp", -offset);
-            for src in reg_int_res.iter() {
-                offset -= 8;
-                builder.s(&src.to_string(), "sp", offset, false, true);
-            }
+            offset -= 8;
+            builder.s(&ra.to_string(), "sp", offset, false, true);
         });
 
         let mut offset = stack_size;
         self.context.set_epilogue_event(move||{
             let mut builder = AsmBuilder::new(&mut f2);
-            for src in reg_int_res_cl.iter() {
-                offset -= 8;
-                builder.l(&src.to_string(), "sp", offset, false, true);
-            }
+            offset -= 8;
+            builder.l(&ra.to_string(), "sp", offset, false, true);
             builder.addi("sp", "sp", stack_size);
         });
         
@@ -273,8 +267,28 @@ impl Func {
         
     }
 
-    fn handle_parameters(&mut self) {
+    fn handle_parameters(&mut self, ir_func: &Function) {
         //TODO:
+        let mut iparam : Vec<_> = ir_func.get_params().iter()
+            .filter(|(_, param)| param.as_ref().get_param_type() == IrType::Int)
+            .map(|(_, param)| param.clone()).collect();
+        let mut fparam : Vec<_> = ir_func.get_params().iter()
+            .filter(|(_, param)| param.as_ref().get_param_type() == IrType::Float)
+            .map(|(_, param)| param.clone()).collect();
+        self.param_cnt = (iparam.len() as i32, fparam.len() as i32);
+        self.params.append(&mut iparam);
+        self.params.append(&mut fparam);
+
+        let mut offset = 0;
+        let overflow_param = max(0, self.param_cnt.0 - ARG_REG_COUNT) + max(0, self.param_cnt.1 - ARG_REG_COUNT);
+        if overflow_param % 2 == 1 {
+            offset = (overflow_param + 1) * 4;
+        } else {
+            offset = overflow_param * 4;
+        }
+        let slot = StackSlot::new(0, offset);
+        assert!(self.stack_addr.is_empty());
+        self.stack_addr.push_front(slot);
     }
 
     pub fn get_first_block(&self) -> ObjPtr<BB> {
