@@ -12,13 +12,12 @@ use crate::ir::function::Function;
 use crate::ir::instruction::Inst;
 use crate::ir::ir_type::IrType;
 use crate::utility::{ScalarType, ObjPool, ObjPtr};
-use crate::backend::operand::Reg;
-use crate::backend::instrs::LIRInst;
+use crate::backend::operand::{Reg, ARG_REG_COUNT};
+use crate::backend::instrs::{LIRInst, Operand};
 use crate::backend::asm_builder::AsmBuilder;
 use crate::backend::module::AsmModule;
 use crate::backend::block::*;
 use crate::backend::regalloc::{regalloc::Regalloc, easy_ls_alloc::Allocator, structs::FuncAllocStat};
-use super::operand::ARG_REG_COUNT;
 use super::structs::*;
 
 // #[derive(Clone)]
@@ -34,7 +33,7 @@ pub struct Func {
     reg_def: Vec<HashSet<CurInstrInfo>>,
     reg_use: Vec<HashSet<CurInstrInfo>>,
     reg_num: i32,
-    fregs: HashSet<Reg>,
+    // fregs: HashSet<Reg>,
 
     pub context: Context,
 
@@ -58,7 +57,7 @@ impl Func {
             reg_def: Vec::new(),
             reg_use: Vec::new(),
             reg_num: 0,
-            fregs: HashSet::new(),
+            // fregs: HashSet::new(),
 
             context: Context::new(),
 
@@ -74,10 +73,16 @@ impl Func {
         self.blocks_mpool.free_all()
     }
 
-    pub fn construct(&mut self, module: &AsmModule, ir_func: &Function, func_seq: i32, ) {
+    pub fn construct(&mut self, module: &AsmModule, ir_func: &Function, func_seq: i32) {
         //FIXME: temporary
         // more infos to add
         let mut info = Mapping::new();
+
+        // 处理全局变量和数组
+        let globl = &module.upper_module.global_variable;
+        globl.iter().for_each(|(name, val)| {
+            info.val_map.insert(val.clone(), Operand::Addr(name.to_string()));
+        });
         
         // entry shouldn't generate for asm, called label for entry should always be false
         let label = &self.label;

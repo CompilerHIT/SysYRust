@@ -243,6 +243,16 @@ impl GenerateAsm for LIRInst {
                 builder.ret()?;
                 Ok(())
             },
+            InstrsType::LoadGlobal => {
+                let mut builder = AsmBuilder::new(f);
+                let dst = match self.get_dst() {
+                    Operand::Reg(reg) => reg,
+                    _ => panic!("dst of load must be reg, to improve"),
+                };
+                builder.load_global(&dst.to_string(), &self.get_global_var_str(true), 
+                    &self.get_global_var_str(false));
+                Ok(())
+            },
         }
         //InstrsType::GenerateArray => {
                 //TODO: generate array

@@ -10,8 +10,6 @@ pub use crate::utility::{ScalarType, ObjPtr};
 pub use crate::backend::asm_builder::AsmBuilder;
 use crate::backend::operand::*;
 
-use super::operand;
-
 #[derive(Clone, PartialEq)]
 pub enum Operand {
     IImm(IImm),
@@ -97,6 +95,7 @@ pub enum InstrsType {
     // j block
     Jump,
     Ret(ScalarType),
+    LoadGlobal,
 }
 
 pub struct LIRInst {
@@ -202,7 +201,7 @@ impl LIRInst {
     pub fn get_reg_def(&self) -> Vec<Reg> {
         match self.inst_type {
             InstrsType::Binary(..) | InstrsType::OpReg(..) | InstrsType::Load | InstrsType::Store |
-            InstrsType::LoadFromStack | InstrsType::LoadParamFromStack =>
+            InstrsType::LoadFromStack | InstrsType::LoadParamFromStack | InstrsType::LoadGlobal =>
             { 
                 match self.operands[0] {
                     Operand::Reg(dst_reg) => vec![dst_reg],
@@ -241,7 +240,7 @@ impl LIRInst {
         match self.inst_type {
             InstrsType::Binary(..) | InstrsType::OpReg(..) | InstrsType::Load |
             InstrsType::Store | InstrsType::LoadFromStack | InstrsType::StoreToStack | InstrsType::Branch(..) |
-            InstrsType::Jump | InstrsType::LoadParamFromStack | InstrsType::StoreParamToStack => {
+            InstrsType::Jump | InstrsType::LoadParamFromStack | InstrsType::StoreParamToStack | InstrsType::LoadGlobal=> {
                 let mut regs = self.operands.clone();
                 let mut res = Vec::new();
                 while let Some(operand) = regs.pop() {
@@ -324,6 +323,21 @@ impl LIRInst {
     }
     pub fn is_double(&self) -> bool {
         self.double
+    }
+
+    // LoadGlobal
+    pub fn get_global_var_str(&self, origin: bool) -> String {
+        if origin {
+            match self.operands[1] {
+                Operand::Addr(ref name) => name.clone(),
+                _ => unreachable!("only support global var"),
+            }
+        } else {
+            match self.operands[2] {
+                Operand::Addr(ref name) => name.clone(),
+                _ => unreachable!("only support global var"),
+            }
+        }
     }
 
     // LoadParamFromStack(include alloca):

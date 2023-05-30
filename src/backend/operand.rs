@@ -50,11 +50,6 @@ pub fn is_imm_12bs(imm: i32) -> bool {
     imm >= -IMM_12_Bs - 1 && imm <= IMM_12_Bs
 }
 
-#[derive(Clone, PartialEq, Hash, Eq)]
-pub struct Addr {
-    label: &'static str,
-}
-
 pub trait ToString {
     fn to_string(&self) -> String;
     fn to_hex_string(&self) -> String;
@@ -75,14 +70,6 @@ impl ToString for FImm {
     fn to_hex_string(&self) -> String {
         let bits = self.data.to_bits();
         format!("0x{:x}", bits)
-    }
-}
-impl ToString for Addr {
-    fn to_string(&self) -> String {
-        self.label.to_string()
-    }
-    fn to_hex_string(&self) -> String {
-        panic!("Wrong Call")
     }
 }
 

@@ -18,6 +18,7 @@ use super::operand::ARG_REG_COUNT;
 use super::structs::*;
 
 pub static mut ARRAY_NUM: i32 = 0;
+pub static mut GLOBAL_SEQ: i32 = 0;
 
 pub struct BB {
     pub label: String,
@@ -34,6 +35,7 @@ pub struct BB {
     pub live_out: HashSet<Reg>,
 
     insts_mpool: ObjPool<LIRInst>,
+    global_map: HashMap<ObjPtr<Inst>, Operand>,
 }
 
 impl BB {
@@ -49,6 +51,7 @@ impl BB {
             live_in: HashSet::new(),
             live_out: HashSet::new(),
             insts_mpool: ObjPool::new(),
+            global_map: HashMap::new(),
         }
     }
 
@@ -346,12 +349,29 @@ impl BB {
                 }
                 
                 //TODO: load/store float 
+                // FIXME: 偏移量暂设为0
                 InstKind::Load => {
                     let addr = inst_ref.get_ptr();
                     //TODO: if global var
                     let dst_reg = self.resolve_operand(func, ir_block_inst, true, map_info);
-                    let src_reg = self.resolve_operand(func, addr, false, map_info);
-                    self.insts.push(self.insts_mpool.put(LIRInst::new(InstrsType::Load, 
+                    let mut src_reg = match inst_ref.get_ir_type() {
+                        IrType::IntPtr | IrType::FloatPtr => {
+                            match addr.as_ref().get_kind() {
+                                InstKind::GlobalConstFloat(..) | InstKind::GlobalFloat(..) | InstKind::GlobalInt(..) |
+                                InstKind::GlobalConstInt(..) => {
+                                    assert!(map_info.val_map.contains_key(&addr));
+                                    map_info.val_map.get(&addr).unwrap().clone()
+                                },
+                                _ => {
+                                    self.resolve_operand(func, addr, false, map_info)
+                                }
+                            }
+                        }
+                        _ => {
+                            self.resolve_operand(func, addr, false, map_info)
+                        }
+                    };
+                    self.insts.push(self.insts_mpool.put(LIRInst::new(InstrsType::Load,
                             vec![dst_reg, src_reg, Operand::IImm(IImm::new(0))])));
                 },
                 InstKind::Store => {
@@ -360,13 +380,14 @@ impl BB {
                     let addr_reg = self.resolve_operand(func, addr, false, map_info);
                     let value_reg = self.resolve_operand(func, value, true, map_info);
                     self.insts.push(self.insts_mpool.put(LIRInst::new(InstrsType::Store, 
-                        vec![value_reg, addr_reg])));
+                        vec![value_reg, addr_reg, Operand::IImm(IImm::new(0))])));
                 },
                 //FIXME:获取数组名
                 InstKind::Alloca => {
                     unsafe {
-                        let label = format!(".LC{ARRAY_NUM}");
-                        ARRAY_NUM += 1;
+                        let array_num = get_current_array_num();
+                        let label = format!(".LC{array_num}");
+                        inc_array_num();
                         //将发生分配的数组装入map_info中：记录数组结构、占用栈空间
                         //TODO:la dst label    sd dst (offset)sp
                         //TODO: 大数组而装填因子过低的压缩问题
@@ -614,10 +635,6 @@ impl BB {
                         IrType::Int => {
                             let src = inst_ref.get_return_value();
                             let src_operand = self.resolve_operand(func, src, true, map_info);
-                            let num = match src_operand {
-                                Operand::Reg(reg) => reg.get_id(),
-                                _ => panic!("cannot reach, Return false")
-                            };
                             self.insts.push(
                                 self.insts_mpool.put(
                                     LIRInst::new(InstrsType::OpReg(SingleOp::IMv), 
@@ -733,8 +750,8 @@ impl BB {
             InstKind::ConstInt(iimm) => self.resolve_iimm(iimm),
             InstKind::ConstFloat(fimm) => self.resolve_fimm(fimm),
             InstKind::Parameter => self.resolve_param(src, func, map),
-            InstKind::GlobalConstInt(_) | InstKind::GlobalInt(..) => panic!("todo global int"),
-            InstKind::GlobalConstFloat(_) | InstKind::GlobalFloat(..) => panic!("todo global float"),
+            InstKind::GlobalConstInt(_) | InstKind::GlobalInt(..) |
+                InstKind::GlobalConstFloat(_) | InstKind::GlobalFloat(..) => self.resolve_global(src, map),
             _ => {
                 let op : Operand = match src.as_ref().get_ir_type() {
                     IrType::Int => Operand::Reg(Reg::init(ScalarType::Int)),
@@ -831,6 +848,31 @@ impl BB {
         }
     }
 
+    fn resolve_global(&mut self, src: ObjPtr<Inst>, map: &mut Mapping) -> Operand {
+        if !self.global_map.contains_key(&src) {
+            let reg = match src.as_ref().get_ir_type() {
+                IrType::Int => Operand::Reg(Reg::init(ScalarType::Int)),
+                IrType::Float => Operand::Reg(Reg::init(ScalarType::Float)),
+                _ => unreachable!("cannot reach, global var is either int or float")
+            };
+            self.global_map.insert(src, reg.clone());
+            let global_num = get_current_global_seq();
+            self.label = String::from(format!(".Lpcrel_hi{global_num}"));
+            inc_global_seq();
+            assert!(map.val_map.contains_key(&src));
+            let global_name = match map.val_map.get(&src) {
+                Some(Operand::Addr(addr)) => addr,
+                _ => unreachable!("cannot reach, global var must be addr")
+            };
+            let inst = LIRInst::new(InstrsType::LoadGlobal,
+                vec![reg.clone(), Operand::Addr(global_name.clone()), Operand::Addr(self.label.clone())]);
+            self.insts.push(self.insts_mpool.put(inst));
+            reg
+        } else {
+            return self.global_map.get(&src).unwrap().clone()
+        }
+    }
+
     fn resolve_opt_mul(&mut self, dst: Operand, src: Operand, imm: i32) {
         //TODO: 暂时不使用优化
     }
@@ -878,4 +920,28 @@ fn is_opt_num(imm: i32) -> bool {
     //FIXME:暂时不使用优化
     // (imm & (imm - 1)) == 0
     false
+}
+
+fn get_current_global_seq() -> i32 {
+    unsafe {
+        GLOBAL_SEQ
+    }
+}
+
+fn inc_global_seq() {
+    unsafe {
+        GLOBAL_SEQ += 1;
+    }
+}
+
+fn get_current_array_num() -> i32 {
+    unsafe {
+        ARRAY_NUM
+    }
+}
+
+fn inc_array_num() {
+    unsafe {
+        ARRAY_NUM += 1;
+    }
 }
