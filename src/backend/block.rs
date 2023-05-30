@@ -178,10 +178,11 @@ impl BB {
                                     src = self.resolve_operand(func, lhs, true, map_info);
                                     imm = rhs.as_ref().get_int_bond();
                                 }
-                                if op_flag {
-                                    self.resolve_opt_mul(dst_reg, src, imm);
-                                    break;
-                                }
+                                //FIXME: 暂时不使用乘法优化
+                                // if op_flag {
+                                //     self.resolve_opt_mul(dst_reg, src, imm);
+                                //     break;
+                                // }
                             }
                             lhs_reg = self.resolve_operand(func, lhs, true, map_info);
                             rhs_reg = self.resolve_operand(func, rhs, true, map_info);
@@ -228,8 +229,8 @@ impl BB {
                                     },
                                     _ => {
                                         if is_opt_num(imm) || is_opt_num(-imm) {
-                                            //TODO: 
-                                            self.resolve_opt_rem(dst_reg, lhs, rhs);
+                                            //TODO: 暂时不使用优化
+                                            self.resolve_opt_rem(func, map_info, dst_reg, lhs, rhs);
                                         } else {
                                             lhs_reg = self.resolve_operand(func, lhs, true, map_info);
                                             rhs_reg = self.resolve_operand(func, rhs, false, map_info);
@@ -373,9 +374,9 @@ impl BB {
                         let size = inst_ref.get_array_length().as_ref().get_int_bond();
                         let alloca = IntArray::new(label.clone(), size, true,
                                                              inst_ref.get_int_init().clone());
-                        let last = map_info.stack_slot_set.front().unwrap();
+                        let last = func.as_ref().stack_addr.front().unwrap();
                         let pos = last.get_pos() + last.get_size();
-                        map_info.stack_slot_set.push_front(StackSlot::new(pos, (size * 4 / 8 + 1) * 8));
+                        func.as_mut().stack_addr.push_front(StackSlot::new(pos, (size * 4 / 8 + 1) * 8));
 
                         let dst_reg = self.resolve_operand(func, ir_block_inst, true, map_info);
                         let offset = pos;
@@ -492,20 +493,13 @@ impl BB {
                     }
 
                     // set stack slot
-                    let mut pos = 0;
                     let mut size = 0;
-                    if let Some(last_slot) = func.as_ref().callee_stack_addr.back() {
-                        pos = last_slot.get_pos() + last_slot.get_size();
-                        size = max(0, icnt - ARG_REG_COUNT) + max(0, fcnt - ARG_REG_COUNT);
-                        //FIXME: 是否需要对齐
-                        if size % 2 == 1 {
-                            size += 1;
-                        }
-                        size *= 4;
-                        func.as_mut().callee_stack_addr.push_back(StackSlot::new(pos, size));
-                    } else {
-                        unreachable!("stack slot set is empty");
+                    size = max(0, icnt - ARG_REG_COUNT) + max(0, fcnt - ARG_REG_COUNT);
+                    //FIXME: 是否需要对齐
+                    if size % 2 == 1 {
+                        size += 1;
                     }
+                    size *= 4;
                     
                     for arg in arg_list.iter().rev() {
                         match arg.as_ref().get_param_type() {
@@ -513,9 +507,9 @@ impl BB {
                                 icnt -= 1;
                                 if icnt >= ARG_REG_COUNT {
                                     let src_reg = self.resolve_operand(func, *arg, true, map_info);
-                                    // 第后一个溢出参数在最下方（最远离sp位置）
+                                    // 最后一个溢出参数在最下方（最远离sp位置）
                                     let offset = Operand::IImm(IImm::new(
-                                        -(pos + (max(0, icnt - ARG_REG_COUNT) + max(0, fcnt - ARG_REG_COUNT)) * 4)
+                                        -(max(0, icnt - ARG_REG_COUNT) + max(0, fcnt - ARG_REG_COUNT)) * 4
                                     ));
                                     self.insts.push(self.insts_mpool.put(
                                         LIRInst::new(InstrsType::StoreToStack,
@@ -525,12 +519,13 @@ impl BB {
                                     // 保存在寄存器中的参数，从前往后
                                     let src_reg = self.resolve_operand(func, *arg, true, map_info);
                                     let dst_reg = Operand::Reg(Reg::new(icnt, ScalarType::Int));
-                                    let pos = map_info.stack_slot_set.front().unwrap().get_pos() + map_info.stack_slot_set.front().unwrap().get_size();
+                                    let stack_addr = &func.as_ref().stack_addr;
+                                    let pos = stack_addr.front().unwrap().get_pos() + stack_addr.front().unwrap().get_size();
                                     let size = 8;
                                     let slot = StackSlot::new(pos, size);
-                                    map_info.stack_slot_set.push_front(slot);
+                                    func.as_mut().stack_addr.push_front(slot);
                                     func.as_mut().spill_stack_map.insert(icnt, slot);
-                                    let mut inst = LIRInst::new(InstrsType::StoreToStack,
+                                    let mut inst = LIRInst::new(InstrsType::StoreParamToStack,
                                         vec![dst_reg.clone(), Operand::IImm(IImm::new(pos))]);
                                     inst.set_double();
                                     self.insts.push(self.insts_mpool.put(inst));
@@ -546,7 +541,7 @@ impl BB {
                                     let src_reg = self.resolve_operand(func, *arg, true, map_info);
                                     // 第后一个溢出参数在最下方（最远离sp位置）
                                     let offset = Operand::IImm(IImm::new(
-                                        -(pos + (max(0, icnt - ARG_REG_COUNT) + max(0, fcnt - ARG_REG_COUNT)) * 4)
+                                    -(max(0, icnt - ARG_REG_COUNT) + max(0, fcnt - ARG_REG_COUNT)) * 4
                                     ));
                                     self.insts.push(self.insts_mpool.put(
                                         LIRInst::new(InstrsType::StoreToStack,
@@ -556,10 +551,11 @@ impl BB {
                                     //FIXME:暂时不考虑浮点数参数
                                     let src_reg = self.resolve_operand(func, *arg, true, map_info);
                                     let dst_reg = Operand::Reg(Reg::new(fcnt, ScalarType::Float));
-                                    let pos = map_info.stack_slot_set.back().unwrap().get_pos() + map_info.stack_slot_set.back().unwrap().get_size();
+                                    let stack_addr = &func.as_ref().stack_addr;
+                                    let pos = stack_addr.back().unwrap().get_pos() + stack_addr.back().unwrap().get_size();
                                     let size = 8;
-                                    map_info.stack_slot_set.push_back(StackSlot::new(pos, size));
-                                    let mut inst = LIRInst::new(InstrsType::StoreToStack,
+                                    func.as_mut().stack_addr.push_back(StackSlot::new(pos, size));
+                                    let mut inst = LIRInst::new(InstrsType::StoreParamToStack,
                                         vec![dst_reg.clone(), Operand::IImm(IImm::new(pos))]);
                                     inst.set_double();
                                     self.insts.push(self.insts_mpool.put(inst));
@@ -789,7 +785,6 @@ impl BB {
     fn resolve_param(&mut self, src: ObjPtr<Inst>, func: ObjPtr<Func>, map: &mut Mapping) -> Operand {
         if !map.val_map.contains_key(&src) {
             let params = &func.as_ref().params;
-            let (icnt, fcnt) = func.as_ref().param_cnt;
             let reg = match src.as_ref().get_param_type() {
                 IrType::Int => Operand::Reg(Reg::init(ScalarType::Int)),
                 IrType::Float => Operand::Reg(Reg::init(ScalarType::Float)),
@@ -837,16 +832,20 @@ impl BB {
     }
 
     fn resolve_opt_mul(&mut self, dst: Operand, src: Operand, imm: i32) {
-        //TODO:
-
+        //TODO: 暂时不使用优化
     }
 
     fn resolve_opt_div(&mut self, dst: Operand, src: Operand, imm: i32) {
-        //TODO:
+        //TODO: 暂时不使用优化
+        let reg = self.resolve_iimm(imm);
+        self.insts.push(self.insts_mpool.put(LIRInst::new(InstrsType::Binary(BinaryOp::Div), vec![dst, src, reg])));
     }
 
-    fn resolve_opt_rem(&mut self, dst: Operand, lhs: ObjPtr<Inst>, rhs: ObjPtr<Inst>) {
+    fn resolve_opt_rem(&mut self, func: ObjPtr<Func>, map: &mut Mapping,dst: Operand, lhs: ObjPtr<Inst>, rhs: ObjPtr<Inst>) {
         //TODO:
+        let lhs_reg = self.resolve_operand(func, lhs, true, map);
+        let rhs_reg = self.resolve_operand(func, rhs, true, map);
+        self.insts.push(self.insts_mpool.put(LIRInst::new(InstrsType::Binary(BinaryOp::Rem), vec![dst, lhs_reg, rhs_reg])));
     }
 
     // fn clear_reg_info(&mut self) {
@@ -871,10 +870,12 @@ impl GenerateAsm for BB {
 }
 
 fn is_opt_mul(imm: i32) -> bool {
-    //TODO:
+    //FIXME:暂时不使用优化
     false
 }
 
 fn is_opt_num(imm: i32) -> bool {
-    (imm & (imm - 1)) == 0
+    //FIXME:暂时不使用优化
+    // (imm & (imm - 1)) == 0
+    false
 }
