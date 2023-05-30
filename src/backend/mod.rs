@@ -24,6 +24,6 @@ pub fn generate_asm(in_path: &str, path: &str, module: &mut AsmModule) {
     writeln!(file, "    .text");
     module.generator(&mut file);
     
-    writeln!(file, "    .ident	\"GCC: (Ubuntu 9.4.0-1ubuntu1~20.04) 9.4.0\"");
+    // writeln!(file, "    .ident	\"GCC: (Ubuntu 9.4.0-1ubuntu1~20.04) 9.4.0\"");
     writeln!(file, "    .section	.note.GNU-stack,\"\",@progbits");
 }
