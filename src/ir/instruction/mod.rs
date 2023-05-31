@@ -8,8 +8,10 @@ mod alloca;
 mod binary;
 mod branch;
 mod call;
+mod float_to_int;
 mod gep;
 mod iconst;
+mod int_to_float;
 mod ireturn;
 mod load;
 mod parameter;
@@ -43,6 +45,10 @@ pub enum InstKind {
     Call(&'static str),
     Parameter,
     Return,
+
+    // 类型转换
+    FtoI,
+    ItoF,
 
     // 常量
     ConstInt(i32),
