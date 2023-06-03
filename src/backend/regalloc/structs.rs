@@ -10,6 +10,7 @@ pub struct RegUsedStat{
     fregs_used: u32,
 }
 
+// 对于regusedstat来说，通用寄存器映射到0-31，浮点寄存器映射到32-63
 impl RegUsedStat {
 
     pub fn new()->RegUsedStat {
@@ -28,24 +29,24 @@ impl RegUsedStat {
         return  false;
     }
 
-    pub fn num_available_iregs(&self)->i32 {
-        let mut out=0;
-        for i in 0..31 {
-            if self.is_available_ireg(i) {
-                out+=1;
-            }
-        }
-        out
-    }
-    pub fn num_available_fregs(&self)->i32 {
-        let mut out=0;
-        for i in 0..31 {
-            if self.is_available_freg(i) {
-                out+=1;
-            }
-        }
-        out
-    }
+    // pub fn num_available_iregs(&self)->i32 {
+    //     let mut out=0;
+    //     for i in 0..31 {
+    //         if self.is_available_ireg(i) {
+    //             out+=1;
+    //         }
+    //     }
+    //     out
+    // }
+    // pub fn num_available_fregs(&self)->i32 {
+    //     let mut out=0;
+    //     for i in 0..31 {
+    //         if self.is_available_freg(i) {
+    //             out+=1;
+    //         }
+    //     }
+    //     out
+    // }
 
     // 获取一个可用的整数寄存器
     pub fn get_available_ireg(&self)->Option<i32> {
@@ -91,25 +92,27 @@ impl RegUsedStat {
     pub fn get_available_freg(&self)->Option<i32> {
         // f0作为特殊浮点寄存器保持0
         for i in 1..=31 {
-            if self.iregs_used&(1<<i)==0 {
+            if self.fregs_used&(1<<i)==0 {
                 return Some(i+32)
             }
         }
         None
     }
 
-    // 释放一个寄存器
+    // 释放一个通用寄存器
     pub fn release_ireg(&mut self,reg :i32) {
         self.iregs_used&=!(1<<reg);
     }
-    // 占有一个寄存器
+    // 占有一个整数寄存器
     pub fn use_ireg(&mut self,reg :i32){
         self.iregs_used|=1<<reg;
     }
-    // 
+    // 释放浮点寄存器
     pub fn release_freg(&mut self,reg :i32) {
+        let reg=reg-32;
         self.fregs_used&=!(1<<reg);
     }
+    // 占有一个浮点寄存器
     pub fn use_freg(&mut self,reg: i32) {
         self.fregs_used|=1<<reg;
     }
