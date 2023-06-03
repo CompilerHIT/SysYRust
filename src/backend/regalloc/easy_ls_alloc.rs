@@ -6,6 +6,7 @@ use std::collections::VecDeque;
 use crate::backend::instrs::LIRInst;
 use crate::backend::func::Func;
 use crate::backend::block::BB;
+use crate::backend::operand::Reg;
 use crate::backend::regalloc::structs::{FuncAllocStat,RegUsedStat};
 use crate::backend::regalloc::regalloc::Regalloc;
 use crate::container::bitmap::Bitmap;
@@ -209,9 +210,10 @@ impl Allocator {
         // 可用寄存器
         let mut regUsedStat=RegUsedStat::new();
         let mut iwindow:PriorityDeque<RegInterval>=PriorityDeque::new();
+        let mut fwindow:PriorityDeque<RegInterval>=PriorityDeque::new();
         // 遍历指令
         for (i,it) in self.lines.iter().enumerate() {
-            // 先判断有没有可以释放的寄存器
+            // 先通用寄存器窗口中判断有没有可以释放的寄存器
             while iwindow.len()!=0  {
                 if let Some(min)=iwindow.front() {
                     if min.end<=i {
@@ -219,46 +221,74 @@ impl Allocator {
                     }
                 }
             }
+            // 判断浮点寄存器窗口中有没有可以释放的寄存器,进行释放
+            while fwindow.len()!=0 {
+                if let Some(min)=fwindow.front() {
+                    if min.end<=i {
+                        fwindow.pop_front();
+                    }
+                }
+            }
 
             for reg in it.as_ref().get_reg_def() {
                 if !reg.is_virtual() {continue;}
                 let id=reg.get_id();
+                // 如果已经在dstr的key中，也就是已经分配，则忽略处理
                 if dstr.contains_key(&id) {
                     continue;
                 }
+                // 如果已经归为溢出寄存器，则不再重复处理
                 if spillings.contains(&id) {
                     continue;
                 }
+                // 在周期表中搜索该寄存器的终结周期
                 let end=*self.intervals.get(&id).unwrap();
-                // 先判断有没有可以使用的寄存器,如果有,则分配
-                if let Some(ereg)=regUsedStat.get_available_ireg() {
-                    dstr.insert(id, ereg);
-                    iwindow.push(RegInterval::new(id,end))
-                }else{
-                    let max=iwindow.borrow().back();
-                    let mut maxID=0;
-                    let mut ifSpilling=false;
-                    match max {
-                        Some(max)=>{
-                            if max.end>end {
-                                ifSpilling=false;
-                                maxID=max.id;
-                            }else{
-                                ifSpilling=true;
-                            }
-                        },
-                        None=>(),
-                    }
-                    if ifSpilling {
-                        spillings.insert(id);
+                //TODO 根据寄存器类型选择浮点或者整数寄存器进行分配
+                let mut alloc_reg_for=|tmpwindow:&mut PriorityDeque<RegInterval>,available:Option<i32>|{
+                    // let mut tmpwindow=&mut fwindow;
+                    // let available:Option<Reg>;
+                    if let Some(ereg)=available {
+                        // 如果抛弃新寄存器
+                        dstr.insert(id, ereg);
+                        tmpwindow.push(RegInterval::new(id,end))
                     }else{
-                        iwindow.pop_back();
-                        dstr.insert(id, *dstr.get(&maxID).unwrap());
-                        dstr.remove(&maxID);
-                        iwindow.push(RegInterval::new(id,end))
+                        let max=tmpwindow.back();
+                        let mut maxID=0;
+                        let mut ifSpilling=false;   //记录将新寄存器处理成溢出
+                        match max {
+                            Some(max)=>{
+                                if max.end>end {
+                                    // 溢出旧寄存器
+                                    ifSpilling=false;
+                                    maxID=max.id;
+                                }else{
+                                    // 溢出新寄存器
+                                    ifSpilling=true;
+                                }
+                            },
+                            None=>(),
+                        }
+                        if ifSpilling {
+                            spillings.insert(id);
+                        }else{
+                            tmpwindow.pop_back();
+                            dstr.insert(id, *dstr.get(&maxID).unwrap());    //给新寄存器分配旧寄存器所有寄存器
+                            dstr.remove(&maxID);    //接触旧末虚拟寄存器与实际寄存器的契约
+                            tmpwindow.push(RegInterval::new(id,end));    //把心的分配结果加入窗口
+                        }
                     }
-                }
+                };
+                // TODO,逻辑判断选择不同的分配方案
                 
+                // 如果是通用寄存器
+                {
+                    alloc_reg_for(&mut iwindow,regUsedStat.get_available_ireg());
+                }
+                // 如果是浮点寄存器
+                {
+                    alloc_reg_for(&mut fwindow,regUsedStat.get_available_freg());
+                }
+               
             }
         }
         (spillings,dstr)
@@ -288,6 +318,8 @@ impl Allocator {
     }
 
 }
+
+
 
 
 impl Regalloc for Allocator {
