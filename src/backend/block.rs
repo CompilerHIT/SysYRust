@@ -384,36 +384,34 @@ impl BB {
                 },
                 //FIXME:获取数组名
                 InstKind::Alloca => {
-                    unsafe {
-                        let array_num = get_current_array_num();
-                        let label = format!(".LC{array_num}");
-                        inc_array_num();
-                        //将发生分配的数组装入map_info中：记录数组结构、占用栈空间
-                        //TODO:la dst label    sd dst (offset)sp
-                        //TODO: 大数组而装填因子过低的压缩问题
-                        //FIXME: 未考虑数组全零数组，仅考虑int数组
-                        let size = inst_ref.get_array_length().as_ref().get_int_bond();
-                        let alloca = IntArray::new(label.clone(), size, true,
-                                                             inst_ref.get_int_init().clone());
-                        let last = func.as_ref().stack_addr.front().unwrap();
-                        let pos = last.get_pos() + last.get_size();
-                        func.as_mut().stack_addr.push_front(StackSlot::new(pos, (size * 4 / 8 + 1) * 8));
+                    let array_num = get_current_array_num();
+                    let label = format!(".LC{array_num}");
+                    inc_array_num();
+                    //将发生分配的数组装入map_info中：记录数组结构、占用栈空间
+                    //TODO:la dst label    sd dst (offset)sp
+                    //TODO: 大数组而装填因子过低的压缩问题
+                    //FIXME: 未考虑数组全零数组，仅考虑int数组
+                    let size = inst_ref.get_array_length().as_ref().get_int_bond();
+                    let alloca = IntArray::new(label.clone(), size, true,
+                                                            inst_ref.get_int_init().clone());
+                    let last = func.as_ref().stack_addr.front().unwrap();
+                    let pos = last.get_pos() + last.get_size();
+                    func.as_mut().stack_addr.push_front(StackSlot::new(pos, (size * 4 / 8 + 1) * 8));
 
-                        let dst_reg = self.resolve_operand(func, ir_block_inst, true, map_info);
-                        let offset = pos;
-                        self.insts.push(self.insts_mpool.put(LIRInst::new(InstrsType::OpReg(SingleOp::LoadAddr), 
-                            vec![dst_reg.clone(), Operand::Addr(label.clone())])));
-                        
-                        let mut store = LIRInst::new(InstrsType::StoreParamToStack, 
-                            vec![dst_reg.clone(), Operand::IImm(IImm::new(offset))]);
-                        store.set_double();
-                        self.insts.push(self.insts_mpool.put(store));
-                        
-                        // array: offset~offset+size(8字节对齐)
-                        // map_key: array_name
-                        map_info.int_array_map.insert(alloca);
-                        map_info.array_slot_map.insert(ir_block_inst, offset);
-                    }
+                    let dst_reg = self.resolve_operand(func, ir_block_inst, true, map_info);
+                    let offset = pos;
+                    self.insts.push(self.insts_mpool.put(LIRInst::new(InstrsType::OpReg(SingleOp::LoadAddr), 
+                        vec![dst_reg.clone(), Operand::Addr(label.clone())])));
+                    
+                    let mut store = LIRInst::new(InstrsType::StoreParamToStack, 
+                        vec![dst_reg.clone(), Operand::IImm(IImm::new(offset))]);
+                    store.set_double();
+                    self.insts.push(self.insts_mpool.put(store));
+                    
+                    // array: offset~offset+size(8字节对齐)
+                    // map_key: array_name
+                    map_info.int_array_map.insert(alloca);
+                    map_info.array_slot_map.insert(ir_block_inst, offset);
                 }
                 InstKind::Gep => {
                     //TODO: 数组的优化使用
@@ -512,15 +510,6 @@ impl BB {
                             unreachable!("call arg type not match, either be int or float")
                         }
                     }
-
-                    // set stack slot
-                    let mut size = 0;
-                    size = max(0, icnt - ARG_REG_COUNT) + max(0, fcnt - ARG_REG_COUNT);
-                    //FIXME: 是否需要对齐
-                    if size % 2 == 1 {
-                        size += 1;
-                    }
-                    size *= 4;
                     
                     for arg in arg_list.iter().rev() {
                         match arg.as_ref().get_param_type() {
@@ -652,6 +641,12 @@ impl BB {
                         },
                         _ => panic!("cannot reach, Return false")
                     }
+                },
+                InstKind::ItoF => {
+                    todo!("ItoF")
+                },
+                InstKind::FtoI => {
+                    todo!("FtoI")
                 },
                 InstKind::ConstFloat(..) | InstKind::ConstInt(..) | InstKind::GlobalConstFloat(..) | InstKind::GlobalConstInt(..) | InstKind::GlobalFloat(..) |
                 InstKind::GlobalInt(..) | InstKind::Head | InstKind::Parameter | InstKind::Phi => {
