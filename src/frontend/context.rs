@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::{
-    ir::{basicblock::BasicBlock, function::Function, instruction::Inst, module::Module},
+    ir::{basicblock::BasicBlock, function::Function, instruction::{Inst, InstKind}, module::Module},
     utility::ObjPtr,
 };
 
@@ -12,7 +12,7 @@ pub struct Context<'a> {
     pub symbol_table: HashMap<String, Symbol>,
     pub bb_map: HashMap<String, HashMap<String, ObjPtr<Inst>>>,
     pub bb_now_mut: InfuncChoice,
-    module_mut: &'a mut Module,
+    pub module_mut: &'a mut Module,
     index: i64,
     layer: i64,
 }
@@ -151,6 +151,24 @@ impl Context<'_> {
             }
             InfuncChoice::NInFunc() => {
                 bbname = "notinblock";
+                // let kind = inst.as_ref().get_kind();
+                // match tp {
+                //     Type::ConstFloat =>{
+                //         let inst_temp = 
+                //         self.push_var_bb(s.to_string(), inst);
+                //     }
+                //     Type::ConstFloat =>{
+
+                //     }
+                //     Type::Float =>{
+
+                //     }
+                //     Type::Int =>{
+
+                //     }
+                //     // InstKind
+                //     _=>{}
+                // }
                 self.push_var_bb(s.to_string(), inst);
             }
         }
@@ -177,19 +195,6 @@ impl Context<'_> {
         let s = "@".to_string() + i.to_string().as_str();
         let mut v = vec![];
         let temps = self.add_prefix(s.clone());
-        
-        // v.push((temps.clone(), 1));
-        // let stemp = s.clone();
-        // self.var_map.insert(stemp, v);
-        // self.symbol_table.insert(
-        //     temps.clone(),
-        //     Symbol {
-        //         tp: Type::Int,
-        //         is_array: false,
-        //         layer: self.layer,
-        //         dimension: vec![],
-        //     },
-        // );
         
         match &mut self.bb_now_mut {
             InfuncChoice::InFunc(bbptr) => {
@@ -229,9 +234,10 @@ impl Context<'_> {
                 let bb = bbptr.as_mut();
                 bb.push_back(inst);
                 v.push((temps.clone(), 1));
+                self.update_var_scope_now(&s, inst);
             }
             InfuncChoice::NInFunc() => {
-                self.push_globalvar_module(temps.clone(), inst);
+                // self.push_globalvar_module(temps.clone(), inst);
                 v.push((temps.clone(), -1));
             }
         }
@@ -247,7 +253,7 @@ impl Context<'_> {
                 dimension: vec![],
             },
         );
-        self.update_var_scope_now(&s, inst);
+        // self.update_var_scope_now(&s, inst);
         self.get_const_float(f)
     }
 
