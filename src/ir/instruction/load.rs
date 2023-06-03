@@ -37,7 +37,9 @@ impl ObjPool<Inst> {
         match ptr.as_ref().get_ir_type() {
             // 全局变量作为指针，但是其值的类型仍为Int
             IrType::Int | IrType::ConstInt => {}
-            _ => unreachable!("ObjPool::make_global_int_load: ptr must be a pointer"),
+            _ => {
+                unreachable!("ObjPool::make_global_int_load: ptr must be a global int")
+            }
         }
 
         let inst = self.put(Inst::new(
@@ -100,6 +102,7 @@ impl ObjPool<Inst> {
 
         inst
     }
+
     /// 加载一个float值
     /// # Arguments
     /// * 'ptr' - 需要加载的指针
@@ -135,7 +138,7 @@ impl ObjPool<Inst> {
         // 正确性检查
         match ptr.as_ref().get_ir_type() {
             IrType::Float | IrType::ConstFloat => {}
-            _ => unreachable!("ObjPool::make_global_float_load: ptr must be a pointer"),
+            _ => unreachable!("ObjPool::make_global_float_load: ptr must be a global float"),
         }
 
         let inst = self.put(Inst::new(
