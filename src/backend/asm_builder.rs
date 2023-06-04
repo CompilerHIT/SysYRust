@@ -36,11 +36,19 @@ impl<'f> AsmBuilder<'f> {
     
 
     pub fn op2(&mut self, op: &str, dest: &str, lhs: &str, rhs: &str, is_imm: bool) -> Result<()> {
-        //FIXME: op2是否都允许w
+        //FIXME: mul使用w是否有超过32位的用例
         if is_imm {
-            writeln!(self.f, "    {op}iw {dest}, {lhs}, {rhs}")
+            if op == "or" || op == "xor" || op == "and" {
+                writeln!(self.f, "    {op}i {dest}, {lhs}, {rhs}")
+            } else {
+                writeln!(self.f, "    {op}iw {dest}, {lhs}, {rhs}")
+            }
         } else {
-            writeln!(self.f, "    {op}w {dest}, {lhs}, {rhs}")
+            if op == "or" || op == "xor" || op == "and" {
+                writeln!(self.f, "    {op} {dest}, {lhs}, {rhs}")
+            } else {
+                writeln!(self.f, "    {op}w {dest}, {lhs}, {rhs}")
+            }
         }
     }
 
@@ -163,7 +171,7 @@ impl<'f> AsmBuilder<'f> {
     pub fn load_global(&mut self, reg: &str, global_label: &str, block_label: &str) -> Result<()> {
         writeln!(self.f, "{block_label}");
         writeln!(self.f, "	auipc   {reg}, %pcrel_hi({global_label})")?;
-        writeln!(self.f, "	addi    {reg}, {reg}, %pcrel_lo{block_label}")
+        writeln!(self.f, "	addi    {reg}, {reg}, %pcrel_lo({block_label})")
     }
 
     pub fn print_array(&mut self, array: &Vec<i32>, name: String) -> Result<()> {
