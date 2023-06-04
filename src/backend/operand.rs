@@ -3,8 +3,8 @@ use crate::utility::ScalarType;
 pub const REG_COUNT: i32 = 32;
 pub const ARG_REG_COUNT: i32 = 8;
 pub const REG_SP: i32 = 2;
-const IMM_12_Bs: i32 = 2047;
-const IMM_20_Bs: i32 = 524287;
+pub const IMM_12_Bs: i32 = 2047;
+pub const IMM_20_Bs: i32 = 524287;
 pub static mut I_REG_ID : i32 = 0;
 pub static mut F_REG_ID : i32 = 0;
 

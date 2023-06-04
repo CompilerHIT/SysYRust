@@ -10,6 +10,8 @@ pub use crate::utility::{ScalarType, ObjPtr};
 pub use crate::backend::asm_builder::AsmBuilder;
 use crate::backend::operand::*;
 
+use super::operand;
+
 #[derive(Clone, PartialEq)]
 pub enum Operand {
     IImm(IImm),
@@ -132,7 +134,7 @@ impl LIRInst {
     pub fn get_lhs_mut(&mut self) -> &mut Operand {
         &mut self.operands[1]
     }
-    fn is_rhs_exist(&self) -> bool {
+    pub fn is_rhs_exist(&self) -> bool {
         if self.operands.len() < 3 { false } else { true }
     }
     // rhs不一定存在
@@ -199,6 +201,10 @@ impl LIRInst {
 
     pub fn replace_op(&mut self, operands: Vec<Operand>) {
         self.operands = operands;
+    }
+
+    pub fn replace_kind(&mut self, inst_type: InstrsType) {
+        self.inst_type = inst_type;
     }
 
     // instr's def/use regs

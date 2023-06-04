@@ -36,10 +36,11 @@ impl<'f> AsmBuilder<'f> {
     
 
     pub fn op2(&mut self, op: &str, dest: &str, lhs: &str, rhs: &str, is_imm: bool) -> Result<()> {
+        //FIXME: op2是否都允许w
         if is_imm {
-            writeln!(self.f, "  {op}i {dest}, {lhs}, {rhs}")
+            writeln!(self.f, "  {op}iw {dest}, {lhs}, {rhs}")
         } else {
-            writeln!(self.f, "  {op} {dest}, {lhs}, {rhs}")
+            writeln!(self.f, "  {op}w {dest}, {lhs}, {rhs}")
         }
     }
 
@@ -48,7 +49,7 @@ impl<'f> AsmBuilder<'f> {
     }
 
     pub fn addi(&mut self, dest: &str, opr: &str, imm: i32) -> Result<()> {
-        writeln!(self.f, "    addi {dest}, {opr}, {imm}")
+        writeln!(self.f, "    addiw {dest}, {opr}, {imm}")
         
     }
 

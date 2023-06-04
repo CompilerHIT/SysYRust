@@ -764,6 +764,78 @@ impl BB {
         }
     }
 
+    pub fn handle_overflow(&mut self, func: ObjPtr<Func>, pool: &mut BackendPool) {
+        loop {
+            let mut pos = 0;
+            if pos >= self.insts.len() {
+                break;
+            }
+            let inst_ref = self.insts[pos].as_ref();
+            match inst_ref.get_type() {
+                InstrsType::Load | InstrsType::Store => {
+                    let temp = Operand::Reg(Reg::init(ScalarType::Int));
+                    let offset = inst_ref.get_offset().get_data();
+                    if operand::is_imm_12bs(offset) {
+                        break;
+                    }
+                    self.resolve_overflow_sl(temp.clone(), &mut pos, offset, pool);
+                    self.insts.insert(pos, pool.put_inst(LIRInst::new(
+                        InstrsType::Binary(BinaryOp::Add),
+                        vec![temp.clone(), temp.clone(), inst_ref.get_lhs().clone()]
+                    )));
+                    pos += 1;
+                    self.insts[pos].as_mut().replace_op(vec![inst_ref.get_dst().clone(), temp, Operand::IImm(IImm::new(0))]);
+                },
+                InstrsType::LoadFromStack | InstrsType::StoreToStack => {
+                    let temp = Operand::Reg(Reg::init(ScalarType::Int));
+                    let offset = inst_ref.get_stack_offset().get_data();
+                    if operand::is_imm_12bs(offset) {
+                        break;
+                    }
+                    self.resolve_overflow_sl(temp.clone(), &mut pos, offset, pool);
+                    self.insts.insert(pos, pool.put_inst(LIRInst::new(
+                        InstrsType::Binary(BinaryOp::Add),
+                        vec![temp.clone(), temp.clone(), Operand::Reg(Reg::new(2, ScalarType::Int))]
+                    )));
+                    pos += 1;
+                    self.insts[pos].as_mut().replace_op(vec![inst_ref.get_dst().clone(), temp, Operand::IImm(IImm::new(0))]);
+                },
+                InstrsType::LoadParamFromStack | InstrsType::StoreParamToStack => {
+                    let temp = Operand::Reg(Reg::init(ScalarType::Int));
+                    let offset = func.as_ref().reg_alloc_info.stack_size as i32 - inst_ref.get_stack_offset().get_data();
+                    if operand::is_imm_12bs(offset) {
+                        break;
+                    }
+                    self.resolve_overflow_sl(temp.clone(), &mut pos, offset, pool);
+                    self.insts.insert(pos, pool.put_inst(LIRInst::new(
+                        InstrsType::Binary(BinaryOp::Add),
+                        vec![temp.clone(), temp.clone(), Operand::Reg(Reg::new(2, ScalarType::Int))]
+                    )));
+                    pos += 1;
+                    self.insts[pos].as_mut().replace_op(vec![inst_ref.get_dst().clone(), temp, Operand::IImm(IImm::new(0))]);
+                },
+                InstrsType::Call | InstrsType::Branch(..) => {
+                    
+                }
+                _ => continue
+            }
+            pos += 1;
+        }
+    }
+
+    fn resolve_overflow_sl(&mut self, temp: Operand, pos: &mut usize, offset: i32, pool: &mut BackendPool) {
+        let op1 = Operand::IImm(IImm::new(offset >> 12));
+        let op2 = Operand::IImm(IImm::new(offset & 0xfff));
+        self.insts.insert(*pos, pool.put_inst(
+            LIRInst::new(InstrsType::OpReg(SingleOp::Lui), 
+                        vec![temp.clone(), op1])));
+        *pos += 1;
+        self.insts.insert(*pos, pool.put_inst(
+            LIRInst::new(InstrsType::Binary(BinaryOp::Add),
+                vec![temp.clone(), temp.clone(), op2])));
+        *pos += 1;
+    }
+
     fn resolve_operand(&mut self, func: ObjPtr<Func>, src: ObjPtr<Inst>, is_left: bool, map: &mut Mapping, pool: &mut BackendPool) -> Operand {
         if is_left {
             match src.as_ref().get_kind() {
@@ -821,10 +893,12 @@ impl BB {
         let reg = Operand::Reg(Reg::init(ScalarType::Int));
         let iimm = Operand::IImm(IImm::new(imm));
         if operand::is_imm_12bs(imm) {
-            self.insts.push(pool.put_inst(LIRInst::new(InstrsType::OpReg(SingleOp::Li), vec![reg.clone(), iimm.clone()])));
+            self.insts.push(pool.put_inst(LIRInst::new(InstrsType::OpReg(SingleOp::Li), vec![reg.clone(), iimm])));
         } else {
-            self.insts.push(pool.put_inst(LIRInst::new(InstrsType::OpReg(SingleOp::Lui), vec![reg.clone(), iimm.clone()])));
-            self.insts.push(pool.put_inst(LIRInst::new(InstrsType::Binary(BinaryOp::Add), vec![reg.clone(), reg.clone(), iimm.clone()])));
+            let op1 = Operand::IImm(IImm::new(imm >> 12));
+            let op2 = Operand::IImm(IImm::new(imm & 0xfff));
+            self.insts.push(pool.put_inst(LIRInst::new(InstrsType::OpReg(SingleOp::Lui), vec![reg.clone(), op1])));
+            self.insts.push(pool.put_inst(LIRInst::new(InstrsType::Binary(BinaryOp::Add), vec![reg.clone(), reg.clone(), op2])));
         }
         reg
     }
