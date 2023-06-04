@@ -193,6 +193,7 @@ impl Kit<'_> {
             } else {
                 println!("没找到变量{:?}", s);
                 //没找到
+                // bb.as_ref().
                 let phiinst = self
                     .push_phi(s.to_string(), InfuncChoice::InFunc(bb))
                     .unwrap();
@@ -876,6 +877,7 @@ impl Process for LVal {
                                 return Ok((var, val_ret));
                             }
                             _ => {
+                                println!("var:{:?},var_type:{:?}",var.as_ref().get_kind(),var.as_ref().get_ir_type());
                                 let mut val = var.as_ref().get_int_bond();
                                 let mut val_ret = ExpValue::Int(val);
                                 // kit_mut.context_mut.push_inst_bb(inst_trans);
@@ -1247,9 +1249,9 @@ impl Process for AddExp {
                 AddOp::Minus => {
                     let (inst_left, lval) = opexp.process(input, kit_mut).unwrap();
                     let (inst_right, rval) = mulexp.process(input, kit_mut).unwrap();
-                    let inst_right_neg = kit_mut.pool_inst_mut.make_neg(inst_right);
-                    let inst = kit_mut.pool_inst_mut.make_add(inst_left, inst_right_neg);
-                    kit_mut.context_mut.push_inst_bb(inst_right_neg);
+                    // let inst_right_neg = kit_mut.pool_inst_mut.make_neg(inst_right);
+                    let inst = kit_mut.pool_inst_mut.make_sub(inst_left, inst_right);
+                    kit_mut.context_mut.push_inst_bb(inst_right);
                     kit_mut.context_mut.push_inst_bb(inst);
                     let mut val_ret = lval;
                     match lval {
