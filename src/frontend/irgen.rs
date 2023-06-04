@@ -321,6 +321,8 @@ impl Process for ConstDecl {
                             }
                             inst_ptr = kit_mut.pool_inst_mut.make_global_int_const(bond);
                             //这里
+                        }else{
+                            kit_mut.context_mut.push_inst_bb(inst_ptr);
                         }
                         kit_mut
                             .context_mut
@@ -359,6 +361,8 @@ impl Process for ConstDecl {
                             }
                             inst_ptr = kit_mut.pool_inst_mut.make_global_float_const(bond);
                             //这里
+                        }else{
+                            kit_mut.context_mut.push_inst_bb(inst_ptr);
                         }
                         kit_mut
                             .context_mut
@@ -821,8 +825,13 @@ impl Process for LVal {
                                 return Ok((inst_trans, val_ret));
                             }
                             _ => {
-                                let mut val = var.as_ref().get_int_bond();
-                                let mut val_ret = ExpValue::Float(val as f32);
+                                let mut val_ret = ExpValue::None;
+                                if kit_mut.context_mut.get_layer()<0{
+                                    let val = var.as_ref().get_int_bond();
+                                    val_ret = ExpValue::Float(val as f32);
+                                }
+                                // var.as_ref().get_int_bond();
+                                // let mut val_ret = ExpValue::Float(val as f32);
                                 kit_mut.context_mut.push_inst_bb(inst_trans);
                                 return Ok((inst_trans, val_ret));
                             }
@@ -840,8 +849,13 @@ impl Process for LVal {
                                 return Ok((var, val_ret));
                             }
                             _ => {
-                                let mut val = var.as_ref().get_float_bond();
-                                let mut val_ret = ExpValue::Float(val);
+                                // let mut val = var.as_ref().get_float_bond();
+                                // let mut val_ret = ExpValue::Float(val);
+                                let mut val_ret = ExpValue::None;
+                                if kit_mut.context_mut.get_layer()<0{
+                                    let val = var.as_ref().get_float_bond();
+                                    val_ret = ExpValue::Float(val);
+                                }
                                 // kit_mut.context_mut.push_inst_bb(inst_trans);
                                 return Ok((var, val_ret));
                             }
@@ -862,8 +876,13 @@ impl Process for LVal {
                                 return Ok((inst_trans, val_ret));
                             }
                             _ => {
-                                let mut val = var.as_ref().get_float_bond();
-                                let mut val_ret = ExpValue::Int(val as i32);
+                                let mut val_ret = ExpValue::None;
+                                if kit_mut.context_mut.get_layer()<0{
+                                    let val = var.as_ref().get_float_bond();
+                                    val_ret = ExpValue::Int(val as i32);
+                                }
+                                // let mut val = var.as_ref().get_float_bond();
+                                // let mut val_ret = ExpValue::Int(val as i32);
                                 kit_mut.context_mut.push_inst_bb(inst_trans);
                                 return Ok((inst_trans, val_ret));
                             }
@@ -878,8 +897,13 @@ impl Process for LVal {
                             }
                             _ => {
                                 println!("var:{:?},var_type:{:?}",var.as_ref().get_kind(),var.as_ref().get_ir_type());
-                                let mut val = var.as_ref().get_int_bond();
-                                let mut val_ret = ExpValue::Int(val);
+                                let mut val_ret = ExpValue::None;
+                                if kit_mut.context_mut.get_layer()<0{
+                                    let val = var.as_ref().get_int_bond();
+                                    val_ret = ExpValue::Int(val);
+                                }
+                                // let mut val = var.as_ref().get_int_bond();
+                                // let mut val_ret = ExpValue::Int(val);
                                 // kit_mut.context_mut.push_inst_bb(inst_trans);
                                 return Ok((var, val_ret));
                             }
@@ -1251,7 +1275,7 @@ impl Process for AddExp {
                     let (inst_right, rval) = mulexp.process(input, kit_mut).unwrap();
                     // let inst_right_neg = kit_mut.pool_inst_mut.make_neg(inst_right);
                     let inst = kit_mut.pool_inst_mut.make_sub(inst_left, inst_right);
-                    kit_mut.context_mut.push_inst_bb(inst_right);
+                    // kit_mut.context_mut.push_inst_bb(inst_right);
                     kit_mut.context_mut.push_inst_bb(inst);
                     let mut val_ret = lval;
                     match lval {
