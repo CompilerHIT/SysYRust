@@ -5,7 +5,7 @@ impl ObjPool<Inst> {
     /// # Arguments
     /// * `callee` - 被调用的函数
     /// * `args` - 参数列表
-    pub fn make_int_call(&mut self, callee: &'static str, args: Vec<ObjPtr<Inst>>) -> ObjPtr<Inst> {
+    pub fn make_int_call(&mut self, callee: String, args: Vec<ObjPtr<Inst>>) -> ObjPtr<Inst> {
         // 正确性检查
         for arg in args.clone().iter() {
             let arg = arg.as_ref();
@@ -28,11 +28,7 @@ impl ObjPool<Inst> {
     /// # Arguments
     /// * `callee` - 被调用的函数
     /// * `args` - 参数列表
-    pub fn make_void_call(
-        &mut self,
-        callee: &'static str,
-        args: Vec<ObjPtr<Inst>>,
-    ) -> ObjPtr<Inst> {
+    pub fn make_void_call(&mut self, callee: String, args: Vec<ObjPtr<Inst>>) -> ObjPtr<Inst> {
         // 正确性检查
         for arg in args.clone().iter() {
             let arg = arg.as_ref();
@@ -59,11 +55,7 @@ impl ObjPool<Inst> {
     /// # Arguments
     /// * `callee` - 被调用的函数
     /// * `args` - 参数列表
-    pub fn make_float_call(
-        &mut self,
-        callee: &'static str,
-        args: Vec<ObjPtr<Inst>>,
-    ) -> ObjPtr<Inst> {
+    pub fn make_float_call(&mut self, callee: String, args: Vec<ObjPtr<Inst>>) -> ObjPtr<Inst> {
         // 正确性检查
         for arg in args.clone().iter() {
             let arg = arg.as_ref();
@@ -96,7 +88,7 @@ impl Inst {
         }
 
         match self.kind {
-            InstKind::Call(callee) => callee,
+            InstKind::Call(callee) => callee.as_str(),
             _ => panic!("not a call inst"),
         }
     }

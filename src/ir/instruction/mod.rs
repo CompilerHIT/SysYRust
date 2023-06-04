@@ -26,7 +26,7 @@ pub struct Inst {
     init: (Vec<i32>, Vec<f32>),
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub enum InstKind {
     // 内存相关
     Alloca,
@@ -42,7 +42,7 @@ pub enum InstKind {
     Branch,
 
     // 函数相关
-    Call(&'static str),
+    Call(String),
     Parameter,
     Return,
 
