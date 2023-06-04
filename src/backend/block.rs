@@ -230,7 +230,7 @@ impl BB {
                                             self.resolve_opt_rem(func, map_info, dst_reg, lhs, rhs, pool);
                                         } else {
                                             lhs_reg = self.resolve_operand(func, lhs, true, map_info, pool);
-                                            rhs_reg = self.resolve_operand(func, rhs, false, map_info, pool);
+                                            rhs_reg = self.resolve_operand(func, rhs, true, map_info, pool);
                                             self.insts.push(
                                                 pool.put_inst(
                                                     LIRInst::new(InstrsType::Binary(BinaryOp::Rem), vec![dst_reg, lhs_reg, rhs_reg])
@@ -276,7 +276,7 @@ impl BB {
                 InstKind::Unary(op) => {
                     let dst_reg = self.resolve_operand(func, ir_block_inst, true, map_info, pool);
                     let src = ir_block_inst.as_ref().get_unary_operand();
-                    let src_reg = self.resolve_operand(func, src, false, map_info, pool);
+                    let src_reg = self.resolve_operand(func, src, true, map_info, pool);
                     match op {
                         UnOp::Neg => {
                             match src.as_ref().get_ir_type() {
