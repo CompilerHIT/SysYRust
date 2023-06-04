@@ -1,7 +1,8 @@
-/target
+target/
 .idea
 .vscode
 .hisory
+data/
 *.txt
 *.s
 *.sy
