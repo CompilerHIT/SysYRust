@@ -4,5 +4,5 @@
 .hisory
 *.txt
 *.s
+/data
 *.sy
-test

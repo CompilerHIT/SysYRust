@@ -1,27 +1,57 @@
+### ci使用前置(手动版)
+
+docker 本地registry部署在局域网中，未配置https,所以需要切换使用http client来允许docker进行不安全的pull
+
+```
+sudo touch /etc/docker/daemon.json
+
+sudo echo '{ "insecure-registries":["10.249.12.83:5000"] }' > /etc/docker/daemon.json
+
+sudo systemctl restart docker
+```
+
+然后登录该局域docker registry
+
+```
+docker login docker login 10.249.12.83:5000 -u root -p root
+```
+
+然后拉取最新镜像,
+
+```
+docker pull riscv-ci:3.0
+```
+
+运行且挂载文件
+
+```
+docker 
+```
+
+### ci使用初始化(自动版)
+
+使用默认配置初始化ci
+
+```
+```
+
 ### ci使用流程
 
-1. 本地拉取docker image然后运行启动测试服务器的脚本(ps,注意版本)
+如果代码发生了更新，使用-refresh参数指定使用更新后的代码编译程序并且使用新的编译程序,(其中<test_folder1>等是指定的容器中/test/data下要测试的用例文件夹名):
 
-登录局域网registry
-docker login 10.249.12.83:5000
-账号:root
-密码:root
+```
 
-拉取镜像
-docker pull riscv-ci:3.0
+test -refresh <test_folder1> <test_folder2> ..
+```
 
-1. 运行镜像,挂载数据(测试数据应该放在data文件夹下面,详见https://github.com/cncsmonster/c-ci)
+如果代码没有发生更新,要使用过去编译的compiler进行编译
 
-docker run -it -d -p 50051:50051 -v your_data_path:/test/data --name ci riscv-ci:3.0
+```
 
-1. 本地rpc调用镜像内的测试代码
-   在根目录中,已经编译好了可执行程序test,
-   test   ...
-   将测试环境<your_data_path>目录下指定目录中的内容，并返回测试结果
-   生成的自己的汇编代码myasm以及比对用的标准汇编代码tasm以及编译和运行过程中的提示文件log
-   都会放到该路径下
+test <test_folder1> <test_folder2> ...
+```
 
-比如你挂载了 /root/data 目录进容器的/test/data中
-则在compiler2023的根目录下执行
-test functional
-则会测试 /root/data/functional文件夹中的所有用例
+如果要测试容器中挂载到的 /test/下所有用例
+
+```
+```
