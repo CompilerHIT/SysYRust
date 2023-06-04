@@ -39,7 +39,9 @@ pub struct Func {
 
     blocks_mpool: ObjPool<BB>,
     pub reg_alloc_info: FuncAllocStat,
-    pub spill_stack_map: HashMap<i32, StackSlot>
+    pub spill_stack_map: HashMap<i32, StackSlot>,
+
+    pub const_array: HashSet<IntArray>
 }
 
 
@@ -64,7 +66,8 @@ impl Func {
             blocks_mpool: ObjPool::new(),
 
             reg_alloc_info: FuncAllocStat::new(),
-            spill_stack_map: HashMap::new()
+            spill_stack_map: HashMap::new(),
+            const_array: HashSet::new(),
         }
     }
 
@@ -78,7 +81,7 @@ impl Func {
         // more infos to add
         let mut info = Mapping::new();
 
-        // 处理全局变量和数组
+        // 处理全局变量
         let globl = &module.upper_module.global_variable;
         globl.iter().for_each(|(name, val)| {
             info.val_map.insert(val.clone(), Operand::Addr(name.to_string()));
@@ -91,7 +94,7 @@ impl Func {
         self.blocks.push(self.entry.unwrap());
 
         // 第一遍pass
-        let mut fblock = ir_func.get_head();
+        let fblock = ir_func.get_head();
         let mut ir_block_set: HashSet<ObjPtr<BasicBlock>> = HashSet::new();
         let first_block = self.blocks_mpool.put(BB::new(&label));
         info.ir_block_map.insert(fblock,first_block);
@@ -303,7 +306,6 @@ impl Func {
     pub fn handle_spill(&mut self) {
         for block in self.blocks.iter() {
             let pos = match self.reg_alloc_info.bb_stack_sizes.get(&block) {
-                //FIXME: handle no spill block
                 Some(pos) => {
                     *pos as i32
                 },
@@ -316,10 +318,14 @@ impl Func {
 
 impl GenerateAsm for Func {
     fn generate(&mut self, _: ObjPtr<Context>, f: &mut File) -> Result<()> {
+        let context = ObjPtr::new(&self.context);
+        for mut a in self.const_array.clone() {
+            a.generate(context, f)?;
+        }
         AsmBuilder::new(f).show_func(&self.label)?;
         self.context.call_prologue_event();
         for block in self.blocks.iter() {
-            block.as_mut().generate(ObjPtr::new(&self.context), f)?;
+            block.as_mut().generate(context, f)?;
         }
         writeln!(f, "	.size	{}, .-{}", self.label, self.label)?;
         Ok(())

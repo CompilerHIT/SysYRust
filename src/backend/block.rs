@@ -387,6 +387,7 @@ impl BB {
                     let array_num = get_current_array_num();
                     let label = format!(".LC{array_num}");
                     inc_array_num();
+                    // map_info.val_map.insert(ir_block_inst, Operand::Addr(label.clone()));
                     //将发生分配的数组装入map_info中：记录数组结构、占用栈空间
                     //TODO:la dst label    sd dst (offset)sp
                     //TODO: 大数组而装填因子过低的压缩问题
@@ -400,7 +401,7 @@ impl BB {
 
                     let dst_reg = self.resolve_operand(func, ir_block_inst, true, map_info);
                     let offset = pos;
-                    self.insts.push(self.insts_mpool.put(LIRInst::new(InstrsType::OpReg(SingleOp::LoadAddr), 
+                    self.insts.push(self.insts_mpool.put(LIRInst::new(InstrsType::OpReg(SingleOp::LoadAddr),
                         vec![dst_reg.clone(), Operand::Addr(label.clone())])));
                     
                     let mut store = LIRInst::new(InstrsType::StoreParamToStack, 
@@ -410,7 +411,7 @@ impl BB {
                     
                     // array: offset~offset+size(8字节对齐)
                     // map_key: array_name
-                    map_info.int_array_map.insert(alloca);
+                    func.as_mut().const_array.insert(alloca);
                     map_info.array_slot_map.insert(ir_block_inst, offset);
                 }
                 InstKind::Gep => {
@@ -436,6 +437,7 @@ impl BB {
                 },
                 InstKind::Branch => {
                     // if jump
+                    let mut inst = LIRInst::new(InstrsType::Jump, vec![]);
                     if inst_ref.is_jmp() {
                         let next_bb = block.as_ref().get_next_bb()[0];
                         let jump_block = match map_info.ir_block_map.get(&next_bb) {
@@ -443,10 +445,10 @@ impl BB {
                             None => panic!("jump block not found"),
                         };
                         if *jump_block != next_blocks.unwrap() {
-                            self.insts.push(self.insts_mpool.put(
-                                LIRInst::new(InstrsType::Jump, 
-                                    vec![Operand::Addr(next_bb.as_ref().get_name().to_string())])
-                            ));
+                            inst.replace_op(vec![Operand::Addr(next_bb.as_ref().get_name().to_string())]);
+                            let obj_inst = self.insts_mpool.put(inst);
+                            self.insts.push(obj_inst);
+                            map_info.block_branch.insert(self.label.clone(), obj_inst);
                         }
                         jump_block.as_mut().in_edge.push(ObjPtr::new(self));
                         self.out_edge.push(*jump_block);
@@ -485,10 +487,10 @@ impl BB {
                                 LIRInst::new(inst_kind, 
                                     vec![Operand::Addr(false_bb.as_ref().get_name().to_string()), lhs_reg, rhs_reg])
                             ));
-                            self.insts.push(self.insts_mpool.put(
-                                LIRInst::new(InstrsType::Jump, 
-                                    vec![Operand::Addr(false_bb.as_ref().get_name().to_string())])
-                            ));
+                            inst.replace_op(vec![Operand::Addr(false_bb.as_ref().get_name().to_string())]);
+                            let obj_inst = self.insts_mpool.put(inst);
+                            self.insts.push(obj_inst);
+                            map_info.block_branch.insert(self.label.clone(), obj_inst);
                             true_block.as_mut().in_edge.push(ObjPtr::new(self));
                             false_block.as_mut().in_edge.push(ObjPtr::new(self));
                             self.out_edge.append(vec![*true_block, *false_block].as_mut());
@@ -648,8 +650,45 @@ impl BB {
                 InstKind::FtoI => {
                     todo!("FtoI")
                 },
+                InstKind::Phi => {
+                    let phi_reg = self.resolve_operand(func, ir_block_inst, false, map_info);
+                    let mut kind = ScalarType::Void;
+                    let temp = match phi_reg {
+                        Operand::Reg(reg) => {
+                            assert!(reg.get_type() != ScalarType::Void);
+                            kind = reg.get_type();
+                            Operand::Reg(Reg::init(reg.get_type()))
+                        },
+                        _ => unreachable!("phi reg must be reg")
+                    };
+                    assert!(kind != ScalarType::Void);
+                    let inst_kind = match kind {
+                        ScalarType::Int => InstrsType::OpReg(SingleOp::IMv),
+                        ScalarType::Float => InstrsType::OpReg(SingleOp::FMv),
+                        _ => unreachable!("mv must be int or float")
+                    };
+                    self.insts.insert(0, self.insts_mpool.put(
+                        LIRInst::new(inst_kind, vec![phi_reg, temp.clone()])
+                    ));
+                    inst_ref.get_operands().iter().for_each(|op| {
+                        let src_reg = self.resolve_operand(func, *op, true, map_info);
+                        let inst = LIRInst::new(inst_kind, vec![temp.clone(), src_reg]);
+                        let obj_inst = self.insts_mpool.put(inst);
+                        if map_info.block_branch.contains_key(&self.label) {
+                            let b_inst = map_info.block_branch.get(&self.label).unwrap();
+                            for i in 0..self.insts.len() {
+                                if self.insts[i] == *b_inst {
+                                    self.insts.insert(i, obj_inst);
+                                    break;
+                                }
+                            }
+                        } else {
+                            self.push_back(obj_inst);
+                        }
+                    });
+                },
                 InstKind::ConstFloat(..) | InstKind::ConstInt(..) | InstKind::GlobalConstFloat(..) | InstKind::GlobalConstInt(..) | InstKind::GlobalFloat(..) |
-                InstKind::GlobalInt(..) | InstKind::Head | InstKind::Parameter | InstKind::Phi => {
+                InstKind::GlobalInt(..) | InstKind::Head | InstKind::Parameter=> {
                     // do nothing
                 },
             }
