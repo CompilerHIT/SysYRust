@@ -74,7 +74,7 @@ impl Func {
         let mut info = Mapping::new();
 
         // 处理全局变量
-        let globl = &module.upper_module.as_ref().global_variable;
+        let globl = &module.upper_module.global_variable;
         globl.iter().for_each(|(name, val)| {
             info.val_map.insert(val.clone(), Operand::Addr(name.to_string()));
         });
