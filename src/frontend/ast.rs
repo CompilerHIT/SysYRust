@@ -199,14 +199,14 @@ pub enum Number {
 }
 
 #[derive(Debug)]
-pub struct OptionFuncFParams {
-    pub func_fparams: Option<FuncFParams>,
+pub struct OptionFuncRParams {
+    pub func_fparams: Option<FuncRParams>,
 }
 
 #[derive(Debug)]
 pub enum UnaryExp {
     PrimaryExp(Box<PrimaryExp>),
-    FuncCall((Ident, OptionFuncFParams)),
+    FuncCall((Ident, OptionFuncRParams)),
     // AddUnaryExp(Box<UnaryExp>),
     OpUnary((UnaryOp, Box<UnaryExp>)),
 }

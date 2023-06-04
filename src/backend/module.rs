@@ -49,7 +49,7 @@ impl<'a> AsmModule<'a> {
         self.allocate_reg(f);
         self.handle_spill(pool);
         // 检查地址溢出，插入间接寻址
-        // self.handle_overflow(f, pool);
+        self.handle_overflow(pool);
         // 第二次分配寄存器
         self.allocate_reg(f);
         self.handle_spill(pool);
@@ -59,11 +59,11 @@ impl<'a> AsmModule<'a> {
         self.generate_asm(f, pool);
     }
 
-    // fn handle_overflow(&mut self, f: &mut File) {
-    //     self.func_map.iter_mut().for_each(|(_, func)| {
-    //         func.as_mut().handle_overflow(f);
-    //     });
-    // }
+    fn handle_overflow(&mut self, pool: &mut BackendPool) {
+        self.func_map.iter_mut().for_each(|(_, func)| {
+            func.as_mut().handle_overflow(pool);
+        });
+    }
 
     fn allocate_reg(&mut self, f: &mut File) {
         self.func_map.iter_mut().for_each(|(_, func)| {
@@ -84,10 +84,10 @@ impl<'a> AsmModule<'a> {
         for (name, iter) in map {
             //TODO: update ir translation，to use ObjPtr match
             match iter.as_ref().get_kind() {
-                InstKind::GlobalConstInt(value) => list.push(GlobalVar::IGlobalVar(
+                InstKind::GlobalConstInt(value) | InstKind::GlobalInt(value) => list.push(GlobalVar::IGlobalVar(
                     IGlobalVar::init(name.to_string(), value, true),
                 )),
-                InstKind::GlobalConstFloat(value) => list.push(GlobalVar::FGlobalVar(
+                InstKind::GlobalConstFloat(value) | InstKind::GlobalFloat(value) => list.push(GlobalVar::FGlobalVar(
                     FGlobalVar::init(name.to_string(), value, true),
                 )),
                 _ => panic!("fail to analyse GlobalConst"),

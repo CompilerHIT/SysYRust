@@ -69,8 +69,6 @@ impl Func {
     }
 
     pub fn construct(&mut self, module: &AsmModule, ir_func: &Function, func_seq: i32, pool: &mut BackendPool) {
-        //FIXME: temporary
-        // more infos to add
         let mut info = Mapping::new();
 
         // 处理全局变量
@@ -316,7 +314,15 @@ impl Func {
                 },
                 None => continue,
             };
-            block.as_mut().handle_spill(ObjPtr::new(&self), &self.reg_alloc_info.spillings, pos, pool);
+            let this = pool.put_func(self.clone());
+            block.as_mut().handle_spill(this, &self.reg_alloc_info.spillings, pos, pool);
+        }
+    }
+
+    pub fn handle_overflow(&mut self, pool: &mut BackendPool) {
+        for block in self.blocks.iter() {
+            let this = pool.put_func(self.clone());
+            block.as_mut().handle_overflow(this, pool);
         }
     }
 }
