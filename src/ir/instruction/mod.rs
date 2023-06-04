@@ -110,7 +110,7 @@ impl Inst {
     }
 
     pub fn get_kind(&self) -> InstKind {
-        self.kind
+        self.kind.clone()
     }
 
     /// 获得使用该Inst的列表

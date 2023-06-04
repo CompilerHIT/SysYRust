@@ -87,7 +87,7 @@ impl Inst {
             unreachable!("Inst::get_callee")
         }
 
-        match self.kind {
+        match &self.kind {
             InstKind::Call(callee) => callee.as_str(),
             _ => panic!("not a call inst"),
         }
