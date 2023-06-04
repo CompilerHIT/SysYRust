@@ -765,8 +765,8 @@ impl BB {
     }
 
     pub fn handle_overflow(&mut self, func: ObjPtr<Func>, pool: &mut BackendPool) {
+        let mut pos = 0;
         loop {
-            let mut pos = 0;
             if pos >= self.insts.len() {
                 break;
             }
@@ -815,9 +815,9 @@ impl BB {
                     self.insts[pos].as_mut().replace_op(vec![inst_ref.get_dst().clone(), temp, Operand::IImm(IImm::new(0))]);
                 },
                 InstrsType::Call | InstrsType::Branch(..) => {
-                    
+
                 }
-                _ => continue
+                _ => {}
             }
             pos += 1;
         }
@@ -844,17 +844,26 @@ impl BB {
             }
         }
 
-        if map.val_map.contains_key(&src) {
-            return map.val_map.get(&src).unwrap().clone();
-        }
-
         match src.as_ref().get_kind() {
-            InstKind::ConstInt(iimm) => self.resolve_iimm(iimm, pool),
-            InstKind::ConstFloat(fimm) => self.resolve_fimm(fimm, pool),
+            InstKind::ConstInt(iimm) => {
+                if map.val_map.contains_key(&src) {
+                    return map.val_map.get(&src).unwrap().clone();
+                }
+                self.resolve_iimm(iimm, pool)
+            },
+            InstKind::ConstFloat(fimm) => {
+                if map.val_map.contains_key(&src) {
+                    return map.val_map.get(&src).unwrap().clone();
+                }
+                self.resolve_fimm(fimm, pool)
+            },
             InstKind::Parameter => self.resolve_param(src, func, map, pool),
             InstKind::GlobalConstInt(_) | InstKind::GlobalInt(..) |
                 InstKind::GlobalConstFloat(_) | InstKind::GlobalFloat(..) => self.resolve_global(src, map, pool),
             _ => {
+                if map.val_map.contains_key(&src) {
+                    return map.val_map.get(&src).unwrap().clone();
+                }
                 let op : Operand = match src.as_ref().get_ir_type() {
                     IrType::Int => Operand::Reg(Reg::init(ScalarType::Int)),
                     IrType::Float => Operand::Reg(Reg::init(ScalarType::Float)),
@@ -973,6 +982,7 @@ impl BB {
             self.insts.push(pool.put_inst(inst));
             reg
         } else {
+            println!("find!");
             return self.global_map.get(&src).unwrap().clone()
         }
     }
@@ -1006,9 +1016,7 @@ impl GenerateAsm for BB {
         if self.called {
             print!("{}:\n", self.label);
         }
-        println!("generate bb\n");
         for inst in self.insts.iter() {
-            println!("inst here\n");
             inst.as_mut().generate(context.clone(), f)?;
         }
         Ok(())

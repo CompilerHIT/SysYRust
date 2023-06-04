@@ -51,11 +51,13 @@ impl<'a> AsmModule<'a> {
         // 检查地址溢出，插入间接寻址
         self.handle_overflow(pool);
         // 第二次分配寄存器
+        println!("start second allocate reg");
         self.allocate_reg(f);
         self.handle_spill(pool);
         self.generate_global_var(f);
         //FIXME: generate array
         // self.gnerate_array(f);
+        println!("start generate");
         self.generate_asm(f, pool);
     }
 
@@ -103,7 +105,6 @@ impl<'a> AsmModule<'a> {
                     let name = ig.get_name();
                     let value = ig.get_init().to_string();
                     writeln!(f, "{name}:\n        .word:   {value}\n");
-                    writeln!(f, "    {value}\n");
                 }
                 GlobalVar::FGlobalVar(fg) => {
                     let name = fg.get_name();
