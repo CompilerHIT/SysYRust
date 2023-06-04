@@ -7,6 +7,7 @@ pub struct Function {
     value: Value,
     return_type: IrType,
     parameters: HashMap<String, ObjPtr<Inst>>,
+    index: Vec<ObjPtr<Inst>>,
     head_block: Option<ObjPtr<BasicBlock>>,
 }
 
@@ -24,6 +25,7 @@ impl Function {
             value: Value::new(IrType::Function),
             return_type: IrType::Void,
             parameters: HashMap::new(),
+            index: Vec::new(),
             head_block: None,
         }
     }
@@ -65,6 +67,13 @@ impl Function {
     /// 为函数增加参数
     pub fn set_parameter(&mut self, name: String, parameter: ObjPtr<Inst>) {
         self.parameters.insert(name, parameter);
+        self.index.push(parameter);
+    }
+
+    /// 获得按顺序排列的参数
+    /// 默认参数存在
+    pub fn get_parameter_list(&self) -> &Vec<ObjPtr<Inst>> {
+        &self.index
     }
 
     /// 获得参数
