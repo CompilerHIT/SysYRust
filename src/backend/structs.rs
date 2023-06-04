@@ -1,4 +1,3 @@
-use std::collections::LinkedList;
 pub use std::collections::{HashSet, VecDeque};
 pub use std::collections::HashMap;
 pub use std::fs::File;
@@ -197,7 +196,6 @@ pub struct Mapping {
     pub ir_block_map: HashMap<ObjPtr<BasicBlock>, ObjPtr<BB>>,
     pub block_ir_map: HashMap<ObjPtr<BB>, ObjPtr<BasicBlock>>,
     //TODO:for float
-    pub int_array_map: HashSet<IntArray>,
     pub array_slot_map: HashMap<ObjPtr<Inst>, i32>,
 
     pub val_map: HashMap<ObjPtr<Inst>, Operand>,
@@ -210,7 +208,6 @@ impl Mapping {
         Self {
             ir_block_map: HashMap::new(),
             block_ir_map: HashMap::new(),
-            int_array_map: HashSet::new(),
             array_slot_map: HashMap::new(),
             val_map: HashMap::new(),
         }
@@ -224,6 +221,7 @@ impl Hash for ObjPtr<Inst> {
     }
 }
 
+#[derive(Clone)]
 pub struct IntArray {
     pub name: String,
     pub size: i32,
@@ -249,7 +247,6 @@ impl IntArray {
     }
 }
 
-//TODO: generate array
 impl GenerateAsm for IntArray {
     fn generate(&mut self, _: ObjPtr<Context>, f: &mut File) -> Result<()> {
         let mut builder = AsmBuilder::new(f);

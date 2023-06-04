@@ -203,6 +203,7 @@ impl Reg {
         self.id
     }
     pub fn get_type(&self) -> ScalarType {
+        assert!(self.r_type != ScalarType::Void);
         self.r_type
     }
 }

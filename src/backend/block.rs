@@ -387,6 +387,7 @@ impl BB {
                     let array_num = get_current_array_num();
                     let label = format!(".LC{array_num}");
                     inc_array_num();
+                    // map_info.val_map.insert(ir_block_inst, Operand::Addr(label.clone()));
                     //将发生分配的数组装入map_info中：记录数组结构、占用栈空间
                     //TODO:la dst label    sd dst (offset)sp
                     //TODO: 大数组而装填因子过低的压缩问题
@@ -400,7 +401,7 @@ impl BB {
 
                     let dst_reg = self.resolve_operand(func, ir_block_inst, true, map_info);
                     let offset = pos;
-                    self.insts.push(self.insts_mpool.put(LIRInst::new(InstrsType::OpReg(SingleOp::LoadAddr), 
+                    self.insts.push(self.insts_mpool.put(LIRInst::new(InstrsType::OpReg(SingleOp::LoadAddr),
                         vec![dst_reg.clone(), Operand::Addr(label.clone())])));
                     
                     let mut store = LIRInst::new(InstrsType::StoreParamToStack, 
@@ -410,7 +411,7 @@ impl BB {
                     
                     // array: offset~offset+size(8字节对齐)
                     // map_key: array_name
-                    map_info.int_array_map.insert(alloca);
+                    func.as_mut().const_array.insert(alloca);
                     map_info.array_slot_map.insert(ir_block_inst, offset);
                 }
                 InstKind::Gep => {
