@@ -18,9 +18,9 @@ use crate::backend::asm_builder::AsmBuilder;
 use crate::backend::module::AsmModule;
 use crate::backend::block::*;
 use crate::backend::regalloc::{regalloc::Regalloc, easy_ls_alloc::Allocator, structs::FuncAllocStat};
-use super::structs::*;
+use super::{structs::*, BackendPool};
 
-// #[derive(Clone)]
+#[derive(Clone)]
 pub struct Func {
     pub label: String,
     blocks: Vec<ObjPtr<BB>>,
@@ -35,18 +35,19 @@ pub struct Func {
     reg_num: i32,
     // fregs: HashSet<Reg>,
 
-    pub context: Context,
+    pub context: ObjPtr<Context>,
 
-    blocks_mpool: ObjPool<BB>,
     pub reg_alloc_info: FuncAllocStat,
-    pub spill_stack_map: HashMap<i32, StackSlot>
+    pub spill_stack_map: HashMap<i32, StackSlot>,
+
+    pub const_array: HashSet<IntArray>
 }
 
 
 /// reg_num, stack_addr, caller_stack_addr考虑借助回填实现
 /// 是否需要caller_stack_addr？caller函数sp保存在s0中
 impl Func {
-    pub fn new(name: &str) -> Self {
+    pub fn new(name: &str, context: ObjPtr<Context>) -> Self {
         Self {
             label: name.to_string(),
             blocks: Vec::new(),
@@ -59,26 +60,20 @@ impl Func {
             reg_num: 0,
             // fregs: HashSet::new(),
 
-            context: Context::new(),
-
-            blocks_mpool: ObjPool::new(),
+            context,
 
             reg_alloc_info: FuncAllocStat::new(),
-            spill_stack_map: HashMap::new()
+            spill_stack_map: HashMap::new(),
+            const_array: HashSet::new(),
         }
     }
 
-    // 或许不会删除函数？
-    pub fn del(&mut self) {
-        self.blocks_mpool.free_all()
-    }
-
-    pub fn construct(&mut self, module: &AsmModule, ir_func: &Function, func_seq: i32) {
+    pub fn construct(&mut self, module: &AsmModule, ir_func: &Function, func_seq: i32, pool: &mut BackendPool) {
         //FIXME: temporary
         // more infos to add
         let mut info = Mapping::new();
 
-        // 处理全局变量和数组
+        // 处理全局变量
         let globl = &module.upper_module.global_variable;
         globl.iter().for_each(|(name, val)| {
             info.val_map.insert(val.clone(), Operand::Addr(name.to_string()));
@@ -86,14 +81,14 @@ impl Func {
         
         // entry shouldn't generate for asm, called label for entry should always be false
         let label = &self.label;
-        let entry = self.blocks_mpool.put(BB::new(&format!(".entry_{label}")));
+        let entry = pool.put_block(BB::new(&format!(".entry_{label}")));
         self.entry = Some(entry);
         self.blocks.push(self.entry.unwrap());
 
         // 第一遍pass
-        let mut fblock = ir_func.get_head();
+        let fblock = ir_func.get_head();
         let mut ir_block_set: HashSet<ObjPtr<BasicBlock>> = HashSet::new();
-        let first_block = self.blocks_mpool.put(BB::new(&label));
+        let first_block = pool.put_block(BB::new(&label));
         info.ir_block_map.insert(fblock,first_block);
         info.block_ir_map.insert(first_block, fblock);
         ir_block_set.insert(fblock);
@@ -113,7 +108,7 @@ impl Func {
             }
             if ir_block_set.insert(fblock) {
                 let label = format!(".LBB{func_seq}_{block_seq}");
-                let block = self.blocks_mpool.put(BB::new(&label));
+                let block = pool.put_block(BB::new(&label));
                 info.ir_block_map.insert(fblock, block);
                 info.block_ir_map.insert(block, fblock);
                 self.blocks.push(block);
@@ -128,13 +123,26 @@ impl Func {
         let mut i = 0;
 
         self.blocks.iter().for_each(|block| {
+            let this = self.clone();
             if *block != self.entry.unwrap() {
                 let basicblock = info.block_ir_map.get(block).unwrap();
                 if i + 1 < self.blocks.len() {
                     let next_block = Some(self.blocks[i + 1]);
-                    block.as_mut().construct(ObjPtr::new(self), *basicblock, next_block, &mut info);
+                    block.as_mut().construct(
+                        pool.put_func(this),
+                        *basicblock,
+                        next_block,
+                        &mut info,
+                        pool
+                    );
                 } else {
-                    block.as_mut().construct(ObjPtr::new(self) , *basicblock, None, &mut info);
+                    block.as_mut().construct(
+                        pool.put_func(this),
+                        *basicblock,
+                        None,
+                        &mut info,
+                        pool
+                    );
                 }
                 i += 1;
             }
@@ -225,7 +233,7 @@ impl Func {
         println!("alloc end");
 
         self.reg_alloc_info = alloc_stat;
-        self.context.set_reg_map(&self.reg_alloc_info.dstr);
+        self.context.as_mut().set_reg_map(&self.reg_alloc_info.dstr);
         println!("stack_size: {}", self.reg_alloc_info.stack_size);
         println!("alloc result: {:?}", self.reg_alloc_info.dstr);
 
@@ -246,7 +254,7 @@ impl Func {
             Ok(f) => f,
             Err(e) => panic!("Error: {}", e),
         };
-        self.context.set_prologue_event(move||{
+        self.context.as_mut().set_prologue_event(move||{
             let mut builder = AsmBuilder::new(&mut f1);
             // addi sp -stack_size
             builder.addi("sp", "sp", -offset);
@@ -255,7 +263,7 @@ impl Func {
         });
 
         let mut offset = stack_size;
-        self.context.set_epilogue_event(move||{
+        self.context.as_mut().set_epilogue_event(move||{
             let mut builder = AsmBuilder::new(&mut f2);
             offset -= 8;
             builder.l(&ra.to_string(), "sp", offset, false, true);
@@ -300,26 +308,28 @@ impl Func {
         self.blocks[1].clone()
     }
 
-    pub fn handle_spill(&mut self) {
+    pub fn handle_spill(&mut self, pool: &mut BackendPool) {
         for block in self.blocks.iter() {
             let pos = match self.reg_alloc_info.bb_stack_sizes.get(&block) {
-                //FIXME: handle no spill block
                 Some(pos) => {
                     *pos as i32
                 },
                 None => continue,
             };
-            block.as_mut().handle_spill(ObjPtr::new(&self), &self.reg_alloc_info.spillings, pos);
+            block.as_mut().handle_spill(ObjPtr::new(&self), &self.reg_alloc_info.spillings, pos, pool);
         }
     }
 }
 
 impl GenerateAsm for Func {
     fn generate(&mut self, _: ObjPtr<Context>, f: &mut File) -> Result<()> {
+        for mut a in self.const_array.clone() {
+            a.generate(self.context, f)?;
+        }
         AsmBuilder::new(f).show_func(&self.label)?;
-        self.context.call_prologue_event();
+        self.context.as_mut().call_prologue_event();
         for block in self.blocks.iter() {
-            block.as_mut().generate(ObjPtr::new(&self.context), f)?;
+            block.as_mut().generate(self.context, f)?;
         }
         writeln!(f, "	.size	{}, .-{}", self.label, self.label)?;
         Ok(())

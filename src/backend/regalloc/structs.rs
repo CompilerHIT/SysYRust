@@ -119,6 +119,7 @@ impl RegUsedStat {
 
 }
 
+#[derive(Clone)]
 pub struct FuncAllocStat{
     pub stack_size:usize,
     pub bb_stack_sizes:HashMap<ObjPtr<BB>,usize>,  //统计翻译bb的时候前面已经用过的栈空间

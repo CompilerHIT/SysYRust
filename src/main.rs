@@ -1,8 +1,8 @@
 use lalrpop_util::lalrpop_mod;
+use sysylib::backend::module::AsmModule;
 use sysylib::frontend::irgen::irgen;
 use sysylib::ir::instruction::Inst;
-use sysylib::backend::module::AsmModule;
-use sysylib::{self, ir::module::Module, utility::ObjPool, backend::generate_asm};
+use sysylib::{self, backend::generate_asm, ir::module::Module, utility::ObjPool};
 lalrpop_mod! {
   #[allow(clippy::all)]
   SysYRust
@@ -35,27 +35,28 @@ fn run_main() {
     // 读取文件
     let file = std::fs::read_to_string(filename).unwrap();
 
-    // TODO 生成IR
-    let file = std::fs::read_to_string(filename).unwrap();
-    let mut pool_module = ObjPool::new();
-    let module_ptr = pool_module.put(Module::new()); //module的指针
-    let module_mut = module_ptr.as_mut();
+    // 生成IR
+
+    let mut module = Module::new(); //module的指针
+
+    let mut pool_func = ObjPool::new();
+
+    let mut pool_bb = ObjPool::new();
+
     let mut pool_inst: ObjPool<Inst> = ObjPool::new();
-    let pool_inst_mut = &mut pool_inst;
+
     let mut compunit = SysYRust::CompUnitParser::new()
         .parse(file.as_str())
         .unwrap();
-    let mut pool_bb = ObjPool::new();
-    let pool_bb_mut = &mut pool_bb;
-    let mut pool_func = ObjPool::new();
-    let pool_func_mut = &mut pool_func;
+
     irgen(
         &mut compunit,
-        module_mut,
-        pool_inst_mut,
-        pool_bb_mut,
-        pool_func_mut,
+        &mut module,
+        &mut pool_inst,
+        &mut pool_bb,
+        &mut pool_func,
     );
-    // TODO 后端解析
-    generate_asm(filename, output, &mut AsmModule::new(module_mut));
+
+    // 后端解析
+    generate_asm(filename, output, &mut AsmModule::new(&module));
 }
