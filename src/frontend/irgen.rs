@@ -6,7 +6,7 @@ use super::{ast::*, context::Context};
 use crate::frontend::context::Symbol;
 use crate::frontend::error::Error;
 use crate::ir::basicblock::BasicBlock;
-use crate::ir::function::Function;
+use crate::ir::function::{self, Function};
 use crate::ir::instruction::{Inst, InstKind};
 use crate::ir::ir_type::IrType;
 use crate::ir::module::Module;
@@ -954,11 +954,15 @@ impl Process for Number {
     }
 }
 
-impl Process for OptionFuncFParams {
-    type Ret = i32;
-    type Message = (i32);
+impl Process for OptionFuncRParams {
+    type Ret = Vec<ObjPtr<Inst>>;
+    type Message = (Vec<Type>);
     fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
-        todo!();
+        if let Some(rparams) = &mut self.func_fparams {
+            Ok(rparams.process(input, kit_mut).unwrap())
+        } else {
+            Ok(vec![])
+        }
     }
 }
 impl Process for UnaryExp {
@@ -1000,7 +1004,74 @@ impl Process for UnaryExp {
                     Ok((inst, ExpValue::None))
                 }
             },
-            UnaryExp::FuncCall((funcname, funcparams)) => todo!(),
+            UnaryExp::FuncCall((funcname, funcparams)) => {
+                let inst_func = kit_mut.context_mut.module_mut.get_function(&funcname);
+                let fparams = inst_func.as_ref().get_parameter_list();
+                let mut fparams_type_vec = vec![];
+                for fp in fparams {
+                    match fp.as_ref().get_ir_type() {
+                        IrType::Float => {
+                            fparams_type_vec.push(Type::Float);
+                        }
+                        IrType::Int => {
+                            fparams_type_vec.push(Type::Int);
+                        }
+                        _ => {
+                            unreachable!()
+                        }
+                    }
+                }
+                match inst_func.as_ref().get_return_type() {
+                    IrType::Float => {
+                        let mut args = funcparams.process(fparams_type_vec, kit_mut).unwrap();
+                        let mut fname = " ".to_string();
+                        if let Some((funcname_in, _)) = kit_mut
+                            .context_mut
+                            .module_mut
+                            .function
+                            .get_key_value(funcname)
+                        {
+                            fname = funcname_in.clone();
+                        }
+                        let inst = kit_mut.pool_inst_mut.make_float_call(fname, args);
+                        kit_mut.context_mut.push_inst_bb(inst);
+                        Ok((inst, ExpValue::None)) //这里可以进一步对返回值进行分析
+                    }
+                    IrType::Int => {
+                        let mut args = funcparams.process(fparams_type_vec, kit_mut).unwrap();
+                        let mut fname = " ".to_string();
+                        if let Some((funcname_in, _)) = kit_mut
+                            .context_mut
+                            .module_mut
+                            .function
+                            .get_key_value(funcname)
+                        {
+                            fname = funcname_in.clone();
+                        }
+                        let inst = kit_mut.pool_inst_mut.make_int_call(fname, args);
+                        kit_mut.context_mut.push_inst_bb(inst);
+                        Ok((inst, ExpValue::None)) //这里可以进一步对返回值进行分析
+                    }
+                    IrType::Void => {
+                        let mut args = funcparams.process(fparams_type_vec, kit_mut).unwrap();
+                        let mut fname = " ".to_string();
+                        if let Some((funcname_in, _)) = kit_mut
+                            .context_mut
+                            .module_mut
+                            .function
+                            .get_key_value(funcname)
+                        {
+                            fname = funcname_in.clone();
+                        }
+                        let inst = kit_mut.pool_inst_mut.make_void_call(fname, args);
+                        kit_mut.context_mut.push_inst_bb(inst);
+                        Ok((inst, ExpValue::None)) //这里可以进一步对返回值进行分析
+                    }
+                    _ => {
+                        unreachable!()
+                    }
+                }
+            }
             _ => unreachable!(),
         }
     }
@@ -1015,13 +1086,20 @@ impl Process for UnaryOp {
 }
 
 impl Process for FuncRParams {
-    type Ret = i32;
-    type Message = (i32);
+    type Ret = Vec<ObjPtr<Inst>>;
+    type Message = (Vec<Type>);
     fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
         // match self{
         //     FuncFParams
         // }
-        todo!()
+        let mut vec = vec![];
+        let mut index = 0;
+        for i in &mut self.exp_vec {
+            let (inst, _) = i.process(input[index], kit_mut).unwrap();
+            vec.push(inst);
+            index = index + 1;
+        }
+        Ok(vec)
     }
 }
 
@@ -1121,13 +1199,13 @@ impl Process for MulExp {
         }
     }
 }
-impl Process for AddOp {
-    type Ret = i32;
-    type Message = (i32);
-    fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
-        todo!();
-    }
-}
+// impl Process for AddOp {
+//     type Ret = i32;
+//     type Message = (i32);
+//     fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
+//         todo!();
+//     }
+// }
 
 impl Process for AddExp {
     type Ret = (ObjPtr<Inst>, ExpValue);

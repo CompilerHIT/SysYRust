@@ -281,8 +281,8 @@ UnaryExp:UnaryExp = {
     PrimaryExp =>{
         UnaryExp::PrimaryExp(Box::new(<>))
     },
-    <id:Ident> "(" <func_fparams:FuncFParams?> ")" =>{
-        UnaryExp::FuncCall((id,OptionFuncFParams{func_fparams}))
+    <id:Ident> "(" <func_fparams:FuncRParams?> ")" =>{
+        UnaryExp::FuncCall((id,OptionFuncRParams{func_fparams}))
     },
     // "+" <UnaryExp> =>{
     //     UnaryExp::AddUnaryExp(Box::new(<>))
