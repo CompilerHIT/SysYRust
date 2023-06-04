@@ -1024,30 +1024,46 @@ impl Process for UnaryExp {
                 match inst_func.as_ref().get_return_type() {
                     IrType::Float => {
                         let mut args = funcparams.process(fparams_type_vec, kit_mut).unwrap();
+                        let mut fname = " ".to_string();
                         if let Some((funcname_in, _)) = kit_mut
                             .context_mut
                             .module_mut
                             .function
                             .get_key_value(funcname)
                         {
-                            let inst = kit_mut.pool_inst_mut.make_float_call(&funcname_in, args);
-                            kit_mut.context_mut.push_inst_bb(inst);
-                            Ok((inst, ExpValue::None)) //这里可以进一步对返回值进行分析
-                        } else {
-                            unreachable!()
+                            fname = funcname_in.clone();
                         }
-
-                        // Ok(())
+                        let inst = kit_mut.pool_inst_mut.make_float_call(fname, args);
+                        kit_mut.context_mut.push_inst_bb(inst);
+                        Ok((inst, ExpValue::None)) //这里可以进一步对返回值进行分析
                     }
                     IrType::Int => {
                         let mut args = funcparams.process(fparams_type_vec, kit_mut).unwrap();
-                        let inst = kit_mut.pool_inst_mut.make_int_call(&funcname, args);
+                        let mut fname = " ".to_string();
+                        if let Some((funcname_in, _)) = kit_mut
+                            .context_mut
+                            .module_mut
+                            .function
+                            .get_key_value(funcname)
+                        {
+                            fname = funcname_in.clone();
+                        }
+                        let inst = kit_mut.pool_inst_mut.make_int_call(fname, args);
                         kit_mut.context_mut.push_inst_bb(inst);
                         Ok((inst, ExpValue::None)) //这里可以进一步对返回值进行分析
                     }
                     IrType::Void => {
                         let mut args = funcparams.process(fparams_type_vec, kit_mut).unwrap();
-                        let inst = kit_mut.pool_inst_mut.make_void_call(&funcname, args);
+                        let mut fname = " ".to_string();
+                        if let Some((funcname_in, _)) = kit_mut
+                            .context_mut
+                            .module_mut
+                            .function
+                            .get_key_value(funcname)
+                        {
+                            fname = funcname_in.clone();
+                        }
+                        let inst = kit_mut.pool_inst_mut.make_void_call(fname, args);
                         kit_mut.context_mut.push_inst_bb(inst);
                         Ok((inst, ExpValue::None)) //这里可以进一步对返回值进行分析
                     }
