@@ -306,7 +306,6 @@ impl Func {
     pub fn handle_spill(&mut self) {
         for block in self.blocks.iter() {
             let pos = match self.reg_alloc_info.bb_stack_sizes.get(&block) {
-                //FIXME: handle no spill block
                 Some(pos) => {
                     *pos as i32
                 },

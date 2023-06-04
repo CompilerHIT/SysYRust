@@ -197,6 +197,10 @@ impl LIRInst {
         }
     }
 
+    pub fn replace_op(&mut self, operands: Vec<Operand>) {
+        self.operands = operands;
+    }
+
     // instr's def/use regs
     pub fn get_reg_def(&self) -> Vec<Reg> {
         match self.inst_type {
