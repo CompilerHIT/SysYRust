@@ -6,7 +6,7 @@ impl ObjPool<Inst> {
     /// 创建取正指令
     /// # Arguments
     /// * `value` - 要取正的值
-    pub fn make_neg(&mut self, value: ObjPtr<Inst>) -> ObjPtr<Inst> {
+    pub fn make_pos(&mut self, value: ObjPtr<Inst>) -> ObjPtr<Inst> {
         let ir_type = value.as_ref().get_ir_type();
         let kind = InstKind::Unary(UnOp::Pos);
         let operands = vec![value];
@@ -21,7 +21,7 @@ impl ObjPool<Inst> {
     /// 创建取负指令
     /// # Arguments
     /// * `value` - 要取负的值
-    pub fn make_pos(&mut self, value: ObjPtr<Inst>) -> ObjPtr<Inst> {
+    pub fn make_neg(&mut self, value: ObjPtr<Inst>) -> ObjPtr<Inst> {
         let ir_type = value.as_ref().get_ir_type();
         let kind = InstKind::Unary(UnOp::Neg);
         let operands = vec![value];
