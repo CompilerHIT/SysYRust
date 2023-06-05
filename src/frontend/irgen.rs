@@ -153,16 +153,17 @@ impl Kit<'_> {
 
         // let mut is_const = false;
 
-        if layer_var < 0 {
+        if layer_var == -1 {
             bbname = "notinblock"; //全局变量,const和一般类型需要分开处理吗?
-                                   // match sym_opt.unwrap().tp{
-                                   // Type::ConstFloat |Type::ConstInt =>{
-                                   //     is_const = true;
-                                   // }
-                                   // _=>{
-
-            // }
-            // }
+        }else if layer_var ==0 {
+            // bbname = "params";
+            if let Some(is_used) = self.context_mut.param_usage_table.get(&name_changed){
+                if !is_used{
+                    // println!("进来了");
+                    bbname = "params";
+                }
+                // bbname = "params";
+            }
         }
 
         let inst_opt = self
@@ -172,6 +173,7 @@ impl Kit<'_> {
             .and_then(|var_inst_map| var_inst_map.get(&name_changed));
 
         if let Some(sym) = sym_opt {
+            // println!("进来了");
             // println!("找到变量{:?}",s);
             if let Some(inst) = inst_opt {
                 if layer_var < 0 {
@@ -560,14 +562,16 @@ impl Process for FuncDef {
                     FuncType::Int => func_mut.set_return_type(IrType::Int),
                     FuncType::Float => func_mut.set_return_type(IrType::Float),
                 }
-                kit_mut.context_mut.bb_now_set(bb);
+                
                 kit_mut
                     .context_mut
                     .push_func_module(id.to_string(), func_ptr);
                 let params_vec = params.process(1, kit_mut).unwrap();
                 for (name, param) in params_vec {
+                    // kit_mut.add_var(&name, tp, is_array, dimension)
                     func_mut.set_parameter(name, param); //这里
                 }
+                kit_mut.context_mut.bb_now_set(bb);
                 blk.process(1, kit_mut);
                 kit_mut.context_mut.delete_layer();
                 return Ok(1);
@@ -617,7 +621,7 @@ impl Process for FuncFParam {
                         .context_mut
                         .add_var(id, Type::Int, false, Vec::new());
                     //这里
-                    // kit_mut.context_mut.update_var_scope_now(s, inst)
+                    kit_mut.context_mut.update_var_scope_now(id, param);
                     Ok((id.clone(), param))
                 }
                 BType::Float => {
@@ -625,6 +629,7 @@ impl Process for FuncFParam {
                     kit_mut
                         .context_mut
                         .add_var(id, Type::Float, false, Vec::new());
+                    kit_mut.context_mut.update_var_scope_now(id, param);
                     Ok((id.clone(), param))
                 }
             },

@@ -15,6 +15,7 @@ use super::irgen::InfuncChoice;
 pub struct Context<'a> {
     pub var_map: HashMap<String, Vec<(String, i64)>>,
     pub symbol_table: HashMap<String, Symbol>,
+    pub param_usage_table:HashMap<String,bool>,
     pub bb_map: HashMap<String, HashMap<String, ObjPtr<Inst>>>,
     pub bb_now_mut: InfuncChoice,
     pub module_mut: &'a mut Module,
@@ -46,6 +47,7 @@ impl Context<'_> {
         Context {
             var_map: HashMap::new(),
             bb_map: HashMap::new(),
+            param_usage_table:HashMap::new(),
             bb_now_mut: InfuncChoice::NInFunc(),
             module_mut,
             index: 0,
@@ -155,7 +157,13 @@ impl Context<'_> {
                 bbname = bbn.get_name();
             }
             InfuncChoice::NInFunc() => {
-                bbname = "notinblock";
+                if self.get_layer()==-1{
+                    bbname = "notinblock";
+                    self.push_var_bb(s.to_string(), inst);
+                }else if self.get_layer()==0 {
+                    bbname = "params";
+                }
+                // bbname = "notinblock";
                 // let kind = inst.as_ref().get_kind();
                 // match tp {
                 //     Type::ConstFloat =>{
@@ -174,7 +182,9 @@ impl Context<'_> {
                 //     // InstKind
                 //     _=>{}
                 // }
-                self.push_var_bb(s.to_string(), inst);
+                
+                
+                // self.push_var_bb(s.to_string(), inst);
             }
         }
         if self.var_map.contains_key(s) {
@@ -362,6 +372,12 @@ impl Context<'_> {
                 },
             );
         }
+
+        //for params
+        if self.get_layer()==0{
+            self.param_usage_table.insert(temps.to_string(), false);
+        }
+
         // if self.layer==-1{
         //     self.update_var_scope_now(s, inst, bb)
         // }
