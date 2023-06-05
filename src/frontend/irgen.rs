@@ -109,6 +109,7 @@ impl Kit<'_> {
                 // }
             }
         }
+        println!("没找到变量:{:?}",s);
         return Err(Error::VariableNotFound);
     }
 
@@ -1034,7 +1035,7 @@ impl Process for UnaryExp {
                 let inst_func = kit_mut.context_mut.module_mut.get_function(&funcname);
                 let fparams = inst_func.as_ref().get_parameter_list();
                 let mut fparams_type_vec = vec![];
-                for fp in fparams {
+                for fp in fparams {//获得各参数类型
                     match fp.as_ref().get_ir_type() {
                         IrType::Float => {
                             fparams_type_vec.push(Type::Float);
@@ -1047,9 +1048,9 @@ impl Process for UnaryExp {
                         }
                     }
                 }
-                match inst_func.as_ref().get_return_type() {
+                match inst_func.as_ref().get_return_type() {//根据返回值类型生成call指令
                     IrType::Float => {
-                        let mut args = funcparams.process(fparams_type_vec, kit_mut).unwrap();
+                        let mut args = funcparams.process(fparams_type_vec, kit_mut).unwrap();//获得实参
                         let mut fname = " ".to_string();
                         if let Some((funcname_in, _)) = kit_mut
                             .context_mut
