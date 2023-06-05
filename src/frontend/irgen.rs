@@ -444,6 +444,10 @@ impl Process for VarDecl {
                             {
                                 return Err(Error::MultipleDeclaration);
                             }
+                            if kit_mut.context_mut.get_layer()==-1{
+                                let inst_ptr = kit_mut.pool_inst_mut.make_global_int(0);
+                                kit_mut.context_mut.update_var_scope_now(id, inst_ptr);
+                            }
                         }
                         VarDef::ArrayInit((id, exp_vec, val)) => {}
                         VarDef::Array((id, exp_vec)) => {
@@ -495,6 +499,10 @@ impl Process for VarDecl {
                                 .add_var(id.as_str(), Type::Float, false, vec![])
                             {
                                 return Err(Error::MultipleDeclaration);
+                            }
+                            if kit_mut.context_mut.get_layer()==-1{
+                                let inst_ptr = kit_mut.pool_inst_mut.make_global_float(0.0);
+                                kit_mut.context_mut.update_var_scope_now(id, inst_ptr);
                             }
                         }
                         VarDef::ArrayInit((id, exp_vec, val)) => {
