@@ -10,7 +10,8 @@ pub mod user;
 pub mod value;
 
 /// 侵入式链表
-pub struct IList<T> {
+#[derive(Debug)]
+pub struct IList<T: 'static> {
     prev: Option<ObjPtr<T>>,
     next: Option<ObjPtr<T>>,
 }

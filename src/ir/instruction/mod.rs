@@ -2,7 +2,7 @@
 ///! 此模块中存放有Inst和InstKind结构体的定义，还有
 ///! 所有Inst类型的公有方法和Head的简单实现。特定的
 ///! inst的相关实现放在当前目录下的其他文件中。
-use super::{ir_type::IrType, user::User, IList};
+use super::{basicblock::BasicBlock, ir_type::IrType, user::User, IList};
 use crate::utility::{ObjPool, ObjPtr};
 mod alloca;
 mod binary;
@@ -19,6 +19,7 @@ mod phi;
 mod store;
 mod unary;
 
+#[derive(Debug)]
 pub struct Inst {
     user: User,
     list: IList<Inst>,
@@ -64,7 +65,7 @@ pub enum InstKind {
     Phi,
 
     // 作为链表头存在，没有实际意义
-    Head,
+    Head(Option<ObjPtr<BasicBlock>>),
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -132,7 +133,7 @@ impl Inst {
     /// 判断是否为当前bb的第一条指令
     pub fn is_head(&self) -> bool {
         match self.list.get_prev().as_ref().get_kind() {
-            InstKind::Head => true,
+            InstKind::Head(_) => true,
             _ => false,
         }
     }
@@ -141,7 +142,7 @@ impl Inst {
     pub fn is_tail(&self) -> bool {
         // 同上
         match self.list.get_next().as_ref().get_kind() {
-            InstKind::Head => true,
+            InstKind::Head(_) => true,
             _ => false,
         }
     }
@@ -186,15 +187,29 @@ impl Inst {
         self.list.prev = None;
     }
 
+    /// 获得当前指令所在的bb
+    pub fn get_parent_bb(&self) -> ObjPtr<BasicBlock> {
+        Self::find_bb(ObjPtr::new(self))
+    }
+
+    fn find_bb(inst: ObjPtr<Inst>) -> ObjPtr<BasicBlock> {
+        match inst.as_ref().get_kind() {
+            InstKind::Head(Some(bb)) => bb,
+            InstKind::Head(None) => unreachable!("Head is not init"),
+            _ => Self::find_bb(inst.as_ref().get_prev()),
+        }
+    }
+
     /// 构造一个Head
     pub fn make_head() -> Inst {
-        Inst::new(IrType::Void, InstKind::Head, vec![])
+        Inst::new(IrType::Void, InstKind::Head(None), vec![])
     }
     /// 初始化Head
-    pub fn init_head(&mut self) {
-        if let InstKind::Head = self.kind {
+    pub fn init_head(&mut self, bb: ObjPtr<BasicBlock>) {
+        if let InstKind::Head(_) = self.kind {
             self.list.set_prev(ObjPtr::new(self));
             self.list.set_next(ObjPtr::new(self));
+            self.kind = InstKind::Head(Some(bb));
         } else {
             debug_assert!(false);
         }

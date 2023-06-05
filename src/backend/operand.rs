@@ -5,8 +5,8 @@ pub const ARG_REG_COUNT: i32 = 8;
 pub const REG_SP: i32 = 2;
 pub const IMM_12_Bs: i32 = 2047;
 pub const IMM_20_Bs: i32 = 524287;
-pub static mut I_REG_ID : i32 = 0;
-pub static mut F_REG_ID : i32 = 0;
+pub static mut I_REG_ID: i32 = 0;
+pub static mut F_REG_ID: i32 = 0;
 
 #[derive(Clone, Copy, PartialEq, Hash, Eq, Debug)]
 pub struct Reg {
@@ -21,7 +21,7 @@ pub struct IImm {
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub struct FImm {
-    data: f32
+    data: f32,
 }
 
 impl IImm {
@@ -41,7 +41,6 @@ impl FImm {
         self.data
     }
 }
-
 
 pub fn is_imm_20bs(imm: i32) -> bool {
     imm >= -IMM_20_Bs - 1 && imm <= IMM_20_Bs
@@ -73,41 +72,27 @@ impl ToString for FImm {
     }
 }
 
-
 impl Reg {
     pub fn new(id: i32, r_type: ScalarType) -> Self {
-        Self {
-            id,
-            r_type
-        }
+        Self { id, r_type }
     }
     pub fn init(r_type: ScalarType) -> Self {
         match r_type {
-            ScalarType::Int => {
-                unsafe {
-                    let mut id = I_REG_ID;
-                    I_REG_ID += 1;
-                    match id {
-                        0 | 2 | 4 => id = I_REG_ID,
-                        _ => {}
-                    }
-                    Self {
-                        id,
-                        r_type
-                    }
+            ScalarType::Int => unsafe {
+                let mut id = I_REG_ID;
+                I_REG_ID += 1;
+                match id {
+                    0 | 2 | 4 => id = I_REG_ID,
+                    _ => {}
                 }
+                Self { id, r_type }
             },
-            ScalarType::Float => {
-                unsafe {
-                    let id = F_REG_ID;
-                    F_REG_ID += 1;
-                    Self {
-                        id,
-                        r_type
-                    }
-                }
+            ScalarType::Float => unsafe {
+                let id = F_REG_ID;
+                F_REG_ID += 1;
+                Self { id, r_type }
             },
-            _ => panic!("Wrong Type")
+            _ => panic!("Wrong Type"),
         }
     }
     pub fn to_string(&self) -> String {
@@ -123,7 +108,7 @@ impl Reg {
                 10..=17 => format!("a{}", self.id - 10),
                 18..=27 => format!("s{}", self.id - 16),
                 28..=31 => format!("t{}", self.id - 25),
-                _ => panic!("Invalid Physic Integer Register Id")
+                _ => panic!("Invalid Physic Integer Register Id"),
             }
         } else {
             match self.id {
@@ -133,7 +118,7 @@ impl Reg {
                 12..=17 => format!("fs{}", self.id - 10),
                 18..=27 => format!("fs{}", self.id - 16),
                 28..=31 => format!("ft{}", self.id - 20),
-                _ => panic!("Invalid Physic Float Register Id")
+                _ => panic!("Invalid Physic Float Register Id"),
             }
         }
     }
@@ -147,26 +132,31 @@ impl Reg {
     //FIXME: ABI是否对gp(x3)进行了规定？
     pub fn is_caller_save(&self) -> bool {
         match self.r_type {
-            ScalarType::Int => self.id == 1 || self.id == 3
-                                || (self.id >= 5 && self.id <= 7)
-                                || (self.id >= 10 && self.id <= 17)
-                                || (self.id >= 28 && self.id <= 31),
-            ScalarType::Float => (self.id >= 0 && self.id <= 7) 
-                                || (self.id >= 10 && self.id <= 17)
-                                || (self.id >= 28 && self.id <= 31),
-            _ => panic!("Wrong Type")
+            ScalarType::Int => {
+                self.id == 1
+                    || self.id == 3
+                    || (self.id >= 5 && self.id <= 7)
+                    || (self.id >= 10 && self.id <= 17)
+                    || (self.id >= 28 && self.id <= 31)
+            }
+            ScalarType::Float => {
+                (self.id >= 0 && self.id <= 7)
+                    || (self.id >= 10 && self.id <= 17)
+                    || (self.id >= 28 && self.id <= 31)
+            }
+            _ => panic!("Wrong Type"),
         }
-        
     }
 
-    // sp, s0(fp), s1, s2-11    
+    // sp, s0(fp), s1, s2-11
     // f8-9, f18-27
     pub fn is_callee_save(&self) -> bool {
         match self.r_type {
-            ScalarType::Int => self.id == 2 || self.id == 8 || self.id == 9 
-                                || (self.id >= 18 && self.id <= 27),
+            ScalarType::Int => {
+                self.id == 2 || self.id == 8 || self.id == 9 || (self.id >= 18 && self.id <= 27)
+            }
             ScalarType::Float => (self.id >= 8 && self.id <= 9) || (self.id >= 18 && self.id <= 27),
-            _ => panic!("Wrong Type")
+            _ => panic!("Wrong Type"),
         }
     }
 

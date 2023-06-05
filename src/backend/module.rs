@@ -31,7 +31,7 @@ impl<'a> AsmModule<'a> {
             upper_module: ir_module,
         }
     }
-    
+
     pub fn build_lir(&mut self, pool: &mut BackendPool) {
         let mut func_seq = 0;
         for (name, iter) in &self.upper_module.function {
@@ -86,12 +86,12 @@ impl<'a> AsmModule<'a> {
         for (name, iter) in map {
             //TODO: update ir translation，to use ObjPtr match
             match iter.as_ref().get_kind() {
-                InstKind::GlobalConstInt(value) | InstKind::GlobalInt(value) => list.push(GlobalVar::IGlobalVar(
-                    IGlobalVar::init(name.to_string(), value, true),
-                )),
-                InstKind::GlobalConstFloat(value) | InstKind::GlobalFloat(value) => list.push(GlobalVar::FGlobalVar(
-                    FGlobalVar::init(name.to_string(), value, true),
-                )),
+                InstKind::GlobalConstInt(value) | InstKind::GlobalInt(value) => list.push(
+                    GlobalVar::IGlobalVar(IGlobalVar::init(name.to_string(), value, true)),
+                ),
+                InstKind::GlobalConstFloat(value) | InstKind::GlobalFloat(value) => list.push(
+                    GlobalVar::FGlobalVar(FGlobalVar::init(name.to_string(), value, true)),
+                ),
                 _ => panic!("fail to analyse GlobalConst"),
             };
         }
