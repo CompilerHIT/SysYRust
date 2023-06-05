@@ -10,36 +10,35 @@ pub enum ExpValue {
     None,
 }
 
-pub fn init_padding_int(now:i32,num_of_sons:i32,dimension_now:&Vec<i32>) ->Vec<i32>{
-    let mut vec = vec![];
-    let mut total = 1;
+pub enum RetInitVec{
+    Float(Vec<f32>),
+    Int(Vec<i32>),
+}
+
+pub fn init_padding_int(vec:&mut Vec<i32>,dimension_now:Vec<i32>) {
+    let mut total= 1;
+    let now = vec.len();
     for dm in dimension_now{
         total = total*dm;
     }
-    if dimension_now.len()==1&&num_of_sons!=0{
-        unreachable!()
-    }
-    let son_has = num_of_sons*(total/dimension_now[0]);
-    let need = total-now-son_has;
+    
+    // println!("total:{:?},now{:?}",total,now);
+    let need = total as usize -now;
     for i in 0..need{
         vec.push(0);
     }
-    vec
+    
 }
 
-pub fn init_padding_float(now:i32,num_of_sons:i32,dimension_now:&Vec<i32>) ->Vec<f32>{
-    let mut vec = vec![];
-    let mut total = 1;
+pub fn init_padding_float(vec:&mut Vec<f32>,dimension_now:Vec<i32>) {
+    let mut total= 1;
+    let now = vec.len();
     for dm in dimension_now{
         total = total*dm;
     }
-    if dimension_now.len()==1&&num_of_sons!=0{
-        unreachable!()
-    }
-    let son_has = num_of_sons*(total/dimension_now[0]);
-    let need = total-now-son_has;
+
+    let need = total as usize -now;
     for i in 0..need{
         vec.push(0.0);
     }
-    vec
 }

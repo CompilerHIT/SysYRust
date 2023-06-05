@@ -37,7 +37,7 @@ pub struct Symbol {
     pub is_array: bool,
     pub is_param: bool,
     pub layer: i64,
-    pub dimension: Vec<i64>,
+    pub dimension: Vec<i32>,
 }
 
 impl Context<'_> {
@@ -283,8 +283,8 @@ impl Context<'_> {
         if self.layer > 0 {
             let iname = "@".to_string() + i.to_string().as_str();
             if let Some(vec) = self.var_map.get(&iname) {
-                for (name_changed, layer_) in vec {
-                    if *layer_ == 1 {
+                for (name_changed, layer_now) in vec {
+                    if *layer_now == 1 {
                         for ((bbname, inst_vec)) in &self.bb_map {
                             if let Some(inst) = inst_vec.get(name_changed) {
                                 return Option::Some(*inst);
@@ -343,7 +343,7 @@ impl Context<'_> {
         }
     }
 
-    pub fn add_var(&mut self, s: &str, tp: Type, is_array: bool,is_param:bool, dimension: Vec<i64>) -> bool {
+    pub fn add_var(&mut self, s: &str, tp: Type, is_array: bool,is_param:bool, dimension: Vec<i32>) -> bool {
         let s1 = s.clone();
         if (self.has_var_now(s1)) {
             println!("当前作用域中已声明过变量{:?}", s);
