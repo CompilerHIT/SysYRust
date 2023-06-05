@@ -204,7 +204,7 @@ pub struct Mapping {
     pub array_slot_map: HashMap<ObjPtr<Inst>, i32>,
 
     pub val_map: HashMap<ObjPtr<Inst>, Operand>,
-    pub block_branch: HashMap<String, ObjPtr<LIRInst>>,
+    pub block_branch: HashMap<ObjPtr<BB>, ObjPtr<LIRInst>>,
     // pub func_
 }
 

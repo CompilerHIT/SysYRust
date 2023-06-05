@@ -216,6 +216,9 @@ impl LIRInst {
         self.inst_type = inst_type;
     }
 
+    pub fn replace_label(&mut self, label: String) {
+        self.operands[0] = Operand::Addr(label);
+    }
     // instr's def/use regs
     pub fn get_reg_def(&self) -> Vec<Reg> {
         match self.inst_type {

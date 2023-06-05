@@ -20,12 +20,12 @@ use crate::ir::basicblock::BasicBlock;
 use crate::ir::function::Function;
 use crate::ir::instruction::Inst;
 use crate::ir::ir_type::IrType;
-use crate::utility::{ObjPool, ObjPtr, ScalarType};
+use crate::utility::{ObjPtr, ScalarType};
 
 #[derive(Clone)]
 pub struct Func {
     pub label: String,
-    blocks: Vec<ObjPtr<BB>>,
+    pub blocks: Vec<ObjPtr<BB>>,
     pub stack_addr: LinkedList<StackSlot>,
     pub params: Vec<ObjPtr<Inst>>,
     pub param_cnt: (i32, i32), // (int, float)
