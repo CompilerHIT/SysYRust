@@ -13,16 +13,16 @@ sudo systemctl restart docker
 2\.然后登录该局域docker registry
 
 ```
-docker login docker login 10.249.12.83:5000 -u root -p root
+docker login 10.249.12.83:5000 -u root -p root
 ```
 
-3\.然后拉取最新镜像,为最新的测试镜像名
+3\.然后拉取最新镜像,使用最新镜像名
 
 ```
 docker pull <latest-ci>
 ```
 
-当前最新名为riscv-ci:3.0
+当前最新测试镜像名为`10.249.12.83:5000/compilerhit/sysy-rv64-cpci:1.0` 
 
 4\.删除旧的同名容器,避免运行新镜像失败
 
@@ -31,13 +31,14 @@ docker stop ci
 docker rm ci
 ```
 
-5\.运行镜像制造新容器且挂载宿主机测试用例文件夹
+5\.运行镜像制造新容器ci且挂载宿主机测试用例文件夹,并且要绑定外部端口50051(ps:如果该端口被使用了，绑定就会失败)
 
 ```
-docker run --name ci -v <your_data_path>:/test/data <latest-ci>
+docker run --name ci -d -p 50051:50051 -v <your_data_path>:/test/data <latest-ci>
 ```
+<!-- docker run --name ci -d -p 50051:50051 -v ./data:/test/data  10.249.12.83:5000/compilerhit/sysy-rv64-cpci:1.0 -->
 
-### ci使用初始化(自动版:TODO)
+### ci使用初始化(自动版:TODO,maybe not do)
 
 1. 编辑配置文件(选项以及作用如下)
 
@@ -64,22 +65,20 @@ ci init -config <config_path>
 
 ### ci使用流程
 
-如果代码发生了更新，使用-refresh参数指定使用更新后的代码编译程序并且使用新的编译程序,(其中<test_folder1>等是指定的容器中/test/data下要测试的用例文件夹名):
+如果编译器项目进行了新的编译,可以使用-u标签指定先更新容器中的编译器再测试,(其中<test_folder1>等是指定的容器中/test/data下要测试的用例文件夹名):
 
 ```
-
-test -refresh <test_folder1> <test_folder2> ..
+./test -u <test_folder1> <test_folder2> ..
 ```
 
 如果代码没有发生更新,要使用过去编译的compiler进行编译
 
 ```
-
-test <test_folder1> <test_folder2> ...
+./test <test_folder1> <test_folder2> ...
 ```
 
 如果要测试容器中挂载到的 /test/下所有用例
 
 ```
-test all
+./test all
 ```
