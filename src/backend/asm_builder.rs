@@ -1,22 +1,22 @@
 /* TODO:
     code generator，将lir(tac)转为汇编形式代码
-    实现指令： 
+    实现指令：
             伪指令：li, la, mv, bz, j, ret, neg, call ...
             op2(2 operand), op1(1 operand),
             ld, sd, addi,
             slli: 优化muli, srli: 优化divi,
             bz: beqz, bnez, blez, bgez, bltz, bgtz
             j
-    注：只支持生成lw、sw指令，因为sysy只有int与float型而没有long型 
+    注：只支持生成lw、sw指令，因为sysy只有int与float型而没有long型
         =>> 很粗暴的对l/s指令使用ld, sd
 */
 
 // FIXME: divi使用srli替代
 // FIXME: 是否使用addiw而非addi
 // use super::func::FunctionInfo;
-use std::io::Result;
-use std::io::prelude::*;
 use std::fs::File;
+use std::io::prelude::*;
+use std::io::Result;
 
 /// Assembly builder.
 pub struct AsmBuilder<'f> {
@@ -25,15 +25,13 @@ pub struct AsmBuilder<'f> {
 
 impl<'f> AsmBuilder<'f> {
     /// Creates a new assembly builder.
-    pub fn new(f:  &'f mut File) -> Self {
+    pub fn new(f: &'f mut File) -> Self {
         Self { f }
     }
 
     pub fn ret(&mut self) -> Result<()> {
         writeln!(self.f, "    ret")
     }
-
-    
 
     pub fn op2(&mut self, op: &str, dest: &str, lhs: &str, rhs: &str, is_imm: bool) -> Result<()> {
         //FIXME: mul使用w是否有超过32位的用例
@@ -58,7 +56,6 @@ impl<'f> AsmBuilder<'f> {
 
     pub fn addi(&mut self, dest: &str, opr: &str, imm: i32) -> Result<()> {
         writeln!(self.f, "    addiw {dest}, {opr}, {imm}")
-        
     }
 
     pub fn slli(&mut self, dest: &str, opr: &str, imm: i32) -> Result<()> {
@@ -117,7 +114,14 @@ impl<'f> AsmBuilder<'f> {
     //     }
     // }
 
-    pub fn s(&mut self, src: &str, addr: &str, offset: i32, is_float: bool, is_double: bool) -> Result<()> {
+    pub fn s(
+        &mut self,
+        src: &str,
+        addr: &str,
+        offset: i32,
+        is_float: bool,
+        is_double: bool,
+    ) -> Result<()> {
         if !is_double {
             if is_float {
                 writeln!(self.f, "	fsw {src}, {offset}({addr})")
@@ -133,7 +137,14 @@ impl<'f> AsmBuilder<'f> {
         }
     }
 
-    pub fn l(&mut self, dest: &str, addr: &str, offset: i32, is_float: bool, is_double: bool) -> Result<()> {
+    pub fn l(
+        &mut self,
+        dest: &str,
+        addr: &str,
+        offset: i32,
+        is_float: bool,
+        is_double: bool,
+    ) -> Result<()> {
         if !is_double {
             if is_float {
                 writeln!(self.f, "	flw {dest}, {offset}({addr})")

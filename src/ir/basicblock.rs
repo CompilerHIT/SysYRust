@@ -1,5 +1,7 @@
 use super::{instruction::Inst, ir_type::IrType, value::Value};
 use crate::utility::{ObjPool, ObjPtr};
+
+#[derive(Debug)]
 pub struct BasicBlock {
     name: String,
     value: Value,
@@ -15,7 +17,7 @@ impl ObjPool<BasicBlock> {
         let bb = self.put(bb);
 
         // 初始化指令头
-        bb.as_mut().inst_head.init_head();
+        bb.as_mut().inst_head.init_head(bb);
         bb
     }
 }

@@ -2,12 +2,10 @@
 
 use super::regalloc::Regalloc;
 
-pub struct Allocator{
-    
-}
+pub struct Allocator {}
 
 impl Regalloc for Allocator {
-    fn alloc(&mut self,func :& crate::backend::func::Func)->super::structs::FuncAllocStat {
+    fn alloc(&mut self, func: &crate::backend::func::Func) -> super::structs::FuncAllocStat {
         todo!()
     }
 }

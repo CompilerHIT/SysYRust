@@ -1,28 +1,26 @@
-pub use std::io::Result;
-use std::collections::{HashMap, HashSet};
-use std::vec;
 use std::cmp::min;
+use std::collections::{HashMap, HashSet};
+pub use std::io::Result;
+use std::vec;
 
-pub use crate::backend::structs::{Context, GenerateAsm};
+pub use crate::backend::asm_builder::AsmBuilder;
 pub use crate::backend::block::BB;
 pub use crate::backend::func::Func;
-pub use crate::utility::{ScalarType, ObjPtr};
-pub use crate::backend::asm_builder::AsmBuilder;
 use crate::backend::operand::*;
+pub use crate::backend::structs::{Context, GenerateAsm};
+pub use crate::utility::{ObjPtr, ScalarType};
 
-use super::operand;
-
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Debug)]
 pub enum Operand {
     IImm(IImm),
     FImm(FImm),
     Reg(Reg),
-    Addr(String)
+    Addr(String),
 }
 
 //TODO:浮点数运算
 /// 二元运算符
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum BinaryOp {
     Add,
     Sub,
@@ -41,7 +39,7 @@ pub enum BinaryOp {
 }
 
 /// 单目运算符
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum SingleOp {
     Li,
     Lui,
@@ -60,7 +58,7 @@ pub enum SingleOp {
 }
 
 /// 比较运算符
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum CmpOp {
     Ne,
     Eq,
@@ -70,7 +68,7 @@ pub enum CmpOp {
     Le,
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum InstrsType {
     // dst: reg = lhs: operand op rhs: operand
     // 默认左操作数为寄存器，为此需要进行常量折叠 / 交换(前端完成？)
@@ -79,7 +77,7 @@ pub enum InstrsType {
     OpReg(SingleOp),
     // addi sp (-)imm, check legal first
     // ChangeSp,
-    // src: stackslot, dst: reg, offset: iimm  
+    // src: stackslot, dst: reg, offset: iimm
     LoadFromStack,
     // src: reg, dst: stackslot, offset: iimm
     StoreToStack,
@@ -115,7 +113,14 @@ pub struct LIRInst {
 impl LIRInst {
     // 通用
     pub fn new(inst_type: InstrsType, operands: Vec<Operand>) -> Self {
-        Self { inst_type, operands, param_cnt: (0, 0), func: None, func_name: String::new(), double: false }
+        Self {
+            inst_type,
+            operands,
+            param_cnt: (0, 0),
+            func: None,
+            func_name: String::new(),
+            double: false,
+        }
     }
     pub fn get_type(&self) -> InstrsType {
         self.inst_type
@@ -135,7 +140,11 @@ impl LIRInst {
         &mut self.operands[1]
     }
     pub fn is_rhs_exist(&self) -> bool {
-        if self.operands.len() < 3 { false } else { true }
+        if self.operands.len() < 3 {
+            false
+        } else {
+            true
+        }
     }
     // rhs不一定存在
     pub fn get_rhs(&self) -> &Operand {
@@ -210,13 +219,15 @@ impl LIRInst {
     // instr's def/use regs
     pub fn get_reg_def(&self) -> Vec<Reg> {
         match self.inst_type {
-            InstrsType::Binary(..) | InstrsType::OpReg(..) | InstrsType::Load | InstrsType::Store |
-            InstrsType::LoadFromStack | InstrsType::LoadParamFromStack | InstrsType::LoadGlobal =>
-            { 
-                match self.operands[0] {
-                    Operand::Reg(dst_reg) => vec![dst_reg],
-                    _ => panic!("dst must be reg")
-                }
+            InstrsType::Binary(..)
+            | InstrsType::OpReg(..)
+            | InstrsType::Load
+            | InstrsType::Store
+            | InstrsType::LoadFromStack
+            | InstrsType::LoadParamFromStack
+            | InstrsType::LoadGlobal => match self.operands[0] {
+                Operand::Reg(dst_reg) => vec![dst_reg],
+                _ => panic!("dst must be reg"),
             },
             InstrsType::Call => {
                 let mut set = Vec::new();
@@ -235,22 +246,31 @@ impl LIRInst {
                 }
                 set
             }
-            InstrsType::StoreToStack | InstrsType::StoreParamToStack | InstrsType::Jump | InstrsType::Branch(..) => vec![],
+            InstrsType::StoreToStack
+            | InstrsType::StoreParamToStack
+            | InstrsType::Jump
+            | InstrsType::Branch(..) => vec![],
 
-            InstrsType::Ret(re_type) => {
-                match re_type {
-                    ScalarType::Int => vec![Reg::new(10, ScalarType::Int)],
-                    ScalarType::Float => vec![Reg::new(10, ScalarType::Float)],
-                    ScalarType::Void => vec![],
-                }
-            }
+            InstrsType::Ret(re_type) => match re_type {
+                ScalarType::Int => vec![Reg::new(10, ScalarType::Int)],
+                ScalarType::Float => vec![Reg::new(10, ScalarType::Float)],
+                ScalarType::Void => vec![],
+            },
         }
     }
     pub fn get_reg_use(&self) -> Vec<Reg> {
         match self.inst_type {
-            InstrsType::Binary(..) | InstrsType::OpReg(..) | InstrsType::Load |
-            InstrsType::Store | InstrsType::LoadFromStack | InstrsType::StoreToStack | InstrsType::Branch(..) |
-            InstrsType::Jump | InstrsType::LoadParamFromStack | InstrsType::StoreParamToStack | InstrsType::LoadGlobal=> {
+            InstrsType::Binary(..)
+            | InstrsType::OpReg(..)
+            | InstrsType::Load
+            | InstrsType::Store
+            | InstrsType::LoadFromStack
+            | InstrsType::StoreToStack
+            | InstrsType::Branch(..)
+            | InstrsType::Jump
+            | InstrsType::LoadParamFromStack
+            | InstrsType::StoreParamToStack
+            | InstrsType::LoadGlobal => {
                 let mut regs = self.operands.clone();
                 let mut res = Vec::new();
                 while let Some(operand) = regs.pop() {
@@ -258,15 +278,15 @@ impl LIRInst {
                         Operand::Reg(reg) => res.push(reg),
                         _ => {}
                     }
-                }           
+                }
                 res
-            },
+            }
             InstrsType::Call => {
                 let mut set = Vec::new();
                 let (iarg_cnt, farg_cnt) = self.param_cnt;
                 let mut ni = 0;
                 while ni < min(iarg_cnt, REG_COUNT) {
-                    // if 
+                    // if
                     set.push(Reg::new(ni, ScalarType::Int));
                     ni += 1;
                 }
@@ -274,12 +294,12 @@ impl LIRInst {
                 while nf < min(farg_cnt, REG_COUNT) {
                     set.push(Reg::new(nf, ScalarType::Float));
                     nf += 1;
-                } 
+                }
                 set
             }
             InstrsType::Ret(..) => {
                 vec![]
-            },
+            }
         }
     }
 
@@ -306,6 +326,7 @@ impl LIRInst {
         self.operands[2] = Operand::IImm(offset);
     }
     pub fn get_offset(&self) -> IImm {
+        assert!(self.get_type() == InstrsType::Load || self.get_type() == InstrsType::Store);
         match self.operands[2] {
             Operand::IImm(offset) => offset,
             _ => unreachable!("only support imm sp offset"),
@@ -371,7 +392,6 @@ impl LIRInst {
     // fn replace_def_value() {}
     // fn replace_use_value() {}
 }
-
 
 //TODO: maybe
 // enum StackOp {

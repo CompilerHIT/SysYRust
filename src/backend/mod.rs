@@ -1,27 +1,27 @@
 mod asm_builder;
-mod instrs;
-mod generate;
 mod block;
 mod func;
-pub mod operand;
-pub mod structs;
+mod generate;
+mod instrs;
 pub mod module;
+pub mod operand;
 pub mod regalloc;
+pub mod structs;
 
-use std::io::Write;
 use std::fs::File;
+use std::io::Write;
 
 use crate::backend::module::AsmModule;
 use crate::utility::ObjPool;
 
 use self::func::Func;
-use self::instrs::{BB, LIRInst, ObjPtr, Context};
+use self::instrs::{Context, LIRInst, ObjPtr, BB};
 
 pub struct BackendPool {
     func_pool: ObjPool<Func>,
     block_pool: ObjPool<BB>,
     inst_pool: ObjPool<LIRInst>,
-    context_pool: ObjPool<Context>
+    context_pool: ObjPool<Context>,
 }
 
 impl BackendPool {
@@ -30,7 +30,7 @@ impl BackendPool {
             func_pool: ObjPool::new(),
             block_pool: ObjPool::new(),
             inst_pool: ObjPool::new(),
-            context_pool: ObjPool::new()
+            context_pool: ObjPool::new(),
         }
     }
 
@@ -69,7 +69,7 @@ pub fn generate_asm(in_path: &str, path: &str, module: &mut AsmModule) {
     let mut pool = BackendPool::new();
     module.generator(&mut file, &mut pool);
     pool.free_all();
-    
+
     // writeln!(file, "    .ident	\"GCC: (Ubuntu 9.4.0-1ubuntu1~20.04) 9.4.0\"");
     writeln!(file, "    .section	.note.GNU-stack,\"\",@progbits");
 }
