@@ -104,12 +104,12 @@ impl<'a> AsmModule<'a> {
                 GlobalVar::IGlobalVar(ig) => {
                     let name = ig.get_name();
                     let value = ig.get_init().to_string();
-                    writeln!(f, "{name}:\n        .word:   {value}\n");
+                    writeln!(f, "{name}:\n    .word:   {value}\n");
                 }
                 GlobalVar::FGlobalVar(fg) => {
                     let name = fg.get_name();
                     let value = fg.get_init().to_hex_string();
-                    writeln!(f, "{name}:\n        .word:   {value}\n");
+                    writeln!(f, "{name}:\n    .word:   {value}\n");
                 }
             }
         }

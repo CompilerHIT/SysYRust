@@ -224,16 +224,11 @@ impl Func {
         let ra = Reg::new(1, ScalarType::Int);
         
         self.calc_live();
-        println!("cal live end");
         let mut allocator = Allocator::new();
-        println!("start alloc");
         let alloc_stat = allocator.alloc(self);
-        println!("alloc end");
 
         self.reg_alloc_info = alloc_stat;
         self.context.as_mut().set_reg_map(&self.reg_alloc_info.dstr);
-        println!("stack_size: {}", self.reg_alloc_info.stack_size);
-        println!("alloc result: {:?}", self.reg_alloc_info.dstr);
 
         let mut stack_size = self.reg_alloc_info.stack_size as i32;
         if let Some(addition_stack_info) = self.stack_addr.front() {

@@ -118,14 +118,14 @@ impl GenerateAsm for LIRInst {
 
             InstrsType::StoreToStack => {
                 let mut builder = AsmBuilder::new(f);
-                if !operand::is_imm_12bs(self.get_offset().get_data()) {
+                if !operand::is_imm_12bs(self.get_stack_offset().get_data()) {
                     panic!("illegal offset");
                 }
                 let src = match self.get_lhs() {
                     Operand::Reg(reg) => reg,
                     _ => panic!("src of store must be reg, to improve"),
                 };
-                let offset =  self.get_offset().get_data();
+                let offset =  self.get_stack_offset().get_data();
                 //FIXME: 判断寄存器中存的是否是地址，如果只是简单的数值，则可以使用sw替代
                 //FIXME: *4 or *8
                 match src.get_type() {
@@ -137,7 +137,7 @@ impl GenerateAsm for LIRInst {
             },
             InstrsType::LoadFromStack => {
                 let mut builder = AsmBuilder::new(f);
-                if !operand::is_imm_12bs(self.get_offset().get_data()) {
+                if !operand::is_imm_12bs(self.get_stack_offset().get_data()) {
                     panic!("illegal offset");
                 }
                 let dst = match self.get_dst() {
@@ -146,7 +146,7 @@ impl GenerateAsm for LIRInst {
                 };
                 // let inst_off = self.get_offset().
                 //FIXME: *4 or *8
-                let offset = self.get_offset().get_data();
+                let offset = self.get_stack_offset().get_data();
                 match dst.get_type() {
                     ScalarType::Int => builder.l(&dst.to_string(), "sp", offset, false, self.is_double())?,
                     ScalarType::Float => builder.l(&dst.to_string(), "sp", offset, true, self.is_double())?,
@@ -157,7 +157,7 @@ impl GenerateAsm for LIRInst {
             InstrsType::LoadParamFromStack => {
                 let mut builder = AsmBuilder::new(f);
 
-                let true_offset = context.as_ref().get_offset() - self.get_offset().get_data();
+                let true_offset = context.as_ref().get_offset() - self.get_stack_offset().get_data();
                 if !operand::is_imm_12bs(true_offset) {
                     panic!("illegal offset");
                 }
@@ -176,7 +176,7 @@ impl GenerateAsm for LIRInst {
 
             InstrsType::StoreParamToStack => {
                 let mut builder = AsmBuilder::new(f);
-                let true_offset = context.as_ref().get_offset() - self.get_offset().get_data();
+                let true_offset = context.as_ref().get_offset() - self.get_stack_offset().get_data();
                 if !operand::is_imm_12bs(true_offset) {
                     panic!("illegal offset");
                 }

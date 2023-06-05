@@ -10,9 +10,7 @@ pub use crate::utility::{ScalarType, ObjPtr};
 pub use crate::backend::asm_builder::AsmBuilder;
 use crate::backend::operand::*;
 
-use super::operand;
-
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Debug)]
 pub enum Operand {
     IImm(IImm),
     FImm(FImm),
@@ -22,7 +20,7 @@ pub enum Operand {
 
 //TODO:浮点数运算
 /// 二元运算符
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum BinaryOp {
     Add,
     Sub,
@@ -41,7 +39,7 @@ pub enum BinaryOp {
 }
 
 /// 单目运算符
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum SingleOp {
     Li,
     Lui,
@@ -60,7 +58,7 @@ pub enum SingleOp {
 }
 
 /// 比较运算符
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum CmpOp {
     Ne,
     Eq,
@@ -70,7 +68,7 @@ pub enum CmpOp {
     Le,
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum InstrsType {
     // dst: reg = lhs: operand op rhs: operand
     // 默认左操作数为寄存器，为此需要进行常量折叠 / 交换(前端完成？)
@@ -306,6 +304,7 @@ impl LIRInst {
         self.operands[2] = Operand::IImm(offset);
     }
     pub fn get_offset(&self) -> IImm {
+        assert!(self.get_type() == InstrsType::Load || self.get_type() == InstrsType::Store);
         match self.operands[2] {
             Operand::IImm(offset) => offset,
             _ => unreachable!("only support imm sp offset"),

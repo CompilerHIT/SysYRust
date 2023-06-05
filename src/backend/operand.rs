@@ -8,18 +8,18 @@ pub const IMM_20_Bs: i32 = 524287;
 pub static mut I_REG_ID : i32 = 0;
 pub static mut F_REG_ID : i32 = 0;
 
-#[derive(Clone, Copy, PartialEq, Hash, Eq)]
+#[derive(Clone, Copy, PartialEq, Hash, Eq, Debug)]
 pub struct Reg {
     id: i32,
     r_type: ScalarType,
 }
 
-#[derive(Clone, Copy, PartialEq, Hash, Eq)]
+#[derive(Clone, Copy, PartialEq, Hash, Eq, Debug)]
 pub struct IImm {
     data: i32,
 }
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub struct FImm {
     data: f32
 }
