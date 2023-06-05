@@ -24,8 +24,28 @@ impl Kit<'_> {
         self.context_mut.push_inst_bb(inst_ptr);
     }
 
-    pub fn add_var(&mut self, s: &str, tp: Type, is_array: bool, dimension: Vec<i64>) {
-        self.context_mut.add_var(s, tp, is_array, dimension);
+    pub fn add_var(&mut self, s: &str, tp: Type, is_array: bool,is_param:bool, dimension: Vec<i64>) {
+        self.context_mut.add_var(s, tp, is_array,is_param, dimension);
+    }
+
+    pub fn param_used(&mut self,s:&str){
+        // let inst = self.context_mut.module_mut.get_var(s);
+
+                let mut name_changed = " ".to_string();
+                let mut layer_var = 0;
+
+                self
+                    .context_mut
+                    .var_map
+                    .get(s)
+                    .and_then(|vec_temp| vec_temp.last())
+                    .and_then(|(last_elm, layer)| {
+                        name_changed = last_elm.clone();
+                        layer_var = *layer;
+                        self.context_mut.symbol_table.get(last_elm)
+                    });//获得改名后的名字
+                    
+                self.context_mut.param_usage_table.insert(name_changed, true);
     }
 
     // pub fn update_var(&mut self, s: &str, inst: ObjPtr<Inst>) -> bool {
@@ -118,21 +138,6 @@ impl Kit<'_> {
         s: &str,
         bb: ObjPtr<BasicBlock>,
     ) -> Option<(ObjPtr<Inst>, Symbol)> {
-        // if let Some(vec_temp) = self.context_mut.var_map.get(s.clone()) {
-        //     if let Some((last_element0, _last_element1)) = vec_temp.last() {
-        //         let name = last_element0.clone();
-        //         if let Some(symbol_temp) = self.context_mut.symbol_table.get(&name) {
-        //             let symbol = symbol_temp.clone();
-
-        //             let bbname = bb.as_ref().get_name();
-        //             if let Some(var_inst_map) = self.context_mut.bb_map.get(bbname) {
-        //                 if let Some(inst) = var_inst_map.get(s.clone()) {
-        //                     return Option::Some((*inst, symbol));
-        //                 }
-        //             }
-        //         }
-        //     }
-        // }
 
         let mut name_changed = " ".to_string();
         let mut layer_var = 0;
@@ -195,6 +200,8 @@ impl Kit<'_> {
                 return Some((*inst, sym));
             } else {
                 println!("没找到变量{:?}", s);
+                println!("bbname:{:?}",bbname);
+                
                 //没找到
                 // bb.as_ref().
                 let phiinst = self
@@ -307,16 +314,24 @@ impl Process for ConstDecl {
                             &def.ident,
                             Type::ConstInt,
                             false,
+                            false,
                             Vec::new(),
                         ) {
                             return Err(Error::MultipleDeclaration);
                         }
 
-                        if kit_mut.context_mut.get_layer() < 0 {
+                        
                             let mut bond = 0;
                             match val {
                                 ExpValue::Int(i) => {
+                                    
                                     bond = i;
+                                    if kit_mut.context_mut.get_layer() < 0 {
+                                        inst_ptr = kit_mut.pool_inst_mut.make_global_int_const(bond);
+                                    }else{
+                                        inst_ptr = kit_mut.pool_inst_mut.make_int_const(i);
+                                        kit_mut.context_mut.push_inst_bb(inst_ptr);
+                                    }
                                 }
                                 _ => {
                                     unreachable!()
@@ -324,9 +339,7 @@ impl Process for ConstDecl {
                             }
                             inst_ptr = kit_mut.pool_inst_mut.make_global_int_const(bond);
                             //这里
-                        }else{
-                            kit_mut.context_mut.push_inst_bb(inst_ptr);
-                        }
+                        
                         kit_mut
                             .context_mut
                             .update_var_scope_now(&def.ident, inst_ptr);
@@ -347,16 +360,39 @@ impl Process for ConstDecl {
                             &def.ident,
                             Type::ConstFloat,
                             false,
+                            false,
                             Vec::new(),
                         ) {
                             return Err(Error::MultipleDeclaration);
                         }
 
-                        if kit_mut.context_mut.get_layer() < 0 {
-                            let mut bond = 0.0;
+                        // if kit_mut.context_mut.get_layer() < 0 {
+                        //     let mut bond = 0.0;
+                        //     match val {
+                        //         ExpValue::Float(f) => {
+                        //             bond = f;
+                        //         }
+                        //         _ => {
+                        //             unreachable!()
+                        //         }
+                        //     }
+                        //     inst_ptr = kit_mut.pool_inst_mut.make_global_float_const(bond);
+                        //     //这里
+                        // }else{
+                        //     kit_mut.context_mut.push_inst_bb(inst_ptr);
+                        // }
+
+                        let mut bond= 0.0;
                             match val {
-                                ExpValue::Float(f) => {
-                                    bond = f;
+                                ExpValue::Float(i) => {
+                                    
+                                    bond = i;
+                                    if kit_mut.context_mut.get_layer() < 0 {
+                                        inst_ptr = kit_mut.pool_inst_mut.make_global_float_const(bond);
+                                    }else{
+                                        inst_ptr = kit_mut.pool_inst_mut.make_float_const(i);
+                                        kit_mut.context_mut.push_inst_bb(inst_ptr);
+                                    }
                                 }
                                 _ => {
                                     unreachable!()
@@ -364,9 +400,6 @@ impl Process for ConstDecl {
                             }
                             inst_ptr = kit_mut.pool_inst_mut.make_global_float_const(bond);
                             //这里
-                        }else{
-                            kit_mut.context_mut.push_inst_bb(inst_ptr);
-                        }
                         kit_mut
                             .context_mut
                             .update_var_scope_now(&def.ident, inst_ptr);
@@ -416,11 +449,11 @@ impl Process for VarDecl {
                                     exp.process(Type::Int, kit_mut).unwrap();
                                 if !kit_mut
                                     .context_mut
-                                    .add_var(id, Type::Int, false, Vec::new())
+                                    .add_var(id, Type::Int, false,false, Vec::new())
                                 {
                                     return Err(Error::MultipleDeclaration);
                                 }
-                                if kit_mut.context_mut.get_layer() < 0 {
+                                if kit_mut.context_mut.get_layer() < 0 {//设计相关(全局变量指令与局部变量不同)，全局变量得在这额外判断，放到module里
                                     match val {
                                         ExpValue::Int(i) => {
                                             inst_ptr = kit_mut.pool_inst_mut.make_global_int(i);
@@ -440,20 +473,23 @@ impl Process for VarDecl {
                         VarDef::NonArray(id) => {
                             if !kit_mut
                                 .context_mut
-                                .add_var(id, Type::Int, false, Vec::new())
+                                .add_var(id, Type::Int, false, false,Vec::new())
                             {
                                 return Err(Error::MultipleDeclaration);
                             }
-                            if kit_mut.context_mut.get_layer()==-1{
+                            if kit_mut.context_mut.get_layer()==-1{//设计相关(全局变量指令与局部变量不同)，全局变量得在这额外判断，放到module里
                                 let inst_ptr = kit_mut.pool_inst_mut.make_global_int(0);
                                 kit_mut.context_mut.update_var_scope_now(id, inst_ptr);
                             }
                         }
-                        VarDef::ArrayInit((id, exp_vec, val)) => {}
+                        VarDef::ArrayInit((id, exp_vec, val)) => {
+                            // let dimension_vec = exp_vec.iter().map(|x|x.process(Type::Int, kit_mut).unwrap()).collect();
+                            // val.process((Type::Int,), kit_mut).unwrap();
+                        }
                         VarDef::Array((id, exp_vec)) => {
                             if !kit_mut
                                 .context_mut
-                                .add_var(id.as_str(), Type::Int, true, vec![])
+                                .add_var(id.as_str(), Type::Int, true,false, vec![])
                             {
                                 return Err(Error::MultipleDeclaration);
                             }
@@ -471,12 +507,12 @@ impl Process for VarDecl {
                                     exp.process(Type::Float, kit_mut).unwrap();
                                 if !kit_mut
                                     .context_mut
-                                    .add_var(id, Type::Float, false, Vec::new())
+                                    .add_var(id, Type::Float, false,false, Vec::new())
                                 {
                                     return Err(Error::MultipleDeclaration);
                                 }
 
-                                if kit_mut.context_mut.get_layer() < 0 {
+                                if kit_mut.context_mut.get_layer() < 0 {//设计相关(全局变量指令与局部变量不同)，全局变量得在这额外判断，放到module里
                                     match val {
                                         ExpValue::Float(f) => {
                                             inst_ptr = kit_mut.pool_inst_mut.make_global_float(f);
@@ -496,11 +532,11 @@ impl Process for VarDecl {
                         VarDef::NonArray((id)) => {
                             if !kit_mut
                                 .context_mut
-                                .add_var(id.as_str(), Type::Float, false, vec![])
+                                .add_var(id.as_str(), Type::Float, false, false,vec![])
                             {
                                 return Err(Error::MultipleDeclaration);
                             }
-                            if kit_mut.context_mut.get_layer()==-1{
+                            if kit_mut.context_mut.get_layer()==-1{//设计相关(全局变量指令与局部变量不同)，全局变量得在这额外判断，放到module里
                                 let inst_ptr = kit_mut.pool_inst_mut.make_global_float(0.0);
                                 kit_mut.context_mut.update_var_scope_now(id, inst_ptr);
                             }
@@ -530,7 +566,7 @@ impl Process for VarDef {
 
 impl Process for InitVal {
     type Ret = i32;
-    type Message = (i32);
+    type Message = (Type,Vec<i32>);
     fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
         todo!();
     }
@@ -627,7 +663,7 @@ impl Process for FuncFParam {
                     let param = kit_mut.pool_inst_mut.make_param(IrType::Int);
                     kit_mut
                         .context_mut
-                        .add_var(id, Type::Int, false, Vec::new());
+                        .add_var(id, Type::Int, false, true,Vec::new());
                     //这里
                     kit_mut.context_mut.update_var_scope_now(id, param);
                     Ok((id.clone(), param))
@@ -636,7 +672,7 @@ impl Process for FuncFParam {
                     let param = kit_mut.pool_inst_mut.make_param(IrType::Float);
                     kit_mut
                         .context_mut
-                        .add_var(id, Type::Float, false, Vec::new());
+                        .add_var(id, Type::Float, false, true,Vec::new());
                     kit_mut.context_mut.update_var_scope_now(id, param);
                     Ok((id.clone(), param))
                 }
@@ -739,7 +775,12 @@ impl Process for Assign {
                 mes = Type::Int;
             }
         }
+        
+// println!("zhe");
         let (inst_r, _) = self.exp.process(mes, kit_mut).unwrap();
+        if symbol.is_param{
+            kit_mut.param_used(&lval.id);
+        }
         kit_mut
             .context_mut
             .update_var_scope_now(&self.lval.id, inst_r);
@@ -840,12 +881,17 @@ impl Process for LVal {
                             }
                             _ => {
                                 let mut val_ret = ExpValue::None;
-                                if kit_mut.context_mut.get_layer()<0{
-                                    let val = var.as_ref().get_int_bond();
-                                    val_ret = ExpValue::Float(val as f32);
+                                // if kit_mut.context_mut.get_layer()<0{
+                                //     let val = var.as_ref().get_int_bond();
+                                //     val_ret = ExpValue::Float(val as f32);
+                                // }
+                                
+                                match var.as_ref().get_kind() {
+                                    InstKind::ConstInt(i)|InstKind::GlobalInt(i)|InstKind::GlobalConstInt(i) =>{
+                                        val_ret = ExpValue::Float(i as f32);
+                                    }
+                                    _=>{}
                                 }
-                                // var.as_ref().get_int_bond();
-                                // let mut val_ret = ExpValue::Float(val as f32);
                                 kit_mut.context_mut.push_inst_bb(inst_trans);
                                 return Ok((inst_trans, val_ret));
                             }
@@ -866,10 +912,17 @@ impl Process for LVal {
                                 // let mut val = var.as_ref().get_float_bond();
                                 // let mut val_ret = ExpValue::Float(val);
                                 let mut val_ret = ExpValue::None;
-                                if kit_mut.context_mut.get_layer()<0{
-                                    let val = var.as_ref().get_float_bond();
-                                    val_ret = ExpValue::Float(val);
+
+                                match var.as_ref().get_kind() {
+                                    InstKind::ConstFloat(f)|InstKind::GlobalFloat(f)|InstKind::GlobalConstFloat(f) =>{
+                                        val_ret = ExpValue::Float(f);
+                                    }
+                                    _=>{}
                                 }
+                                // if kit_mut.context_mut.get_layer()<0{
+                                //     let val = var.as_ref().get_float_bond();
+                                //     val_ret = ExpValue::Float(val);
+                                // }
                                 // kit_mut.context_mut.push_inst_bb(inst_trans);
                                 return Ok((var, val_ret));
                             }
@@ -891,12 +944,18 @@ impl Process for LVal {
                             }
                             _ => {
                                 let mut val_ret = ExpValue::None;
-                                if kit_mut.context_mut.get_layer()<0{
-                                    let val = var.as_ref().get_float_bond();
-                                    val_ret = ExpValue::Int(val as i32);
+                                // if kit_mut.context_mut.get_layer()<0{
+                                //     let val = var.as_ref().get_float_bond();
+                                //     val_ret = ExpValue::Int(val as i32);
+                                // }
+
+                                match var.as_ref().get_kind() {
+                                    InstKind::ConstFloat(f)|InstKind::GlobalFloat(f)|InstKind::GlobalConstFloat(f) =>{
+                                        val_ret = ExpValue::Int(f as i32);
+                                    }
+                                    _=>{}
                                 }
-                                // let mut val = var.as_ref().get_float_bond();
-                                // let mut val_ret = ExpValue::Int(val as i32);
+                                
                                 kit_mut.context_mut.push_inst_bb(inst_trans);
                                 return Ok((inst_trans, val_ret));
                             }
@@ -910,12 +969,19 @@ impl Process for LVal {
                                 return Ok((var, val_ret));
                             }
                             _ => {
-                                println!("var:{:?},var_type:{:?}",var.as_ref().get_kind(),var.as_ref().get_ir_type());
+                                // println!("var:{:?},var_type:{:?}",var.as_ref().get_kind(),var.as_ref().get_ir_type());
                                 let mut val_ret = ExpValue::None;
-                                if kit_mut.context_mut.get_layer()<0{
-                                    let val = var.as_ref().get_int_bond();
-                                    val_ret = ExpValue::Int(val);
+                                match var.as_ref().get_kind() {
+                                    InstKind::ConstInt(i)|InstKind::GlobalInt(i)|InstKind::GlobalConstInt(i) =>{
+                                        val_ret = ExpValue::Int(i);
+                                    }
+                                    _=>{}
                                 }
+                                // if kit_mut.context_mut.get_layer()<0{
+                                //     let val = var.as_ref().get_int_bond();
+                                //     val_ret = ExpValue::Int(val);
+                                // }
+
                                 // let mut val = var.as_ref().get_int_bond();
                                 // let mut val_ret = ExpValue::Int(val);
                                 // kit_mut.context_mut.push_inst_bb(inst_trans);

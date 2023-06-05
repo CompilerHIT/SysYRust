@@ -35,6 +35,7 @@ pub enum Type {
 pub struct Symbol {
     pub tp: Type,
     pub is_array: bool,
+    pub is_param: bool,
     pub layer: i64,
     pub dimension: Vec<i64>,
 }
@@ -151,6 +152,7 @@ impl Context<'_> {
 
     pub fn update_var_scope(&mut self, s: &str, inst: ObjPtr<Inst>, bb: InfuncChoice) -> bool {
         let mut bbname = " ";
+        // println!("进来了");
         match bb {
             InfuncChoice::InFunc(bbptr) => {
                 let bbn = bbptr.as_mut();
@@ -188,7 +190,9 @@ impl Context<'_> {
             }
         }
         if self.var_map.contains_key(s) {
+            
             if let Some(vec) = self.var_map.get_mut(s) {
+                // println!("进来了");
                 // let temps = self.add_prefix(s.to_string()).as_str()
                 if let Some(tempvar) = vec.last() {
                     let temps = tempvar.0.clone();
@@ -199,6 +203,7 @@ impl Context<'_> {
                         map.insert(temps, inst);
                         self.bb_map.insert(bbname.to_string(), map);
                     }
+                    // println!("bbname:{:?}插入:{:?}",bbname,s);
                     return true;
                 }
             }
@@ -231,6 +236,7 @@ impl Context<'_> {
             Symbol {
                 tp: Type::Int,
                 is_array: false,
+                is_param: false,
                 layer: self.layer,
                 dimension: vec![],
             },
@@ -264,6 +270,7 @@ impl Context<'_> {
             Symbol {
                 tp: Type::Float,
                 is_array: false,
+                is_param:false,
                 layer: self.layer,
                 dimension: vec![],
             },
@@ -336,7 +343,7 @@ impl Context<'_> {
         }
     }
 
-    pub fn add_var(&mut self, s: &str, tp: Type, is_array: bool, dimension: Vec<i64>) -> bool {
+    pub fn add_var(&mut self, s: &str, tp: Type, is_array: bool,is_param:bool, dimension: Vec<i64>) -> bool {
         let s1 = s.clone();
         if (self.has_var_now(s1)) {
             println!("当前作用域中已声明过变量{:?}", s);
@@ -352,6 +359,7 @@ impl Context<'_> {
                     Symbol {
                         tp,
                         is_array,
+                        is_param,
                         layer: self.layer,
                         dimension,
                     },
@@ -367,6 +375,7 @@ impl Context<'_> {
                 Symbol {
                     tp,
                     is_array,
+                    is_param,
                     layer: self.layer,
                     dimension,
                 },
