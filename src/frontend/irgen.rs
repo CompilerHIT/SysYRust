@@ -417,10 +417,10 @@ impl Process for ConstDecl {
                                 unreachable!()
                             }
                             RetInitVec::Int(ivec) => {
-                                println!("初始值:");
-                                for i in &ivec {
-                                    println!("{:?}", i);
-                                }
+                                // println!("初始值:");
+                                // for i in &ivec {
+                                //     println!("{:?}", i);
+                                // }
                                 let inst = kit_mut.pool_inst_mut.make_int_array(length, ivec);
                                 if !kit_mut.context_mut.add_var(
                                     &def.ident,
@@ -778,10 +778,10 @@ impl Process for VarDecl {
                                            // let inst =
                             match init_vec {
                                 RetInitVec::Int(ivec) => {
-                                    println!("初始值:");
-                                    for i in &ivec {
-                                        println!("{:?}", i);
-                                    }
+                                    // println!("初始值:");
+                                    // for i in &ivec {
+                                    //     println!("{:?}", i);
+                                    // }
                                     let inst = kit_mut.pool_inst_mut.make_int_array(length, ivec);
                                     if !kit_mut.context_mut.add_var(
                                         &id,
@@ -959,10 +959,10 @@ impl Process for VarDecl {
                                            // let inst =
                             match init_vec {
                                 RetInitVec::Float(fvec) => {
-                                    println!("初始值:");
-                                    for i in &fvec {
-                                        println!("{:?}", i);
-                                    }
+                                    // println!("初始值:");
+                                    // for i in &fvec {
+                                    //     println!("{:?}", i);
+                                    // }
                                     let inst = kit_mut.pool_inst_mut.make_float_array(length, fvec);
                                     if !kit_mut.context_mut.add_var(
                                         &id,
