@@ -105,9 +105,8 @@ pub struct LIRInst {
     // param cnts in call instruction: (ints, floats)
     param_cnt: (i32, i32),
     // call指令的跳转到函数
-    func: Option<ObjPtr<Func>>,
-    func_name: String,
     double: bool,
+    float: bool,
 }
 
 impl LIRInst {
@@ -117,9 +116,8 @@ impl LIRInst {
             inst_type,
             operands,
             param_cnt: (0, 0),
-            func: None,
-            func_name: String::new(),
             double: false,
+            float: false,
         }
     }
     pub fn get_type(&self) -> InstrsType {
@@ -357,6 +355,14 @@ impl LIRInst {
     }
     pub fn is_double(&self) -> bool {
         self.double
+    }
+
+    pub fn set_float(&mut self) {
+        self.float = true;
+    }
+
+    pub fn is_float(&self) -> bool {
+        self.float
     }
 
     // LoadGlobal

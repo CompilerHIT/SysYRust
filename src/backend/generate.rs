@@ -79,7 +79,6 @@ impl GenerateAsm for LIRInst {
             //     Ok(())
             // },
             InstrsType::Load => {
-                //FIXME: only call ld -- lw...to implement
                 let mut builder = AsmBuilder::new(f);
                 let offset = self.get_offset();
                 if !operand::is_imm_12bs(offset.get_data()) {
@@ -94,11 +93,10 @@ impl GenerateAsm for LIRInst {
                     _ => panic!("src of load must be reg, to improve"),
                 };
 
-                builder.l(&dst, &addr, offset.get_data(), false, self.is_double())?;
+                builder.l(&dst, &addr, offset.get_data(), self.is_float(), self.is_double())?;
                 Ok(())
             }
             InstrsType::Store => {
-                //FIXME: only call sd -- sw...to implement
                 let mut builder = AsmBuilder::new(f);
                 let offset = self.get_offset();
                 if !operand::is_imm_12bs(offset.get_data()) {
@@ -112,7 +110,7 @@ impl GenerateAsm for LIRInst {
                     Operand::Reg(reg) => reg.to_string(),
                     _ => panic!("dst of store must be reg, to improve"),
                 };
-                builder.s(&src, &addr, offset.get_data(), false, self.is_double())?;
+                builder.s(&src, &addr, offset.get_data(), self.is_float(), self.is_double())?;
                 Ok(())
             }
 
@@ -128,15 +126,7 @@ impl GenerateAsm for LIRInst {
                 let offset = self.get_stack_offset().get_data();
                 //FIXME: 判断寄存器中存的是否是地址，如果只是简单的数值，则可以使用sw替代
                 //FIXME: *4 or *8
-                match src.get_type() {
-                    ScalarType::Int => {
-                        builder.s(&src.to_string(), "sp", offset, false, self.is_double())?
-                    }
-                    ScalarType::Float => {
-                        builder.s(&src.to_string(), "sp", offset, true, self.is_double())?
-                    }
-                    _ => panic!("illegal type"),
-                }
+                builder.s(&src.to_string(), "sp", offset, self.is_float(), self.is_double())?;
                 Ok(())
             }
             InstrsType::LoadFromStack => {
@@ -151,15 +141,7 @@ impl GenerateAsm for LIRInst {
                 // let inst_off = self.get_offset().
                 //FIXME: *4 or *8
                 let offset = self.get_stack_offset().get_data();
-                match dst.get_type() {
-                    ScalarType::Int => {
-                        builder.l(&dst.to_string(), "sp", offset, false, self.is_double())?
-                    }
-                    ScalarType::Float => {
-                        builder.l(&dst.to_string(), "sp", offset, true, self.is_double())?
-                    }
-                    _ => panic!("illegal type"),
-                }
+                builder.l(&dst.to_string(), "sp", offset, self.is_float(), self.is_double())?;
                 Ok(())
             }
             InstrsType::LoadParamFromStack => {
@@ -175,15 +157,7 @@ impl GenerateAsm for LIRInst {
                     _ => panic!("dst of load must be reg, to improve"),
                 };
 
-                match dst.get_type() {
-                    ScalarType::Int => {
-                        builder.l(&dst.to_string(), "sp", true_offset, false, self.is_double())?
-                    }
-                    ScalarType::Float => {
-                        builder.l(&dst.to_string(), "sp", true_offset, true, self.is_double())?
-                    }
-                    _ => unreachable!("illegal type"),
-                }
+                builder.l(&dst.to_string(), "sp", true_offset, self.is_float(), self.is_double())?;
                 Ok(())
             }
 
@@ -199,15 +173,7 @@ impl GenerateAsm for LIRInst {
                     _ => panic!("dst of load must be reg, to improve"),
                 };
 
-                match dst.get_type() {
-                    ScalarType::Int => {
-                        builder.s(&dst.to_string(), "sp", true_offset, false, self.is_double())?
-                    }
-                    ScalarType::Float => {
-                        builder.s(&dst.to_string(), "sp", true_offset, true, self.is_double())?
-                    }
-                    _ => unreachable!("illegal type"),
-                }
+                builder.s(&dst.to_string(), "sp", true_offset, self.is_float(), self.is_double())?;
                 Ok(())
             }
             // 判断！是否需要多插入一条j，间接跳转到
@@ -271,7 +237,7 @@ impl GenerateAsm for LIRInst {
                     &dst.to_string(),
                     &self.get_global_var_str(true),
                     &self.get_global_var_str(false),
-                );
+                )?;
                 Ok(())
             }
         }
