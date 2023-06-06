@@ -30,7 +30,7 @@ pub struct Inst {
 #[derive(Debug, Clone)]
 pub enum InstKind {
     // 内存相关
-    Alloca,
+    Alloca(i32),
     Gep,
     Load,
     Store,
