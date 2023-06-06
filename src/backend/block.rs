@@ -398,7 +398,7 @@ impl BB {
                     )));
                 }
                 //FIXME:获取数组名
-                InstKind::Alloca => {
+                InstKind::Alloca(size) => {
                     let array_num = get_current_array_num();
                     let label = format!(".LC{array_num}");
                     inc_array_num();
@@ -407,7 +407,6 @@ impl BB {
                     //TODO:la dst label    sd dst (offset)sp
                     //TODO: 大数组而装填因子过低的压缩问题
                     //FIXME: 未考虑数组全零数组，仅考虑int数组
-                    let size = inst_ref.get_array_length().as_ref().get_int_bond();
                     let alloca =
                         IntArray::new(label.clone(), size, true, inst_ref.get_int_init().clone());
                     let last = func.as_ref().stack_addr.front().unwrap();
