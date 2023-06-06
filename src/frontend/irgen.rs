@@ -30,10 +30,11 @@ impl Kit<'_> {
         tp: Type,
         is_array: bool,
         is_param: bool,
+        array_inst: Option<ObjPtr<Inst>>,
         dimension: Vec<i32>,
     ) {
         self.context_mut
-            .add_var(s, tp, is_array, is_param, dimension);
+            .add_var(s, tp, is_array, is_param, array_inst, dimension);
     }
 
     pub fn param_used(&mut self, s: &str) {
@@ -326,6 +327,7 @@ impl Process for ConstDecl {
                             Type::ConstInt,
                             false,
                             false,
+                            None,
                             Vec::new(),
                         ) {
                             return Err(Error::MultipleDeclaration);
@@ -382,15 +384,16 @@ impl Process for ConstDecl {
                         // let length_inst = kit_mut.pool_inst_mut.make_int_const(length);
                         // kit_mut.context_mut.push_inst_bb(length_inst); //这里
 
-                        if !kit_mut.context_mut.add_var(
-                            &def.ident,
-                            Type::ConstInt,
-                            true,
-                            false,
-                            dimension_vec_in.clone(),
-                        ) {
-                            return Err(Error::MultipleDeclaration);
-                        } //添加该变量，但没有生成实际的指令
+                        // if !kit_mut.context_mut.add_var(
+                        //     &def.ident,
+                        //     Type::ConstInt,
+                        //     true,
+                        //     false,
+                        //     None,
+                        //     dimension_vec_in.clone(),
+                        // ) {
+                        //     return Err(Error::MultipleDeclaration);
+                        // } //添加该变量，但没有生成实际的指令
 
                         let (mut inst_ptr, mut val, init_vec) = def
                             .const_init_val
@@ -398,9 +401,20 @@ impl Process for ConstDecl {
                             .unwrap(); //获得初始值
                         match init_vec {
                             RetInitVec::Float(fvec) => {
-                                let inst = kit_mut.pool_inst_mut.make_float_array(length, fvec);
-                                kit_mut.context_mut.update_var_scope_now(&def.ident, inst);
-                                kit_mut.context_mut.push_inst_bb(inst);
+                                // let inst = kit_mut.pool_inst_mut.make_float_array(length, fvec);
+                                // if !kit_mut.context_mut.add_var(
+                                //     &def.ident,
+                                //     Type::ConstInt,
+                                //     true,
+                                //     false,
+                                //     Some(inst),
+                                //     dimension_vec_in.clone(),
+                                // ) {
+                                //     return Err(Error::MultipleDeclaration);
+                                // } //添加该变量，但没有生成实际的指令
+                                // kit_mut.context_mut.update_var_scope_now(&def.ident, inst);
+                                // kit_mut.context_mut.push_inst_bb(inst);
+                                unreachable!()
                             }
                             RetInitVec::Int(ivec) => {
                                 println!("初始值:");
@@ -408,6 +422,16 @@ impl Process for ConstDecl {
                                     println!("{:?}", i);
                                 }
                                 let inst = kit_mut.pool_inst_mut.make_int_array(length, ivec);
+                                if !kit_mut.context_mut.add_var(
+                                    &def.ident,
+                                    Type::ConstInt,
+                                    true,
+                                    false,
+                                    Some(inst),
+                                    dimension_vec_in.clone(),
+                                ) {
+                                    return Err(Error::MultipleDeclaration);
+                                } //添加该变量，但没有生成实际的指令
                                 kit_mut.context_mut.update_var_scope_now(&def.ident, inst);
                                 kit_mut.context_mut.push_inst_bb(inst);
                             }
@@ -428,6 +452,7 @@ impl Process for ConstDecl {
                             Type::ConstFloat,
                             false,
                             false,
+                            None,
                             Vec::new(),
                         ) {
                             return Err(Error::MultipleDeclaration);
@@ -498,34 +523,39 @@ impl Process for ConstDecl {
                         // let length_inst = kit_mut.pool_inst_mut.make_int_const(length);
                         // kit_mut.context_mut.push_inst_bb(length_inst); //这里
 
-                        if !kit_mut.context_mut.add_var(
-                            &def.ident,
-                            Type::ConstInt,
-                            true,
-                            false,
-                            dimension_vec_in.clone(),
-                        ) {
-                            return Err(Error::MultipleDeclaration);
-                        } //添加该变量，但没有生成实际的指令
+                        // if !kit_mut.context_mut.add_var(
+                        //     &def.ident,
+                        //     Type::ConstInt,
+                        //     true,
+                        //     false,
+                        //     None,
+                        //     dimension_vec_in.clone(),
+                        // ) {
+                        //     return Err(Error::MultipleDeclaration);
+                        // } //添加该变量，但没有生成实际的指令
 
                         let (mut inst_ptr, mut val, init_vec) = def
                             .const_init_val
-                            .process((Type::ConstInt, dimension_vec_in.clone()), kit_mut)
+                            .process((Type::ConstFloat, dimension_vec_in.clone()), kit_mut)
                             .unwrap(); //获得初始值
                         match init_vec {
                             RetInitVec::Float(fvec) => {
                                 let inst = kit_mut.pool_inst_mut.make_float_array(length, fvec);
+                                if !kit_mut.context_mut.add_var(
+                                    &def.ident,
+                                    Type::ConstInt,
+                                    true,
+                                    false,
+                                    Some(inst),
+                                    dimension_vec_in.clone(),
+                                ) {
+                                    return Err(Error::MultipleDeclaration);
+                                } //添加该变量，但没有生成实际的指令
                                 kit_mut.context_mut.update_var_scope_now(&def.ident, inst);
                                 kit_mut.context_mut.push_inst_bb(inst);
                             }
                             RetInitVec::Int(ivec) => {
-                                println!("初始值:");
-                                for i in &ivec {
-                                    println!("{:?}", i);
-                                }
-                                let inst = kit_mut.pool_inst_mut.make_int_array(length, ivec);
-                                kit_mut.context_mut.update_var_scope_now(&def.ident, inst);
-                                kit_mut.context_mut.push_inst_bb(inst);
+                                unreachable!()
                             }
                         }
                     }
@@ -665,6 +695,7 @@ impl Process for VarDecl {
                                     Type::Int,
                                     false,
                                     false,
+                                    None,
                                     Vec::new(),
                                 ) {
                                     return Err(Error::MultipleDeclaration);
@@ -688,10 +719,14 @@ impl Process for VarDecl {
                             }
                         },
                         VarDef::NonArray(id) => {
-                            if !kit_mut
-                                .context_mut
-                                .add_var(id, Type::Int, false, false, Vec::new())
-                            {
+                            if !kit_mut.context_mut.add_var(
+                                id,
+                                Type::Int,
+                                false,
+                                false,
+                                None,
+                                Vec::new(),
+                            ) {
                                 return Err(Error::MultipleDeclaration);
                             }
                             if kit_mut.context_mut.get_layer() == -1 {
@@ -726,16 +761,17 @@ impl Process for VarDecl {
                             // let length_inst = kit_mut.pool_inst_mut.make_int_const(length);
                             // kit_mut.context_mut.push_inst_bb(length_inst); //这里
 
-                            if !kit_mut.context_mut.add_var(
-                                &id,
-                                Type::Int,
-                                true,
-                                false,
-                                dimension_vec_in.clone(),
-                            ) {
-                                return Err(Error::MultipleDeclaration);
-                            } //添加该变量，但没有生成实际的指令
-                              // unreachable!()
+                            // if !kit_mut.context_mut.add_var(
+                            //     &id,
+                            //     Type::Int,
+                            //     true,
+                            //     false,
+                            //     dimension_vec_in.clone(),
+                            // ) {
+                            //     return Err(Error::MultipleDeclaration);
+                            // } //添加该变量，但没有生成实际的指令
+
+                            // unreachable!()
                             let (mut init_vec, mut inst_vec) = val
                                 .process((Type::Int, dimension_vec_in.clone(), 0, 1), kit_mut)
                                 .unwrap(); //获得初始值
@@ -747,11 +783,21 @@ impl Process for VarDecl {
                                         println!("{:?}", i);
                                     }
                                     let inst = kit_mut.pool_inst_mut.make_int_array(length, ivec);
+                                    if !kit_mut.context_mut.add_var(
+                                        &id,
+                                        Type::Int,
+                                        true,
+                                        false,
+                                        Some(inst),
+                                        dimension_vec_in.clone(),
+                                    ) {
+                                        return Err(Error::MultipleDeclaration);
+                                    } //添加该变量，但没有生成实际的指令
                                     kit_mut.context_mut.update_var_scope_now(&id, inst);
                                     kit_mut.context_mut.push_inst_bb(inst);
-                                    println!("没进来");
+                                    // println!("没进来");
                                     for option_exp in inst_vec {
-                                        println!("进来了");
+                                        // println!("进来了");
                                         if let Some((inst_val, offset_val)) = option_exp {
                                             let offset =
                                                 kit_mut.pool_inst_mut.make_int_const(offset_val);
@@ -779,20 +825,39 @@ impl Process for VarDecl {
                                 .iter()
                                 .map(|x| match x {
                                     ExpValue::Int(i) => *i,
-                                    _ => {
+                                    ExpValue::Float(f) => {
+                                        unreachable!()
+                                    }
+                                    ExpValue::None => {
                                         unreachable!()
                                     }
                                 })
                                 .collect(); //生成维度vec
+
+                            let mut length = 1;
+                            for dm in &dimension_vec_in {
+                                length = length * dm;
+                            }
+
+                            // let (mut init_vec, mut inst_vec) = val
+                            //     .process((Type::Int, dimension_vec_in.clone(), 0, 1), kit_mut)
+                            //     .unwrap(); //获得初始值
+                            // let inst =
+                            let mut ivec = vec![];
+                            init_padding_int(&mut ivec, dimension_vec_in.clone());
+                            let inst = kit_mut.pool_inst_mut.make_int_array(length, ivec);
                             if !kit_mut.context_mut.add_var(
-                                id.as_str(),
+                                &id,
                                 Type::Int,
                                 true,
                                 false,
-                                dimension_vec_in,
+                                Some(inst),
+                                dimension_vec_in.clone(),
                             ) {
                                 return Err(Error::MultipleDeclaration);
-                            }
+                            } //添加该变量，但没有生成实际的指令
+                            kit_mut.context_mut.update_var_scope_now(&id, inst);
+                            kit_mut.context_mut.push_inst_bb(inst);
                         }
                     }
                 }
@@ -810,6 +875,7 @@ impl Process for VarDecl {
                                     Type::Float,
                                     false,
                                     false,
+                                    None,
                                     Vec::new(),
                                 ) {
                                     return Err(Error::MultipleDeclaration);
@@ -839,6 +905,7 @@ impl Process for VarDecl {
                                 Type::Float,
                                 false,
                                 false,
+                                None,
                                 vec![],
                             ) {
                                 return Err(Error::MultipleDeclaration);
@@ -850,11 +917,129 @@ impl Process for VarDecl {
                             }
                         }
                         VarDef::ArrayInit((id, exp_vec, val)) => {
-                            todo!()
+                            let mut dimension = vec![];
+                            for exp in exp_vec {
+                                dimension.push(exp.process(Type::Int, kit_mut).unwrap());
+                            }
+                            let dimension_vec: Vec<_> = dimension.iter().map(|(_, x)| x).collect();
+                            let dimension_vec_in: Vec<_> = dimension_vec
+                                .iter()
+                                .map(|x| match x {
+                                    ExpValue::Int(i) => *i,
+                                    ExpValue::Float(f) => {
+                                        unreachable!()
+                                    }
+                                    ExpValue::None => {
+                                        unreachable!()
+                                    }
+                                })
+                                .collect(); //生成维度vec
+
+                            let mut length = 1;
+                            for dm in &dimension_vec_in {
+                                length = length * dm;
+                            }
+                            // let length_inst = kit_mut.pool_inst_mut.make_int_const(length);
+                            // kit_mut.context_mut.push_inst_bb(length_inst); //这里
+
+                            // if !kit_mut.context_mut.add_var(
+                            //     &id,
+                            //     Type::Int,
+                            //     true,
+                            //     false,
+                            //     dimension_vec_in.clone(),
+                            // ) {
+                            //     return Err(Error::MultipleDeclaration);
+                            // } //添加该变量，但没有生成实际的指令
+
+                            // unreachable!()
+                            let (mut init_vec, mut inst_vec) = val
+                                .process((Type::Float, dimension_vec_in.clone(), 0, 1), kit_mut)
+                                .unwrap(); //获得初始值
+                                           // let inst =
+                            match init_vec {
+                                RetInitVec::Float(fvec) => {
+                                    println!("初始值:");
+                                    for i in &fvec {
+                                        println!("{:?}", i);
+                                    }
+                                    let inst = kit_mut.pool_inst_mut.make_float_array(length, fvec);
+                                    if !kit_mut.context_mut.add_var(
+                                        &id,
+                                        Type::Float,
+                                        true,
+                                        false,
+                                        Some(inst),
+                                        dimension_vec_in.clone(),
+                                    ) {
+                                        return Err(Error::MultipleDeclaration);
+                                    } //添加该变量，但没有生成实际的指令
+                                    kit_mut.context_mut.update_var_scope_now(&id, inst);
+                                    kit_mut.context_mut.push_inst_bb(inst);
+                                    // println!("没进来");
+                                    for option_exp in inst_vec {
+                                        // println!("进来了");
+                                        if let Some((inst_val, offset_val)) = option_exp {
+                                            let offset =
+                                                kit_mut.pool_inst_mut.make_int_const(offset_val);
+                                            let ptr = kit_mut.pool_inst_mut.make_gep(inst, offset);
+                                            let inst_store = kit_mut
+                                                .pool_inst_mut
+                                                .make_float_store(ptr, inst_val);
+                                            kit_mut.context_mut.push_inst_bb(offset);
+                                            kit_mut.context_mut.push_inst_bb(ptr);
+                                            kit_mut.context_mut.push_inst_bb(inst_store);
+                                        }
+                                    }
+                                }
+                                _ => {
+                                    unreachable!()
+                                }
+                            }
                         }
                         VarDef::Array((id, exp_vec)) => {
-                            // kit_mut.add_var(id.as_str(), Type::Float, true, vec![]);
-                            // return Ok(1);
+                            let mut dimension = vec![];
+                            for exp in exp_vec {
+                                dimension.push(exp.process(Type::Int, kit_mut).unwrap());
+                            }
+                            let dimension_vec: Vec<_> = dimension.iter().map(|(_, x)| x).collect();
+                            let dimension_vec_in: Vec<_> = dimension_vec
+                                .iter()
+                                .map(|x| match x {
+                                    ExpValue::Int(i) => *i,
+                                    ExpValue::Float(f) => {
+                                        unreachable!()
+                                    }
+                                    ExpValue::None => {
+                                        unreachable!()
+                                    }
+                                })
+                                .collect(); //生成维度vec
+
+                            let mut length = 1;
+                            for dm in &dimension_vec_in {
+                                length = length * dm;
+                            }
+
+                            // let (mut init_vec, mut inst_vec) = val
+                            //     .process((Type::Int, dimension_vec_in.clone(), 0, 1), kit_mut)
+                            //     .unwrap(); //获得初始值
+                            // let inst =
+                            let mut fvec = vec![];
+                            init_padding_float(&mut fvec, dimension_vec_in.clone());
+                            let inst = kit_mut.pool_inst_mut.make_float_array(length, fvec);
+                            if !kit_mut.context_mut.add_var(
+                                &id,
+                                Type::Float,
+                                true,
+                                false,
+                                Some(inst),
+                                dimension_vec_in.clone(),
+                            ) {
+                                return Err(Error::MultipleDeclaration);
+                            } //添加该变量，但没有生成实际的指令
+                            kit_mut.context_mut.update_var_scope_now(&id, inst);
+                            kit_mut.context_mut.push_inst_bb(inst);
                         }
                         _ => todo!(),
                     }
@@ -1116,7 +1301,7 @@ impl Process for FuncFParam {
                     let param = kit_mut.pool_inst_mut.make_param(IrType::Int);
                     kit_mut
                         .context_mut
-                        .add_var(id, Type::Int, false, true, Vec::new());
+                        .add_var(id, Type::Int, false, true, None, Vec::new());
                     //这里
                     kit_mut.context_mut.update_var_scope_now(id, param);
                     Ok((id.clone(), param))
@@ -1125,7 +1310,7 @@ impl Process for FuncFParam {
                     let param = kit_mut.pool_inst_mut.make_param(IrType::Float);
                     kit_mut
                         .context_mut
-                        .add_var(id, Type::Float, false, true, Vec::new());
+                        .add_var(id, Type::Float, false, true, None, Vec::new());
                     kit_mut.context_mut.update_var_scope_now(id, param);
                     Ok((id.clone(), param))
                 }

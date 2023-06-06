@@ -36,6 +36,7 @@ pub struct Symbol {
     pub tp: Type,
     pub is_array: bool,
     pub is_param: bool,
+    pub array_inst: Option<ObjPtr<Inst>>,
     pub layer: i64,
     pub dimension: Vec<i32>,
 }
@@ -235,6 +236,7 @@ impl Context<'_> {
                 tp: Type::Int,
                 is_array: false,
                 is_param: false,
+                array_inst: None,
                 layer: self.layer,
                 dimension: vec![],
             },
@@ -269,6 +271,7 @@ impl Context<'_> {
                 tp: Type::Float,
                 is_array: false,
                 is_param: false,
+                array_inst: None,
                 layer: self.layer,
                 dimension: vec![],
             },
@@ -349,6 +352,7 @@ impl Context<'_> {
         tp: Type,
         is_array: bool,
         is_param: bool,
+        array_inst: Option<ObjPtr<Inst>>,
         dimension: Vec<i32>,
     ) -> bool {
         let s1 = s.clone();
@@ -367,6 +371,7 @@ impl Context<'_> {
                         tp,
                         is_array,
                         is_param,
+                        array_inst,
                         layer: self.layer,
                         dimension,
                     },
@@ -383,6 +388,7 @@ impl Context<'_> {
                     tp,
                     is_array,
                     is_param,
+                    array_inst,
                     layer: self.layer,
                     dimension,
                 },
