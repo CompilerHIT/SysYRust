@@ -5,7 +5,7 @@ use std::{
     {pin::Pin, ptr::NonNull},
 };
 
-#[derive(Clone, Copy, PartialEq, Hash, Eq)]
+#[derive(Clone, Copy, PartialEq, Hash, Eq, Debug)]
 pub enum ScalarType {
     Void,
     Int,

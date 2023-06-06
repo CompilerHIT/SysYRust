@@ -230,7 +230,7 @@ impl Allocator {
                 if let Some(min) = iwindow.front() {
                     if min.end <= i {
                         // 获取已经使用寄存器号，释放
-                        let iereg:i32=*dstr.get(&min.id).unwrap();
+                        let iereg: i32 = *dstr.get(&min.id).unwrap();
                         regUsedStat.release_ireg(iereg);
                         iwindow.pop_front();
                     }
@@ -240,7 +240,7 @@ impl Allocator {
             while fwindow.len() != 0 {
                 if let Some(min) = fwindow.front() {
                     if min.end <= i {
-                        let fereg:i32=*dstr.get(&min.id).unwrap();
+                        let fereg: i32 = *dstr.get(&min.id).unwrap();
                         regUsedStat.release_freg(fereg);
                         fwindow.pop_front();
                     }
@@ -263,34 +263,33 @@ impl Allocator {
                 // 在周期表中搜索该寄存器的终结周期
                 let end = *self.intervals.get(&id).unwrap();
                 // 定义寄存器溢出处理流程
-                let mut spill_reg_for =
-                    |tmpwindow: &mut PriorityDeque<RegInterval>| {
-                        // let mut tmpwindow=&mut fwindow;
-                        // let available:Option<Reg>;
-                        let max = tmpwindow.back();
-                        let mut maxID = 0;
-                        let mut ifSpilling = false; //记录将新寄存器处理成溢出
-                        match max {
-                            Some(max) => {
-                                if max.end > end {
-                                    // 溢出旧寄存器
-                                    ifSpilling = false;
-                                    maxID = max.id;
-                                } else {
-                                    // 溢出新寄存器
-                                    ifSpilling = true;
-                                }
+                let mut spill_reg_for = |tmpwindow: &mut PriorityDeque<RegInterval>| {
+                    // let mut tmpwindow=&mut fwindow;
+                    // let available:Option<Reg>;
+                    let max = tmpwindow.back();
+                    let mut maxID = 0;
+                    let mut ifSpilling = false; //记录将新寄存器处理成溢出
+                    match max {
+                        Some(max) => {
+                            if max.end > end {
+                                // 溢出旧寄存器
+                                ifSpilling = false;
+                                maxID = max.id;
+                            } else {
+                                // 溢出新寄存器
+                                ifSpilling = true;
                             }
-                            None => (),
                         }
-                        if ifSpilling {
-                            spillings.insert(id);
-                        } else {
-                            tmpwindow.pop_back();
-                            dstr.insert(id, *dstr.get(&maxID).unwrap()); //给新寄存器分配旧寄存器所有寄存器
-                            dstr.remove(&maxID); //接触旧末虚拟寄存器与实际寄存器的契约
-                            tmpwindow.push(RegInterval::new(id, end)); //把心的分配结果加入窗口
-                        }
+                        None => (),
+                    }
+                    if ifSpilling {
+                        spillings.insert(id);
+                    } else {
+                        tmpwindow.pop_back();
+                        dstr.insert(id, *dstr.get(&maxID).unwrap()); //给新寄存器分配旧寄存器所有寄存器
+                        dstr.remove(&maxID); //接触旧末虚拟寄存器与实际寄存器的契约
+                        tmpwindow.push(RegInterval::new(id, end)); //把心的分配结果加入窗口
+                    }
                 };
                 // TODO,逻辑判断选择不同的分配方案
                 if reg.get_type() == ScalarType::Int
@@ -309,7 +308,7 @@ impl Allocator {
                 else if reg.get_type() == ScalarType::Float {
                     if let Some(ereg) = regUsedStat.get_available_freg() {
                         // 如果抛弃新寄存器
-                        dstr.insert(id, ereg);   
+                        dstr.insert(id, ereg);
                         regUsedStat.use_freg(ereg); //记录float_entity_reg为被使用状态
                         fwindow.push(RegInterval::new(id, end))
                     } else {

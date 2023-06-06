@@ -1,19 +1,18 @@
-pub use std::collections::{HashSet, VecDeque};
 pub use std::collections::HashMap;
+pub use std::collections::{HashSet, VecDeque};
 pub use std::fs::File;
 pub use std::hash::{Hash, Hasher};
-pub use std::io::Result;
 use std::io::prelude::*;
+pub use std::io::Result;
 
-use crate::utility::ObjPtr;
-use crate::backend::operand::{IImm, FImm};
-use crate::backend::instrs::{LIRInst, Operand};
 use crate::backend::block::BB;
+use crate::backend::instrs::{LIRInst, Operand};
+use crate::backend::operand::{FImm, IImm};
 use crate::ir::basicblock::BasicBlock;
 use crate::ir::instruction::Inst;
+use crate::utility::ObjPtr;
 
 use super::asm_builder::AsmBuilder;
-
 
 #[derive(Clone)]
 pub struct IGlobalVar {
@@ -25,14 +24,14 @@ pub struct IGlobalVar {
 pub struct FGlobalVar {
     name: String,
     init: bool,
-    value:FImm,
+    value: FImm,
 }
 
 //TODO: to implement const array
 #[derive(Clone)]
 pub enum GlobalVar {
     IGlobalVar(IGlobalVar),
-    FGlobalVar(FGlobalVar)
+    FGlobalVar(FGlobalVar),
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -47,8 +46,6 @@ pub struct Context {
     epilogue: Option<Box<dyn FnMut()>>,
     prologue: Option<Box<dyn FnMut()>>,
 }
-
-
 
 #[derive(Clone)]
 pub struct CurInstrInfo {
@@ -78,7 +75,7 @@ impl Context {
     pub fn set_epilogue_event<F: FnMut() + 'static>(&mut self, callback: F) {
         self.epilogue = Some(Box::new(callback));
     }
-    
+
     pub fn set_prologue_event<F: FnMut() + 'static>(&mut self, callback: F) {
         self.prologue = Some(Box::new(callback));
     }
@@ -107,9 +104,9 @@ impl Context {
 impl CurInstrInfo {
     pub fn new(pos: i32) -> Self {
         Self {
-           pos,
-           block: None,
-           insts_it: None,
+            pos,
+            block: None,
+            insts_it: None,
         }
     }
 
@@ -124,7 +121,11 @@ impl CurInstrInfo {
 
 impl IGlobalVar {
     pub fn init(name: String, value: i32, init: bool) -> Self {
-        Self { name, value: IImm::new(value), init }
+        Self {
+            name,
+            value: IImm::new(value),
+            init,
+        }
     }
     pub fn new(name: String) -> Self {
         Self::init(name, 0, false)
@@ -139,7 +140,11 @@ impl IGlobalVar {
 
 impl FGlobalVar {
     pub fn init(name: String, value: f32, init: bool) -> Self {
-        Self { name, value: FImm::new(value), init }
+        Self {
+            name,
+            value: FImm::new(value),
+            init,
+        }
     }
     pub fn new(name: String) -> Self {
         Self::init(name, 0.0, false)
@@ -175,7 +180,7 @@ impl Hash for CurInstrInfo {
 
 impl StackSlot {
     pub fn new(pos: i32, size: i32) -> Self {
-        Self{ pos, size }
+        Self { pos, size }
     }
     pub fn get_pos(&self) -> i32 {
         self.pos
@@ -186,11 +191,11 @@ impl StackSlot {
 
     pub fn set_pos(&mut self, pos: i32) {
         self.pos = pos
-    } 
+    }
     pub fn set_size(&mut self, size: i32) {
         self.size = size
     }
-}   
+}
 
 pub struct Mapping {
     pub ir_block_map: HashMap<ObjPtr<BasicBlock>, ObjPtr<BB>>,
@@ -199,7 +204,7 @@ pub struct Mapping {
     pub array_slot_map: HashMap<ObjPtr<Inst>, i32>,
 
     pub val_map: HashMap<ObjPtr<Inst>, Operand>,
-    pub block_branch: HashMap<String, ObjPtr<LIRInst>>,
+    pub block_branch: HashMap<ObjPtr<BB>, ObjPtr<LIRInst>>,
     // pub func_
 }
 
@@ -214,7 +219,6 @@ impl Mapping {
         }
     }
 }
-
 
 impl Hash for ObjPtr<Inst> {
     fn hash<H: Hasher>(&self, state: &mut H) {
@@ -231,8 +235,13 @@ pub struct IntArray {
 }
 
 impl IntArray {
-    pub fn new(name: String,size: i32, init: bool, value: Vec<i32>) -> Self {
-        Self { name, size, init, value }
+    pub fn new(name: String, size: i32, init: bool, value: Vec<i32>) -> Self {
+        Self {
+            name,
+            size,
+            init,
+            value,
+        }
     }
     pub fn set_use(&mut self, used: bool) {
         self.init = used;
@@ -243,7 +252,7 @@ impl IntArray {
     pub fn get_value(&self, index: i32) -> i32 {
         self.value[index as usize]
     }
-    pub fn get_array(&self)  -> &Vec<i32> {
+    pub fn get_array(&self) -> &Vec<i32> {
         &self.value
     }
 }
