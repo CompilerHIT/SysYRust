@@ -96,7 +96,9 @@ impl<'a> AsmModule<'a> {
     }
 
     fn generate_global_var(&self, f: &mut File) {
-        writeln!(f, "	.data");
+        if self.global_var_list.len() > 0 {
+            writeln!(f, "	.data");
+        }
         for iter in self.global_var_list.iter() {
             match iter {
                 GlobalVar::IGlobalVar(ig) => {

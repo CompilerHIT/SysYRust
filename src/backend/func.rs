@@ -348,6 +348,7 @@ impl GenerateAsm for Func {
             a.generate(self.context, f)?;
         }
         if self.floats.len() > 0 {
+            println!("generate float");
             writeln!(f, "   .data")?;
         }
         for (name, data) in self.floats.clone() {
