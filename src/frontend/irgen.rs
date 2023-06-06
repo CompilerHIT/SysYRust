@@ -725,12 +725,12 @@ impl Process for VarDecl {
                             for dm in &dimension_vec_in {
                                 length = length * dm;
                             }
-                            let length_inst = kit_mut.pool_inst_mut.make_int_const(length);
-                            kit_mut.context_mut.push_inst_bb(length_inst); //这里
+                            // let length_inst = kit_mut.pool_inst_mut.make_int_const(length);
+                            // kit_mut.context_mut.push_inst_bb(length_inst); //这里
 
                             if !kit_mut.context_mut.add_var(
                                 &id,
-                                Type::ConstInt,
+                                Type::Int,
                                 true,
                                 false,
                                 dimension_vec_in.clone(),
@@ -738,25 +738,34 @@ impl Process for VarDecl {
                                 return Err(Error::MultipleDeclaration);
                             } //添加该变量，但没有生成实际的指令
                               // unreachable!()
-                            let (mut inst_ptr, mut val, inst_vec) = val
-                                .process((Type::ConstInt, dimension_vec_in.clone()), kit_mut)
+                            let (mut init_vec, mut inst_vec) = val
+                                .process((Type::Int, dimension_vec_in.clone(), 0, 1), kit_mut)
                                 .unwrap(); //获得初始值
+                                           // let inst =
                             match init_vec {
-                                RetInitVec::Float(fvec) => {
-                                    let inst =
-                                        kit_mut.pool_inst_mut.make_float_array(length_inst, fvec);
-                                    kit_mut.context_mut.update_var_scope_now(&def.ident, inst);
-                                    kit_mut.context_mut.push_inst_bb(inst);
-                                }
                                 RetInitVec::Int(ivec) => {
                                     println!("初始值:");
                                     for i in &ivec {
                                         println!("{:?}", i);
                                     }
-                                    let inst =
-                                        kit_mut.pool_inst_mut.make_int_array(length_inst, ivec);
-                                    kit_mut.context_mut.update_var_scope_now(&def.ident, inst);
+                                    let inst = kit_mut.pool_inst_mut.make_int_array(length, ivec);
+                                    kit_mut.context_mut.update_var_scope_now(&id, inst);
                                     kit_mut.context_mut.push_inst_bb(inst);
+                                    for option_exp in inst_vec {
+                                        if let Some((inst_val, offset_val)) = option_exp {
+                                            let offset =
+                                                kit_mut.pool_inst_mut.make_int_const(offset_val);
+                                            let ptr = kit_mut.pool_inst_mut.make_gep(inst, offset);
+                                            let inst_store =
+                                                kit_mut.pool_inst_mut.make_int_store(ptr, inst_val);
+                                            kit_mut.context_mut.push_inst_bb(offset);
+                                            kit_mut.context_mut.push_inst_bb(ptr);
+                                            kit_mut.context_mut.push_inst_bb(inst_store);
+                                        }
+                                    }
+                                }
+                                _ => {
+                                    unreachable!()
                                 }
                             }
                         }
@@ -864,20 +873,20 @@ impl Process for VarDef {
 }
 
 impl Process for InitVal {
-    type Ret = (Vec<ExpValue>, Vec<Option<(ObjPtr<Inst>, i32)>>);
-    type Message = (Type, Vec<i32>, usize, usize);
+    type Ret = (RetInitVec, Vec<Option<(ObjPtr<Inst>, i32)>>);
+    type Message = (Type, Vec<i32>, i32, usize);
     fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
         match self {
             InitVal::Exp(exp) => {
                 let (tp, dimension, num_precessor, layer_now) = input;
                 let (inst, val) = exp.process(tp, kit_mut).unwrap();
-                let vecf = vec![];
-                let veci = vec![];
-                let inst_vec = vec![];
+                let mut vecf = vec![];
+                let mut veci = vec![];
+                let mut inst_vec = vec![];
                 match val {
                     ExpValue::Float(f) => match tp {
                         Type::Float | Type::ConstFloat => {
-                            vecf.push(ExpValue::Float(f));
+                            vecf.push(f);
                             inst_vec.push(None);
                         }
                         _ => {
@@ -886,7 +895,7 @@ impl Process for InitVal {
                     },
                     ExpValue::Int(i) => match tp {
                         Type::Int | Type::ConstInt => {
-                            veci.push(ExpValue::Int(i));
+                            veci.push(i);
                             inst_vec.push(None);
                         }
                         _ => {
@@ -895,24 +904,123 @@ impl Process for InitVal {
                     },
                     ExpValue::None => match tp {
                         Type::Float | Type::ConstFloat => {
-                            vecf.push(ExpValue::Float(0.0));
+                            vecf.push(0.0);
                             // let offset =
-                            inst_vec.push((Some(inst), num_precessor));
+                            inst_vec.push(Some((inst, num_precessor)));
                         }
                         Type::Int | Type::ConstInt => {
-                            veci.push(ExpValue::Int(0));
+                            veci.push(0);
                             // let offset =
-                            inst_vec.push((Some(inst), num_precessor));
+                            inst_vec.push(Some((inst, num_precessor)));
                         }
                         _ => {
                             unreachable!()
                         }
                     },
                 }
-                Err(Error::Todo)
+                match tp {
+                    Type::Float | Type::ConstFloat => Ok((RetInitVec::Float(vecf), inst_vec)),
+                    Type::Int | Type::ConstInt => Ok((RetInitVec::Int(veci), inst_vec)),
+                }
+                // Err(Error::Todo)
             }
 
-            InitVal::InitValVec(initvec) => {}
+            InitVal::InitValVec(initvec) => {
+                let (tp, dimension, num_precessor, layer_now) = input;
+                let mut vec_val_f = vec![];
+                let mut vec_val_i = vec![];
+                let mut vec_inst_init = vec![];
+                let mut after = 1;
+                for i in layer_now..dimension.len() {
+                    after = after * dimension[i];
+                } //计算当前维度每增1对应多少元素
+                let mut vec_dimension_now = vec![];
+                for i in (layer_now - 1)..dimension.len() {
+                    vec_dimension_now.push(dimension[i]);
+                } //计算当前维度每增1对应多少元素
+
+                let mut index = 0; //当前相对位移
+                for init in initvec {
+                    match init {
+                        InitVal::Exp(exp) => {
+                            let (vec_val_temp, vec_inst_temp) = init
+                                .process(
+                                    (tp, dimension.clone(), num_precessor + index, layer_now),
+                                    kit_mut,
+                                )
+                                .unwrap();
+                            match vec_val_temp {
+                                RetInitVec::Float(vec_f) => {
+                                    for val in vec_f {
+                                        vec_val_f.push(val);
+                                    }
+                                    for inst in vec_inst_temp {
+                                        if let Some(inst_list) = inst {
+                                            vec_inst_init.push(inst);
+                                        }
+                                    }
+                                }
+                                RetInitVec::Int(vec_i) => {
+                                    for val in vec_i {
+                                        vec_val_i.push(val);
+                                    }
+                                    for inst in vec_inst_temp {
+                                        if let Some(inst_list) = inst {
+                                            vec_inst_init.push(inst);
+                                        }
+                                    }
+                                }
+                            }
+
+                            index = index + 1; //init为exp，相对偏移加1
+                        }
+                        InitVal::InitValVec(initvec) => {
+                            let (vec_val_temp, vec_inst_temp) = init
+                                .process(
+                                    (tp, dimension.clone(), num_precessor + index, layer_now + 1),
+                                    kit_mut,
+                                )
+                                .unwrap();
+                            match vec_val_temp {
+                                RetInitVec::Float(vec_f) => {
+                                    for val in vec_f {
+                                        vec_val_f.push(val);
+                                    }
+                                    for inst in vec_inst_temp {
+                                        if let Some(inst_list) = inst {
+                                            vec_inst_init.push(inst);
+                                        }
+                                    }
+                                }
+                                RetInitVec::Int(vec_i) => {
+                                    for val in vec_i {
+                                        vec_val_i.push(val);
+                                    }
+                                    for inst in vec_inst_temp {
+                                        if let Some(inst_list) = inst {
+                                            vec_inst_init.push(inst);
+                                        }
+                                    }
+                                }
+                            }
+                            index = index + after; //init为vec,相对偏移加after
+                        }
+                    }
+                }
+
+                match tp {
+                    Type::Float | Type::ConstFloat => {
+                        init_padding_float(&mut vec_val_f, vec_dimension_now);
+                        Ok((RetInitVec::Float(vec_val_f), vec_inst_init))
+                    }
+                    Type::Int | Type::ConstInt => {
+                        init_padding_int(&mut vec_val_i, vec_dimension_now);
+                        Ok((RetInitVec::Int(vec_val_i), vec_inst_init))
+                    }
+                }
+
+                // Err(Error::Todo)
+            }
         }
     }
 }
