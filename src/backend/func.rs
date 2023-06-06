@@ -42,7 +42,7 @@ pub struct Func {
     pub spill_stack_map: HashMap<i32, StackSlot>,
 
     pub const_array: HashSet<IntArray>,
-    pub floats: Vec<f32>,
+    pub floats: Vec<(String, f32)>,
 }
 
 /// reg_num, stack_addr, caller_stack_addr考虑借助回填实现
@@ -285,7 +285,6 @@ impl Func {
     }
 
     fn handle_parameters(&mut self, ir_func: &Function) {
-        //TODO:
         let mut iparam: Vec<_> = ir_func
             .get_params()
             .iter()
@@ -351,10 +350,8 @@ impl GenerateAsm for Func {
         if self.floats.len() > 0 {
             writeln!(f, "   .data")?;
         }
-        let mut i = 0;
-        for data in self.floats.clone() {
-            writeln!(f, "{label}_float{i}:  .float  {data}", label = self.label)?;
-            i += 1;
+        for (name, data) in self.floats.clone() {
+            writeln!(f, "{name}:  .float  {data}")?;
         }
         AsmBuilder::new(f).show_func(&self.label)?;
         self.context.as_mut().call_prologue_event();

@@ -1145,26 +1145,25 @@ impl BB {
         }
     }
 
-    //FIXME: fimm 使用16进制表示转换为int，使用浮点数加法
     fn resolve_fimm(&mut self, imm: f32, pool: &mut BackendPool, func: ObjPtr<Func>) -> Operand {
-        let fimm = Operand::FImm(FImm::new(imm));
+        let var_name = format!(
+            "{label}_float{index}",
+            label = func.as_ref().label,
+            index = func.as_ref().floats.len()
+        );
+        func.as_mut().floats.push((var_name.clone(), imm));
         let reg = Operand::Reg(Reg::init(ScalarType::Float));
-        //FIXME:
-        if operand::is_imm_12bs(imm as i32) {
-            self.insts.push(pool.put_inst(LIRInst::new(
-                InstrsType::OpReg(SingleOp::Li),
-                vec![reg.clone(), fimm.clone()],
-            )));
-        } else {
-            self.insts.push(pool.put_inst(LIRInst::new(
-                InstrsType::OpReg(SingleOp::Lui),
-                vec![reg.clone(), fimm.clone()],
-            )));
-            self.insts.push(pool.put_inst(LIRInst::new(
-                InstrsType::Binary(BinaryOp::Add),
-                vec![reg.clone(), reg.clone(), fimm.clone()],
-            )));
-        }
+        let tmp = Operand::Reg(Reg::init(ScalarType::Int));
+        self.insts.push(pool.put_inst(LIRInst::new(
+            InstrsType::OpReg(SingleOp::LoadAddr),
+            vec![tmp.clone(), Operand::Addr(var_name)],
+        )));
+        let mut inst = LIRInst::new(
+            InstrsType::Load,
+            vec![reg.clone(), tmp, Operand::IImm(IImm::new(0))],
+        );
+        inst.set_float();
+        self.insts.push(pool.put_inst(inst));
         reg
     }
 
