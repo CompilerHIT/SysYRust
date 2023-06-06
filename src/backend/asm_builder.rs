@@ -55,7 +55,7 @@ impl<'f> AsmBuilder<'f> {
     }
 
     pub fn addi(&mut self, dest: &str, opr: &str, imm: i32) -> Result<()> {
-        writeln!(self.f, "    addiw {dest}, {opr}, {imm}")
+        writeln!(self.f, "    addi {dest}, {opr}, {imm}")
     }
 
     pub fn slli(&mut self, dest: &str, opr: &str, imm: i32) -> Result<()> {
