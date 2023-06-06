@@ -407,7 +407,7 @@ impl BB {
                     //将发生分配的数组装入map_info中：记录数组结构、占用栈空间
                     //TODO:la dst label    sd dst (offset)sp
                     //TODO: 大数组而装填因子过低的压缩问题
-                    //FIXME: 未考虑数组全零数组，仅考虑int数组
+                    //FIXME: 认为未初始化数组也被初始化为全0
                     let size = inst_ref.get_array_length().as_ref().get_int_bond();
                     let alloca =
                         IntArray::new(label.clone(), size, true, inst_ref.get_int_init().clone());
@@ -738,8 +738,6 @@ impl BB {
                     todo!("FtoI")
                 }
 
-                // TODO: find block
-                // FIXME: waiting for ir
                 InstKind::Phi => {
                     let phi_reg = self.resolve_operand(func, ir_block_inst, false, map_info, pool);
                     let mut kind = ScalarType::Void;
@@ -968,36 +966,45 @@ impl BB {
                         Operand::IImm(IImm::new(0)),
                     ]);
                 }
-                InstrsType::Branch(..) => {
+                InstrsType::Branch(..) | InstrsType::Jump => {
                     // deal with false branch
                     let mut distance = 0;
-                    let mut target_bb = BB::new("Init");
+                    let is_j = match inst_ref.get_type() {
+                        InstrsType::Branch(..) => false,
+                        InstrsType::Jump => true,
+                        _ => unreachable!(),
+                    };
                     let target = match inst_ref.get_label() {
                         Operand::Addr(label) => label,
                         _ => unreachable!("branch must have a label"),
                     };
-                    let (mut i, mut start) = (0, 0);
+                    let mut i = 0;
                     let (mut flag, mut first_j) = (false, true);
                     loop {
                         let block_ref = func.as_ref().blocks[i];
                         if &self.label == &block_ref.as_ref().label {
                             flag = true;
-                            start = i;
                         }
                         if &block_ref.as_ref().label == target {
-                            target_bb = block_ref.as_ref().clone();
                             break;
                         }
                         if flag {
                             distance += block_ref.as_ref().insts.len() * 4;
                         }
                         i += 1;
-                        if !operand::is_imm_12bs(distance as i32) {
+                        if (!is_j && !operand::is_imm_12bs(distance as i32))
+                            || (is_j && !operand::is_imm_20bs(distance as i32))
+                        {
                             let name = format!("overflow_{}", get_tmp_bb());
                             let tmp = pool.put_block(BB::new(&name));
                             func.as_mut().blocks.insert(i, tmp);
                             if first_j {
                                 self.insts[pos].as_mut().replace_label(name);
+                                if is_j {
+                                    distance -= operand::IMM_20_Bs as usize;
+                                } else {
+                                    distance -= operand::IMM_12_Bs as usize;
+                                }
                             } else {
                                 self.insts.insert(
                                     pos,
@@ -1006,17 +1013,48 @@ impl BB {
                                         vec![Operand::Addr(name)],
                                     )),
                                 );
+                                distance -= operand::IMM_20_Bs as usize;
                             }
                             pos += 1;
-                            distance -= operand::IMM_12_Bs as usize;
                             first_j = false;
                         }
                     }
                 }
                 InstrsType::Call => {
-                    todo!("long call");
+                    // call 指令不会发生偏移量的溢出
+                    // let mut flag = false;
+                    // let mut distance = 0;
+                    // let target = match inst_ref.get_label() {
+                    //     Operand::Addr(label) => label,
+                    //     _ => unreachable!("call must have a label"),
+                    // };
+                    // for (_, f) in func_map.iter() {
+                    //     if &f.as_ref().label == target || f.as_ref().label == func.as_ref().label {
+                    //         if !flag {
+                    //             flag = true;
+                    //         } else {
+                    //             break;
+                    //         }
+                    //     }
+                    //     if flag {
+                    //         distance += f.as_ref().cal_func_size();
+                    //     }
+                    //     if !operand::is_imm_20bs(distance as i32) {
+                    //         let name = format!("overflow_{}", get_tmp_bb());
+                    //         let tmp = pool.put_block(BB::new(&name));
+                    //         func.as_mut().blocks.insert(0, tmp);
+                    //         self.insts.insert(
+                    //             pos,
+                    //             pool.put_inst(LIRInst::new(
+                    //                 InstrsType::Jump,
+                    //                 vec![Operand::Addr(name)],
+                    //             )),
+                    //         );
+                    //         pos += 1;
+                    //         distance -= operand::IMM_20_Bs as usize;
+                    //     }
+                    // }
                 }
-                InstrsType::Call | InstrsType::Branch(..) => {}
                 _ => {}
             }
             pos += 1;

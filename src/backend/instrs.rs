@@ -336,7 +336,7 @@ impl LIRInst {
         }
     }
 
-    // Branch, Jump:
+    // Branch, Jump, Call:
     pub fn get_label(&self) -> &Operand {
         &self.operands[0]
     }
