@@ -1,8 +1,8 @@
 use std::env::var;
 
 use super::context::Type;
-use super::{ExpValue, RetInitVec, init_padding_float, init_padding_int};
 use super::{ast::*, context::Context};
+use super::{init_padding_float, init_padding_int, ExpValue, RetInitVec};
 use crate::frontend::context::Symbol;
 use crate::frontend::error::Error;
 use crate::ir::basicblock::BasicBlock;
@@ -24,28 +24,37 @@ impl Kit<'_> {
         self.context_mut.push_inst_bb(inst_ptr);
     }
 
-    pub fn add_var(&mut self, s: &str, tp: Type, is_array: bool,is_param:bool, dimension: Vec<i32>) {
-        self.context_mut.add_var(s, tp, is_array,is_param, dimension);
+    pub fn add_var(
+        &mut self,
+        s: &str,
+        tp: Type,
+        is_array: bool,
+        is_param: bool,
+        dimension: Vec<i32>,
+    ) {
+        self.context_mut
+            .add_var(s, tp, is_array, is_param, dimension);
     }
 
-    pub fn param_used(&mut self,s:&str){
+    pub fn param_used(&mut self, s: &str) {
         // let inst = self.context_mut.module_mut.get_var(s);
 
-                let mut name_changed = " ".to_string();
-                let mut layer_var = 0;
+        let mut name_changed = " ".to_string();
+        let mut layer_var = 0;
 
-                self
-                    .context_mut
-                    .var_map
-                    .get(s)
-                    .and_then(|vec_temp| vec_temp.last())
-                    .and_then(|(last_elm, layer)| {
-                        name_changed = last_elm.clone();
-                        layer_var = *layer;
-                        self.context_mut.symbol_table.get(last_elm)
-                    });//获得改名后的名字
-                    
-                self.context_mut.param_usage_table.insert(name_changed, true);
+        self.context_mut
+            .var_map
+            .get(s)
+            .and_then(|vec_temp| vec_temp.last())
+            .and_then(|(last_elm, layer)| {
+                name_changed = last_elm.clone();
+                layer_var = *layer;
+                self.context_mut.symbol_table.get(last_elm)
+            }); //获得改名后的名字
+
+        self.context_mut
+            .param_usage_table
+            .insert(name_changed, true);
     }
 
     // pub fn update_var(&mut self, s: &str, inst: ObjPtr<Inst>) -> bool {
@@ -138,7 +147,6 @@ impl Kit<'_> {
         s: &str,
         bb: ObjPtr<BasicBlock>,
     ) -> Option<(ObjPtr<Inst>, Symbol)> {
-
         let mut name_changed = " ".to_string();
         let mut layer_var = 0;
 
@@ -160,10 +168,10 @@ impl Kit<'_> {
 
         if layer_var == -1 {
             bbname = "notinblock"; //全局变量,const和一般类型需要分开处理吗?
-        }else if layer_var ==0 {
+        } else if layer_var == 0 {
             // bbname = "params";
-            if let Some(is_used) = self.context_mut.param_usage_table.get(&name_changed){
-                if !is_used{
+            if let Some(is_used) = self.context_mut.param_usage_table.get(&name_changed) {
+                if !is_used {
                     // println!("进来了");
                     bbname = "params";
                 }
@@ -200,8 +208,8 @@ impl Kit<'_> {
                 return Some((*inst, sym));
             } else {
                 println!("没找到变量{:?}", s);
-                println!("bbname:{:?}",bbname);
-                
+                println!("bbname:{:?}", bbname);
+
                 //没找到
                 // bb.as_ref().
                 let phiinst = self
@@ -307,9 +315,12 @@ impl Process for ConstDecl {
         match self.btype {
             BType::Int => {
                 for def in &mut self.const_def_vec {
-                    if def.const_exp_vec.is_empty() {//非数组
-                        let (mut inst_ptr, mut val,_) =
-                            def.const_init_val.process((Type::ConstInt,vec![]), kit_mut).unwrap();
+                    if def.const_exp_vec.is_empty() {
+                        //非数组
+                        let (mut inst_ptr, mut val, _) = def
+                            .const_init_val
+                            .process((Type::ConstInt, vec![]), kit_mut)
+                            .unwrap();
                         if !kit_mut.context_mut.add_var(
                             &def.ident,
                             Type::ConstInt,
@@ -320,85 +331,87 @@ impl Process for ConstDecl {
                             return Err(Error::MultipleDeclaration);
                         }
 
-                        
-                            let mut bond = 0;
-                            match val {//构造const指令
-                                ExpValue::Int(i) => {
-                                    
-                                    bond = i;
-                                    if kit_mut.context_mut.get_layer() < 0 {
-                                        inst_ptr = kit_mut.pool_inst_mut.make_global_int_const(bond);
-                                    }else{
-                                        inst_ptr = kit_mut.pool_inst_mut.make_int_const(i);
-                                        kit_mut.context_mut.push_inst_bb(inst_ptr);//update会将全局变量放入module中不会将局部变量放入bb中
-                                    }
-                                }
-                                _ => {
-                                    unreachable!()
+                        let mut bond = 0;
+                        match val {
+                            //构造const指令
+                            ExpValue::Int(i) => {
+                                bond = i;
+                                if kit_mut.context_mut.get_layer() < 0 {
+                                    inst_ptr = kit_mut.pool_inst_mut.make_global_int_const(bond);
+                                } else {
+                                    inst_ptr = kit_mut.pool_inst_mut.make_int_const(i);
+                                    kit_mut.context_mut.push_inst_bb(inst_ptr); //update会将全局变量放入module中不会将局部变量放入bb中
                                 }
                             }
-                            // inst_ptr = kit_mut.pool_inst_mut.make_global_int_const(bond);
-                            //这里
-                        
+                            _ => {
+                                unreachable!()
+                            }
+                        }
+                        // inst_ptr = kit_mut.pool_inst_mut.make_global_int_const(bond);
+                        //这里
+
                         kit_mut
                             .context_mut
-                            .update_var_scope_now(&def.ident, inst_ptr);//update会将全局变量放入module中不会将局部变量放入bb中
-                    } else {//数组
+                            .update_var_scope_now(&def.ident, inst_ptr); //update会将全局变量放入module中不会将局部变量放入bb中
+                    } else {
+                        //数组
                         // let (mut inst_ptr, mut val) =
                         //     def.const_init_val.process(Type::ConstInt, kit_mut).unwrap();//获得初始值
                         let mut dimension = vec![];
-                        for exp in &mut def.const_exp_vec{
+                        for exp in &mut def.const_exp_vec {
                             dimension.push(exp.process(Type::Int, kit_mut).unwrap());
                         }
-                        let dimension_vec :Vec<_>= dimension.iter().map(|(_,x)|x).collect();
-                        let dimension_vec_in :Vec<_> = dimension_vec.iter().map(|x|match x {
-                            ExpValue::Int(i) =>{
-                                *i
-                            }
-                            ExpValue::Float(f)=>{
-                                unreachable!()
-                            }
-                            ExpValue::None =>{
-                                unreachable!()
-                            }
-                        }).collect();//生成维度vec
-                            
+                        let dimension_vec: Vec<_> = dimension.iter().map(|(_, x)| x).collect();
+                        let dimension_vec_in: Vec<_> = dimension_vec
+                            .iter()
+                            .map(|x| match x {
+                                ExpValue::Int(i) => *i,
+                                ExpValue::Float(f) => {
+                                    unreachable!()
+                                }
+                                ExpValue::None => {
+                                    unreachable!()
+                                }
+                            })
+                            .collect(); //生成维度vec
+
                         let mut length = 1;
-                        for dm in &dimension_vec_in{
-                            length = length*dm;
+                        for dm in &dimension_vec_in {
+                            length = length * dm;
                         }
-                        let length_inst = kit_mut.pool_inst_mut.make_int_const(length);
-                        kit_mut.context_mut.push_inst_bb(length_inst);//这里
+                        // let length_inst = kit_mut.pool_inst_mut.make_int_const(length);
+                        // kit_mut.context_mut.push_inst_bb(length_inst); //这里
 
-                            if !kit_mut.context_mut.add_var(
-                                &def.ident,
-                                Type::ConstInt,
-                                true,
-                                false,
-                                dimension_vec_in.clone(),
-                            ) {
-                                return Err(Error::MultipleDeclaration);
-                            }//添加该变量，但没有生成实际的指令
+                        if !kit_mut.context_mut.add_var(
+                            &def.ident,
+                            Type::ConstInt,
+                            true,
+                            false,
+                            dimension_vec_in.clone(),
+                        ) {
+                            return Err(Error::MultipleDeclaration);
+                        } //添加该变量，但没有生成实际的指令
 
-                        let (mut inst_ptr, mut val,init_vec) =
-                            def.const_init_val.process((Type::ConstInt,dimension_vec_in.clone()), kit_mut).unwrap();//获得初始值
-                            match init_vec {
-                                RetInitVec::Float(fvec) =>{
-                                    let inst = kit_mut.pool_inst_mut.make_float_array(length_inst, fvec);
-                                    kit_mut.context_mut.update_var_scope_now(&def.ident, inst);
-                                    kit_mut.context_mut.push_inst_bb(inst);
-                                }
-                                RetInitVec::Int(ivec) =>{
-                                    println!("初始值:");
-                                    for i in &ivec{
-                                        println!("{:?}",i);
-                                    }
-                                    let inst = kit_mut.pool_inst_mut.make_int_array(length_inst, ivec);
-                                    kit_mut.context_mut.update_var_scope_now(&def.ident, inst);
-                                    kit_mut.context_mut.push_inst_bb(inst);
-                                }
+                        let (mut inst_ptr, mut val, init_vec) = def
+                            .const_init_val
+                            .process((Type::ConstInt, dimension_vec_in.clone()), kit_mut)
+                            .unwrap(); //获得初始值
+                        match init_vec {
+                            RetInitVec::Float(fvec) => {
+                                let inst = kit_mut.pool_inst_mut.make_float_array(length, fvec);
+                                kit_mut.context_mut.update_var_scope_now(&def.ident, inst);
+                                kit_mut.context_mut.push_inst_bb(inst);
                             }
-                            
+                            RetInitVec::Int(ivec) => {
+                                println!("初始值:");
+                                for i in &ivec {
+                                    println!("{:?}", i);
+                                }
+                                let inst = kit_mut.pool_inst_mut.make_int_array(length, ivec);
+                                kit_mut.context_mut.update_var_scope_now(&def.ident, inst);
+                                kit_mut.context_mut.push_inst_bb(inst);
+                            }
+                        }
                     }
                 }
                 return Ok(1);
@@ -406,9 +419,9 @@ impl Process for ConstDecl {
             BType::Float => {
                 for def in &mut self.const_def_vec {
                     if def.const_exp_vec.is_empty() {
-                        let (mut inst_ptr, mut val,_) = def
+                        let (mut inst_ptr, mut val, _) = def
                             .const_init_val
-                            .process((Type::ConstFloat,vec![]), kit_mut)
+                            .process((Type::ConstFloat, vec![]), kit_mut)
                             .unwrap();
                         if !kit_mut.context_mut.add_var(
                             &def.ident,
@@ -436,83 +449,85 @@ impl Process for ConstDecl {
                         //     kit_mut.context_mut.push_inst_bb(inst_ptr);
                         // }
 
-                        let mut bond= 0.0;
-                            match val {
-                                ExpValue::Float(i) => {
-                                    
-                                    bond = i;
-                                    if kit_mut.context_mut.get_layer() < 0 {
-                                        inst_ptr = kit_mut.pool_inst_mut.make_global_float_const(bond);
-                                    }else{
-                                        inst_ptr = kit_mut.pool_inst_mut.make_float_const(i);
-                                        kit_mut.context_mut.push_inst_bb(inst_ptr);
-                                    }
-                                }
-                                _ => {
-                                    unreachable!()
+                        let mut bond = 0.0;
+                        match val {
+                            ExpValue::Float(i) => {
+                                bond = i;
+                                if kit_mut.context_mut.get_layer() < 0 {
+                                    inst_ptr = kit_mut.pool_inst_mut.make_global_float_const(bond);
+                                } else {
+                                    inst_ptr = kit_mut.pool_inst_mut.make_float_const(i);
+                                    kit_mut.context_mut.push_inst_bb(inst_ptr);
                                 }
                             }
-                            // inst_ptr = kit_mut.pool_inst_mut.make_global_float_const(bond);
-                            //这里
+                            _ => {
+                                unreachable!()
+                            }
+                        }
+                        // inst_ptr = kit_mut.pool_inst_mut.make_global_float_const(bond);
+                        //这里
                         kit_mut
                             .context_mut
                             .update_var_scope_now(&def.ident, inst_ptr);
-                    } else {//数组
+                    } else {
+                        //数组
                         // let (mut inst_ptr, mut val) =
                         //     def.const_init_val.process(Type::ConstInt, kit_mut).unwrap();//获得初始值
                         let mut dimension = vec![];
-                        for exp in &mut def.const_exp_vec{
+                        for exp in &mut def.const_exp_vec {
                             dimension.push(exp.process(Type::Int, kit_mut).unwrap());
                         }
-                        let dimension_vec :Vec<_>= dimension.iter().map(|(_,x)|x).collect();
-                        let dimension_vec_in :Vec<_> = dimension_vec.iter().map(|x|match x {
-                            ExpValue::Int(i) =>{
-                                *i
-                            }
-                            ExpValue::Float(f)=>{
-                                unreachable!()
-                            }
-                            ExpValue::None =>{
-                                unreachable!()
-                            }
-                        }).collect();//生成维度vec
-                            
+                        let dimension_vec: Vec<_> = dimension.iter().map(|(_, x)| x).collect();
+                        let dimension_vec_in: Vec<_> = dimension_vec
+                            .iter()
+                            .map(|x| match x {
+                                ExpValue::Int(i) => *i,
+                                ExpValue::Float(f) => {
+                                    unreachable!()
+                                }
+                                ExpValue::None => {
+                                    unreachable!()
+                                }
+                            })
+                            .collect(); //生成维度vec
+
                         let mut length = 1;
-                        for dm in &dimension_vec_in{
-                            length = length*dm;
+                        for dm in &dimension_vec_in {
+                            length = length * dm;
                         }
-                        let length_inst = kit_mut.pool_inst_mut.make_int_const(length);
-                        kit_mut.context_mut.push_inst_bb(length_inst);//这里
+                        // let length_inst = kit_mut.pool_inst_mut.make_int_const(length);
+                        // kit_mut.context_mut.push_inst_bb(length_inst); //这里
 
-                            if !kit_mut.context_mut.add_var(
-                                &def.ident,
-                                Type::ConstInt,
-                                true,
-                                false,
-                                dimension_vec_in.clone(),
-                            ) {
-                                return Err(Error::MultipleDeclaration);
-                            }//添加该变量，但没有生成实际的指令
+                        if !kit_mut.context_mut.add_var(
+                            &def.ident,
+                            Type::ConstInt,
+                            true,
+                            false,
+                            dimension_vec_in.clone(),
+                        ) {
+                            return Err(Error::MultipleDeclaration);
+                        } //添加该变量，但没有生成实际的指令
 
-                        let (mut inst_ptr, mut val,init_vec) =
-                            def.const_init_val.process((Type::ConstInt,dimension_vec_in.clone()), kit_mut).unwrap();//获得初始值
-                            match init_vec {
-                                RetInitVec::Float(fvec) =>{
-                                    let inst = kit_mut.pool_inst_mut.make_float_array(length_inst, fvec);
-                                    kit_mut.context_mut.update_var_scope_now(&def.ident, inst);
-                                    kit_mut.context_mut.push_inst_bb(inst);
-                                }
-                                RetInitVec::Int(ivec) =>{
-                                    // println!("初始值:");
-                                    // for i in &ivec{
-                                    //     println!("{:?}",i);
-                                    // }
-                                    let inst = kit_mut.pool_inst_mut.make_int_array(length_inst, ivec);
-                                    kit_mut.context_mut.update_var_scope_now(&def.ident, inst);
-                                    kit_mut.context_mut.push_inst_bb(inst);
-                                }
+                        let (mut inst_ptr, mut val, init_vec) = def
+                            .const_init_val
+                            .process((Type::ConstInt, dimension_vec_in.clone()), kit_mut)
+                            .unwrap(); //获得初始值
+                        match init_vec {
+                            RetInitVec::Float(fvec) => {
+                                let inst = kit_mut.pool_inst_mut.make_float_array(length, fvec);
+                                kit_mut.context_mut.update_var_scope_now(&def.ident, inst);
+                                kit_mut.context_mut.push_inst_bb(inst);
                             }
-                            
+                            RetInitVec::Int(ivec) => {
+                                println!("初始值:");
+                                for i in &ivec {
+                                    println!("{:?}", i);
+                                }
+                                let inst = kit_mut.pool_inst_mut.make_int_array(length, ivec);
+                                kit_mut.context_mut.update_var_scope_now(&def.ident, inst);
+                                kit_mut.context_mut.push_inst_bb(inst);
+                            }
+                        }
                     }
                 }
                 return Ok(1);
@@ -531,27 +546,29 @@ impl Process for ConstDecl {
 // }
 
 impl Process for ConstInitVal {
-    type Ret = (ObjPtr<Inst>, ExpValue,RetInitVec);
-    type Message = (Type,Vec<i32>);
+    type Ret = (ObjPtr<Inst>, ExpValue, RetInitVec);
+    type Message = (Type, Vec<i32>);
     fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
         match self {
             ConstInitVal::ConstExp(constexp) => {
-                let (inst,value) = constexp.process(input.0, kit_mut).unwrap();
+                let (inst, value) = constexp.process(input.0, kit_mut).unwrap();
                 match value {
-                    ExpValue::Float(f) =>{
+                    ExpValue::Float(f) => {
                         let mut vec_ret = Vec::new();
                         vec_ret.push(f);
-                        Ok((inst,value,RetInitVec::Float(vec_ret)))
+                        Ok((inst, value, RetInitVec::Float(vec_ret)))
                     }
-                    ExpValue::Int(i) =>{
+                    ExpValue::Int(i) => {
                         let mut vec_ret = Vec::new();
                         vec_ret.push(i);
-                        Ok((inst,value,RetInitVec::Int(vec_ret)))
+                        Ok((inst, value, RetInitVec::Int(vec_ret)))
                     }
-                    _=>{unreachable!()}
+                    _ => {
+                        unreachable!()
+                    }
                 }
                 // Ok((inst,value,RetInitVec::Int(Vec::new())))
-            },
+            }
             ConstInitVal::ConstInitValVec(constvalvec) => {
                 let dimension_vec = input.1;
                 let tp = input.0;
@@ -559,55 +576,65 @@ impl Process for ConstInitVal {
                 let mut vec_ret_int = vec![];
                 let mut dimension_next = vec![];
                 let mut index = 0;
-                for i in &dimension_vec{//构造下一级的维度vec
-                    if index==0{
-                        index = index+1;
+                for i in &dimension_vec {
+                    //构造下一级的维度vec
+                    if index == 0 {
+                        index = index + 1;
                         continue;
                     }
-                    index = index+1;
+                    index = index + 1;
                     dimension_next.push(*i);
                 }
                 // println!("dimension:{:?}",dimension_vec.len());
                 // println!("dimension_next:{:?}",dimension_next.len());
-            
-                for val in constvalvec{
-                    let (_,_,vec_temp) = val.process((tp,dimension_next.clone()), kit_mut).unwrap();//子init_vec生成vec
-                    match vec_temp {//将子vec中值放到当前vec中
-                        RetInitVec::Float(vec_float) =>{
-                            match tp {
-                                Type::Float |Type::ConstFloat =>{
-                                    for val_son in vec_float{
-                                        vec_ret_float.push(val_son);
-                                    }
-                                },
-                                _=>{unreachable!();}
+
+                for val in constvalvec {
+                    let (_, _, vec_temp) =
+                        val.process((tp, dimension_next.clone()), kit_mut).unwrap(); //子init_vec生成vec
+                    match vec_temp {
+                        //将子vec中值放到当前vec中
+                        RetInitVec::Float(vec_float) => match tp {
+                            Type::Float | Type::ConstFloat => {
+                                for val_son in vec_float {
+                                    vec_ret_float.push(val_son);
+                                }
                             }
-                        }
-                        RetInitVec::Int(vec_int) =>{
-                            match tp {
-                                Type::Int |Type::ConstInt =>{
-                                    for val_son in vec_int{
-                                        vec_ret_int.push(val_son);
-                                    }
-                                },
-                                _=>{unreachable!();}
+                            _ => {
+                                unreachable!();
                             }
-                        }
+                        },
+                        RetInitVec::Int(vec_int) => match tp {
+                            Type::Int | Type::ConstInt => {
+                                for val_son in vec_int {
+                                    vec_ret_int.push(val_son);
+                                }
+                            }
+                            _ => {
+                                unreachable!();
+                            }
+                        },
                     }
                 }
 
                 match tp {
-                    Type::Float |Type::ConstFloat =>{
+                    Type::Float | Type::ConstFloat => {
                         init_padding_float(&mut vec_ret_float, dimension_vec.clone());
-                        return Ok((kit_mut.pool_inst_mut.make_int_const(-1),ExpValue::None,RetInitVec::Float(vec_ret_float)));
+                        return Ok((
+                            kit_mut.pool_inst_mut.make_int_const(-1),
+                            ExpValue::None,
+                            RetInitVec::Float(vec_ret_float),
+                        ));
                     }
-                    Type::Int |Type::ConstInt =>{
+                    Type::Int | Type::ConstInt => {
                         init_padding_int(&mut vec_ret_int, dimension_vec.clone());
-                        return Ok((kit_mut.pool_inst_mut.make_int_const(-1),ExpValue::None,RetInitVec::Int(vec_ret_int)));
+                        return Ok((
+                            kit_mut.pool_inst_mut.make_int_const(-1),
+                            ExpValue::None,
+                            RetInitVec::Int(vec_ret_int),
+                        ));
                     }
-                    
                 }
-                
+
                 // match tp {
                 //     Type::ConstFloat |Type::Float =>{
 
@@ -633,13 +660,17 @@ impl Process for VarDecl {
                             InitVal::Exp(exp) => {
                                 let (mut inst_ptr, mut val) =
                                     exp.process(Type::Int, kit_mut).unwrap();
-                                if !kit_mut
-                                    .context_mut
-                                    .add_var(id, Type::Int, false,false, Vec::new())
-                                {
+                                if !kit_mut.context_mut.add_var(
+                                    id,
+                                    Type::Int,
+                                    false,
+                                    false,
+                                    Vec::new(),
+                                ) {
                                     return Err(Error::MultipleDeclaration);
                                 }
-                                if kit_mut.context_mut.get_layer() < 0 {//设计相关(全局变量指令与局部变量不同)，全局变量得在这额外判断，放到module里
+                                if kit_mut.context_mut.get_layer() < 0 {
+                                    //设计相关(全局变量指令与局部变量不同)，全局变量得在这额外判断，放到module里
                                     match val {
                                         ExpValue::Int(i) => {
                                             inst_ptr = kit_mut.pool_inst_mut.make_global_int(i);
@@ -659,50 +690,107 @@ impl Process for VarDecl {
                         VarDef::NonArray(id) => {
                             if !kit_mut
                                 .context_mut
-                                .add_var(id, Type::Int, false, false,Vec::new())
+                                .add_var(id, Type::Int, false, false, Vec::new())
                             {
                                 return Err(Error::MultipleDeclaration);
                             }
-                            if kit_mut.context_mut.get_layer()==-1{//设计相关(全局变量指令与局部变量不同)，全局变量得在这额外判断，放到module里
+                            if kit_mut.context_mut.get_layer() == -1 {
+                                //设计相关(全局变量指令与局部变量不同)，全局变量得在这额外判断，放到module里
                                 let inst_ptr = kit_mut.pool_inst_mut.make_global_int(0);
                                 kit_mut.context_mut.update_var_scope_now(id, inst_ptr);
                             }
                         }
                         VarDef::ArrayInit((id, exp_vec, val)) => {
-                            // let mut dimension :Vec<_>= exp_vec.iter().map(|x|x.process(Type::Int, kit_mut).unwrap()).collect();
                             let mut dimension = vec![];
-                            for exp in exp_vec{
+                            for exp in exp_vec {
                                 dimension.push(exp.process(Type::Int, kit_mut).unwrap());
                             }
-                            let dimension_vec :Vec<_>= dimension.iter().map(|(_,x)|x).collect();
-                            let dimension_vec_in :Vec<_> = dimension_vec.iter().map(|x|match x {
-                                ExpValue::Int(i) =>{
-                                    *i
+                            let dimension_vec: Vec<_> = dimension.iter().map(|(_, x)| x).collect();
+                            let dimension_vec_in: Vec<_> = dimension_vec
+                                .iter()
+                                .map(|x| match x {
+                                    ExpValue::Int(i) => *i,
+                                    ExpValue::Float(f) => {
+                                        unreachable!()
+                                    }
+                                    ExpValue::None => {
+                                        unreachable!()
+                                    }
+                                })
+                                .collect(); //生成维度vec
+
+                            let mut length = 1;
+                            for dm in &dimension_vec_in {
+                                length = length * dm;
+                            }
+                            // let length_inst = kit_mut.pool_inst_mut.make_int_const(length);
+                            // kit_mut.context_mut.push_inst_bb(length_inst); //这里
+
+                            if !kit_mut.context_mut.add_var(
+                                &id,
+                                Type::Int,
+                                true,
+                                false,
+                                dimension_vec_in.clone(),
+                            ) {
+                                return Err(Error::MultipleDeclaration);
+                            } //添加该变量，但没有生成实际的指令
+                              // unreachable!()
+                            let (mut init_vec, mut inst_vec) = val
+                                .process((Type::Int, dimension_vec_in.clone(), 0, 1), kit_mut)
+                                .unwrap(); //获得初始值
+                                           // let inst =
+                            match init_vec {
+                                RetInitVec::Int(ivec) => {
+                                    println!("初始值:");
+                                    for i in &ivec {
+                                        println!("{:?}", i);
+                                    }
+                                    let inst = kit_mut.pool_inst_mut.make_int_array(length, ivec);
+                                    kit_mut.context_mut.update_var_scope_now(&id, inst);
+                                    kit_mut.context_mut.push_inst_bb(inst);
+                                    println!("没进来");
+                                    for option_exp in inst_vec {
+                                        println!("进来了");
+                                        if let Some((inst_val, offset_val)) = option_exp {
+                                            let offset =
+                                                kit_mut.pool_inst_mut.make_int_const(offset_val);
+                                            let ptr = kit_mut.pool_inst_mut.make_gep(inst, offset);
+                                            let inst_store =
+                                                kit_mut.pool_inst_mut.make_int_store(ptr, inst_val);
+                                            kit_mut.context_mut.push_inst_bb(offset);
+                                            kit_mut.context_mut.push_inst_bb(ptr);
+                                            kit_mut.context_mut.push_inst_bb(inst_store);
+                                        }
+                                    }
                                 }
-                                _=>{
+                                _ => {
                                     unreachable!()
                                 }
-                            }).collect();//生成维度vec
-                            val.process((Type::Int,dimension_vec_in), kit_mut).unwrap();
+                            }
                         }
                         VarDef::Array((id, exp_vec)) => {
                             let mut dimension = vec![];
-                            for exp in exp_vec{
+                            for exp in exp_vec {
                                 dimension.push(exp.process(Type::Int, kit_mut).unwrap());
                             }
-                            let dimension_vec :Vec<_>= dimension.iter().map(|(_,x)|x).collect();
-                            let dimension_vec_in :Vec<_> = dimension_vec.iter().map(|x|match x {
-                                ExpValue::Int(i) =>{
-                                    *i
-                                }
-                                _=>{
-                                    unreachable!()
-                                }
-                            }).collect();//生成维度vec
-                            if !kit_mut
-                                .context_mut
-                                .add_var(id.as_str(), Type::Int, true,false, dimension_vec_in)
-                            {
+                            let dimension_vec: Vec<_> = dimension.iter().map(|(_, x)| x).collect();
+                            let dimension_vec_in: Vec<_> = dimension_vec
+                                .iter()
+                                .map(|x| match x {
+                                    ExpValue::Int(i) => *i,
+                                    _ => {
+                                        unreachable!()
+                                    }
+                                })
+                                .collect(); //生成维度vec
+                            if !kit_mut.context_mut.add_var(
+                                id.as_str(),
+                                Type::Int,
+                                true,
+                                false,
+                                dimension_vec_in,
+                            ) {
                                 return Err(Error::MultipleDeclaration);
                             }
                         }
@@ -717,14 +805,18 @@ impl Process for VarDecl {
                             InitVal::Exp(exp) => {
                                 let (mut inst_ptr, val) =
                                     exp.process(Type::Float, kit_mut).unwrap();
-                                if !kit_mut
-                                    .context_mut
-                                    .add_var(id, Type::Float, false,false, Vec::new())
-                                {
+                                if !kit_mut.context_mut.add_var(
+                                    id,
+                                    Type::Float,
+                                    false,
+                                    false,
+                                    Vec::new(),
+                                ) {
                                     return Err(Error::MultipleDeclaration);
                                 }
 
-                                if kit_mut.context_mut.get_layer() < 0 {//设计相关(全局变量指令与局部变量不同)，全局变量得在这额外判断，放到module里
+                                if kit_mut.context_mut.get_layer() < 0 {
+                                    //设计相关(全局变量指令与局部变量不同)，全局变量得在这额外判断，放到module里
                                     match val {
                                         ExpValue::Float(f) => {
                                             inst_ptr = kit_mut.pool_inst_mut.make_global_float(f);
@@ -742,13 +834,17 @@ impl Process for VarDecl {
                             }
                         },
                         VarDef::NonArray((id)) => {
-                            if !kit_mut
-                                .context_mut
-                                .add_var(id.as_str(), Type::Float, false, false,vec![])
-                            {
+                            if !kit_mut.context_mut.add_var(
+                                id.as_str(),
+                                Type::Float,
+                                false,
+                                false,
+                                vec![],
+                            ) {
                                 return Err(Error::MultipleDeclaration);
                             }
-                            if kit_mut.context_mut.get_layer()==-1{//设计相关(全局变量指令与局部变量不同)，全局变量得在这额外判断，放到module里
+                            if kit_mut.context_mut.get_layer() == -1 {
+                                //设计相关(全局变量指令与局部变量不同)，全局变量得在这额外判断，放到module里
                                 let inst_ptr = kit_mut.pool_inst_mut.make_global_float(0.0);
                                 kit_mut.context_mut.update_var_scope_now(id, inst_ptr);
                             }
@@ -777,10 +873,155 @@ impl Process for VarDef {
 }
 
 impl Process for InitVal {
-    type Ret = i32;
-    type Message = (Type,Vec<i32>);
+    type Ret = (RetInitVec, Vec<Option<(ObjPtr<Inst>, i32)>>);
+    type Message = (Type, Vec<i32>, i32, usize);
     fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
-        todo!();
+        match self {
+            InitVal::Exp(exp) => {
+                let (tp, dimension, num_precessor, layer_now) = input;
+                let (inst, val) = exp.process(tp, kit_mut).unwrap();
+                let mut vecf = vec![];
+                let mut veci = vec![];
+                let mut inst_vec = vec![];
+                match val {
+                    ExpValue::Float(f) => match tp {
+                        Type::Float | Type::ConstFloat => {
+                            vecf.push(f);
+                            inst_vec.push(None);
+                        }
+                        _ => {
+                            unreachable!()
+                        }
+                    },
+                    ExpValue::Int(i) => match tp {
+                        Type::Int | Type::ConstInt => {
+                            veci.push(i);
+                            inst_vec.push(None);
+                        }
+                        _ => {
+                            unreachable!()
+                        }
+                    },
+                    ExpValue::None => match tp {
+                        Type::Float | Type::ConstFloat => {
+                            vecf.push(0.0);
+                            // let offset =
+                            inst_vec.push(Some((inst, num_precessor)));
+                        }
+                        Type::Int | Type::ConstInt => {
+                            veci.push(0);
+                            // let offset =
+                            inst_vec.push(Some((inst, num_precessor)));
+                        }
+                        _ => {
+                            unreachable!()
+                        }
+                    },
+                }
+                match tp {
+                    Type::Float | Type::ConstFloat => Ok((RetInitVec::Float(vecf), inst_vec)),
+                    Type::Int | Type::ConstInt => Ok((RetInitVec::Int(veci), inst_vec)),
+                }
+                // Err(Error::Todo)
+            }
+
+            InitVal::InitValVec(initvec) => {
+                let (tp, dimension, num_precessor, layer_now) = input;
+                let mut vec_val_f = vec![];
+                let mut vec_val_i = vec![];
+                let mut vec_inst_init = vec![];
+                let mut after = 1;
+                for i in layer_now..dimension.len() {
+                    after = after * dimension[i];
+                } //计算当前维度每增1对应多少元素
+                let mut vec_dimension_now = vec![];
+                for i in (layer_now - 1)..dimension.len() {
+                    vec_dimension_now.push(dimension[i]);
+                } //计算当前维度每增1对应多少元素
+
+                let mut index = 0; //当前相对位移
+                for init in initvec {
+                    match init {
+                        InitVal::Exp(exp) => {
+                            let (vec_val_temp, vec_inst_temp) = init
+                                .process(
+                                    (tp, dimension.clone(), num_precessor + index, layer_now),
+                                    kit_mut,
+                                )
+                                .unwrap();
+                            match vec_val_temp {
+                                RetInitVec::Float(vec_f) => {
+                                    for val in vec_f {
+                                        vec_val_f.push(val);
+                                    }
+                                    for inst in vec_inst_temp {
+                                        if let Some(inst_list) = inst {
+                                            vec_inst_init.push(inst);
+                                        }
+                                    }
+                                }
+                                RetInitVec::Int(vec_i) => {
+                                    for val in vec_i {
+                                        vec_val_i.push(val);
+                                    }
+                                    for inst in vec_inst_temp {
+                                        if let Some(inst_list) = inst {
+                                            vec_inst_init.push(inst);
+                                        }
+                                    }
+                                }
+                            }
+
+                            index = index + 1; //init为exp，相对偏移加1
+                        }
+                        InitVal::InitValVec(initvec) => {
+                            let (vec_val_temp, vec_inst_temp) = init
+                                .process(
+                                    (tp, dimension.clone(), num_precessor + index, layer_now + 1),
+                                    kit_mut,
+                                )
+                                .unwrap();
+                            match vec_val_temp {
+                                RetInitVec::Float(vec_f) => {
+                                    for val in vec_f {
+                                        vec_val_f.push(val);
+                                    }
+                                    for inst in vec_inst_temp {
+                                        if let Some(inst_list) = inst {
+                                            vec_inst_init.push(inst);
+                                        }
+                                    }
+                                }
+                                RetInitVec::Int(vec_i) => {
+                                    for val in vec_i {
+                                        vec_val_i.push(val);
+                                    }
+                                    for inst in vec_inst_temp {
+                                        if let Some(inst_list) = inst {
+                                            vec_inst_init.push(inst);
+                                        }
+                                    }
+                                }
+                            }
+                            index = index + after; //init为vec,相对偏移加after
+                        }
+                    }
+                }
+
+                match tp {
+                    Type::Float | Type::ConstFloat => {
+                        init_padding_float(&mut vec_val_f, vec_dimension_now);
+                        Ok((RetInitVec::Float(vec_val_f), vec_inst_init))
+                    }
+                    Type::Int | Type::ConstInt => {
+                        init_padding_int(&mut vec_val_i, vec_dimension_now);
+                        Ok((RetInitVec::Int(vec_val_i), vec_inst_init))
+                    }
+                }
+
+                // Err(Error::Todo)
+            }
+        }
     }
 }
 impl Process for FuncDef {
@@ -818,7 +1059,7 @@ impl Process for FuncDef {
                     FuncType::Int => func_mut.set_return_type(IrType::Int),
                     FuncType::Float => func_mut.set_return_type(IrType::Float),
                 }
-                
+
                 kit_mut
                     .context_mut
                     .push_func_module(id.to_string(), func_ptr);
@@ -875,7 +1116,7 @@ impl Process for FuncFParam {
                     let param = kit_mut.pool_inst_mut.make_param(IrType::Int);
                     kit_mut
                         .context_mut
-                        .add_var(id, Type::Int, false, true,Vec::new());
+                        .add_var(id, Type::Int, false, true, Vec::new());
                     //这里
                     kit_mut.context_mut.update_var_scope_now(id, param);
                     Ok((id.clone(), param))
@@ -884,7 +1125,7 @@ impl Process for FuncFParam {
                     let param = kit_mut.pool_inst_mut.make_param(IrType::Float);
                     kit_mut
                         .context_mut
-                        .add_var(id, Type::Float, false, true,Vec::new());
+                        .add_var(id, Type::Float, false, true, Vec::new());
                     kit_mut.context_mut.update_var_scope_now(id, param);
                     Ok((id.clone(), param))
                 }
@@ -987,10 +1228,10 @@ impl Process for Assign {
                 mes = Type::Int;
             }
         }
-        
-// println!("zhe");
+
+        // println!("zhe");
         let (inst_r, _) = self.exp.process(mes, kit_mut).unwrap();
-        if symbol.is_param{
+        if symbol.is_param {
             kit_mut.param_used(&lval.id);
         }
         kit_mut
@@ -1089,10 +1330,10 @@ impl Process for LVal {
                             InstKind::Load => {
                                 let mut val_ret = ExpValue::None;
                                 match var.as_ref().get_ptr().as_ref().get_kind() {
-                                    InstKind::GlobalConstInt(i) =>{
+                                    InstKind::GlobalConstInt(i) => {
                                         val_ret = ExpValue::Float(i as f32);
                                     }
-                                    _=>{}
+                                    _ => {}
                                 }
                                 kit_mut.context_mut.push_inst_bb(inst_trans);
                                 return Ok((inst_trans, val_ret));
@@ -1103,12 +1344,14 @@ impl Process for LVal {
                                 //     let val = var.as_ref().get_int_bond();
                                 //     val_ret = ExpValue::Float(val as f32);
                                 // }
-                                
+
                                 match var.as_ref().get_kind() {
-                                    InstKind::ConstInt(i)|InstKind::GlobalInt(i)|InstKind::GlobalConstInt(i) =>{
+                                    InstKind::ConstInt(i)
+                                    | InstKind::GlobalInt(i)
+                                    | InstKind::GlobalConstInt(i) => {
                                         val_ret = ExpValue::Float(i as f32);
                                     }
-                                    _=>{}
+                                    _ => {}
                                 }
                                 kit_mut.context_mut.push_inst_bb(inst_trans);
                                 return Ok((inst_trans, val_ret));
@@ -1125,10 +1368,10 @@ impl Process for LVal {
                                 let mut val_ret = ExpValue::None;
 
                                 match var.as_ref().get_ptr().as_ref().get_kind() {
-                                    InstKind::GlobalConstFloat(f) =>{
+                                    InstKind::GlobalConstFloat(f) => {
                                         val_ret = ExpValue::Float(f);
                                     }
-                                    _=>{}
+                                    _ => {}
                                 }
 
                                 return Ok((var, val_ret));
@@ -1139,10 +1382,12 @@ impl Process for LVal {
                                 let mut val_ret = ExpValue::None;
 
                                 match var.as_ref().get_kind() {
-                                    InstKind::ConstFloat(f)|InstKind::GlobalFloat(f)|InstKind::GlobalConstFloat(f) =>{
+                                    InstKind::ConstFloat(f)
+                                    | InstKind::GlobalFloat(f)
+                                    | InstKind::GlobalConstFloat(f) => {
                                         val_ret = ExpValue::Float(f);
                                     }
-                                    _=>{}
+                                    _ => {}
                                 }
                                 // if kit_mut.context_mut.get_layer()<0{
                                 //     let val = var.as_ref().get_float_bond();
@@ -1166,10 +1411,10 @@ impl Process for LVal {
                                 let mut val_ret = ExpValue::None;
                                 kit_mut.context_mut.push_inst_bb(inst_trans);
                                 match var.as_ref().get_ptr().as_ref().get_kind() {
-                                    InstKind::GlobalConstFloat(f) =>{
+                                    InstKind::GlobalConstFloat(f) => {
                                         val_ret = ExpValue::Int(f as i32);
                                     }
-                                    _=>{}
+                                    _ => {}
                                 }
                                 return Ok((inst_trans, val_ret));
                             }
@@ -1181,12 +1426,14 @@ impl Process for LVal {
                                 // }
 
                                 match var.as_ref().get_kind() {
-                                    InstKind::ConstFloat(f)|InstKind::GlobalFloat(f)|InstKind::GlobalConstFloat(f) =>{
+                                    InstKind::ConstFloat(f)
+                                    | InstKind::GlobalFloat(f)
+                                    | InstKind::GlobalConstFloat(f) => {
                                         val_ret = ExpValue::Int(f as i32);
                                     }
-                                    _=>{}
+                                    _ => {}
                                 }
-                                
+
                                 kit_mut.context_mut.push_inst_bb(inst_trans);
                                 return Ok((inst_trans, val_ret));
                             }
@@ -1198,10 +1445,10 @@ impl Process for LVal {
                                 let mut val_ret = ExpValue::None;
 
                                 match var.as_ref().get_ptr().as_ref().get_kind() {
-                                    InstKind::GlobalConstInt(i) =>{
+                                    InstKind::GlobalConstInt(i) => {
                                         val_ret = ExpValue::Int(i);
                                     }
-                                    _=>{}
+                                    _ => {}
                                 }
 
                                 return Ok((var, val_ret));
@@ -1210,10 +1457,12 @@ impl Process for LVal {
                                 // println!("var:{:?},var_type:{:?}",var.as_ref().get_kind(),var.as_ref().get_ir_type());
                                 let mut val_ret = ExpValue::None;
                                 match var.as_ref().get_kind() {
-                                    InstKind::ConstInt(i)|InstKind::GlobalInt(i)|InstKind::GlobalConstInt(i) =>{
+                                    InstKind::ConstInt(i)
+                                    | InstKind::GlobalInt(i)
+                                    | InstKind::GlobalConstInt(i) => {
                                         val_ret = ExpValue::Int(i);
                                     }
-                                    _=>{}
+                                    _ => {}
                                 }
                                 // println!("var:{:?},var_type:{:?}",var.as_ref().get_kind(),var.as_ref().get_ir_type());
                                 // println!("{:?}",val_ret);
@@ -1260,10 +1509,12 @@ impl Process for Number {
         match self {
             Number::FloatConst(f) => {
                 if let Some(inst) = kit_mut.context_mut.get_const_float(*f) {
+                    // println!("找到：{:?}", f);
                     return Ok((inst, ExpValue::Float(*f)));
                 } else {
                     let inst = kit_mut.pool_inst_mut.make_float_const(*f);
                     kit_mut.context_mut.add_const_float(*f, inst);
+                    // println!("没找到：{:?}", f);
                     return Ok((inst, ExpValue::Float(*f)));
                 }
             }
@@ -1272,10 +1523,12 @@ impl Process for Number {
                     Type::ConstFloat | Type::Float => {
                         let f = *i as f32;
                         if let Some(inst) = kit_mut.context_mut.get_const_float(f) {
+                            // println!("找到：{:?}", f);
                             return Ok((inst, ExpValue::Float(f)));
                         } else {
                             let inst = kit_mut.pool_inst_mut.make_float_const(f);
                             kit_mut.context_mut.add_const_float(f, inst);
+                            // println!("没找到：{:?}", f);
                             // println!("intconst:{}", i);
                             return Ok((inst, ExpValue::Float(f)));
                         }
@@ -1285,11 +1538,13 @@ impl Process for Number {
                     // }
                     Type::ConstInt | Type::Int => {
                         if let Some(inst) = kit_mut.context_mut.get_const_int(*i) {
+                            // println!("找到：{:?}", i);
                             return Ok((inst, ExpValue::Int(*i)));
                         } else {
                             // println!("没找到常量:{:?}",i);
                             let inst = kit_mut.pool_inst_mut.make_int_const(*i);
                             kit_mut.context_mut.add_const_int(*i, inst);
+                            // println!("没找到：{:?}", i);
                             // println!("intconst:{}", i);
                             return Ok((inst, ExpValue::Int(*i)));
                         }
@@ -1356,7 +1611,8 @@ impl Process for UnaryExp {
                 let inst_func = kit_mut.context_mut.module_mut.get_function(&funcname);
                 let fparams = inst_func.as_ref().get_parameter_list();
                 let mut fparams_type_vec = vec![];
-                for fp in fparams {//获得各参数类型
+                for fp in fparams {
+                    //获得各参数类型
                     match fp.as_ref().get_ir_type() {
                         IrType::Float => {
                             fparams_type_vec.push(Type::Float);
@@ -1369,9 +1625,10 @@ impl Process for UnaryExp {
                         }
                     }
                 }
-                match inst_func.as_ref().get_return_type() {//根据返回值类型生成call指令
+                match inst_func.as_ref().get_return_type() {
+                    //根据返回值类型生成call指令
                     IrType::Float => {
-                        let mut args = funcparams.process(fparams_type_vec, kit_mut).unwrap();//获得实参
+                        let mut args = funcparams.process(fparams_type_vec, kit_mut).unwrap(); //获得实参
                         let mut fname = " ".to_string();
                         if let Some((funcname_in, _)) = kit_mut
                             .context_mut
