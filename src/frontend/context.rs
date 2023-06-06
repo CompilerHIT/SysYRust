@@ -253,7 +253,7 @@ impl Context<'_> {
         match &mut self.bb_now_mut {
             InfuncChoice::InFunc(bbptr) => {
                 let bb = bbptr.as_mut();
-                bb.push_back(inst);
+                bb.push_back(inst);//应该往头节点插，往头节点取
                 v.push((temps.clone(), 1));
                 self.update_var_scope_now(&s, inst);
             }
@@ -281,18 +281,21 @@ impl Context<'_> {
 
     pub fn get_const_int(&self, i: i32) -> Option<(ObjPtr<Inst>)> {
         if self.layer > 0 {
+            
             let iname = "@".to_string() + i.to_string().as_str();
             if let Some(vec) = self.var_map.get(&iname) {
                 for (name_changed, layer_now) in vec {
                     if *layer_now == 1 {
                         for ((bbname, inst_vec)) in &self.bb_map {
                             if let Some(inst) = inst_vec.get(name_changed) {
+                                println!("找到常量:{:?}",i);
                                 return Option::Some(*inst);
                             }
                         }
                     }
                 }
             }
+            println!("没找到常量:{:?}",i);
             return Option::None;
         } else {
             let iname = "@".to_string() + i.to_string().as_str();
