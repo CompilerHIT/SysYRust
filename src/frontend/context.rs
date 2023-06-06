@@ -15,7 +15,7 @@ use super::irgen::InfuncChoice;
 pub struct Context<'a> {
     pub var_map: HashMap<String, Vec<(String, i64)>>,
     pub symbol_table: HashMap<String, Symbol>,
-    pub param_usage_table:HashMap<String,bool>,
+    pub param_usage_table: HashMap<String, bool>,
     pub bb_map: HashMap<String, HashMap<String, ObjPtr<Inst>>>,
     pub bb_now_mut: InfuncChoice,
     pub module_mut: &'a mut Module,
@@ -48,7 +48,7 @@ impl Context<'_> {
         Context {
             var_map: HashMap::new(),
             bb_map: HashMap::new(),
-            param_usage_table:HashMap::new(),
+            param_usage_table: HashMap::new(),
             bb_now_mut: InfuncChoice::NInFunc(),
             module_mut,
             index: 0,
@@ -159,10 +159,10 @@ impl Context<'_> {
                 bbname = bbn.get_name();
             }
             InfuncChoice::NInFunc() => {
-                if self.get_layer()==-1{
+                if self.get_layer() == -1 {
                     bbname = "notinblock";
                     self.push_var_bb(s.to_string(), inst);
-                }else if self.get_layer()==0 {
+                } else if self.get_layer() == 0 {
                     bbname = "params";
                 }
                 // bbname = "notinblock";
@@ -184,13 +184,11 @@ impl Context<'_> {
                 //     // InstKind
                 //     _=>{}
                 // }
-                
-                
+
                 // self.push_var_bb(s.to_string(), inst);
             }
         }
         if self.var_map.contains_key(s) {
-            
             if let Some(vec) = self.var_map.get_mut(s) {
                 // println!("进来了");
                 // let temps = self.add_prefix(s.to_string()).as_str()
@@ -253,7 +251,7 @@ impl Context<'_> {
         match &mut self.bb_now_mut {
             InfuncChoice::InFunc(bbptr) => {
                 let bb = bbptr.as_mut();
-                bb.push_back(inst);//应该往头节点插，往头节点取
+                bb.push_back(inst); //应该往头节点插，往头节点取
                 v.push((temps.clone(), 1));
                 self.update_var_scope_now(&s, inst);
             }
@@ -270,7 +268,7 @@ impl Context<'_> {
             Symbol {
                 tp: Type::Float,
                 is_array: false,
-                is_param:false,
+                is_param: false,
                 layer: self.layer,
                 dimension: vec![],
             },
@@ -281,21 +279,20 @@ impl Context<'_> {
 
     pub fn get_const_int(&self, i: i32) -> Option<(ObjPtr<Inst>)> {
         if self.layer > 0 {
-            
             let iname = "@".to_string() + i.to_string().as_str();
             if let Some(vec) = self.var_map.get(&iname) {
                 for (name_changed, layer_now) in vec {
                     if *layer_now == 1 {
                         for ((bbname, inst_vec)) in &self.bb_map {
                             if let Some(inst) = inst_vec.get(name_changed) {
-                                println!("找到常量:{:?}",i);
+                                // println!("找到常量:{:?}",i);
                                 return Option::Some(*inst);
                             }
                         }
                     }
                 }
             }
-            println!("没找到常量:{:?}",i);
+            // println!("没找到常量:{:?}",i);
             return Option::None;
         } else {
             let iname = "@".to_string() + i.to_string().as_str();
@@ -346,7 +343,14 @@ impl Context<'_> {
         }
     }
 
-    pub fn add_var(&mut self, s: &str, tp: Type, is_array: bool,is_param:bool, dimension: Vec<i32>) -> bool {
+    pub fn add_var(
+        &mut self,
+        s: &str,
+        tp: Type,
+        is_array: bool,
+        is_param: bool,
+        dimension: Vec<i32>,
+    ) -> bool {
         let s1 = s.clone();
         if (self.has_var_now(s1)) {
             println!("当前作用域中已声明过变量{:?}", s);
@@ -386,7 +390,7 @@ impl Context<'_> {
         }
 
         //for params
-        if self.get_layer()==0{
+        if self.get_layer() == 0 {
             self.param_usage_table.insert(temps.to_string(), false);
         }
 

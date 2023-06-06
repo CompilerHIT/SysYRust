@@ -379,8 +379,8 @@ impl Process for ConstDecl {
                         for dm in &dimension_vec_in {
                             length = length * dm;
                         }
-                        let length_inst = kit_mut.pool_inst_mut.make_int_const(length);
-                        kit_mut.context_mut.push_inst_bb(length_inst); //这里
+                        // let length_inst = kit_mut.pool_inst_mut.make_int_const(length);
+                        // kit_mut.context_mut.push_inst_bb(length_inst); //这里
 
                         if !kit_mut.context_mut.add_var(
                             &def.ident,
@@ -398,8 +398,7 @@ impl Process for ConstDecl {
                             .unwrap(); //获得初始值
                         match init_vec {
                             RetInitVec::Float(fvec) => {
-                                let inst =
-                                    kit_mut.pool_inst_mut.make_float_array(length_inst, fvec);
+                                let inst = kit_mut.pool_inst_mut.make_float_array(length, fvec);
                                 kit_mut.context_mut.update_var_scope_now(&def.ident, inst);
                                 kit_mut.context_mut.push_inst_bb(inst);
                             }
@@ -408,7 +407,7 @@ impl Process for ConstDecl {
                                 for i in &ivec {
                                     println!("{:?}", i);
                                 }
-                                let inst = kit_mut.pool_inst_mut.make_int_array(length_inst, ivec);
+                                let inst = kit_mut.pool_inst_mut.make_int_array(length, ivec);
                                 kit_mut.context_mut.update_var_scope_now(&def.ident, inst);
                                 kit_mut.context_mut.push_inst_bb(inst);
                             }
@@ -496,8 +495,8 @@ impl Process for ConstDecl {
                         for dm in &dimension_vec_in {
                             length = length * dm;
                         }
-                        let length_inst = kit_mut.pool_inst_mut.make_int_const(length);
-                        kit_mut.context_mut.push_inst_bb(length_inst); //这里
+                        // let length_inst = kit_mut.pool_inst_mut.make_int_const(length);
+                        // kit_mut.context_mut.push_inst_bb(length_inst); //这里
 
                         if !kit_mut.context_mut.add_var(
                             &def.ident,
@@ -515,8 +514,7 @@ impl Process for ConstDecl {
                             .unwrap(); //获得初始值
                         match init_vec {
                             RetInitVec::Float(fvec) => {
-                                let inst =
-                                    kit_mut.pool_inst_mut.make_float_array(length_inst, fvec);
+                                let inst = kit_mut.pool_inst_mut.make_float_array(length, fvec);
                                 kit_mut.context_mut.update_var_scope_now(&def.ident, inst);
                                 kit_mut.context_mut.push_inst_bb(inst);
                             }
@@ -525,7 +523,7 @@ impl Process for ConstDecl {
                                 for i in &ivec {
                                     println!("{:?}", i);
                                 }
-                                let inst = kit_mut.pool_inst_mut.make_int_array(length_inst, ivec);
+                                let inst = kit_mut.pool_inst_mut.make_int_array(length, ivec);
                                 kit_mut.context_mut.update_var_scope_now(&def.ident, inst);
                                 kit_mut.context_mut.push_inst_bb(inst);
                             }
@@ -751,7 +749,9 @@ impl Process for VarDecl {
                                     let inst = kit_mut.pool_inst_mut.make_int_array(length, ivec);
                                     kit_mut.context_mut.update_var_scope_now(&id, inst);
                                     kit_mut.context_mut.push_inst_bb(inst);
+                                    println!("没进来");
                                     for option_exp in inst_vec {
+                                        println!("进来了");
                                         if let Some((inst_val, offset_val)) = option_exp {
                                             let offset =
                                                 kit_mut.pool_inst_mut.make_int_const(offset_val);
@@ -1509,12 +1509,12 @@ impl Process for Number {
         match self {
             Number::FloatConst(f) => {
                 if let Some(inst) = kit_mut.context_mut.get_const_float(*f) {
-                    println!("找到：{:?}", f);
+                    // println!("找到：{:?}", f);
                     return Ok((inst, ExpValue::Float(*f)));
                 } else {
                     let inst = kit_mut.pool_inst_mut.make_float_const(*f);
                     kit_mut.context_mut.add_const_float(*f, inst);
-                    println!("没找到：{:?}", f);
+                    // println!("没找到：{:?}", f);
                     return Ok((inst, ExpValue::Float(*f)));
                 }
             }
@@ -1523,12 +1523,12 @@ impl Process for Number {
                     Type::ConstFloat | Type::Float => {
                         let f = *i as f32;
                         if let Some(inst) = kit_mut.context_mut.get_const_float(f) {
-                            println!("找到：{:?}", f);
+                            // println!("找到：{:?}", f);
                             return Ok((inst, ExpValue::Float(f)));
                         } else {
                             let inst = kit_mut.pool_inst_mut.make_float_const(f);
                             kit_mut.context_mut.add_const_float(f, inst);
-                            println!("没找到：{:?}", f);
+                            // println!("没找到：{:?}", f);
                             // println!("intconst:{}", i);
                             return Ok((inst, ExpValue::Float(f)));
                         }
@@ -1538,13 +1538,13 @@ impl Process for Number {
                     // }
                     Type::ConstInt | Type::Int => {
                         if let Some(inst) = kit_mut.context_mut.get_const_int(*i) {
-                            println!("找到：{:?}", i);
+                            // println!("找到：{:?}", i);
                             return Ok((inst, ExpValue::Int(*i)));
                         } else {
                             // println!("没找到常量:{:?}",i);
                             let inst = kit_mut.pool_inst_mut.make_int_const(*i);
                             kit_mut.context_mut.add_const_int(*i, inst);
-                            println!("没找到：{:?}", i);
+                            // println!("没找到：{:?}", i);
                             // println!("intconst:{}", i);
                             return Ok((inst, ExpValue::Int(*i)));
                         }
