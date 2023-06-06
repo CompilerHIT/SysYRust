@@ -1291,7 +1291,7 @@ impl BB {
             };
             self.global_map.insert(src, reg.clone());
             let global_num = get_current_global_seq();
-            self.label = String::from(format!(".Lpcrel_hi{global_num}"));
+            self.label = String::from(format!(".Lpcrel_hi{global_num}:"));
             inc_global_seq();
             assert!(map.val_map.contains_key(&src));
             let global_name = match map.val_map.get(&src) {
