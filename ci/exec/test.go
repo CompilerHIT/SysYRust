@@ -11,8 +11,7 @@ func main() {
 	args := os.Args[1:]
 	if len(args) >= 1 && args[0] == "-u" {
 		// 如果要更新,则把compiler传递到远程
-		exec.Command("docker", []string{"cp", "./target/debug/compiler", "ci:/test/data/compiler"}...)
-		cmd := exec.Command("docker", []string{"cp", "./cie", "ci:/test/data/cie"}...)
+		cmd := exec.Command("docker", []string{"cp", "./target/debug/compiler", "ci:/test/data/compiler"}...)
 		out, err := cmd.Output()
 		fmt.Println("update", err, ":", string(out))
 		args = args[1:]
