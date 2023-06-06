@@ -42,6 +42,7 @@ pub struct Func {
     pub spill_stack_map: HashMap<i32, StackSlot>,
 
     pub const_array: HashSet<IntArray>,
+    pub floats: Vec<f32>,
 }
 
 /// reg_num, stack_addr, caller_stack_addr考虑借助回填实现
@@ -64,6 +65,7 @@ impl Func {
             reg_alloc_info: FuncAllocStat::new(),
             spill_stack_map: HashMap::new(),
             const_array: HashSet::new(),
+            floats: Vec::new(),
         }
     }
 
@@ -340,8 +342,19 @@ impl Func {
 
 impl GenerateAsm for Func {
     fn generate(&mut self, _: ObjPtr<Context>, f: &mut File) -> Result<()> {
+        if self.const_array.len() > 0 {
+            writeln!(f, "	.section	.rodata\n   .align  3")?;
+        }
         for mut a in self.const_array.clone() {
             a.generate(self.context, f)?;
+        }
+        if self.floats.len() > 0 {
+            writeln!(f, "   .data")?;
+        }
+        let mut i = 0;
+        for data in self.floats.clone() {
+            writeln!(f, "{label}_float{i}:  .float  {data}", label = self.label)?;
+            i += 1;
         }
         AsmBuilder::new(f).show_func(&self.label)?;
         self.context.as_mut().call_prologue_event();

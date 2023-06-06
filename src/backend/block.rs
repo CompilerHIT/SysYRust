@@ -1115,7 +1115,7 @@ impl BB {
                 if map.val_map.contains_key(&src) {
                     return map.val_map.get(&src).unwrap().clone();
                 }
-                self.resolve_fimm(fimm, pool)
+                self.resolve_fimm(fimm, pool, func)
             }
             InstKind::Parameter => self.resolve_param(src, func, map, pool),
             InstKind::GlobalConstInt(_)
@@ -1147,7 +1147,7 @@ impl BB {
     }
 
     //FIXME: fimm 使用16进制表示转换为int，使用浮点数加法
-    fn resolve_fimm(&mut self, imm: f32, pool: &mut BackendPool) -> Operand {
+    fn resolve_fimm(&mut self, imm: f32, pool: &mut BackendPool, func: ObjPtr<Func>) -> Operand {
         let fimm = Operand::FImm(FImm::new(imm));
         let reg = Operand::Reg(Reg::init(ScalarType::Float));
         //FIXME:

@@ -96,11 +96,14 @@ impl<'a> AsmModule<'a> {
     }
 
     fn generate_global_var(&self, f: &mut File) {
+        writeln!(f, "	.data");
         for iter in self.global_var_list.iter() {
             match iter {
                 GlobalVar::IGlobalVar(ig) => {
                     let name = ig.get_name();
                     let value = ig.get_init().to_string();
+                    //FIXME:数组8字节对齐，一般变量4字节对齐，数组size大小为4*array_size
+                    writeln!(f, "   .globl {name}\n    .align:  2\n     .type   {name}, @object\n   .size   {name}, 4");
                     writeln!(f, "{name}:\n    .word:   {value}\n");
                 }
                 GlobalVar::FGlobalVar(fg) => {
