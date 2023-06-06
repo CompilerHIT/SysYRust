@@ -16,7 +16,6 @@ use super::structs::GenerateAsm;
 pub struct AsmModule<'a> {
     global_var_list: Vec<GlobalVar>,
 
-    // const_array_mapping: HashMap<String, ArrayConst>,
     func_map: Vec<(ObjPtr<Function>, ObjPtr<Func>)>,
     pub upper_module: &'a Module,
 }
@@ -55,8 +54,6 @@ impl<'a> AsmModule<'a> {
         self.allocate_reg(f);
         self.handle_spill(pool);
         self.generate_global_var(f);
-        //FIXME: generate array
-        // self.gnerate_array(f);
         println!("start generate");
         self.generate_asm(f, pool);
     }
