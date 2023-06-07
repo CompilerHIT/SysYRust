@@ -823,18 +823,20 @@ impl Process for VarDecl {
                                             unreachable!()
                                         }
                                     }
+                                } else {
+                                    if !kit_mut.context_mut.add_var(
+                                        id,
+                                        Type::Int,
+                                        false,
+                                        false,
+                                        None,
+                                        None,
+                                        Vec::new(),
+                                    ) {
+                                        return Err(Error::MultipleDeclaration);
+                                    }
                                 }
-                                if !kit_mut.context_mut.add_var(
-                                    id,
-                                    Type::Int,
-                                    false,
-                                    false,
-                                    None,
-                                    None,
-                                    Vec::new(),
-                                ) {
-                                    return Err(Error::MultipleDeclaration);
-                                }
+
                                 kit_mut.context_mut.update_var_scope_now(id, inst_ptr);
                             }
                             InitVal::InitValVec(val_vec) => {
