@@ -95,7 +95,7 @@ pub enum InstrsType {
     // j block
     Jump,
     Ret(ScalarType),
-    LoadGlobal,
+    // LoadGlobal,
 }
 
 pub struct LIRInst {
@@ -225,8 +225,7 @@ impl LIRInst {
             | InstrsType::Load
             | InstrsType::Store
             | InstrsType::LoadFromStack
-            | InstrsType::LoadParamFromStack
-            | InstrsType::LoadGlobal => match self.operands[0] {
+            | InstrsType::LoadParamFromStack => match self.operands[0] {
                 Operand::Reg(dst_reg) => vec![dst_reg],
                 _ => panic!("dst must be reg"),
             },
@@ -270,8 +269,7 @@ impl LIRInst {
             | InstrsType::Branch(..)
             | InstrsType::Jump
             | InstrsType::LoadParamFromStack
-            | InstrsType::StoreParamToStack
-            | InstrsType::LoadGlobal => {
+            | InstrsType::StoreParamToStack => {
                 let mut regs = self.operands.clone();
                 let mut res = Vec::new();
                 while let Some(operand) = regs.pop() {
