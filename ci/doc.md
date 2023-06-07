@@ -36,7 +36,12 @@ docker rm ci
 ```
 docker run --name ci -d -p 50051:50051 -v <your_data_path>:/test/data <latest-ci>
 ```
-<!-- docker run --name ci -d -p 50051:50051 -v ./data:/test/data  10.249.12.83:5000/compilerhit/sysy-rv64-cpci:1.0 -->
+
+6\.在宿主机安装需要的python的grpc模块:
+
+```
+pip install grpcio grpcio-tools protobuf
+```
 
 ### ci使用初始化(自动版:TODO,maybe not do)
 
