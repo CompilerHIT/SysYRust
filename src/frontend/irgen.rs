@@ -31,10 +31,18 @@ impl Kit<'_> {
         is_array: bool,
         is_param: bool,
         array_inst: Option<ObjPtr<Inst>>,
+        global_inst: Option<ObjPtr<Inst>>,
         dimension: Vec<i32>,
     ) {
-        self.context_mut
-            .add_var(s, tp, is_array, is_param, array_inst, dimension);
+        self.context_mut.add_var(
+            s,
+            tp,
+            is_array,
+            is_param,
+            array_inst,
+            global_inst,
+            dimension,
+        );
     }
 
     pub fn param_used(&mut self, s: &str) {
@@ -98,11 +106,17 @@ impl Kit<'_> {
         Err(Error::VariableNotFound)
     }
 
-    pub fn get_var(&mut self, s: &str) -> Result<(ObjPtr<Inst>, Symbol), Error> {
+    // pub fn get_var_symbol()
+
+    pub fn get_var(
+        &mut self,
+        s: &str,
+        offset: Option<ObjPtr<Inst>>,
+    ) -> Result<(ObjPtr<Inst>, Symbol), Error> {
         // let bb = self.context_mut.bb_now_mut;
         match self.context_mut.bb_now_mut {
             InfuncChoice::InFunc(bb) => {
-                if let Some((inst, symbol)) = self.get_var_bb(s, bb) {
+                if let Some((inst, symbol)) = self.get_var_bb(s, bb, offset) {
                     return Ok((inst, symbol));
                 }
             }
@@ -147,6 +161,7 @@ impl Kit<'_> {
         &mut self,
         s: &str,
         bb: ObjPtr<BasicBlock>,
+        offset: Option<ObjPtr<Inst>>,
     ) -> Option<(ObjPtr<Inst>, Symbol)> {
         let mut name_changed = " ".to_string();
         let mut layer_var = 0;
@@ -190,23 +205,73 @@ impl Kit<'_> {
             // println!("进来了");
             // println!("找到变量{:?}",s);
             if let Some(inst) = inst_opt {
-                if layer_var < 0 {
-                    // bbname = "notinblock";//全局变量,const和一般类型需要分开处理吗?
-                    //这里返回一条load指令
+                //找到变量
+                let mut inst_ret = *inst;
+                if let Some(inst_array) = sym.array_inst {
+                    //如果是数组
                     match sym.tp {
-                        Type::ConstFloat | Type::Float => {
-                            let inst_load = self.pool_inst_mut.make_global_float_load(*inst);
-                            self.context_mut.push_inst_bb(inst_load); //这里
-                            return Some((inst_load, sym));
+                        Type::Float | Type::ConstFloat => {
+                            //判断类型
+                            if layer_var < 0 {
+                                //是否是全局
+                                if let Some(offset) = offset {
+                                    //有偏移
+                                    let ptr = self.pool_inst_mut.make_gep(inst_array, offset);
+                                    inst_ret = self.pool_inst_mut.make_global_float_array_load(ptr);
+                                    self.context_mut.push_inst_bb(inst_ret);
+                                } else {
+                                    //没偏移
+                                    inst_ret =
+                                        self.pool_inst_mut.make_global_float_array_load(inst_array);
+                                    self.context_mut.push_inst_bb(inst_ret);
+                                }
+                            } else {
+                                //不是全局
+                                if let Some(offset) = offset {
+                                    //有偏移
+                                    let ptr = self.pool_inst_mut.make_gep(inst_array, offset);
+                                    inst_ret = self.pool_inst_mut.make_float_array_load(ptr);
+                                    self.context_mut.push_inst_bb(inst_ret);
+                                } else {
+                                    //没偏移
+                                    inst_ret = self.pool_inst_mut.make_float_array_load(inst_array);
+                                    self.context_mut.push_inst_bb(inst_ret);
+                                }
+                            }
                         }
-                        Type::ConstInt | Type::Int => {
-                            let inst_load = self.pool_inst_mut.make_global_int_load(*inst);
-                            self.context_mut.push_inst_bb(inst_load);
-                            return Some((inst_load, sym));
+                        Type::Int | Type::ConstInt => {
+                            if layer_var < 0 {
+                                inst_ret =
+                                    self.pool_inst_mut.make_global_int_array_load(inst_array);
+                                self.context_mut.push_inst_bb(inst_ret);
+                            } else {
+                                inst_ret = self.pool_inst_mut.make_int_array_load(inst_array);
+                                self.context_mut.push_inst_bb(inst_ret);
+                            }
+                        }
+                    }
+                } else {
+                    //不是数组的情况
+                    if layer_var < 0 {
+                        //如果是全局变量
+                        // bbname = "notinblock";//全局变量,const和一般类型需要分开处理吗?
+                        //这里返回一条load指令
+                        match sym.tp {
+                            Type::ConstFloat | Type::Float => {
+                                inst_ret = self.pool_inst_mut.make_global_float_load(inst_ret);
+                                self.context_mut.push_inst_bb(inst_ret); //这里
+                                                                         // return Some((inst_load, sym));
+                            }
+                            Type::ConstInt | Type::Int => {
+                                inst_ret = self.pool_inst_mut.make_global_int_load(inst_ret);
+                                self.context_mut.push_inst_bb(inst_ret);
+                                // return Some((inst_load, sym));
+                            }
                         }
                     }
                 }
-                return Some((*inst, sym));
+
+                return Some((inst_ret, sym));
             } else {
                 println!("没找到变量{:?}", s);
                 println!("bbname:{:?}", bbname);
@@ -322,16 +387,6 @@ impl Process for ConstDecl {
                             .const_init_val
                             .process((Type::ConstInt, vec![]), kit_mut)
                             .unwrap();
-                        if !kit_mut.context_mut.add_var(
-                            &def.ident,
-                            Type::ConstInt,
-                            false,
-                            false,
-                            None,
-                            Vec::new(),
-                        ) {
-                            return Err(Error::MultipleDeclaration);
-                        }
 
                         let mut bond = 0;
                         match val {
@@ -349,6 +404,32 @@ impl Process for ConstDecl {
                                 unreachable!()
                             }
                         }
+                        if kit_mut.context_mut.get_layer() < 0 {
+                            if !kit_mut.context_mut.add_var(
+                                &def.ident,
+                                Type::ConstInt,
+                                false,
+                                false,
+                                None,
+                                Some(inst_ptr),
+                                Vec::new(),
+                            ) {
+                                return Err(Error::MultipleDeclaration);
+                            }
+                        } else {
+                            if !kit_mut.context_mut.add_var(
+                                &def.ident,
+                                Type::ConstInt,
+                                false,
+                                false,
+                                None,
+                                None,
+                                Vec::new(),
+                            ) {
+                                return Err(Error::MultipleDeclaration);
+                            }
+                        }
+
                         // inst_ptr = kit_mut.pool_inst_mut.make_global_int_const(bond);
                         //这里
 
@@ -428,6 +509,7 @@ impl Process for ConstDecl {
                                     true,
                                     false,
                                     Some(inst),
+                                    None,
                                     dimension_vec_in.clone(),
                                 ) {
                                     return Err(Error::MultipleDeclaration);
@@ -447,16 +529,16 @@ impl Process for ConstDecl {
                             .const_init_val
                             .process((Type::ConstFloat, vec![]), kit_mut)
                             .unwrap();
-                        if !kit_mut.context_mut.add_var(
-                            &def.ident,
-                            Type::ConstFloat,
-                            false,
-                            false,
-                            None,
-                            Vec::new(),
-                        ) {
-                            return Err(Error::MultipleDeclaration);
-                        }
+                        // if !kit_mut.context_mut.add_var(
+                        //     &def.ident,
+                        //     Type::ConstFloat,
+                        //     false,
+                        //     false,
+                        //     None,
+                        //     Vec::new(),
+                        // ) {
+                        //     return Err(Error::MultipleDeclaration);
+                        // }
 
                         // if kit_mut.context_mut.get_layer() < 0 {
                         //     let mut bond = 0.0;
@@ -489,6 +571,33 @@ impl Process for ConstDecl {
                                 unreachable!()
                             }
                         }
+
+                        if kit_mut.context_mut.get_layer() < 0 {
+                            if !kit_mut.context_mut.add_var(
+                                &def.ident,
+                                Type::ConstFloat,
+                                false,
+                                false,
+                                None,
+                                Some(inst_ptr),
+                                Vec::new(),
+                            ) {
+                                return Err(Error::MultipleDeclaration);
+                            }
+                        } else {
+                            if !kit_mut.context_mut.add_var(
+                                &def.ident,
+                                Type::ConstFloat,
+                                false,
+                                false,
+                                None,
+                                None,
+                                Vec::new(),
+                            ) {
+                                return Err(Error::MultipleDeclaration);
+                            }
+                        }
+
                         // inst_ptr = kit_mut.pool_inst_mut.make_global_float_const(bond);
                         //这里
                         kit_mut
@@ -547,6 +656,7 @@ impl Process for ConstDecl {
                                     true,
                                     false,
                                     Some(inst),
+                                    None,
                                     dimension_vec_in.clone(),
                                 ) {
                                     return Err(Error::MultipleDeclaration);
@@ -690,27 +800,40 @@ impl Process for VarDecl {
                             InitVal::Exp(exp) => {
                                 let (mut inst_ptr, mut val) =
                                     exp.process(Type::Int, kit_mut).unwrap();
-                                if !kit_mut.context_mut.add_var(
-                                    id,
-                                    Type::Int,
-                                    false,
-                                    false,
-                                    None,
-                                    Vec::new(),
-                                ) {
-                                    return Err(Error::MultipleDeclaration);
-                                }
+
                                 if kit_mut.context_mut.get_layer() < 0 {
                                     //设计相关(全局变量指令与局部变量不同)，全局变量得在这额外判断，放到module里
                                     match val {
                                         ExpValue::Int(i) => {
                                             inst_ptr = kit_mut.pool_inst_mut.make_global_int(i);
+                                            if !kit_mut.context_mut.add_var(
+                                                id,
+                                                Type::Int,
+                                                false,
+                                                false,
+                                                None,
+                                                Some(inst_ptr),
+                                                Vec::new(),
+                                            ) {
+                                                return Err(Error::MultipleDeclaration);
+                                            }
                                             //这里
                                         }
                                         _ => {
                                             unreachable!()
                                         }
                                     }
+                                }
+                                if !kit_mut.context_mut.add_var(
+                                    id,
+                                    Type::Int,
+                                    false,
+                                    false,
+                                    None,
+                                    None,
+                                    Vec::new(),
+                                ) {
+                                    return Err(Error::MultipleDeclaration);
                                 }
                                 kit_mut.context_mut.update_var_scope_now(id, inst_ptr);
                             }
@@ -719,20 +842,33 @@ impl Process for VarDecl {
                             }
                         },
                         VarDef::NonArray(id) => {
-                            if !kit_mut.context_mut.add_var(
-                                id,
-                                Type::Int,
-                                false,
-                                false,
-                                None,
-                                Vec::new(),
-                            ) {
-                                return Err(Error::MultipleDeclaration);
-                            }
                             if kit_mut.context_mut.get_layer() == -1 {
                                 //设计相关(全局变量指令与局部变量不同)，全局变量得在这额外判断，放到module里
                                 let inst_ptr = kit_mut.pool_inst_mut.make_global_int(0);
+                                if !kit_mut.context_mut.add_var(
+                                    id,
+                                    Type::Int,
+                                    false,
+                                    false,
+                                    None,
+                                    Some(inst_ptr),
+                                    Vec::new(),
+                                ) {
+                                    return Err(Error::MultipleDeclaration);
+                                }
                                 kit_mut.context_mut.update_var_scope_now(id, inst_ptr);
+                            } else {
+                                if !kit_mut.context_mut.add_var(
+                                    id,
+                                    Type::Int,
+                                    false,
+                                    false,
+                                    None,
+                                    None,
+                                    Vec::new(),
+                                ) {
+                                    return Err(Error::MultipleDeclaration);
+                                }
                             }
                         }
                         VarDef::ArrayInit((id, exp_vec, val)) => {
@@ -789,6 +925,7 @@ impl Process for VarDecl {
                                         true,
                                         false,
                                         Some(inst),
+                                        None, //可能得改,数组的就没有对全局区域留inst
                                         dimension_vec_in.clone(),
                                     ) {
                                         return Err(Error::MultipleDeclaration);
@@ -852,6 +989,7 @@ impl Process for VarDecl {
                                 true,
                                 false,
                                 Some(inst),
+                                None,
                                 dimension_vec_in.clone(),
                             ) {
                                 return Err(Error::MultipleDeclaration);
@@ -870,28 +1008,40 @@ impl Process for VarDecl {
                             InitVal::Exp(exp) => {
                                 let (mut inst_ptr, val) =
                                     exp.process(Type::Float, kit_mut).unwrap();
-                                if !kit_mut.context_mut.add_var(
-                                    id,
-                                    Type::Float,
-                                    false,
-                                    false,
-                                    None,
-                                    Vec::new(),
-                                ) {
-                                    return Err(Error::MultipleDeclaration);
-                                }
 
                                 if kit_mut.context_mut.get_layer() < 0 {
                                     //设计相关(全局变量指令与局部变量不同)，全局变量得在这额外判断，放到module里
                                     match val {
                                         ExpValue::Float(f) => {
                                             inst_ptr = kit_mut.pool_inst_mut.make_global_float(f);
+                                            if !kit_mut.context_mut.add_var(
+                                                id,
+                                                Type::Float,
+                                                false,
+                                                false,
+                                                None,
+                                                Some(inst_ptr),
+                                                Vec::new(),
+                                            ) {
+                                                return Err(Error::MultipleDeclaration);
+                                            }
                                             //这里
                                         }
                                         _ => {
                                             unreachable!()
                                         }
                                     }
+                                }
+                                if !kit_mut.context_mut.add_var(
+                                    id,
+                                    Type::Float,
+                                    false,
+                                    false,
+                                    None,
+                                    None,
+                                    Vec::new(),
+                                ) {
+                                    return Err(Error::MultipleDeclaration);
                                 }
                                 kit_mut.context_mut.update_var_scope_now(id, inst_ptr);
                             }
@@ -900,20 +1050,33 @@ impl Process for VarDecl {
                             }
                         },
                         VarDef::NonArray((id)) => {
-                            if !kit_mut.context_mut.add_var(
-                                id.as_str(),
-                                Type::Float,
-                                false,
-                                false,
-                                None,
-                                vec![],
-                            ) {
-                                return Err(Error::MultipleDeclaration);
-                            }
                             if kit_mut.context_mut.get_layer() == -1 {
                                 //设计相关(全局变量指令与局部变量不同)，全局变量得在这额外判断，放到module里
                                 let inst_ptr = kit_mut.pool_inst_mut.make_global_float(0.0);
+                                if !kit_mut.context_mut.add_var(
+                                    id.as_str(),
+                                    Type::Float,
+                                    false,
+                                    false,
+                                    None,
+                                    Some(inst_ptr),
+                                    vec![],
+                                ) {
+                                    return Err(Error::MultipleDeclaration);
+                                }
                                 kit_mut.context_mut.update_var_scope_now(id, inst_ptr);
+                            } else {
+                                if !kit_mut.context_mut.add_var(
+                                    id.as_str(),
+                                    Type::Float,
+                                    false,
+                                    false,
+                                    None,
+                                    None,
+                                    vec![],
+                                ) {
+                                    return Err(Error::MultipleDeclaration);
+                                }
                             }
                         }
                         VarDef::ArrayInit((id, exp_vec, val)) => {
@@ -970,6 +1133,7 @@ impl Process for VarDecl {
                                         true,
                                         false,
                                         Some(inst),
+                                        None,
                                         dimension_vec_in.clone(),
                                     ) {
                                         return Err(Error::MultipleDeclaration);
@@ -1034,6 +1198,7 @@ impl Process for VarDecl {
                                 true,
                                 false,
                                 Some(inst),
+                                None,
                                 dimension_vec_in.clone(),
                             ) {
                                 return Err(Error::MultipleDeclaration);
@@ -1301,16 +1466,22 @@ impl Process for FuncFParam {
                     let param = kit_mut.pool_inst_mut.make_param(IrType::Int);
                     kit_mut
                         .context_mut
-                        .add_var(id, Type::Int, false, true, None, Vec::new());
+                        .add_var(id, Type::Int, false, true, None, None, Vec::new());
                     //这里
                     kit_mut.context_mut.update_var_scope_now(id, param);
                     Ok((id.clone(), param))
                 }
                 BType::Float => {
                     let param = kit_mut.pool_inst_mut.make_param(IrType::Float);
-                    kit_mut
-                        .context_mut
-                        .add_var(id, Type::Float, false, true, None, Vec::new());
+                    kit_mut.context_mut.add_var(
+                        id,
+                        Type::Float,
+                        false,
+                        true,
+                        None,
+                        None,
+                        Vec::new(),
+                    );
                     kit_mut.context_mut.update_var_scope_now(id, param);
                     Ok((id.clone(), param))
                 }
@@ -1418,11 +1589,46 @@ impl Process for Assign {
         let (inst_r, _) = self.exp.process(mes, kit_mut).unwrap();
         if symbol.is_param {
             kit_mut.param_used(&lval.id);
+            kit_mut
+                .context_mut
+                .update_var_scope_now(&self.lval.id, inst_r);
+            return Ok(1);
         }
-        kit_mut
-            .context_mut
-            .update_var_scope_now(&self.lval.id, inst_r);
-        Ok(1)
+        if symbol.is_array {
+            // if symbol.layer<0{
+            //     let inst_store =
+            //                 kit_mut.pool_inst_mut.make_float_store(global_inst, inst_r);
+            //             kit_mut.context_mut.push_inst_bb(inst_store);
+            // }
+            kit_mut
+                .context_mut
+                .update_var_scope_now(&self.lval.id, inst_r);
+            Ok(1)
+            // Ok(1)
+        } else {
+            if let Some(global_inst) = symbol.global_inst {
+                match symbol.tp {
+                    Type::ConstFloat | Type::Float => {
+                        let inst_store =
+                            kit_mut.pool_inst_mut.make_float_store(global_inst, inst_r);
+                        kit_mut.context_mut.push_inst_bb(inst_store);
+                    }
+                    Type::ConstInt | Type::Int => {
+                        let inst_store = kit_mut.pool_inst_mut.make_int_store(global_inst, inst_r);
+                        kit_mut.context_mut.push_inst_bb(inst_store);
+                    }
+                }
+            }
+            kit_mut
+                .context_mut
+                .update_var_scope_now(&self.lval.id, inst_r);
+            Ok(1)
+        }
+
+        // kit_mut
+        //     .context_mut
+        //     .update_var_scope_now(&self.lval.id, inst_r);
+        // Ok(1)
     }
 }
 impl Process for ExpStmt {
@@ -1500,8 +1706,104 @@ impl Process for LVal {
     type Message = (Type);
     fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
         // let id = self.id;
-        // let vec = self.exp_vec;
-        let (var, symbol) = kit_mut.get_var(&self.id).unwrap();
+        // let mut exp_vec = &self.exp_vec;
+
+        let (mut var, mut symbol) = (
+            kit_mut.pool_inst_mut.make_int_const(0),
+            Symbol {
+                tp: Type::Int,
+                is_array: false,
+                is_param: false,
+                array_inst: None,
+                global_inst: None,
+                layer: -2,
+                dimension: vec![],
+            },
+        );
+        if self.exp_vec.is_empty() {
+            //如果为空
+            (var, symbol) = kit_mut.get_var(&self.id, None).unwrap();
+        } else {
+            let sym = kit_mut.get_var_symbol(&self.id).unwrap(); //获得符号表
+            let dimension_vec = sym.dimension.clone(); //获得维度信息
+            let mut index = 1;
+            let mut inst_base_vec = vec![];
+            for _ in dimension_vec {
+                let mut after = 1;
+                for i in index..sym.dimension.len() {
+                    after = after * sym.dimension[i]; //计算该维度每加1对应多少元素
+                }
+                index = index + 1;
+                inst_base_vec.push(after as i32);
+                //vec存储维度base信息
+            }
+            let mut inst_add_vec = vec![];
+            let mut imm_flag = true;
+            index = 0;
+            for exp in &mut self.exp_vec {
+                let (inst_exp, val) = exp.process(input, kit_mut).unwrap();
+                match val {
+                    ExpValue::Int(i) => {
+                        let inst_base_now =
+                            kit_mut.pool_inst_mut.make_int_const(inst_base_vec[index]); //构造base对应的inst
+                        let inst_oprand = kit_mut
+                            .pool_inst_mut
+                            .make_int_const(i * inst_base_vec[index]);
+                        inst_add_vec.push((
+                            inst_base_now,
+                            inst_oprand,
+                            ExpValue::Int(i * inst_base_vec[index]),
+                        ))
+                        //将inst和数push入vec中
+                    }
+                    ExpValue::Float(f) => {
+                        unreachable!()
+                    }
+                    ExpValue::None => {
+                        imm_flag = false; //设置flag,表示总偏移不再是一个可以确认的值
+                        let inst_base_now =
+                            kit_mut.pool_inst_mut.make_int_const(inst_base_vec[index]); //构造base对应的inst
+                        let inst_oprand = kit_mut.pool_inst_mut.make_mul(inst_exp, inst_base_now); //构造这一维的偏移的inst
+                        inst_add_vec.push((inst_base_now, inst_oprand, ExpValue::None));
+                        //将inst和数push入vec中
+                    }
+                }
+                index = index + 1;
+            }
+            let mut inst_offset = kit_mut.pool_inst_mut.make_int_const(-1129);
+            let mut inst_base_now = kit_mut.pool_inst_mut.make_int_const(-1129);
+            if imm_flag {
+                //总偏移是一个可以计算出的值
+                let mut offset_final = 0;
+                for (_, _, add_val) in inst_add_vec {
+                    match add_val {
+                        ExpValue::Int(i) => {
+                            offset_final = offset_final + i;
+                        }
+                        _ => {
+                            unreachable!()
+                        }
+                    }
+                }
+                inst_offset = kit_mut.pool_inst_mut.make_int_const(offset_final);
+            } else {
+                //总偏移不是是一个可以计算出的值
+                (inst_base_now, inst_offset, _) = inst_add_vec[0];
+                kit_mut.context_mut.push_inst_bb(inst_base_now);
+                kit_mut.context_mut.push_inst_bb(inst_offset);
+                for i in 1..inst_add_vec.len() {
+                    kit_mut.context_mut.push_inst_bb(inst_add_vec[i].0); //每一维的基数被push进basicblock中
+                    kit_mut.context_mut.push_inst_bb(inst_add_vec[i].1); //被加数push进basicblock中
+                    inst_offset = kit_mut
+                        .pool_inst_mut
+                        .make_add(inst_offset, inst_add_vec[i].1); //构造新的add指令，左操作数改变
+                    kit_mut.context_mut.push_inst_bb(inst_offset); //add指令push进basicblock中
+                }
+            }
+
+            (var, symbol) = kit_mut.get_var(&self.id, Some(inst_offset)).unwrap();
+            // (var, symbol) = kit_mut.get_var(&self.id).unwrap();
+        }
         // println!("var_name:{:?},ir_type:{:?}",&self.id,var.as_ref().get_ir_type());
         // println!("var_name:{:?},ir_type:{:?}",&self.id,var.as_ref().get_kind());
         match input {
