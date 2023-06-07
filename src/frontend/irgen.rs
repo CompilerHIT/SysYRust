@@ -218,6 +218,7 @@ impl Kit<'_> {
                                     //有偏移
                                     let ptr = self.pool_inst_mut.make_gep(inst_array, offset);
                                     inst_ret = self.pool_inst_mut.make_global_float_array_load(ptr);
+                                    self.context_mut.push_inst_bb(ptr);
                                     self.context_mut.push_inst_bb(inst_ret);
                                 } else {
                                     //没偏移
@@ -231,6 +232,7 @@ impl Kit<'_> {
                                     //有偏移
                                     let ptr = self.pool_inst_mut.make_gep(inst_array, offset);
                                     inst_ret = self.pool_inst_mut.make_float_array_load(ptr);
+                                    self.context_mut.push_inst_bb(ptr);
                                     self.context_mut.push_inst_bb(inst_ret);
                                 } else {
                                     //没偏移
@@ -241,12 +243,34 @@ impl Kit<'_> {
                         }
                         Type::Int | Type::ConstInt => {
                             if layer_var < 0 {
-                                inst_ret =
-                                    self.pool_inst_mut.make_global_int_array_load(inst_array);
-                                self.context_mut.push_inst_bb(inst_ret);
+                                //是否是全局
+                                if let Some(offset) = offset {
+                                    // println!("有偏移:{:?}",offset.as_ref().get_kind());
+                                    //有偏移
+                                    let ptr = self.pool_inst_mut.make_gep(inst_array, offset);
+                                    inst_ret = self.pool_inst_mut.make_global_int_array_load(ptr);
+                                    self.context_mut.push_inst_bb(ptr);
+                                    self.context_mut.push_inst_bb(inst_ret);
+                                } else {
+                                    //没偏移
+                                    inst_ret =
+                                        self.pool_inst_mut.make_global_int_array_load(inst_array);
+                                    self.context_mut.push_inst_bb(inst_ret);
+                                }
                             } else {
-                                inst_ret = self.pool_inst_mut.make_int_array_load(inst_array);
-                                self.context_mut.push_inst_bb(inst_ret);
+                                //不是全局
+                                if let Some(offset) = offset {
+                                    //有偏移
+                                    // println!("有偏移:{:?}",offset.as_ref().get_kind());
+                                    let ptr = self.pool_inst_mut.make_gep(inst_array, offset);
+                                    inst_ret = self.pool_inst_mut.make_int_array_load(ptr);
+                                    self.context_mut.push_inst_bb(ptr);
+                                    self.context_mut.push_inst_bb(inst_ret);
+                                } else {
+                                    //没偏移
+                                    inst_ret = self.pool_inst_mut.make_int_array_load(inst_array);
+                                    self.context_mut.push_inst_bb(inst_ret);
+                                }
                             }
                         }
                     }
@@ -1803,7 +1827,9 @@ impl Process for LVal {
                         }
                     }
                 }
+                // println!("偏移:{:?}",offset_final);
                 inst_offset = kit_mut.pool_inst_mut.make_int_const(offset_final);
+                kit_mut.context_mut.push_inst_bb(inst_offset);
             } else {
                 //总偏移不是是一个可以计算出的值
                 (inst_base_now, inst_offset, _) = inst_add_vec[0];
