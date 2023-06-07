@@ -41,5 +41,3 @@ pub fn init_padding_float(vec: &mut Vec<f32>, dimension_now: Vec<i32>) {
         vec.push(0.0);
     }
 }
-
-pub fn offset_calculate() {}

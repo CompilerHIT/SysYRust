@@ -1596,11 +1596,25 @@ impl Process for Assign {
                 .update_var_scope_now(&self.lval.id, inst_r);
             return Ok(1);
         }
-        if symbol.is_array {
-            // if symbol.layer<0{
-            //     let inst_store =
-            //                 kit_mut.pool_inst_mut.make_float_store(global_inst, inst_r);
-            //             kit_mut.context_mut.push_inst_bb(inst_store);
+        if let Some(array_inst) = symbol.array_inst {
+            //如果是数组
+            // if symbol.layer < 0 {
+            //全局变量
+            let inst_offset = offset_calculate(&lval.id, &mut lval.exp_vec, kit_mut);
+            let inst_ptr = kit_mut.pool_inst_mut.make_gep(array_inst, inst_offset);
+            // kit_mut.context_mut.push_inst_bb(inst_offset); //这里需要吗  不需要
+            kit_mut.context_mut.push_inst_bb(inst_ptr);
+            match symbol.tp {
+                Type::ConstFloat | Type::Float => {
+                    let inst_store = kit_mut.pool_inst_mut.make_float_store(inst_ptr, inst_r);
+                    kit_mut.context_mut.push_inst_bb(inst_store);
+                }
+                Type::ConstInt | Type::Int => {
+                    let inst_store = kit_mut.pool_inst_mut.make_int_store(inst_ptr, inst_r);
+                    kit_mut.context_mut.push_inst_bb(inst_store);
+                }
+            }
+
             // }
             kit_mut
                 .context_mut
@@ -1608,7 +1622,9 @@ impl Process for Assign {
             Ok(1)
             // Ok(1)
         } else {
+            //不是数组
             if let Some(global_inst) = symbol.global_inst {
+                //全局变量
                 match symbol.tp {
                     Type::ConstFloat | Type::Float => {
                         let inst_store =
@@ -2417,4 +2433,97 @@ impl Process for LOrExp {
     fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
         todo!();
     }
+}
+
+pub fn offset_calculate(id: &str, exp_vec: &mut Vec<Exp>, kit_mut: &mut Kit) -> ObjPtr<Inst> {
+    let (mut var, mut symbol) = (
+        kit_mut.pool_inst_mut.make_int_const(0),
+        Symbol {
+            tp: Type::Int,
+            is_array: false,
+            is_param: false,
+            array_inst: None,
+            global_inst: None,
+            layer: -2,
+            dimension: vec![],
+        },
+    ); //初始化
+
+    let sym = kit_mut.get_var_symbol(id).unwrap(); //获得符号表
+    let dimension_vec = sym.dimension.clone(); //获得维度信息
+    let mut index = 1;
+    let mut inst_base_vec = vec![];
+    for _ in dimension_vec {
+        let mut after = 1;
+        for i in index..sym.dimension.len() {
+            after = after * sym.dimension[i]; //计算该维度每加1对应多少元素
+        }
+        index = index + 1;
+        inst_base_vec.push(after as i32);
+        //vec存储维度base信息
+    }
+    let mut inst_add_vec = vec![];
+    let mut imm_flag = true;
+    index = 0;
+    for exp in exp_vec {
+        let (inst_exp, val) = exp.process(symbol.tp, kit_mut).unwrap();
+        match val {
+            ExpValue::Int(i) => {
+                let inst_base_now = kit_mut.pool_inst_mut.make_int_const(inst_base_vec[index]); //构造base对应的inst
+                let inst_oprand = kit_mut
+                    .pool_inst_mut
+                    .make_int_const(i * inst_base_vec[index]);
+                inst_add_vec.push((
+                    inst_base_now,
+                    inst_oprand,
+                    ExpValue::Int(i * inst_base_vec[index]),
+                ))
+                //将inst和数push入vec中
+            }
+            ExpValue::Float(f) => {
+                unreachable!()
+            }
+            ExpValue::None => {
+                imm_flag = false; //设置flag,表示总偏移不再是一个可以确认的值
+                let inst_base_now = kit_mut.pool_inst_mut.make_int_const(inst_base_vec[index]); //构造base对应的inst
+                let inst_oprand = kit_mut.pool_inst_mut.make_mul(inst_exp, inst_base_now); //构造这一维的偏移的inst
+                inst_add_vec.push((inst_base_now, inst_oprand, ExpValue::None));
+                //将inst和数push入vec中
+            }
+        }
+        index = index + 1;
+    }
+    let mut inst_offset = kit_mut.pool_inst_mut.make_int_const(-1129);
+    let mut inst_base_now = kit_mut.pool_inst_mut.make_int_const(-1129);
+    if imm_flag {
+        //总偏移是一个可以计算出的值
+        let mut offset_final = 0;
+        for (_, _, add_val) in inst_add_vec {
+            match add_val {
+                ExpValue::Int(i) => {
+                    offset_final = offset_final + i;
+                }
+                _ => {
+                    unreachable!()
+                }
+            }
+        }
+        inst_offset = kit_mut.pool_inst_mut.make_int_const(offset_final);
+    } else {
+        //总偏移不是是一个可以计算出的值
+        (inst_base_now, inst_offset, _) = inst_add_vec[0];
+        kit_mut.context_mut.push_inst_bb(inst_base_now);
+        kit_mut.context_mut.push_inst_bb(inst_offset);
+        for i in 1..inst_add_vec.len() {
+            kit_mut.context_mut.push_inst_bb(inst_add_vec[i].0); //每一维的基数被push进basicblock中
+            kit_mut.context_mut.push_inst_bb(inst_add_vec[i].1); //被加数push进basicblock中
+            inst_offset = kit_mut
+                .pool_inst_mut
+                .make_add(inst_offset, inst_add_vec[i].1); //构造新的add指令，左操作数改变
+            kit_mut.context_mut.push_inst_bb(inst_offset); //add指令push进basicblock中
+        }
+    }
+    // (var, symbol) = kit_mut.get_var(&self.id).unwrap();
+
+    inst_offset
 }
