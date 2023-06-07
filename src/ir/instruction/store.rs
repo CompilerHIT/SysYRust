@@ -77,7 +77,7 @@ impl Inst {
         // 正确性检查
         self.self_check_store();
 
-        self.user.get_use_list()[0]
+        self.user.get_operand(0)
     }
 
     /// 修改存储的目标地址
@@ -109,7 +109,7 @@ impl Inst {
         // 正确性检查
         self.self_check_store();
 
-        self.user.get_use_list()[1]
+        self.user.get_operand(1)
     }
 
     /// 修改存储的值
