@@ -32,6 +32,7 @@ pub struct FGlobalVar {
 pub enum GlobalVar {
     IGlobalVar(IGlobalVar),
     FGlobalVar(FGlobalVar),
+    GlobalConstArray(IntArray)
 }
 
 #[derive(Clone, Copy, PartialEq)]

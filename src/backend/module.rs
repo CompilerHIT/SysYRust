@@ -3,7 +3,7 @@ use std::io::Write;
 
 use crate::backend::func::Func;
 use crate::backend::operand::ToString;
-use crate::backend::structs::{FGlobalVar, GlobalVar, IGlobalVar};
+use crate::backend::structs::{FGlobalVar, GlobalVar, IGlobalVar, IntArray};
 use crate::backend::BackendPool;
 use crate::ir::function::Function;
 use crate::ir::instruction::InstKind;
@@ -82,6 +82,7 @@ impl<'a> AsmModule<'a> {
         let mut list = Vec::with_capacity(map.len());
         for (name, iter) in map {
             //TODO: update ir translation，to use ObjPtr match
+            println!("{:?}", iter.as_ref().get_kind());
             match iter.as_ref().get_kind() {
                 InstKind::GlobalConstInt(value) | InstKind::GlobalInt(value) => list.push(
                     GlobalVar::IGlobalVar(IGlobalVar::init(name.to_string(), value, true)),
@@ -89,6 +90,15 @@ impl<'a> AsmModule<'a> {
                 InstKind::GlobalConstFloat(value) | InstKind::GlobalFloat(value) => list.push(
                     GlobalVar::FGlobalVar(FGlobalVar::init(name.to_string(), value, true)),
                 ),
+                InstKind::Alloca(size) => {
+                    let alloca = IntArray::new(
+                        name.clone(),
+                        size,
+                        true,
+                        iter.as_ref().get_int_init().clone(),
+                    );
+                    list.push(GlobalVar::GlobalConstArray(alloca));
+                }
                 _ => panic!("fail to analyse GlobalConst"),
             };
         }
@@ -112,6 +122,18 @@ impl<'a> AsmModule<'a> {
                     let name = fg.get_name();
                     let value = fg.get_init().to_hex_string();
                     writeln!(f, "{name}:\n    .word   {value}\n");
+                }
+                GlobalVar::GlobalConstArray(array) => {
+                    let not_init : i32 = array.value.iter().map(|x| x * x).sum();
+                    writeln!(f, "   .globl {name}\n    .align  3\n     .type   {name}, @object\n   .size   {name}, {num}", name = array.name, num = array.size * 4);
+                    writeln!(f, "{name}:", name = array.name);
+                    if not_init != 0 {
+                        for value in array.value.iter() {
+                            writeln!(f, "    .word   {value}");
+                        }
+                    } else {
+                        writeln!(f, "    .zero   {num}", num = array.size * 4);
+                    }
                 }
             }
         }

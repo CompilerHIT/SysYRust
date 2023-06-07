@@ -125,9 +125,11 @@ impl BB {
                                         lhs.as_ref().get_ir_type() == IrType::Int
                                             && rhs.as_ref().get_ir_type() == IrType::Int
                                     );
-                                    self.resolve_operand(func, rhs, false, map_info, pool);
+                                    rhs_reg = self.resolve_operand(func, rhs, false, map_info, pool);
                                 }
                             }
+                            println!("lhs_reg: {:?}", lhs_reg);
+                            println!("rhs_reg: {:?}", rhs_reg);
                             self.insts.push(pool.put_inst(LIRInst::new(
                                 inst_kind,
                                 vec![dst_reg, lhs_reg, rhs_reg],
@@ -172,18 +174,18 @@ impl BB {
                         BinOp::Div => {
                             lhs_reg = self.resolve_operand(func, lhs, true, map_info, pool);
                             assert!(rhs.as_ref().get_ir_type() == IrType::Int);
-                            match rhs.as_ref().get_kind() {
-                                InstKind::ConstInt(imm) => {
-                                    self.resolve_opt_div(dst_reg, lhs_reg, imm, pool)
-                                }
-                                _ => {
-                                    rhs_reg = self.resolve_operand(func, rhs, true, map_info, pool);
-                                    self.insts.push(pool.put_inst(LIRInst::new(
-                                        InstrsType::Binary(BinaryOp::Div),
-                                        vec![dst_reg, lhs_reg, rhs_reg],
-                                    )));
-                                }
-                            }
+                            // match rhs.as_ref().get_kind() {
+                                // InstKind::ConstInt(imm) => {
+                                    // self.resolve_opt_div(dst_reg, lhs_reg, imm, pool)
+                                // }
+                                // _ => {
+                            rhs_reg = self.resolve_operand(func, rhs, true, map_info, pool);
+                            self.insts.push(pool.put_inst(LIRInst::new(
+                                InstrsType::Binary(BinaryOp::Div),
+                                vec![dst_reg, lhs_reg, rhs_reg],
+                            )));
+                                // }
+                            // }
                         }
                         BinOp::Rem => {
                             // x % y == x - (x / y) *y
@@ -352,12 +354,11 @@ impl BB {
                 }
 
                 //TODO: load/store float
-                // FIXME: 偏移量暂设为0
                 InstKind::Load => {
                     let addr = inst_ref.get_ptr();
                     //TODO: if global var
                     let dst_reg = self.resolve_operand(func, ir_block_inst, true, map_info, pool);
-                    let mut src_reg = match inst_ref.get_ir_type() {
+                    let src_reg = match inst_ref.get_ir_type() {
                         IrType::IntPtr | IrType::FloatPtr => match addr.as_ref().get_kind() {
                             InstKind::GlobalConstFloat(..)
                             | InstKind::GlobalFloat(..)
@@ -382,7 +383,7 @@ impl BB {
                     let value_reg = self.resolve_operand(func, value, true, map_info, pool);
                     self.insts.push(pool.put_inst(LIRInst::new(
                         InstrsType::Store,
-                        vec![value_reg, addr_reg, Operand::IImm(IImm::new(0))],
+                        vec![addr_reg, value_reg, Operand::IImm(IImm::new(0))],
                     )));
                 }
                 InstKind::Alloca(size) => {
@@ -1111,8 +1112,8 @@ impl BB {
                     return map.val_map.get(&src).unwrap().clone();
                 }
                 let op: Operand = match src.as_ref().get_ir_type() {
-                    IrType::Int => Operand::Reg(Reg::init(ScalarType::Int)),
-                    IrType::Float => Operand::Reg(Reg::init(ScalarType::Float)),
+                    IrType::Int | IrType::IntPtr => Operand::Reg(Reg::init(ScalarType::Int)),
+                    IrType::Float | IrType::FloatPtr => Operand::Reg(Reg::init(ScalarType::Float)),
                     _ => unreachable!("cannot reach, resolve_operand func, false, pool"),
                 };
                 map.val_map.insert(src, op.clone());

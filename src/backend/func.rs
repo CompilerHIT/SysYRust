@@ -129,15 +129,18 @@ impl Func {
         self.entry.unwrap().as_mut().out_edge.push(*first_block);
         first_block.as_mut().in_edge.push(self.entry.unwrap());
         let mut i = 0;
-
-        self.blocks.iter().for_each(|block| {
-            let this = self.clone();
-            if *block != self.entry.unwrap() {
-                let basicblock = info.block_ir_map.get(block).unwrap();
+        let mut index = 0;
+        loop {
+            if index >= self.blocks.len() {
+                break;
+            }
+            let block = self.blocks[i];
+            if block != self.entry.unwrap() {
+                let basicblock = info.block_ir_map.get(&block).unwrap();
                 if i + 1 < self.blocks.len() {
                     let next_block = Some(self.blocks[i + 1]);
                     block.as_mut().construct(
-                        pool.put_func(this),
+                        pool.put_func(self.clone()),
                         *basicblock,
                         next_block,
                         &mut info,
@@ -145,7 +148,7 @@ impl Func {
                     );
                 } else {
                     block.as_mut().construct(
-                        pool.put_func(this),
+                        pool.put_func(self.clone()),
                         *basicblock,
                         None,
                         &mut info,
@@ -154,7 +157,7 @@ impl Func {
                 }
                 i += 1;
             }
-        });
+        }
     }
 
     // 移除指定id的寄存器的使用信息
@@ -341,6 +344,7 @@ impl Func {
 
 impl GenerateAsm for Func {
     fn generate(&mut self, _: ObjPtr<Context>, f: &mut File) -> Result<()> {
+        assert!(self.const_array.len() != 0);
         if self.const_array.len() > 0 {
             writeln!(f, "	.section	.rodata\n   .align  3")?;
         }
