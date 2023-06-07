@@ -180,11 +180,11 @@ impl<'f> AsmBuilder<'f> {
         writeln!(self.f, "{label}:")
     }
 
-    pub fn load_global(&mut self, reg: &str, global_label: &str, block_label: &str) -> Result<()> {
-        writeln!(self.f, "{block_label}");
-        writeln!(self.f, "	auipc   {reg}, %pcrel_hi({global_label})")?;
-        writeln!(self.f, "	addi    {reg}, {reg}, %pcrel_lo({block_label})")
-    }
+    // pub fn load_global(&mut self, reg: &str, global_label: &str, block_label: &str) -> Result<()> {
+    //     writeln!(self.f, "{block_label}");
+    //     writeln!(self.f, "	auipc   {reg}, %pcrel_hi({global_label})")?;
+    //     writeln!(self.f, "	addi    {reg}, {reg}, %pcrel_lo({block_label})")
+    // }
 
     pub fn print_array(&mut self, array: &Vec<i32>, name: String) -> Result<()> {
         writeln!(self.f, ".{name}:")?;
