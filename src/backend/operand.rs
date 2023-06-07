@@ -81,9 +81,9 @@ impl Reg {
             ScalarType::Int => unsafe {
                 let mut id = I_REG_ID;
                 I_REG_ID += 1;
-                match id {
-                    0 | 2 | 4 => id = I_REG_ID,
-                    _ => {}
+                while id == 0 || id == 1 || id == 2 || id == 4 {
+                    id = I_REG_ID;
+                    I_REG_ID += 1;
                 }
                 Self { id, r_type }
             },
@@ -161,13 +161,13 @@ impl Reg {
     }
 
     // sp for both callee and special
-    // zero, sp, gp, tp
+    // zero, sp, tp, ra
     //FIXME: ABI是否对gp进行了规定？
     pub fn is_special(&self) -> bool {
         if self.r_type == ScalarType::Float {
             return false;
         }
-        self.id == 0 || self.id == 2 || self.id == 4
+        self.id == 0 || self.id == 2 || self.id == 4 || self.id == 1
     }
 
     pub fn is_allocable(&self) -> bool {
