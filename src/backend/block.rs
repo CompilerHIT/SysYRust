@@ -7,7 +7,7 @@ pub use std::io::Result;
 use crate::backend::func::Func;
 use crate::backend::instrs::Operand;
 use crate::backend::instrs::{BinaryOp, CmpOp, InstrsType, LIRInst, SingleOp};
-use crate::backend::operand::{IImm, Reg};
+use crate::backend::operand::{IImm, Reg, F_REG_ID, I_REG_ID};
 use crate::ir::basicblock::BasicBlock;
 use crate::ir::instruction::{BinOp, Inst, InstKind, UnOp};
 use crate::ir::ir_type::IrType;
@@ -20,6 +20,9 @@ use crate::backend::operand;
 pub static mut ARRAY_NUM: i32 = 0;
 // pub static mut GLOBAL_SEQ: i32 = 0;
 pub static mut TMP_BB: i32 = 0;
+
+pub const ADDR_SIZE: i32 = 8;
+pub const NUM_SIZE: i32 = 4;
 
 #[derive(Clone)]
 pub struct BB {
@@ -125,7 +128,8 @@ impl BB {
                                         lhs.as_ref().get_ir_type() == IrType::Int
                                             && rhs.as_ref().get_ir_type() == IrType::Int
                                     );
-                                    rhs_reg = self.resolve_operand(func, rhs, false, map_info, pool);
+                                    rhs_reg =
+                                        self.resolve_operand(func, rhs, false, map_info, pool);
                                 }
                             }
                             println!("lhs_reg: {:?}", lhs_reg);
@@ -175,16 +179,16 @@ impl BB {
                             lhs_reg = self.resolve_operand(func, lhs, true, map_info, pool);
                             assert!(rhs.as_ref().get_ir_type() == IrType::Int);
                             // match rhs.as_ref().get_kind() {
-                                // InstKind::ConstInt(imm) => {
-                                    // self.resolve_opt_div(dst_reg, lhs_reg, imm, pool)
-                                // }
-                                // _ => {
+                            // InstKind::ConstInt(imm) => {
+                            // self.resolve_opt_div(dst_reg, lhs_reg, imm, pool)
+                            // }
+                            // _ => {
                             rhs_reg = self.resolve_operand(func, rhs, true, map_info, pool);
                             self.insts.push(pool.put_inst(LIRInst::new(
                                 InstrsType::Binary(BinaryOp::Div),
                                 vec![dst_reg, lhs_reg, rhs_reg],
                             )));
-                                // }
+                            // }
                             // }
                         }
                         BinOp::Rem => {
@@ -330,25 +334,23 @@ impl BB {
                             InstKind::ConstFloat(..) => {
                                 todo!("pos float");
                             }
-                            _ => {
-                                match src.as_ref().get_ir_type() {
-                                    IrType::Int => {
-                                        self.insts.push(pool.put_inst(LIRInst::new(
-                                            InstrsType::OpReg(SingleOp::IMv),
-                                            vec![dst_reg, src_reg],
-                                        )));
-                                    }
-                                    IrType::Float => {
-                                        self.insts.push(pool.put_inst(LIRInst::new(
-                                            InstrsType::OpReg(SingleOp::FMv),
-                                            vec![dst_reg, src_reg],
-                                        )));
-                                    }
-                                    _ => {
-                                        panic!("invalid unary type for pos");
-                                    }
+                            _ => match src.as_ref().get_ir_type() {
+                                IrType::Int => {
+                                    self.insts.push(pool.put_inst(LIRInst::new(
+                                        InstrsType::OpReg(SingleOp::IMv),
+                                        vec![dst_reg, src_reg],
+                                    )));
                                 }
-                            }
+                                IrType::Float => {
+                                    self.insts.push(pool.put_inst(LIRInst::new(
+                                        InstrsType::OpReg(SingleOp::FMv),
+                                        vec![dst_reg, src_reg],
+                                    )));
+                                }
+                                _ => {
+                                    panic!("invalid unary type for pos");
+                                }
+                            },
                         },
                     }
                 }
@@ -358,39 +360,107 @@ impl BB {
                     let addr = inst_ref.get_ptr();
                     //TODO: if global var
                     let dst_reg = self.resolve_operand(func, ir_block_inst, true, map_info, pool);
-                    let src_reg = match inst_ref.get_ir_type() {
-                        IrType::IntPtr | IrType::FloatPtr => match addr.as_ref().get_kind() {
-                            InstKind::GlobalConstFloat(..)
-                            | InstKind::GlobalFloat(..)
-                            | InstKind::GlobalInt(..)
-                            | InstKind::GlobalConstInt(..) => {
-                                assert!(map_info.val_map.contains_key(&addr));
-                                map_info.val_map.get(&addr).unwrap().clone()
+                    match addr.as_ref().get_kind() {
+                        InstKind::GlobalConstFloat(..)
+                        | InstKind::GlobalFloat(..)
+                        | InstKind::GlobalInt(..)
+                        | InstKind::GlobalConstInt(..) => {
+                            assert!(map_info.val_map.contains_key(&addr));
+                            let src_reg = self.resolve_global(addr, map_info, pool);
+                            self.insts.push(pool.put_inst(LIRInst::new(
+                                InstrsType::Load,
+                                vec![dst_reg, src_reg, Operand::IImm(IImm::new(0))],
+                            )));
+                        }
+                        InstKind::Gep => {
+                            //TODO: 数组的优化使用
+                            // type(4B) * index
+                            // 数组成员若是int型则不超过32位，使用word
+                            // ld dst array_offset(sp) # get label(base addr)
+                            // lw dst 4 * gep_offset(dst)
+                            println!("occur");
+                            let offset = addr.as_ref().get_gep_offset().as_ref().get_int_bond() * 4;
+                            println!("gep offset: {}", offset);
+                            let dst_reg =
+                                self.resolve_operand(func, ir_block_inst, true, map_info, pool);
+                            let index = addr.as_ref().get_ptr();
+                            if let Some(head) = map_info.array_slot_map.get(&index) {
+                                //TODO:判断地址合法
+                                let mut load = LIRInst::new(
+                                    InstrsType::LoadParamFromStack,
+                                    vec![dst_reg.clone(), Operand::IImm(IImm::new(*head))],
+                                );
+                                load.set_double();
+                                self.insts.push(pool.put_inst(load));
+                                self.insts.push(pool.put_inst(LIRInst::new(
+                                    InstrsType::Load,
+                                    vec![
+                                        dst_reg.clone(),
+                                        dst_reg.clone(),
+                                        Operand::IImm(IImm::new(offset)),
+                                    ],
+                                )));
+                            } else {
+                                panic!("array not found");
                             }
-                            _ => self.resolve_operand(func, addr, false, map_info, pool),
-                        },
-                        _ => self.resolve_operand(func, addr, false, map_info, pool),
+                        }
+                        _ => {
+                            unreachable!("invalid load addr");
+                            // self.resolve_operand(func, addr, false, map_info, pool);
+                        }
                     };
-                    self.insts.push(pool.put_inst(LIRInst::new(
-                        InstrsType::Load,
-                        vec![dst_reg, src_reg, Operand::IImm(IImm::new(0))],
-                    )));
                 }
                 InstKind::Store => {
                     let addr = inst_ref.get_dest();
                     let value = inst_ref.get_value();
-                    let addr_reg = self.resolve_operand(func, addr, false, map_info, pool);
+                    println!("{:?}", addr.as_ref().get_kind());
+                    println!("{:?}", value.as_ref().get_kind());
                     let value_reg = self.resolve_operand(func, value, true, map_info, pool);
-                    self.insts.push(pool.put_inst(LIRInst::new(
-                        InstrsType::Store,
-                        vec![addr_reg, value_reg, Operand::IImm(IImm::new(0))],
-                    )));
+                    match addr.as_ref().get_kind() {
+                        InstKind::Gep => {
+                            let mut load_new = true;
+                            let addr_reg = match map_info.val_map.get(&addr.as_ref().get_gep_ptr())
+                            {
+                                Some(reg) => {
+                                    load_new = false;
+                                    reg.clone()
+                                }
+                                None => Operand::Reg(Reg::init(ScalarType::Int)),
+                            };
+                            if let Some(base) =
+                                map_info.array_slot_map.get(&addr.as_ref().get_gep_ptr())
+                            {
+                                let offset =
+                                    addr.as_ref().get_gep_offset().as_ref().get_int_bond() * 4;
+                                if load_new {
+                                    let mut load = LIRInst::new(
+                                        InstrsType::LoadParamFromStack,
+                                        vec![addr_reg.clone(), Operand::IImm(IImm::new(*base))],
+                                    );
+                                    load.set_double();
+                                    self.insts.push(pool.put_inst(load));
+                                }
+                                self.insts.push(pool.put_inst(LIRInst::new(
+                                    InstrsType::Store,
+                                    vec![addr_reg, value_reg, Operand::IImm(IImm::new(offset))],
+                                )));
+                            } else {
+                                panic!("array not found");
+                            }
+                        }
+                        _ => {
+                            let addr_reg = self.resolve_operand(func, addr, false, map_info, pool);
+                            self.insts.push(pool.put_inst(LIRInst::new(
+                                InstrsType::Store,
+                                vec![addr_reg, value_reg, Operand::IImm(IImm::new(0))],
+                            )));
+                        }
+                    }
                 }
                 InstKind::Alloca(size) => {
                     let array_num = get_current_array_num();
                     let label = format!(".LC{array_num}");
                     inc_array_num();
-                    // map_info.val_map.insert(ir_block_inst, Operand::Addr(label.clone()));
                     //将发生分配的数组装入map_info中：记录数组结构、占用栈空间
                     //TODO:la dst label    sd dst (offset)sp
                     //TODO: 大数组而装填因子过低的压缩问题
@@ -398,10 +468,10 @@ impl BB {
                     let alloca =
                         IntArray::new(label.clone(), size, true, inst_ref.get_int_init().clone());
                     let last = func.as_ref().stack_addr.front().unwrap();
-                    let pos = last.get_pos() + last.get_size();
+                    let pos = last.get_pos() + ADDR_SIZE;
                     func.as_mut()
                         .stack_addr
-                        .push_front(StackSlot::new(pos, (size * 4 / 8 + 1) * 8));
+                        .push_front(StackSlot::new(pos, ADDR_SIZE));
 
                     let dst_reg = self.resolve_operand(func, ir_block_inst, true, map_info, pool);
                     let offset = pos;
@@ -421,35 +491,6 @@ impl BB {
                     // map_key: array_name
                     func.as_mut().const_array.insert(alloca);
                     map_info.array_slot_map.insert(ir_block_inst, offset);
-                }
-                InstKind::Gep => {
-                    //TODO: 数组的优化使用
-                    // type(4B) * index
-                    // 数组成员若是int型则不超过32位，使用word
-                    // ld dst array_offset(sp)
-                    // lw dst 4 * gep_offset(dst)
-                    let offset = inst_ref.get_gep_offset().as_ref().get_int_bond() * 4;
-                    let dst_reg = self.resolve_operand(func, ir_block_inst, true, map_info, pool);
-                    let index = inst_ref.get_ptr();
-                    if let Some(head) = map_info.array_slot_map.get(&index) {
-                        //TODO:判断地址合法
-                        let mut load = LIRInst::new(
-                            InstrsType::LoadParamFromStack,
-                            vec![dst_reg.clone(), Operand::IImm(IImm::new(*head))],
-                        );
-                        load.set_double();
-                        self.insts.push(pool.put_inst(load));
-                        self.insts.push(pool.put_inst(LIRInst::new(
-                            InstrsType::Load,
-                            vec![
-                                dst_reg.clone(),
-                                dst_reg.clone(),
-                                Operand::IImm(IImm::new(offset)),
-                            ],
-                        )));
-                    } else {
-                        panic!("array not found");
-                    }
                 }
                 InstKind::Branch => {
                     // if jump

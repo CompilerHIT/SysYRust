@@ -90,7 +90,7 @@ impl GenerateAsm for LIRInst {
                 };
                 let addr = match self.get_lhs() {
                     Operand::Reg(reg) => reg.to_string(),
-                    _ => panic!("src of load must be reg, to improve"),
+                    _ => { println!("load reg: {:?}", self.get_lhs());panic!("src of load must be reg, to improve");},
                 };
 
                 builder.l(&dst, &addr, offset.get_data(), self.is_float(), self.is_double())?;

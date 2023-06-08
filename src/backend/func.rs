@@ -78,11 +78,11 @@ impl Func {
     ) {
         let mut info = Mapping::new();
 
-        // 处理全局变量
-        let globl = &module.upper_module.global_variable;
-        globl.iter().for_each(|(name, val)| {
+        // 处理全局变量&数组
+        let globl = &module.global_var_list;
+        globl.iter().for_each(|(inst, var)| {
             info.val_map
-                .insert(val.clone(), Operand::Addr(name.to_string()));
+                .insert(inst.clone(), Operand::Addr(var.get_name().clone()));
         });
 
         // entry shouldn't generate for asm, called label for entry should always be false
@@ -130,17 +130,18 @@ impl Func {
         first_block.as_mut().in_edge.push(self.entry.unwrap());
         let mut i = 0;
         let mut index = 0;
+        let this = pool.put_func(self.clone());
         loop {
             if index >= self.blocks.len() {
                 break;
             }
-            let block = self.blocks[i];
+            let block = self.blocks[index];
             if block != self.entry.unwrap() {
                 let basicblock = info.block_ir_map.get(&block).unwrap();
                 if i + 1 < self.blocks.len() {
                     let next_block = Some(self.blocks[i + 1]);
                     block.as_mut().construct(
-                        pool.put_func(self.clone()),
+                        this,
                         *basicblock,
                         next_block,
                         &mut info,
@@ -148,7 +149,7 @@ impl Func {
                     );
                 } else {
                     block.as_mut().construct(
-                        pool.put_func(self.clone()),
+                        this,
                         *basicblock,
                         None,
                         &mut info,
@@ -157,7 +158,9 @@ impl Func {
                 }
                 i += 1;
             }
+            index += 1;
         }
+        self.update(this);
     }
 
     // 移除指定id的寄存器的使用信息
@@ -255,6 +258,7 @@ impl Func {
         stack_size = stack_size / 16 * 16 + 16;
 
         let mut offset = stack_size;
+        self.context.as_mut().set_offset(offset - 8);
         let mut f1 = match f.try_clone() {
             Ok(f) => f,
             Err(e) => panic!("Error: {}", e),
@@ -322,31 +326,40 @@ impl Func {
     }
 
     pub fn handle_spill(&mut self, pool: &mut BackendPool) {
+        let this = pool.put_func(self.clone());
         for block in self.blocks.iter() {
             let pos = match self.reg_alloc_info.bb_stack_sizes.get(&block) {
                 Some(pos) => *pos as i32,
                 None => continue,
             };
-            let this = pool.put_func(self.clone());
             block
                 .as_mut()
                 .handle_spill(this, &self.reg_alloc_info.spillings, pos, pool);
         }
+        self.update(this);
     }
 
     pub fn handle_overflow(&mut self, pool: &mut BackendPool) {
+        let this = pool.put_func(self.clone());
         for block in self.blocks.iter() {
-            let this = pool.put_func(self.clone());
             block.as_mut().handle_overflow(this, pool);
         }
+        self.update(this);
+    }
+
+    fn update(&mut self, func: ObjPtr<Func>) {
+        let func_ref = func.as_ref();
+        self.blocks = func_ref.blocks.clone();
+        self.stack_addr = func_ref.stack_addr.clone();
+        self.spill_stack_map = func_ref.spill_stack_map.clone();
+        self.const_array = func_ref.const_array.clone();
     }
 }
 
 impl GenerateAsm for Func {
     fn generate(&mut self, _: ObjPtr<Context>, f: &mut File) -> Result<()> {
-        assert!(self.const_array.len() != 0);
         if self.const_array.len() > 0 {
-            writeln!(f, "	.section	.rodata\n   .align  3")?;
+            writeln!(f, "	.section	.data\n   .align  3")?;
         }
         for mut a in self.const_array.clone() {
             a.generate(self.context, f)?;

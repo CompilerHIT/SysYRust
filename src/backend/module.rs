@@ -6,7 +6,7 @@ use crate::backend::operand::ToString;
 use crate::backend::structs::{FGlobalVar, GlobalVar, IGlobalVar, IntArray};
 use crate::backend::BackendPool;
 use crate::ir::function::Function;
-use crate::ir::instruction::InstKind;
+use crate::ir::instruction::{Inst, InstKind};
 use crate::ir::module::Module;
 use crate::utility::ObjPtr;
 
@@ -14,7 +14,7 @@ use super::instrs::Context;
 use super::structs::GenerateAsm;
 
 pub struct AsmModule<'a> {
-    global_var_list: Vec<GlobalVar>,
+    pub global_var_list: Vec<(ObjPtr<Inst>, GlobalVar)>,
 
     func_map: Vec<(ObjPtr<Function>, ObjPtr<Func>)>,
     pub upper_module: &'a Module,
@@ -77,19 +77,21 @@ impl<'a> AsmModule<'a> {
         });
     }
 
-    fn get_global(ir_module: &Module) -> Vec<GlobalVar> {
+    fn get_global(ir_module: &Module) -> Vec<(ObjPtr<Inst>, GlobalVar)> {
         let map = &ir_module.global_variable;
         let mut list = Vec::with_capacity(map.len());
         for (name, iter) in map {
             //TODO: update ir translation，to use ObjPtr match
             println!("{:?}", iter.as_ref().get_kind());
             match iter.as_ref().get_kind() {
-                InstKind::GlobalConstInt(value) | InstKind::GlobalInt(value) => list.push(
+                InstKind::GlobalConstInt(value) | InstKind::GlobalInt(value) => list.push((
+                    *iter,
                     GlobalVar::IGlobalVar(IGlobalVar::init(name.to_string(), value, true)),
-                ),
-                InstKind::GlobalConstFloat(value) | InstKind::GlobalFloat(value) => list.push(
+                )),
+                InstKind::GlobalConstFloat(value) | InstKind::GlobalFloat(value) => list.push((
+                    *iter,
                     GlobalVar::FGlobalVar(FGlobalVar::init(name.to_string(), value, true)),
-                ),
+                )),
                 InstKind::Alloca(size) => {
                     let alloca = IntArray::new(
                         name.clone(),
@@ -97,7 +99,7 @@ impl<'a> AsmModule<'a> {
                         true,
                         iter.as_ref().get_int_init().clone(),
                     );
-                    list.push(GlobalVar::GlobalConstArray(alloca));
+                    list.push((*iter, GlobalVar::GlobalConstArray(alloca)));
                 }
                 _ => panic!("fail to analyse GlobalConst"),
             };
@@ -109,7 +111,7 @@ impl<'a> AsmModule<'a> {
         if self.global_var_list.len() > 0 {
             writeln!(f, "	.data");
         }
-        for iter in self.global_var_list.iter() {
+        for (inst, iter) in self.global_var_list.iter() {
             match iter {
                 GlobalVar::IGlobalVar(ig) => {
                     let name = ig.get_name();
@@ -124,7 +126,7 @@ impl<'a> AsmModule<'a> {
                     writeln!(f, "{name}:\n    .word   {value}\n");
                 }
                 GlobalVar::GlobalConstArray(array) => {
-                    let not_init : i32 = array.value.iter().map(|x| x * x).sum();
+                    let not_init: i32 = array.value.iter().map(|x| x * x).sum();
                     writeln!(f, "   .globl {name}\n    .align  3\n     .type   {name}, @object\n   .size   {name}, {num}", name = array.name, num = array.size * 4);
                     writeln!(f, "{name}:", name = array.name);
                     if not_init != 0 {
