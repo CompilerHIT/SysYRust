@@ -374,6 +374,7 @@ impl BB {
                         }
                         InstKind::Gep => {
                             //TODO: 数组的优化使用
+                            //TODO: lable从栈上重复加载问题
                             // type(4B) * index
                             // 数组成员若是int型则不超过32位，使用word
                             // ld dst array_offset(sp) # get label(base addr)
@@ -383,7 +384,7 @@ impl BB {
                             println!("gep offset: {}", offset);
                             let dst_reg =
                                 self.resolve_operand(func, ir_block_inst, true, map_info, pool);
-                            let index = addr.as_ref().get_ptr();
+                            let index = addr.as_ref().get_gep_ptr();
                             if let Some(head) = map_info.array_slot_map.get(&index) {
                                 //TODO:判断地址合法
                                 let mut load = LIRInst::new(
@@ -401,7 +402,26 @@ impl BB {
                                     ],
                                 )));
                             } else {
-                                panic!("array not found");
+                                // 找不到，认为是全局数组，全局数组的访问是load -> gep -> load -> alloca
+                                let src_reg = self.resolve_operand(func, index, true, map_info, pool);
+                                self.insts.push(pool.put_inst(LIRInst::new(
+                                    InstrsType::Load,
+                                    vec![dst_reg, src_reg, Operand::IImm(IImm::new(offset))],
+                                )));
+                            }
+                        }
+                        InstKind::Alloca(..) => {
+                            assert!(
+                                addr.as_ref().get_ir_type() == IrType::IntPtr
+                                    || addr.as_ref().get_ir_type() == IrType::FloatPtr
+                            );
+                            if let Some(ga) = map_info.val_map.get(&addr) {
+                                self.insts.push(pool.put_inst(LIRInst::new(
+                                    InstrsType::OpReg(SingleOp::LoadAddr),
+                                    vec![dst_reg.clone(), ga.clone()],
+                                )));
+                            } else {
+                                unreachable!("invalid gep");
                             }
                         }
                         _ => {
@@ -609,7 +629,7 @@ impl BB {
 
                     for arg in arg_list.iter().rev() {
                         match arg.as_ref().get_param_type() {
-                            IrType::Int => {
+                            IrType::Int | IrType::IntPtr => {
                                 icnt -= 1;
                                 if icnt >= ARG_REG_COUNT {
                                     let src_reg =
@@ -632,7 +652,7 @@ impl BB {
                                         Operand::Reg(Reg::new(icnt + 10, ScalarType::Int));
                                     let stack_addr = &func.as_ref().stack_addr;
                                     let pos = stack_addr.front().unwrap().get_pos()
-                                        + stack_addr.front().unwrap().get_size();
+                                        + ADDR_SIZE;
                                     let size = 8;
                                     let slot = StackSlot::new(pos, size);
                                     func.as_mut().stack_addr.push_front(slot);
@@ -649,7 +669,7 @@ impl BB {
                                     )));
                                 }
                             }
-                            IrType::Float => {
+                            IrType::Float | IrType::FloatPtr => {
                                 fcnt -= 1;
                                 if fcnt >= ARG_REG_COUNT {
                                     let src_reg =
@@ -672,7 +692,7 @@ impl BB {
                                         Operand::Reg(Reg::new(fcnt + 10, ScalarType::Float));
                                     let stack_addr = &func.as_ref().stack_addr;
                                     let pos = stack_addr.back().unwrap().get_pos()
-                                        + stack_addr.back().unwrap().get_size();
+                                        + ADDR_SIZE;
                                     let size = 8;
                                     func.as_mut()
                                         .stack_addr
