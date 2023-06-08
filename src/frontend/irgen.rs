@@ -216,28 +216,40 @@ impl Kit<'_> {
                                 //是否是全局
                                 if let Some(offset) = offset {
                                     //有偏移
-                                    let ptr = self.pool_inst_mut.make_gep(inst_array, offset);
-                                    inst_ret = self.pool_inst_mut.make_global_float_array_load(ptr);
+                                    // let ptr = self.pool_inst_mut.make_gep(inst_array, offset);
+                                    // inst_ret = self.pool_inst_mut.make_global_float_array_load(ptr);
+                                    let ptr_array =
+                                        self.pool_inst_mut.make_global_float_array_load(inst_array); //获得数组第一个元素(全局变量元素都是指针)
+                                    let ptr = self.pool_inst_mut.make_gep(ptr_array, offset); //获得特定指针
+                                    inst_ret = self.pool_inst_mut.make_float_load(ptr); //获得元素值
+                                                                                        // inst_ret = self.pool_inst_mut.make_gep(ptr_array, offset);
+                                                                                        // self.context_mut.push_inst_bb(offset); //这里需要向bb插入offset吗
+                                    self.context_mut.push_inst_bb(ptr_array); //哪些不插入到块中?
                                     self.context_mut.push_inst_bb(ptr);
                                     self.context_mut.push_inst_bb(inst_ret);
                                 } else {
-                                    //没偏移
-                                    inst_ret =
-                                        self.pool_inst_mut.make_global_float_array_load(inst_array);
-                                    self.context_mut.push_inst_bb(inst_ret);
+                                    unreachable!("没给偏移")
                                 }
+                                //  else {
+                                //     //没偏移
+                                //     let ptr =
+                                //         self.pool_inst_mut.make_global_float_array_load(inst_array);
+                                //     inst_ret = self.pool_inst_mut.make_gep(ptr, );
+                                //     self.context_mut.push_inst_bb(inst_ret);
+                                // }
                             } else {
                                 //不是全局
                                 if let Some(offset) = offset {
                                     //有偏移
                                     let ptr = self.pool_inst_mut.make_gep(inst_array, offset);
-                                    inst_ret = self.pool_inst_mut.make_float_array_load(ptr);
+                                    inst_ret = self.pool_inst_mut.make_float_load(ptr);
+                                    // inst_ret = self.pool_inst_mut.make_gep(inst_array, offset);
+                                    // self.context_mut.push_inst_bb(offset); //这里需要向bb插入offset吗
                                     self.context_mut.push_inst_bb(ptr);
                                     self.context_mut.push_inst_bb(inst_ret);
                                 } else {
                                     //没偏移
-                                    inst_ret = self.pool_inst_mut.make_float_array_load(inst_array);
-                                    self.context_mut.push_inst_bb(inst_ret);
+                                    unreachable!("没给偏移")
                                 }
                             }
                         }
@@ -247,15 +259,18 @@ impl Kit<'_> {
                                 if let Some(offset) = offset {
                                     // println!("有偏移:{:?}",offset.as_ref().get_kind());
                                     //有偏移
-                                    let ptr = self.pool_inst_mut.make_gep(inst_array, offset);
-                                    inst_ret = self.pool_inst_mut.make_global_int_array_load(ptr);
+                                    let ptr_array =
+                                        self.pool_inst_mut.make_global_int_array_load(inst_array); //获得数组第一个元素(全局变量元素都是指针)
+                                    let ptr = self.pool_inst_mut.make_gep(ptr_array, offset); //获得特定指针
+                                    inst_ret = self.pool_inst_mut.make_int_load(ptr); //获得元素值
+                                                                                      // inst_ret = self.pool_inst_mut.make_gep(ptr_array, offset);
+                                                                                      // self.context_mut.push_inst_bb(offset); //这里需要向bb插入offset吗
+                                    self.context_mut.push_inst_bb(ptr_array); //哪些不插入到块中?
                                     self.context_mut.push_inst_bb(ptr);
                                     self.context_mut.push_inst_bb(inst_ret);
                                 } else {
                                     //没偏移
-                                    inst_ret =
-                                        self.pool_inst_mut.make_global_int_array_load(inst_array);
-                                    self.context_mut.push_inst_bb(inst_ret);
+                                    unreachable!("没给偏移")
                                 }
                             } else {
                                 //不是全局
@@ -263,13 +278,15 @@ impl Kit<'_> {
                                     //有偏移
                                     // println!("有偏移:{:?}",offset.as_ref().get_kind());
                                     let ptr = self.pool_inst_mut.make_gep(inst_array, offset);
-                                    inst_ret = self.pool_inst_mut.make_int_array_load(ptr);
+                                    inst_ret = self.pool_inst_mut.make_int_load(ptr);
+                                    // inst_ret = self.pool_inst_mut.make_gep(inst_array, offset);
+                                    // self.context_mut.push_inst_bb(offset); //这里需要向bb插入offset吗
                                     self.context_mut.push_inst_bb(ptr);
                                     self.context_mut.push_inst_bb(inst_ret);
+                                    // self.context_mut.push_inst_bb(inst_ret);
                                 } else {
                                     //没偏移
-                                    inst_ret = self.pool_inst_mut.make_int_array_load(inst_array);
-                                    self.context_mut.push_inst_bb(inst_ret);
+                                    unreachable!("没给偏移")
                                 }
                             }
                         }
@@ -2535,6 +2552,7 @@ pub fn offset_calculate(id: &str, exp_vec: &mut Vec<Exp>, kit_mut: &mut Kit) -> 
             }
         }
         inst_offset = kit_mut.pool_inst_mut.make_int_const(offset_final);
+        kit_mut.context_mut.push_inst_bb(inst_offset);
     } else {
         //总偏移不是是一个可以计算出的值
         (inst_base_now, inst_offset, _) = inst_add_vec[0];
@@ -2549,6 +2567,7 @@ pub fn offset_calculate(id: &str, exp_vec: &mut Vec<Exp>, kit_mut: &mut Kit) -> 
             kit_mut.context_mut.push_inst_bb(inst_offset); //add指令push进basicblock中
         }
     }
+    // println!("左值偏移:{:?}",inst_offset.as_ref().get_kind());
     // (var, symbol) = kit_mut.get_var(&self.id).unwrap();
 
     inst_offset
