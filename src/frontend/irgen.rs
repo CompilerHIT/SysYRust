@@ -112,11 +112,12 @@ impl Kit<'_> {
         &mut self,
         s: &str,
         offset: Option<ObjPtr<Inst>>,
+        bool_get_ptr: bool,
     ) -> Result<(ObjPtr<Inst>, Symbol), Error> {
         // let bb = self.context_mut.bb_now_mut;
         match self.context_mut.bb_now_mut {
             InfuncChoice::InFunc(bb) => {
-                if let Some((inst, symbol)) = self.get_var_bb(s, bb, offset) {
+                if let Some((inst, symbol)) = self.get_var_bb(s, bb, offset, bool_get_ptr) {
                     return Ok((inst, symbol));
                 }
             }
@@ -162,6 +163,7 @@ impl Kit<'_> {
         s: &str,
         bb: ObjPtr<BasicBlock>,
         offset: Option<ObjPtr<Inst>>,
+        bool_get_ptr: bool,
     ) -> Option<(ObjPtr<Inst>, Symbol)> {
         let mut name_changed = " ".to_string();
         let mut layer_var = 0;
@@ -218,17 +220,50 @@ impl Kit<'_> {
                                     //有偏移
                                     // let ptr = self.pool_inst_mut.make_gep(inst_array, offset);
                                     // inst_ret = self.pool_inst_mut.make_global_float_array_load(ptr);
-                                    let ptr_array =
-                                        self.pool_inst_mut.make_global_float_array_load(inst_array); //获得数组第一个元素(全局变量元素都是指针)
-                                    let ptr = self.pool_inst_mut.make_gep(ptr_array, offset); //获得特定指针
-                                    inst_ret = self.pool_inst_mut.make_float_load(ptr); //获得元素值
-                                                                                        // inst_ret = self.pool_inst_mut.make_gep(ptr_array, offset);
-                                                                                        // self.context_mut.push_inst_bb(offset); //这里需要向bb插入offset吗
-                                    self.context_mut.push_inst_bb(ptr_array); //哪些不插入到块中?
-                                    self.context_mut.push_inst_bb(ptr);
-                                    self.context_mut.push_inst_bb(inst_ret);
+                                    if bool_get_ptr {
+                                        //如果是需要取指针(向函数传递数组指针)
+                                        let ptr_array = self
+                                            .pool_inst_mut
+                                            .make_global_float_array_load(inst_array); //获得数组第一个元素(全局变量元素都是指针)
+                                        inst_ret = self.pool_inst_mut.make_gep(ptr_array, offset); //获得特定指针
+                                                                                                   // inst_ret = self.pool_inst_mut.make_float_load(ptr); //获得元素值
+                                                                                                   // inst_ret = self.pool_inst_mut.make_gep(ptr_array, offset);
+                                                                                                   // self.context_mut.push_inst_bb(offset); //这里需要向bb插入offset吗
+                                        self.context_mut.push_inst_bb(ptr_array); //哪些不插入到块中?
+                                                                                  // self.context_mut.push_inst_bb(ptr);
+                                        self.context_mut.push_inst_bb(inst_ret);
+                                    } else {
+                                        let ptr_array = self
+                                            .pool_inst_mut
+                                            .make_global_float_array_load(inst_array); //获得数组第一个元素(全局变量元素都是指针)
+                                        let ptr = self.pool_inst_mut.make_gep(ptr_array, offset); //获得特定指针
+                                        inst_ret = self.pool_inst_mut.make_float_load(ptr); //获得元素值
+                                                                                            // inst_ret = self.pool_inst_mut.make_gep(ptr_array, offset);
+                                                                                            // self.context_mut.push_inst_bb(offset); //这里需要向bb插入offset吗
+                                        self.context_mut.push_inst_bb(ptr_array); //哪些不插入到块中?
+                                        self.context_mut.push_inst_bb(ptr);
+                                        self.context_mut.push_inst_bb(inst_ret);
+                                    }
                                 } else {
-                                    unreachable!("没给偏移")
+                                    //没给偏移
+                                    if bool_get_ptr {
+                                        let ptr_array = self
+                                            .pool_inst_mut
+                                            .make_global_float_array_load(inst_array); //获得数组第一个元素(全局变量元素都是指针)
+                                        let inst_offset_temp = self.pool_inst_mut.make_int_const(0);
+                                        inst_ret = self
+                                            .pool_inst_mut
+                                            .make_gep(ptr_array, inst_offset_temp); //获得特定指针
+                                                                                    // inst_ret = self.pool_inst_mut.make_float_load(ptr); //获得元素值
+                                                                                    // inst_ret = self.pool_inst_mut.make_gep(ptr_array, offset);
+                                                                                    // self.context_mut.push_inst_bb(offset); //这里需要向bb插入offset吗
+                                        self.context_mut.push_inst_bb(ptr_array); //哪些不插入到块中?
+                                        self.context_mut.push_inst_bb(inst_offset_temp);
+                                        // self.context_mut.push_inst_bb(ptr);
+                                        self.context_mut.push_inst_bb(inst_ret);
+                                    } else {
+                                        unreachable!("没给偏移")
+                                    }
                                 }
                                 //  else {
                                 //     //没偏移
@@ -241,15 +276,34 @@ impl Kit<'_> {
                                 //不是全局
                                 if let Some(offset) = offset {
                                     //有偏移
-                                    let ptr = self.pool_inst_mut.make_gep(inst_array, offset);
-                                    inst_ret = self.pool_inst_mut.make_float_load(ptr);
-                                    // inst_ret = self.pool_inst_mut.make_gep(inst_array, offset);
-                                    // self.context_mut.push_inst_bb(offset); //这里需要向bb插入offset吗
-                                    self.context_mut.push_inst_bb(ptr);
-                                    self.context_mut.push_inst_bb(inst_ret);
+                                    if bool_get_ptr {
+                                        //如果是需要取指针(向函数传递数组指针)
+                                        inst_ret = self.pool_inst_mut.make_gep(inst_array, offset); //获得特定指针
+                                        self.context_mut.push_inst_bb(inst_ret);
+                                    } else {
+                                        let ptr = self.pool_inst_mut.make_gep(inst_array, offset);
+                                        inst_ret = self.pool_inst_mut.make_float_load(ptr);
+                                        // inst_ret = self.pool_inst_mut.make_gep(inst_array, offset);
+                                        // self.context_mut.push_inst_bb(offset); //这里需要向bb插入offset吗
+                                        self.context_mut.push_inst_bb(ptr);
+                                        self.context_mut.push_inst_bb(inst_ret);
+                                    }
                                 } else {
+                                    if bool_get_ptr {
+                                        let inst_offset_temp = self.pool_inst_mut.make_int_const(0);
+                                        inst_ret = self
+                                            .pool_inst_mut
+                                            .make_gep(inst_array, inst_offset_temp); //获得特定指针
+                                                                                     // inst_ret = self.pool_inst_mut.make_float_load(ptr); //获得元素值
+                                                                                     // inst_ret = self.pool_inst_mut.make_gep(ptr_array, offset);
+                                                                                     // self.context_mut.push_inst_bb(offset); //这里需要向bb插入offset吗
+                                        self.context_mut.push_inst_bb(inst_offset_temp); //哪些不插入到块中?
+                                                                                         // self.context_mut.push_inst_bb(ptr);
+                                        self.context_mut.push_inst_bb(inst_ret);
+                                    } else {
+                                        unreachable!("没给偏移")
+                                    }
                                     //没偏移
-                                    unreachable!("没给偏移")
                                 }
                             }
                         }
@@ -257,36 +311,93 @@ impl Kit<'_> {
                             if layer_var < 0 {
                                 //是否是全局
                                 if let Some(offset) = offset {
-                                    // println!("有偏移:{:?}",offset.as_ref().get_kind());
                                     //有偏移
-                                    let ptr_array =
-                                        self.pool_inst_mut.make_global_int_array_load(inst_array); //获得数组第一个元素(全局变量元素都是指针)
-                                    let ptr = self.pool_inst_mut.make_gep(ptr_array, offset); //获得特定指针
-                                    inst_ret = self.pool_inst_mut.make_int_load(ptr); //获得元素值
-                                                                                      // inst_ret = self.pool_inst_mut.make_gep(ptr_array, offset);
-                                                                                      // self.context_mut.push_inst_bb(offset); //这里需要向bb插入offset吗
-                                    self.context_mut.push_inst_bb(ptr_array); //哪些不插入到块中?
-                                    self.context_mut.push_inst_bb(ptr);
-                                    self.context_mut.push_inst_bb(inst_ret);
+                                    // let ptr = self.pool_inst_mut.make_gep(inst_array, offset);
+                                    // inst_ret = self.pool_inst_mut.make_global_float_array_load(ptr);
+                                    if bool_get_ptr {
+                                        //如果是需要取指针(向函数传递数组指针)
+                                        let ptr_array = self
+                                            .pool_inst_mut
+                                            .make_global_int_array_load(inst_array); //获得数组第一个元素(全局变量元素都是指针)
+                                        inst_ret = self.pool_inst_mut.make_gep(ptr_array, offset); //获得特定指针
+                                                                                                   // inst_ret = self.pool_inst_mut.make_float_load(ptr); //获得元素值
+                                                                                                   // inst_ret = self.pool_inst_mut.make_gep(ptr_array, offset);
+                                                                                                   // self.context_mut.push_inst_bb(offset); //这里需要向bb插入offset吗
+                                        self.context_mut.push_inst_bb(ptr_array); //哪些不插入到块中?
+                                                                                  // self.context_mut.push_inst_bb(ptr);
+                                        self.context_mut.push_inst_bb(inst_ret);
+                                    } else {
+                                        let ptr_array = self
+                                            .pool_inst_mut
+                                            .make_global_int_array_load(inst_array); //获得数组第一个元素(全局变量元素都是指针)
+                                        let ptr = self.pool_inst_mut.make_gep(ptr_array, offset); //获得特定指针
+                                        inst_ret = self.pool_inst_mut.make_int_load(ptr); //获得元素值
+                                                                                          // inst_ret = self.pool_inst_mut.make_gep(ptr_array, offset);
+                                                                                          // self.context_mut.push_inst_bb(offset); //这里需要向bb插入offset吗
+                                        self.context_mut.push_inst_bb(ptr_array); //哪些不插入到块中?
+                                        self.context_mut.push_inst_bb(ptr);
+                                        self.context_mut.push_inst_bb(inst_ret);
+                                    }
                                 } else {
-                                    //没偏移
-                                    unreachable!("没给偏移")
+                                    //没给偏移
+                                    if bool_get_ptr {
+                                        let ptr_array = self
+                                            .pool_inst_mut
+                                            .make_global_int_array_load(inst_array); //获得数组第一个元素(全局变量元素都是指针)
+                                        let inst_offset_temp = self.pool_inst_mut.make_int_const(0);
+                                        inst_ret = self
+                                            .pool_inst_mut
+                                            .make_gep(ptr_array, inst_offset_temp); //获得特定指针
+                                                                                    // inst_ret = self.pool_inst_mut.make_float_load(ptr); //获得元素值
+                                                                                    // inst_ret = self.pool_inst_mut.make_gep(ptr_array, offset);
+                                                                                    // self.context_mut.push_inst_bb(offset); //这里需要向bb插入offset吗
+                                        self.context_mut.push_inst_bb(ptr_array); //哪些不插入到块中?
+                                        self.context_mut.push_inst_bb(inst_offset_temp);
+                                        // self.context_mut.push_inst_bb(ptr);
+                                        self.context_mut.push_inst_bb(inst_ret);
+                                    } else {
+                                        unreachable!("没给偏移")
+                                    }
                                 }
+                                //  else {
+                                //     //没偏移
+                                //     let ptr =
+                                //         self.pool_inst_mut.make_global_float_array_load(inst_array);
+                                //     inst_ret = self.pool_inst_mut.make_gep(ptr, );
+                                //     self.context_mut.push_inst_bb(inst_ret);
+                                // }
                             } else {
                                 //不是全局
                                 if let Some(offset) = offset {
                                     //有偏移
-                                    // println!("有偏移:{:?}",offset.as_ref().get_kind());
-                                    let ptr = self.pool_inst_mut.make_gep(inst_array, offset);
-                                    inst_ret = self.pool_inst_mut.make_int_load(ptr);
-                                    // inst_ret = self.pool_inst_mut.make_gep(inst_array, offset);
-                                    // self.context_mut.push_inst_bb(offset); //这里需要向bb插入offset吗
-                                    self.context_mut.push_inst_bb(ptr);
-                                    self.context_mut.push_inst_bb(inst_ret);
-                                    // self.context_mut.push_inst_bb(inst_ret);
+                                    if bool_get_ptr {
+                                        //如果是需要取指针(向函数传递数组指针)
+                                        inst_ret = self.pool_inst_mut.make_gep(inst_array, offset); //获得特定指针
+                                        self.context_mut.push_inst_bb(inst_ret);
+                                    } else {
+                                        let ptr = self.pool_inst_mut.make_gep(inst_array, offset);
+                                        inst_ret = self.pool_inst_mut.make_int_load(ptr);
+                                        // inst_ret = self.pool_inst_mut.make_gep(inst_array, offset);
+                                        // self.context_mut.push_inst_bb(offset); //这里需要向bb插入offset吗
+                                        self.context_mut.push_inst_bb(ptr);
+                                        self.context_mut.push_inst_bb(inst_ret);
+                                    }
                                 } else {
+                                    if bool_get_ptr {
+                                        let inst_offset_temp = self.pool_inst_mut.make_int_const(0);
+                                        inst_ret = self
+                                            .pool_inst_mut
+                                            .make_gep(inst_array, inst_offset_temp); //获得特定指针
+                                                                                     // inst_ret = self.pool_inst_mut.make_float_load(ptr); //获得元素值
+                                                                                     // inst_ret = self.pool_inst_mut.make_gep(ptr_array, offset);
+                                                                                     // self.context_mut.push_inst_bb(offset); //这里需要向bb插入offset吗
+                                        self.context_mut.push_inst_bb(inst_offset_temp); //哪些不插入到块中?
+                                                                                         // self.context_mut.push_inst_bb(ptr);
+                                        self.context_mut.push_inst_bb(inst_ret);
+                                    } else {
+                                        unreachable!("没给偏移")
+                                    }
                                     //没偏移
-                                    unreachable!("没给偏移")
                                 }
                             }
                         }
@@ -503,19 +614,6 @@ impl Process for ConstDecl {
                         for dm in &dimension_vec_in {
                             length = length * dm;
                         }
-                        // let length_inst = kit_mut.pool_inst_mut.make_int_const(length);
-                        // kit_mut.context_mut.push_inst_bb(length_inst); //这里
-
-                        // if !kit_mut.context_mut.add_var(
-                        //     &def.ident,
-                        //     Type::ConstInt,
-                        //     true,
-                        //     false,
-                        //     None,
-                        //     dimension_vec_in.clone(),
-                        // ) {
-                        //     return Err(Error::MultipleDeclaration);
-                        // } //添加该变量，但没有生成实际的指令
 
                         let (mut inst_ptr, mut val, init_vec) = def
                             .const_init_val
@@ -523,19 +621,6 @@ impl Process for ConstDecl {
                             .unwrap(); //获得初始值
                         match init_vec {
                             RetInitVec::Float(fvec) => {
-                                // let inst = kit_mut.pool_inst_mut.make_float_array(length, fvec);
-                                // if !kit_mut.context_mut.add_var(
-                                //     &def.ident,
-                                //     Type::ConstInt,
-                                //     true,
-                                //     false,
-                                //     Some(inst),
-                                //     dimension_vec_in.clone(),
-                                // ) {
-                                //     return Err(Error::MultipleDeclaration);
-                                // } //添加该变量，但没有生成实际的指令
-                                // kit_mut.context_mut.update_var_scope_now(&def.ident, inst);
-                                // kit_mut.context_mut.push_inst_bb(inst);
                                 unreachable!()
                             }
                             RetInitVec::Int(ivec) => {
@@ -570,32 +655,6 @@ impl Process for ConstDecl {
                             .const_init_val
                             .process((Type::ConstFloat, vec![]), kit_mut)
                             .unwrap();
-                        // if !kit_mut.context_mut.add_var(
-                        //     &def.ident,
-                        //     Type::ConstFloat,
-                        //     false,
-                        //     false,
-                        //     None,
-                        //     Vec::new(),
-                        // ) {
-                        //     return Err(Error::MultipleDeclaration);
-                        // }
-
-                        // if kit_mut.context_mut.get_layer() < 0 {
-                        //     let mut bond = 0.0;
-                        //     match val {
-                        //         ExpValue::Float(f) => {
-                        //             bond = f;
-                        //         }
-                        //         _ => {
-                        //             unreachable!()
-                        //         }
-                        //     }
-                        //     inst_ptr = kit_mut.pool_inst_mut.make_global_float_const(bond);
-                        //     //这里
-                        // }else{
-                        //     kit_mut.context_mut.push_inst_bb(inst_ptr);
-                        // }
 
                         let mut bond = 0.0;
                         match val {
@@ -670,19 +729,6 @@ impl Process for ConstDecl {
                         for dm in &dimension_vec_in {
                             length = length * dm;
                         }
-                        // let length_inst = kit_mut.pool_inst_mut.make_int_const(length);
-                        // kit_mut.context_mut.push_inst_bb(length_inst); //这里
-
-                        // if !kit_mut.context_mut.add_var(
-                        //     &def.ident,
-                        //     Type::ConstInt,
-                        //     true,
-                        //     false,
-                        //     None,
-                        //     dimension_vec_in.clone(),
-                        // ) {
-                        //     return Err(Error::MultipleDeclaration);
-                        // } //添加该变量，但没有生成实际的指令
 
                         let (mut inst_ptr, mut val, init_vec) = def
                             .const_init_val
@@ -1145,18 +1191,6 @@ impl Process for VarDecl {
                             for dm in &dimension_vec_in {
                                 length = length * dm;
                             }
-                            // let length_inst = kit_mut.pool_inst_mut.make_int_const(length);
-                            // kit_mut.context_mut.push_inst_bb(length_inst); //这里
-
-                            // if !kit_mut.context_mut.add_var(
-                            //     &id,
-                            //     Type::Int,
-                            //     true,
-                            //     false,
-                            //     dimension_vec_in.clone(),
-                            // ) {
-                            //     return Err(Error::MultipleDeclaration);
-                            // } //添加该变量，但没有生成实际的指令
 
                             // unreachable!()
                             let (mut init_vec, mut inst_vec) = val
@@ -1498,7 +1532,71 @@ impl Process for FuncFParam {
     fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
         match self {
             FuncFParam::Array((tp, id, vec)) => {
-                todo!()
+                //vec中存储的是从第二维开始的维度信息，第一维默认存在且为空
+                match tp {
+                    BType::Int => {
+                        let param = kit_mut.pool_inst_mut.make_param(IrType::IntPtr);
+                        let mut dimension_vec = vec![];
+                        let mut dimension_vec_in = vec![];
+                        for exp in vec {
+                            dimension_vec.push(exp.process(Type::Int, kit_mut).unwrap());
+                        }
+                        dimension_vec_in.push(-1);
+                        for (inst, dimension) in dimension_vec {
+                            match dimension {
+                                ExpValue::Int(i) => {
+                                    dimension_vec_in.push(i);
+                                }
+                                _ => {
+                                    unreachable!()
+                                }
+                            }
+                        }
+                        kit_mut.context_mut.add_var(
+                            id,
+                            Type::Int,
+                            true,
+                            true,
+                            Some(param),
+                            None,
+                            dimension_vec_in,
+                        );
+                        //这里
+                        kit_mut.context_mut.update_var_scope_now(id, param);
+                        Ok((id.clone(), param))
+                    }
+                    BType::Float => {
+                        let param = kit_mut.pool_inst_mut.make_param(IrType::FloatPtr);
+                        let mut dimension_vec = vec![];
+                        let mut dimension_vec_in = vec![];
+                        for exp in vec {
+                            dimension_vec.push(exp.process(Type::Int, kit_mut).unwrap());
+                        }
+                        dimension_vec_in.push(-1);
+                        for (inst, dimension) in dimension_vec {
+                            match dimension {
+                                ExpValue::Int(i) => {
+                                    dimension_vec_in.push(i);
+                                }
+                                _ => {
+                                    unreachable!()
+                                }
+                            }
+                        }
+                        kit_mut.context_mut.add_var(
+                            id,
+                            Type::Float,
+                            true,
+                            true,
+                            Some(param),
+                            None,
+                            dimension_vec_in,
+                        );
+                        //这里
+                        kit_mut.context_mut.update_var_scope_now(id, param);
+                        Ok((id.clone(), param))
+                    }
+                }
             }
             // BType::Int => {}
             // BType::Float => {}
@@ -1779,9 +1877,17 @@ impl Process for LVal {
                 dimension: vec![],
             },
         );
+        let sym_tmp = kit_mut.get_var_symbol(&self.id).unwrap();
         if self.exp_vec.is_empty() {
             //如果为空
-            (var, symbol) = kit_mut.get_var(&self.id, None).unwrap();
+            if sym_tmp.dimension.len() > self.exp_vec.len() {
+                println!("{:?}取指针", &self.id);
+                (var, symbol) = kit_mut.get_var(&self.id, None, true).unwrap();
+            } else {
+                println!("{:?}不取指针", &self.id);
+                (var, symbol) = kit_mut.get_var(&self.id, None, false).unwrap();
+            }
+            // (var, symbol) = kit_mut.get_var(&self.id, None).unwrap();
         } else {
             let sym = kit_mut.get_var_symbol(&self.id).unwrap(); //获得符号表
             let dimension_vec = sym.dimension.clone(); //获得维度信息
@@ -1862,8 +1968,12 @@ impl Process for LVal {
                 }
             }
 
-            (var, symbol) = kit_mut.get_var(&self.id, Some(inst_offset)).unwrap();
-            // (var, symbol) = kit_mut.get_var(&self.id).unwrap();
+            // (var, symbol) = kit_mut.get_var(&self.id, Some(inst_offset)).unwrap();
+            if sym_tmp.dimension.len() > self.exp_vec.len() {
+                (var, symbol) = kit_mut.get_var(&self.id, Some(inst_offset), true).unwrap();
+            } else {
+                (var, symbol) = kit_mut.get_var(&self.id, Some(inst_offset), false).unwrap();
+            }
         }
         // println!("var_name:{:?},ir_type:{:?}",&self.id,var.as_ref().get_ir_type());
         // println!("var_name:{:?},ir_type:{:?}",&self.id,var.as_ref().get_kind());
@@ -2012,17 +2122,7 @@ impl Process for LVal {
                                     }
                                     _ => {}
                                 }
-                                // println!("var:{:?},var_type:{:?}",var.as_ref().get_kind(),var.as_ref().get_ir_type());
-                                // println!("{:?}",val_ret);
 
-                                // if kit_mut.context_mut.get_layer()<0{
-                                //     let val = var.as_ref().get_int_bond();
-                                //     val_ret = ExpValue::Int(val);
-                                // }
-
-                                // let mut val = var.as_ref().get_int_bond();
-                                // let mut val_ret = ExpValue::Int(val);
-                                // kit_mut.context_mut.push_inst_bb(inst_trans);
                                 return Ok((var, val_ret));
                             }
                         }
@@ -2165,7 +2265,8 @@ impl Process for UnaryExp {
                         IrType::Float => {
                             fparams_type_vec.push(Type::Float);
                         }
-                        IrType::Int => {
+                        IrType::Int | IrType::FloatPtr | IrType::IntPtr => {
+                            //这里可能得改
                             fparams_type_vec.push(Type::Int);
                         }
                         _ => {

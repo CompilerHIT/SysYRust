@@ -19,6 +19,7 @@ pub struct Context<'a> {
     pub bb_map: HashMap<String, HashMap<String, ObjPtr<Inst>>>,
     pub bb_now_mut: InfuncChoice,
     pub module_mut: &'a mut Module,
+    num_bb: i64,
     index: i64,
     layer: i64,
 }
@@ -53,6 +54,7 @@ impl Context<'_> {
             param_usage_table: HashMap::new(),
             bb_now_mut: InfuncChoice::NInFunc(),
             module_mut,
+            num_bb: 0,
             index: 0,
             layer: -1,
             symbol_table: HashMap::new(),
