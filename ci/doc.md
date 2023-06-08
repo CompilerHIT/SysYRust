@@ -1,3 +1,10 @@
+
+### 测试镜像版本:
+
+`10.249.12.83:5000/compilerhit/sysy-rv64-cpci:2.1` :
+增加目标程序执行时间获取
+
+
 ### ci使用前置(手动版)
 
 1\.docker 本地registry部署在局域网中，未配置https,所以需要切换使用http client来允许docker进行不安全的pull
@@ -22,8 +29,6 @@ docker login 10.249.12.83:5000 -u root -p root
 docker pull <latest-ci>
 ```
 
-当前最新测试镜像名为`10.249.12.83:5000/compilerhit/sysy-rv64-cpci:1.0` 
-
 4\.删除旧的同名容器,避免运行新镜像失败
 
 ```
@@ -35,6 +40,11 @@ docker rm ci
 
 ```
 docker run --name ci -d -p 50051:50051 -v <your_data_path>:/test/data <latest-ci>
+```
+
+如:
+```
+docker run --name ci -d -p 50051:50051 -v ./data:/test/data 10.249.12.83:5000/compilerhit/sysy-rv64-cpci:2.1
 ```
 
 6\.在宿主机安装需要的python的grpc模块:
@@ -87,3 +97,9 @@ ci init -config <config_path>
 ```
 ./test all
 ```
+
+### 更新
+
+1. 增加执行时间获取  ():
+每个测试样例测试后会在当行右侧显示标准程序执行时间和我们的程序执行时间
+每个文件夹测试完成之后log目标程序执行时间总和在最下面
