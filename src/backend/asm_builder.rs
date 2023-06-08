@@ -187,7 +187,7 @@ impl<'f> AsmBuilder<'f> {
     // }
 
     pub fn print_array(&mut self, array: &Vec<i32>, name: String) -> Result<()> {
-        writeln!(self.f, ".{name}:")?;
+        writeln!(self.f, "{name}:")?;
         for i in array {
             writeln!(self.f, "	.word	{i}")?;
         }

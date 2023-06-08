@@ -35,6 +35,16 @@ pub enum GlobalVar {
     GlobalConstArray(IntArray)
 }
 
+impl GlobalVar {
+    pub fn get_name(&self) -> &String {
+        match self {
+            GlobalVar::IGlobalVar(var) => &var.name,
+            GlobalVar::FGlobalVar(var) => &var.name,
+            GlobalVar::GlobalConstArray(var) => &var.name,
+        }
+    }
+}
+
 #[derive(Clone, Copy, PartialEq)]
 pub struct StackSlot {
     pos: i32,
