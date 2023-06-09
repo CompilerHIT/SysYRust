@@ -8,8 +8,8 @@ pub mod typesearch;
 pub enum ExpValue {
     Float(f32),
     Int(i32),
-    True,
-    False,
+    // True,
+    // False,
     None,
 }
 

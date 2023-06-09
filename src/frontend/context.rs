@@ -64,6 +64,11 @@ impl Context<'_> {
     /* -------------------------------------------------------------------------- */
     /*                               for bb_now_mut                               */
     /* -------------------------------------------------------------------------- */
+    pub fn get_newbb_name(&mut self)->String{
+        self.num_bb = self.num_bb+1;
+        self.num_bb.to_string()
+    }
+    
     pub fn push_inst_bb(&mut self, inst_ptr: ObjPtr<Inst>) {
         match self.bb_now_mut {
             InfuncChoice::InFunc(bbptr) => {

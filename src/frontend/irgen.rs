@@ -1,10 +1,11 @@
-use std::env::var;
+
 
 use super::context::Type;
 use super::{ast::*, context::Context};
 use super::{init_padding_float, init_padding_int, ExpValue, RetInitVec};
 use crate::frontend::context::Symbol;
 use crate::frontend::error::Error;
+use crate::frontend::typesearch::TypeProcess;
 use crate::ir::basicblock::BasicBlock;
 use crate::ir::function::{self, Function};
 use crate::ir::instruction::{Inst, InstKind};
@@ -1824,7 +1825,53 @@ impl Process for If {
     type Ret = i32;
     type Message = (i32);
     fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
-        todo!();
+        let (inst_cond,val_cond) = self.cond.process(Type::Int, kit_mut).unwrap();
+        let inst_branch = kit_mut.pool_inst_mut.make_br(inst_cond);
+        kit_mut.context_mut.push_inst_bb(inst_branch);
+        let bb_if_name = kit_mut.context_mut.get_newbb_name();
+        let inst_bb_if = kit_mut.pool_bb_mut.new_basic_block(bb_if_name);
+        if let Some(stmt_else) = &mut self.else_then{//如果有else语句
+            let bb_else_name = kit_mut.context_mut.get_newbb_name();
+            let inst_bb_else = kit_mut.pool_bb_mut.new_basic_block(bb_else_name);
+            match kit_mut.context_mut.bb_now_mut {
+                InfuncChoice::InFunc(bb_now) =>{
+                    bb_now.as_mut().add_next_bb(inst_bb_else);//先放判断为假的else语句
+                    bb_now.as_mut().add_next_bb(inst_bb_if);
+                }   
+                _=>{
+                    unreachable!()
+                }
+            }
+            kit_mut.context_mut.bb_now_set(inst_bb_else);//设置现在所在的bb块，准备归约
+            stmt_else.process(input, kit_mut).unwrap();//向该分支块内生成指令
+            kit_mut.context_mut.bb_now_set(inst_bb_if);
+            self.then.process(input, kit_mut).unwrap();
+            //生成一块新的bb
+            let bb_successor_name = kit_mut.context_mut.get_newbb_name();
+            let inst_bb_successor = kit_mut.pool_bb_mut.new_basic_block(bb_successor_name);
+            inst_bb_if.as_mut().add_next_bb(inst_bb_successor);//向分支添加下一个块
+            inst_bb_else.as_mut().add_next_bb(inst_bb_successor);//向分支添加下一个块
+            kit_mut.context_mut.bb_now_set(inst_bb_successor);//设置现在所在的bb
+        }else{
+            let bb_successor_name = kit_mut.context_mut.get_newbb_name();
+            let inst_bb_successor = kit_mut.pool_bb_mut.new_basic_block(bb_successor_name);
+            match kit_mut.context_mut.bb_now_mut {
+                InfuncChoice::InFunc(bb_now) =>{
+                    bb_now.as_mut().add_next_bb(inst_bb_successor);//先放判断为假的
+                    bb_now.as_mut().add_next_bb(inst_bb_if);
+                }   
+                _=>{
+                    unreachable!()
+                }
+            }
+            //没有else块,只有if块
+            kit_mut.context_mut.bb_now_set(inst_bb_if);
+            self.then.process(input, kit_mut).unwrap();
+            inst_bb_if.as_mut().add_next_bb(inst_bb_successor);//向分支添加下一个块
+            kit_mut.context_mut.bb_now_set(inst_bb_successor);//设置现在所在的bb
+        }
+        Ok(1)
+
     }
 }
 impl Process for While {
@@ -1897,10 +1944,10 @@ impl Process for Exp {
 }
 
 impl Process for Cond {
-    type Ret = i32;
-    type Message = (i32);
+    type Ret = (ObjPtr<Inst>, ExpValue);
+    type Message = (Type);
     fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
-        todo!();
+        self.l_or_exp.process(input, kit_mut)
     }
 }
 impl Process for LVal {
@@ -2627,11 +2674,16 @@ impl Process for RelExp {
     type Ret = (ObjPtr<Inst>, ExpValue);
     type Message = (Type);
     fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
+        let tp = self.type_process(1, kit_mut).unwrap();//获得表达式中各比较元素应该给的类型
         match self {
             RelExp::AddExp(addexp) => addexp.process(input, kit_mut),
             RelExp::OpExp((relexp, op, addexp)) => {
-                let (mut inst_left, val_left) = relexp.process(input, kit_mut).unwrap();
-                let (mut inst_right, val_right) = addexp.process(input, kit_mut).unwrap();
+                let mut tp_in = Type::Int;
+                if tp>1{//float或floatconst
+                    tp_in = Type::Float;
+                }
+                let (mut inst_left, val_left) = relexp.process(tp_in, kit_mut).unwrap();
+                let (mut inst_right, val_right) = addexp.process(tp_in, kit_mut).unwrap();
                 match val_left {
                     ExpValue::Float(f) =>{
                         inst_left = kit_mut.pool_inst_mut.make_float_const(f);
@@ -2682,15 +2734,20 @@ impl Process for RelExp {
 }
 impl Process for EqExp {
     type Ret = (ObjPtr<Inst>, ExpValue);
-    type Message = (Type);
+    type Message = (Type);//if中默认给Type::Int
     fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
+        let tp = self.type_process(1, kit_mut).unwrap();//获得表达式中各比较元素应该给的类型
         match self {
             EqExp::RelExp(relexp) =>{
                 relexp.process(input, kit_mut)
             }
             EqExp::EqualExp((eqexp,relexp)) =>{
-                let (mut inst_left,val_left) = eqexp.process(input, kit_mut).unwrap();
-                let (mut inst_right,val_right) = relexp.process(input, kit_mut).unwrap();
+                let mut tp_in = Type::Int;
+                if tp>1{
+                    tp_in = Type::Float;
+                }
+                let (mut inst_left,val_left) = eqexp.process(tp_in, kit_mut).unwrap();
+                let (mut inst_right,val_right) = relexp.process(tp_in, kit_mut).unwrap();
                 match val_left {
                     ExpValue::Float(f) =>{
                         inst_left = kit_mut.pool_inst_mut.make_float_const(f);
@@ -2761,31 +2818,54 @@ impl Process for LAndExp {
             LAndExp::AndExp((landexp,eqexp)) =>{
                 let (mut inst_left,val_left) = landexp.process(input, kit_mut).unwrap();
                 let (mut inst_right,val_right) = eqexp.process(input, kit_mut).unwrap();
-                match val_left {
-                    ExpValue::Float(f) =>{
-                        inst_left = kit_mut.pool_inst_mut.make_float_const(f);
-                        kit_mut.context_mut.push_inst_bb(inst_left);
-                    }
-                    ExpValue::Int(i) =>{
-                        inst_left = kit_mut.pool_inst_mut.make_int_const(i);
-                        kit_mut.context_mut.push_inst_bb(inst_left);
-                    }
-                    _ =>{}
-                }
-                match val_right {
-                    ExpValue::Float(f) =>{
-                        inst_right = kit_mut.pool_inst_mut.make_float_const(f);
-                        kit_mut.context_mut.push_inst_bb(inst_right);
-                    }
-                    ExpValue::Int(i) =>{
-                        inst_right = kit_mut.pool_inst_mut.make_int_const(i);
-                        kit_mut.context_mut.push_inst_bb(inst_right);
-                    }
-                    _ =>{}
-                }//这里可以进一步优化,计算cond是否恒为真或假
-                let inst_and = kit_mut.pool_inst_mut.make_and(inst_left, inst_right);
+                let mut inst_and = kit_mut.pool_inst_mut.make_and(inst_left, inst_right);
+                let mut val_and = ExpValue::None;
+                // match val_left {//优化得再改改
+                //     ExpValue::False =>{
+                //         inst_and = kit_mut.pool_inst_mut.make_int_const(0);
+                //         val_and = ExpValue::False;
+                //     }
+                //     ExpValue::True =>{
+                //         match val_right{
+                //             ExpValue::False =>{
+                //                 inst_and = kit_mut.pool_inst_mut.make_int_const(0);
+                //                 val_and = ExpValue::False;
+                //             }
+                //             ExpValue::True =>{
+                //                 inst_and = kit_mut.pool_inst_mut.make_int_const(1);
+                //                 val_and = ExpValue::True;
+                //             }
+                //             ExpValue::None =>{
+
+                //             }
+                //             _=>{
+                //                 unreachable!()
+                //             }
+                //         }
+                //     }
+                //     ExpValue::None =>{
+                //         match val_right{
+                //             ExpValue::False =>{
+                //                 inst_and = kit_mut.pool_inst_mut.make_int_const(0);
+                //                 val_and = ExpValue::False;
+                //             }
+                //             ExpValue::True =>{
+                                
+                //             }
+                //             ExpValue::None =>{
+
+                //             }
+                //             _=>{
+                //                 unreachable!()
+                //             }
+                //         }
+                //     }
+                //     _=>{
+                //         unreachable!()
+                //     }
+                // }
                 kit_mut.context_mut.push_inst_bb(inst_and);
-                Ok((inst_and,ExpValue::None))
+                Ok((inst_and,val_and))
             }
         }
     }
@@ -2809,9 +2889,57 @@ impl Process for LOrExp {
             LOrExp::OrExp((lorexp,landexp)) =>{
                 let (inst_left,val_left) = lorexp.process(input, kit_mut).unwrap();
                 let (inst_right,val_right) = landexp.process(input, kit_mut).unwrap();
-                let inst_or = kit_mut.pool_inst_mut.make_or(inst_left, inst_right);
+                let mut inst_or = kit_mut.pool_inst_mut.make_or(inst_left, inst_right);
+                let mut val_or = ExpValue::None;
+                // match val_left {
+                //     ExpValue::Int(i) =>{
+                //         if i!=0{//true
+                //             inst_or = kit_mut.pool_inst_mut.make_int_const(1);
+                //             val_or = ExpValue::Int(1);
+                //         }else{//false
+                //             match val_right {
+                //                 ExpValue::Int(x) =>{
+                //                     if x!=0{//true
+                //                         inst_or = kit_mut.pool_inst_mut.make_int_const(1);
+                //                         val_or = ExpValue::Int(1);
+                //                     }else{
+                //                         inst_or = kit_mut.pool_inst_mut.make_int_const(0);
+                //                         val_or = ExpValue::Int(0);
+                //                     }
+                //                 }
+                //                 ExpValue::None =>{
+
+                //                 }
+                //                 _=>{
+                //                     unreachable!()
+                //                 }
+                //             }
+                //         }
+                        
+                //     }
+                //     ExpValue::None=>{
+                //         match val_right {
+                //             ExpValue::Int(x) =>{
+                //                 if x!=0{//为true
+                //                     inst_or = kit_mut.pool_inst_mut.make_int_const(1);
+                //                 val_or = ExpValue::Int(1);
+                //                 }else{//为false
+
+                //                 }
+                                
+                //             }
+                //             ExpValue::None=>{
+                                
+                //             }
+                //             _=>{unreachable!()}
+                //         }
+                //     }
+                //     _=>{
+                //         unreachable!()
+                //     }
+                // }
                 kit_mut.context_mut.push_inst_bb(inst_or);
-                Ok((inst_or,ExpValue::None))//这里或许可以优化
+                Ok((inst_or,val_or))//这里或许可以优化
             }
         }
     }
