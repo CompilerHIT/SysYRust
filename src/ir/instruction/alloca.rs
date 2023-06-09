@@ -12,12 +12,12 @@ impl ObjPool<Inst> {
         // 正确性检查
         // 数组长度必须为整数
 
-        let inst = self.put(Inst::new(
+        let mut inst = self.put(Inst::new(
             crate::ir::ir_type::IrType::IntPtr,
             InstKind::Alloca(length),
             vec![],
         ));
-        inst.as_mut().set_int_init(init);
+        inst.set_int_init(init);
 
         // 设置use list
         inst
@@ -30,12 +30,12 @@ impl ObjPool<Inst> {
     /// # Returns
     /// 构造好的数组指令，其值为Floatptr
     pub fn make_float_array(&mut self, length: i32, init: Vec<f32>) -> ObjPtr<Inst> {
-        let inst = self.put(Inst::new(
+        let mut inst = self.put(Inst::new(
             crate::ir::ir_type::IrType::FloatPtr,
             InstKind::Alloca(length),
             vec![],
         ));
-        inst.as_mut().set_float_init(init);
+        inst.set_float_init(init);
 
         // 设置use list
         inst

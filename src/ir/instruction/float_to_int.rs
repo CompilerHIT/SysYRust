@@ -4,14 +4,14 @@ impl ObjPool<Inst> {
     /// 创建float_to_int指令
     /// # Arguments
     /// * 'value' - 要转换的值
-    pub fn make_float_to_int(&mut self, value: ObjPtr<Inst>) -> ObjPtr<Inst> {
+    pub fn make_float_to_int(&mut self, mut value: ObjPtr<Inst>) -> ObjPtr<Inst> {
         // 正确性检查
-        if value.as_ref().get_ir_type() != IrType::Float {
+        if value.get_ir_type() != IrType::Float {
             unreachable!("Inst::make_float_to_int")
         }
         let inst = self.put(Inst::new(IrType::Int, InstKind::FtoI, vec![value]));
         // 设置use list
-        value.as_mut().add_user(inst.as_ref());
+        value.add_user(inst.as_ref());
         inst
     }
 }

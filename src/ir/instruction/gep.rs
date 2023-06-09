@@ -10,10 +10,10 @@ impl ObjPool<Inst> {
     /// * 'offset' - 偏移量
     /// # Returns
     /// 构造好的 GEP 指令
-    pub fn make_gep(&mut self, ptr: ObjPtr<Inst>, offset: ObjPtr<Inst>) -> ObjPtr<Inst> {
+    pub fn make_gep(&mut self, mut ptr: ObjPtr<Inst>, mut offset: ObjPtr<Inst>) -> ObjPtr<Inst> {
         // 正确性检查
-        match ptr.as_ref().get_ir_type() {
-            IrType::IntPtr | IrType::FloatPtr => match offset.as_ref().get_ir_type() {
+        match ptr.get_ir_type() {
+            IrType::IntPtr | IrType::FloatPtr => match offset.get_ir_type() {
                 IrType::Int | IrType::ConstInt => {}
                 _ => unreachable!("ObjPool::make_gep: offset must be a int"),
             },
@@ -27,8 +27,8 @@ impl ObjPool<Inst> {
         ));
 
         // 设置use_list
-        ptr.as_mut().add_user(inst.as_ref());
-        offset.as_mut().add_user(inst.as_ref());
+        ptr.add_user(inst.as_ref());
+        offset.add_user(inst.as_ref());
 
         inst
     }
@@ -47,10 +47,10 @@ impl Inst {
     }
 
     /// 设置 GEP 指令的指针
-    pub fn set_gep_ptr(&mut self, ptr: ObjPtr<Inst>) {
+    pub fn set_gep_ptr(&mut self, mut ptr: ObjPtr<Inst>) {
         // 正确性检查
         if let InstKind::Gep = self.get_kind() {
-            match ptr.as_ref().get_ir_type() {
+            match ptr.get_ir_type() {
                 IrType::IntPtr | IrType::FloatPtr => {}
                 _ => unreachable!("Inst::set_gep_ptr: ptr must be a pointer"),
             };
@@ -60,7 +60,7 @@ impl Inst {
 
         // 设置use_list
         self.user.get_operand(0).as_mut().remove_user(self);
-        ptr.as_mut().add_user(self);
+        ptr.add_user(self);
 
         self.user.set_operand(0, ptr);
     }
@@ -77,10 +77,10 @@ impl Inst {
     }
 
     /// 设置 GEP 指令的偏移量
-    pub fn set_gep_offset(&mut self, offset: ObjPtr<Inst>) {
+    pub fn set_gep_offset(&mut self, mut offset: ObjPtr<Inst>) {
         // 正确性检查
         if let InstKind::Gep = self.get_kind() {
-            match offset.as_ref().get_ir_type() {
+            match offset.get_ir_type() {
                 IrType::Int | IrType::ConstInt => {}
                 _ => unreachable!("Inst::set_gep_offset: offset must be a int"),
             };
@@ -90,7 +90,7 @@ impl Inst {
 
         // 设置use_list
         self.user.get_operand(1).as_mut().remove_user(self);
-        offset.as_mut().add_user(self);
+        offset.add_user(self);
 
         self.user.set_operand(1, offset);
     }

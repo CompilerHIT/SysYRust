@@ -105,9 +105,9 @@ impl ObjPool<Inst> {
     /// * 'ptr' - 需要加载的指针
     /// # Return
     /// 返回一个Inst实例
-    pub fn make_global_float_load(&mut self, ptr: ObjPtr<Inst>) -> ObjPtr<Inst> {
+    pub fn make_global_float_load(&mut self, mut ptr: ObjPtr<Inst>) -> ObjPtr<Inst> {
         // 正确性检查
-        match ptr.as_ref().get_ir_type() {
+        match ptr.get_ir_type() {
             IrType::Float | IrType::ConstFloat => {}
             _ => unreachable!("ObjPool::make_global_float_load: ptr must be a global float"),
         }
@@ -119,7 +119,7 @@ impl ObjPool<Inst> {
         ));
 
         // 设置use list
-        ptr.as_mut().add_user(inst.as_ref());
+        ptr.add_user(inst.as_ref());
 
         inst
     }
@@ -129,9 +129,9 @@ impl ObjPool<Inst> {
     /// * 'ptr' - 需要加载的指针
     /// # Return
     /// 返回一个Inst实例
-    pub fn make_global_float_array_load(&mut self, ptr: ObjPtr<Inst>) -> ObjPtr<Inst> {
+    pub fn make_global_float_array_load(&mut self, mut ptr: ObjPtr<Inst>) -> ObjPtr<Inst> {
         // 正确性检查
-        match ptr.as_ref().get_ir_type() {
+        match ptr.get_ir_type() {
             IrType::FloatPtr => {}
             _ => unreachable!("ObjPool::make_global_float_array_load: ptr must be a pointer"),
         }
@@ -143,7 +143,7 @@ impl ObjPool<Inst> {
         ));
 
         // 设置use list
-        ptr.as_mut().add_user(inst.as_ref());
+        ptr.add_user(inst.as_ref());
 
         inst
     }
@@ -160,10 +160,10 @@ impl Inst {
     /// 修改指针
     /// # Arguments
     /// * 'ptr' - 新的指针
-    pub fn set_ptr(&mut self, ptr: ObjPtr<Inst>) {
+    pub fn set_ptr(&mut self, mut ptr: ObjPtr<Inst>) {
         // 修改use list
-        self.get_ptr().as_mut().remove_user(self);
-        ptr.as_mut().add_user(self);
+        self.get_ptr().remove_user(self);
+        ptr.add_user(self);
 
         self.user.set_operand(0, ptr);
     }

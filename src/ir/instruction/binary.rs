@@ -7,20 +7,20 @@ impl ObjPool<Inst> {
     /// # Arguments
     /// * `lhs` - 左操作数
     /// * `rhs` - 右操作数
-    pub fn make_add(&mut self, lhs: ObjPtr<Inst>, rhs: ObjPtr<Inst>) -> ObjPtr<Inst> {
+    pub fn make_add(&mut self, mut lhs: ObjPtr<Inst>, mut rhs: ObjPtr<Inst>) -> ObjPtr<Inst> {
         // 正确性检查
         // 操作数类型要相互对应
         check_arith(lhs, rhs, true);
 
         let inst = self.put(Inst::new(
-            lhs.as_ref().get_ir_type(),
+            lhs.get_ir_type(),
             InstKind::Binary(BinOp::Add),
             vec![lhs, rhs],
         ));
 
         // 设置use list
-        lhs.as_mut().add_user(inst.as_ref());
-        rhs.as_mut().add_user(inst.as_ref());
+        lhs.add_user(inst.as_ref());
+        rhs.add_user(inst.as_ref());
         inst
     }
 
@@ -28,38 +28,38 @@ impl ObjPool<Inst> {
     /// # Arguments
     /// * `lhs` - 左操作数
     /// * `rhs` - 右操作数
-    pub fn make_sub(&mut self, lhs: ObjPtr<Inst>, rhs: ObjPtr<Inst>) -> ObjPtr<Inst> {
+    pub fn make_sub(&mut self, mut lhs: ObjPtr<Inst>, mut rhs: ObjPtr<Inst>) -> ObjPtr<Inst> {
         // 正确性检查
         check_arith(lhs, rhs, true);
 
         let inst = self.put(Inst::new(
-            lhs.as_ref().get_ir_type(),
+            lhs.get_ir_type(),
             InstKind::Binary(BinOp::Sub),
             vec![lhs, rhs],
         ));
 
         // 设置use list
-        lhs.as_mut().add_user(inst.as_ref());
-        rhs.as_mut().add_user(inst.as_ref());
+        lhs.add_user(inst.as_ref());
+        rhs.add_user(inst.as_ref());
         inst
     }
     /// 创建乘法指令
     /// # Arguments
     /// * `lhs` - 左操作数
     /// * `rhs` - 右操作数
-    pub fn make_mul(&mut self, lhs: ObjPtr<Inst>, rhs: ObjPtr<Inst>) -> ObjPtr<Inst> {
+    pub fn make_mul(&mut self, mut lhs: ObjPtr<Inst>, mut rhs: ObjPtr<Inst>) -> ObjPtr<Inst> {
         // 正确性检查
         check_arith(lhs, rhs, true);
 
         let inst = self.put(Inst::new(
-            lhs.as_ref().get_ir_type(),
+            lhs.get_ir_type(),
             InstKind::Binary(BinOp::Mul),
             vec![lhs, rhs],
         ));
 
         // 设置use list
-        lhs.as_mut().add_user(inst.as_ref());
-        rhs.as_mut().add_user(inst.as_ref());
+        lhs.add_user(inst.as_ref());
+        rhs.add_user(inst.as_ref());
         inst
     }
 
@@ -67,19 +67,19 @@ impl ObjPool<Inst> {
     /// # Arguments
     /// * `lhs` - 左操作数
     /// * `rhs` - 右操作数
-    pub fn make_div(&mut self, lhs: ObjPtr<Inst>, rhs: ObjPtr<Inst>) -> ObjPtr<Inst> {
+    pub fn make_div(&mut self, mut lhs: ObjPtr<Inst>, mut rhs: ObjPtr<Inst>) -> ObjPtr<Inst> {
         // 正确性检查
         check_arith(lhs, rhs, true);
 
         let inst = self.put(Inst::new(
-            lhs.as_ref().get_ir_type(),
+            lhs.get_ir_type(),
             InstKind::Binary(BinOp::Div),
             vec![lhs, rhs],
         ));
 
         // 设置use list
-        lhs.as_mut().add_user(inst.as_ref());
-        rhs.as_mut().add_user(inst.as_ref());
+        lhs.add_user(inst.as_ref());
+        rhs.add_user(inst.as_ref());
         inst
     }
 
@@ -87,19 +87,19 @@ impl ObjPool<Inst> {
     /// # Arguments
     /// * `lhs` - 左操作数
     /// * `rhs` - 右操作数
-    pub fn make_rem(&mut self, lhs: ObjPtr<Inst>, rhs: ObjPtr<Inst>) -> ObjPtr<Inst> {
+    pub fn make_rem(&mut self, mut lhs: ObjPtr<Inst>, mut rhs: ObjPtr<Inst>) -> ObjPtr<Inst> {
         // 正确性检查
         check_arith(lhs, rhs, true);
 
         let inst = self.put(Inst::new(
-            lhs.as_ref().get_ir_type(),
+            lhs.get_ir_type(),
             InstKind::Binary(BinOp::Rem),
             vec![lhs, rhs],
         ));
 
         // 设置use list
-        lhs.as_mut().add_user(inst.as_ref());
-        rhs.as_mut().add_user(inst.as_ref());
+        lhs.add_user(inst.as_ref());
+        rhs.add_user(inst.as_ref());
         inst
     }
 
@@ -107,19 +107,19 @@ impl ObjPool<Inst> {
     /// # Arguments
     /// * `lhs` - 左操作数
     /// * `rhs` - 右操作数
-    pub fn make_and(&mut self, lhs: ObjPtr<Inst>, rhs: ObjPtr<Inst>) -> ObjPtr<Inst> {
+    pub fn make_and(&mut self, mut lhs: ObjPtr<Inst>, mut rhs: ObjPtr<Inst>) -> ObjPtr<Inst> {
         // 正确性检查
         check_arith(lhs, rhs, false);
 
         let inst = self.put(Inst::new(
-            lhs.as_ref().get_ir_type(),
+            lhs.get_ir_type(),
             InstKind::Binary(BinOp::And),
             vec![lhs, rhs],
         ));
 
         // 设置use list
-        lhs.as_mut().add_user(inst.as_ref());
-        rhs.as_mut().add_user(inst.as_ref());
+        lhs.add_user(inst.as_ref());
+        rhs.add_user(inst.as_ref());
         inst
     }
 
@@ -127,19 +127,19 @@ impl ObjPool<Inst> {
     /// # Arguments
     /// * `lhs` - 左操作数
     /// * `rhs` - 右操作数
-    pub fn make_or(&mut self, lhs: ObjPtr<Inst>, rhs: ObjPtr<Inst>) -> ObjPtr<Inst> {
+    pub fn make_or(&mut self, mut lhs: ObjPtr<Inst>, mut rhs: ObjPtr<Inst>) -> ObjPtr<Inst> {
         // 正确性检查
         check_arith(lhs, rhs, false);
 
         let inst = self.put(Inst::new(
-            lhs.as_ref().get_ir_type(),
+            lhs.get_ir_type(),
             InstKind::Binary(BinOp::Or),
             vec![lhs, rhs],
         ));
 
         // 设置use list
-        lhs.as_mut().add_user(inst.as_ref());
-        rhs.as_mut().add_user(inst.as_ref());
+        lhs.add_user(inst.as_ref());
+        rhs.add_user(inst.as_ref());
         inst
     }
 
@@ -147,19 +147,19 @@ impl ObjPool<Inst> {
     /// # Arguments
     /// * `lhs` - 左操作数
     /// * `rhs` - 右操作数
-    pub fn make_le(&mut self, lhs: ObjPtr<Inst>, rhs: ObjPtr<Inst>) -> ObjPtr<Inst> {
+    pub fn make_le(&mut self, mut lhs: ObjPtr<Inst>, mut rhs: ObjPtr<Inst>) -> ObjPtr<Inst> {
         // 正确性检查
         check_arith(lhs, rhs, true);
 
         let inst = self.put(Inst::new(
-            lhs.as_ref().get_ir_type(),
+            lhs.get_ir_type(),
             InstKind::Binary(BinOp::Le),
             vec![lhs, rhs],
         ));
 
         // 设置use list
-        lhs.as_mut().add_user(inst.as_ref());
-        rhs.as_mut().add_user(inst.as_ref());
+        lhs.add_user(inst.as_ref());
+        rhs.add_user(inst.as_ref());
         inst
     }
 
@@ -167,19 +167,19 @@ impl ObjPool<Inst> {
     /// # Arguments
     /// * `lhs` - 左操作数
     /// * `rhs` - 右操作数
-    pub fn make_lt(&mut self, lhs: ObjPtr<Inst>, rhs: ObjPtr<Inst>) -> ObjPtr<Inst> {
+    pub fn make_lt(&mut self, mut lhs: ObjPtr<Inst>, mut rhs: ObjPtr<Inst>) -> ObjPtr<Inst> {
         // 正确性检查
         check_arith(lhs, rhs, true);
 
         let inst = self.put(Inst::new(
-            lhs.as_ref().get_ir_type(),
+            lhs.get_ir_type(),
             InstKind::Binary(BinOp::Lt),
             vec![lhs, rhs],
         ));
 
         // 设置use list
-        lhs.as_mut().add_user(inst.as_ref());
-        rhs.as_mut().add_user(inst.as_ref());
+        lhs.add_user(inst.as_ref());
+        rhs.add_user(inst.as_ref());
         inst
     }
 
@@ -187,19 +187,19 @@ impl ObjPool<Inst> {
     /// # Arguments
     /// * `lhs` - 左操作数
     /// * `rhs` - 右操作数
-    pub fn make_ge(&mut self, lhs: ObjPtr<Inst>, rhs: ObjPtr<Inst>) -> ObjPtr<Inst> {
+    pub fn make_ge(&mut self, mut lhs: ObjPtr<Inst>, mut rhs: ObjPtr<Inst>) -> ObjPtr<Inst> {
         // 正确性检查
         check_arith(lhs, rhs, true);
 
         let inst = self.put(Inst::new(
-            lhs.as_ref().get_ir_type(),
+            lhs.get_ir_type(),
             InstKind::Binary(BinOp::Ge),
             vec![lhs, rhs],
         ));
 
         // 设置use list
-        lhs.as_mut().add_user(inst.as_ref());
-        rhs.as_mut().add_user(inst.as_ref());
+        lhs.add_user(inst.as_ref());
+        rhs.add_user(inst.as_ref());
         inst
     }
 
@@ -207,38 +207,38 @@ impl ObjPool<Inst> {
     /// # Arguments
     /// * `lhs` - 左操作数
     /// * `rhs` - 右操作数
-    pub fn make_gt(&mut self, lhs: ObjPtr<Inst>, rhs: ObjPtr<Inst>) -> ObjPtr<Inst> {
+    pub fn make_gt(&mut self, mut lhs: ObjPtr<Inst>, mut rhs: ObjPtr<Inst>) -> ObjPtr<Inst> {
         // 正确性检查
         check_arith(lhs, rhs, true);
 
         let inst = self.put(Inst::new(
-            lhs.as_ref().get_ir_type(),
+            lhs.get_ir_type(),
             InstKind::Binary(BinOp::Gt),
             vec![lhs, rhs],
         ));
 
         // 设置use list
-        lhs.as_mut().add_user(inst.as_ref());
-        rhs.as_mut().add_user(inst.as_ref());
+        lhs.add_user(inst.as_ref());
+        rhs.add_user(inst.as_ref());
         inst
     }
     /// 创建等于指令
     /// # Arguments
     /// * `lhs` - 左操作数
     /// * `rhs` - 右操作数
-    pub fn make_eq(&mut self, lhs: ObjPtr<Inst>, rhs: ObjPtr<Inst>) -> ObjPtr<Inst> {
+    pub fn make_eq(&mut self, mut lhs: ObjPtr<Inst>, mut rhs: ObjPtr<Inst>) -> ObjPtr<Inst> {
         // 正确性检查
         check_arith(lhs, rhs, true);
 
         let inst = self.put(Inst::new(
-            lhs.as_ref().get_ir_type(),
+            lhs.get_ir_type(),
             InstKind::Binary(BinOp::Eq),
             vec![lhs, rhs],
         ));
 
         // 设置use list
-        lhs.as_mut().add_user(inst.as_ref());
-        rhs.as_mut().add_user(inst.as_ref());
+        lhs.add_user(inst.as_ref());
+        rhs.add_user(inst.as_ref());
         inst
     }
 
@@ -246,19 +246,19 @@ impl ObjPool<Inst> {
     /// # Arguments
     /// * `lhs` - 左操作数
     /// * `rhs` - 右操作数
-    pub fn make_ne(&mut self, lhs: ObjPtr<Inst>, rhs: ObjPtr<Inst>) -> ObjPtr<Inst> {
+    pub fn make_ne(&mut self, mut lhs: ObjPtr<Inst>, mut rhs: ObjPtr<Inst>) -> ObjPtr<Inst> {
         // 正确性检查
         check_arith(lhs, rhs, true);
 
         let inst = self.put(Inst::new(
-            lhs.as_ref().get_ir_type(),
+            lhs.get_ir_type(),
             InstKind::Binary(BinOp::Ne),
             vec![lhs, rhs],
         ));
 
         // 设置use list
-        lhs.as_mut().add_user(inst.as_ref());
-        rhs.as_mut().add_user(inst.as_ref());
+        lhs.add_user(inst.as_ref());
+        rhs.add_user(inst.as_ref());
         inst
     }
 }
@@ -287,7 +287,7 @@ impl Inst {
     }
 
     /// 修改左操作数
-    pub fn set_lhs(&mut self, lhs: ObjPtr<Inst>) {
+    pub fn set_lhs(&mut self, mut lhs: ObjPtr<Inst>) {
         // 正确性检查
         if let InstKind::Binary(_) = self.kind {
             check_arith(lhs, self.get_rhs(), is_arith(self));
@@ -296,15 +296,15 @@ impl Inst {
         }
 
         // 修改use list
-        let old_lhs = self.user.get_operand(0);
-        old_lhs.as_mut().remove_user(self);
-        lhs.as_mut().add_user(self);
+        let mut old_lhs = self.user.get_operand(0);
+        old_lhs.remove_user(self);
+        lhs.add_user(self);
 
         self.user.set_operand(0, lhs);
     }
 
     /// 修改右操作数
-    pub fn set_rhs(&mut self, rhs: ObjPtr<Inst>) {
+    pub fn set_rhs(&mut self, mut rhs: ObjPtr<Inst>) {
         // 正确性检查
         if let InstKind::Binary(_) = self.kind {
             check_arith(self.get_lhs(), rhs, is_arith(self));
@@ -313,9 +313,9 @@ impl Inst {
         }
 
         // 修改use list
-        let old_rhs = self.user.get_operand(1);
-        old_rhs.as_mut().remove_user(self);
-        rhs.as_mut().add_user(self);
+        let mut old_rhs = self.user.get_operand(1);
+        old_rhs.remove_user(self);
+        rhs.add_user(self);
 
         self.user.set_operand(1, rhs);
     }
@@ -330,14 +330,12 @@ impl Inst {
 /// (Const)Int op (Const)Int
 /// (Const)Float op (Const)Float
 fn check_arith(lhs: ObjPtr<Inst>, rhs: ObjPtr<Inst>, check_float: bool) {
-    match lhs.as_ref().get_ir_type() {
-        IrType::Int | IrType::ConstInt => debug_assert!(
-            rhs.as_ref().get_ir_type() == IrType::Int
-                || rhs.as_ref().get_ir_type() == IrType::ConstInt
-        ),
+    match lhs.get_ir_type() {
+        IrType::Int | IrType::ConstInt => {
+            debug_assert!(rhs.get_ir_type() == IrType::Int || rhs.get_ir_type() == IrType::ConstInt)
+        }
         IrType::Float | IrType::ConstFloat if check_float => debug_assert!(
-            rhs.as_ref().get_ir_type() == IrType::Float
-                || rhs.as_ref().get_ir_type() == IrType::ConstFloat
+            rhs.get_ir_type() == IrType::Float || rhs.get_ir_type() == IrType::ConstFloat
         ),
         _ => unreachable!("check_arith"),
     }

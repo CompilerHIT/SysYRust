@@ -5,15 +5,15 @@ impl ObjPool<Inst> {
     /// 创建return指令
     /// # Arguments
     /// * 'value' - 返回值
-    pub fn make_return(&mut self, value: ObjPtr<Inst>) -> ObjPtr<Inst> {
+    pub fn make_return(&mut self, mut value: ObjPtr<Inst>) -> ObjPtr<Inst> {
         let inst = self.put(Inst::new(
-            value.as_ref().get_ir_type(),
+            value.get_ir_type(),
             InstKind::Return,
             vec![value],
         ));
 
         // 设置use list
-        value.as_mut().add_user(inst.as_ref());
+        value.add_user(inst.as_ref());
 
         inst
     }
@@ -28,10 +28,10 @@ impl ObjPool<Inst> {
 
 impl Inst {
     /// 设置返回值
-    pub fn set_return_value(&mut self, value: ObjPtr<Inst>) {
+    pub fn set_return_value(&mut self, mut value: ObjPtr<Inst>) {
         // 正确性检查
         if let InstKind::Return = self.get_kind() {
-            if value.as_ref().get_ir_type() != IrType::Void {
+            if value.get_ir_type() != IrType::Void {
                 debug_assert_eq!(self.get_use_list().len(), 0)
             } else {
                 unreachable!("Inst::set_return_value")
@@ -42,7 +42,7 @@ impl Inst {
 
         // 设置use_list
         self.user.get_operand(0).as_mut().remove_user(self);
-        value.as_mut().add_user(self);
+        value.add_user(self);
 
         self.user.set_operand(0, value);
     }

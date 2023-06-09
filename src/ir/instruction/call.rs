@@ -11,8 +11,8 @@ impl ObjPool<Inst> {
         let inst = self.put(Inst::new(IrType::Int, InstKind::Call(callee), args.clone()));
 
         // 设置use_list
-        for arg in args {
-            arg.as_mut().add_user(inst.as_ref());
+        for mut arg in args {
+            arg.add_user(inst.as_ref());
         }
         inst
     }
@@ -31,8 +31,8 @@ impl ObjPool<Inst> {
         ));
 
         // 设置use_list
-        for arg in args {
-            arg.as_mut().add_user(inst.as_ref());
+        for mut arg in args {
+            arg.add_user(inst.as_ref());
         }
         inst
     }
@@ -51,8 +51,8 @@ impl ObjPool<Inst> {
         ));
 
         // 设置use_list
-        for arg in args {
-            arg.as_mut().add_user(inst.as_ref());
+        for mut arg in args {
+            arg.add_user(inst.as_ref());
         }
         inst
     }
@@ -105,7 +105,7 @@ impl Inst {
     pub fn set_arg(&mut self, index: usize, arg: ObjPtr<Inst>) {
         // 正确性检查
         if let InstKind::Call(_) = self.kind {
-            if let InstKind::Parameter = arg.as_ref().get_kind() {
+            if let InstKind::Parameter = arg.get_kind() {
                 debug_assert!(index < self.user.get_operands_size())
             } else {
                 unreachable!("Inst::set_arg")

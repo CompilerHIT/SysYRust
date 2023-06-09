@@ -13,14 +13,14 @@ impl ObjPool<Inst> {
 }
 impl Inst {
     /// 向phi指令中添加一个操作数
-    pub fn add_operand(&mut self, operand: ObjPtr<Inst>) {
+    pub fn add_operand(&mut self, mut operand: ObjPtr<Inst>) {
         // 正确性检查
-        debug_assert_eq!(self.get_ir_type(), operand.as_ref().get_ir_type());
+        debug_assert_eq!(self.get_ir_type(), operand.get_ir_type());
 
         self.user.push_operand(operand);
 
         // 更新操作数的使用者
-        operand.as_mut().add_user(self)
+        operand.add_user(self)
     }
 
     /// 获得phi指令的操作数列表
@@ -32,14 +32,13 @@ impl Inst {
     /// # Arguments
     /// * 'operand' - 操作数
     /// * 'index' - 操作数的索引
-    pub fn set_operand(&mut self, operand: ObjPtr<Inst>, index: usize) {
+    pub fn set_operand(&mut self, mut operand: ObjPtr<Inst>, index: usize) {
         // 正确性检查
         debug_assert_eq!(self.get_ir_type(), operand.as_ref().get_ir_type());
 
         // 修改use list
-        let old_operand = self.user.get_operand(index);
-        old_operand.as_mut().remove_user(self);
-        operand.as_mut().add_user(self);
+        self.user.get_operand(index).remove_user(self);
+        operand.add_user(self);
 
         // 更新操作数的使用者
         self.user.set_operand(index, operand);

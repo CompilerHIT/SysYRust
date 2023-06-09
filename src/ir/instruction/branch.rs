@@ -7,12 +7,9 @@ impl ObjPool<Inst> {
     /// * `cond` - 条件
     /// # Returns
     /// 返回创建的条件跳转指令
-    pub fn make_br(&mut self, cond: ObjPtr<Inst>) -> ObjPtr<Inst> {
+    pub fn make_br(&mut self, mut cond: ObjPtr<Inst>) -> ObjPtr<Inst> {
         // 正确性检查
-        debug_assert!(
-            cond.as_ref().get_ir_type() == IrType::Int
-                || cond.as_ref().get_ir_type() == IrType::ConstInt
-        );
+        debug_assert!(cond.get_ir_type() == IrType::Int || cond.get_ir_type() == IrType::ConstInt);
 
         let ir_type = IrType::Void;
         let kind = InstKind::Branch;
@@ -21,7 +18,7 @@ impl ObjPool<Inst> {
         let inst = self.put(inst);
 
         // 设置use_list
-        cond.as_mut().add_user(inst.as_ref());
+        cond.add_user(inst.as_ref());
 
         inst
     }
@@ -33,8 +30,7 @@ impl ObjPool<Inst> {
         let ir_type = IrType::Void;
         let kind = InstKind::Branch;
         let operands = vec![];
-        let mut inst = Inst::new(ir_type, kind, operands);
-        self.put(inst)
+        self.put(Inst::new(ir_type, kind, operands))
     }
 }
 
@@ -78,7 +74,7 @@ impl Inst {
     /// 设置条件跳转指令的条件
     /// # Arguments
     /// * `cond` - 条件
-    pub fn set_br_cond(&mut self, cond: ObjPtr<Inst>) {
+    pub fn set_br_cond(&mut self, mut cond: ObjPtr<Inst>) {
         // 正确性检查
         if let InstKind::Branch = self.kind {
             debug_assert!(self.is_br());
@@ -91,8 +87,8 @@ impl Inst {
         };
 
         // 修改use_list
-        self.user.get_operand(0).as_mut().remove_user(self);
-        cond.as_mut().add_user(self);
+        self.user.get_operand(0).remove_user(self);
+        cond.add_user(self);
 
         self.user.set_operand(0, cond);
     }
