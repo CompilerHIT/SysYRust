@@ -540,14 +540,14 @@ impl BB {
                     // if branch
                     let cond_ref = inst_ref.get_br_cond().as_ref();
 
-                    let true_bb = block.as_ref().get_next_bb()[0];
-                    let false_bb = block.as_ref().get_next_bb()[1];
+                    let true_succ_bb = block.as_ref().get_next_bb()[0];
+                    let false_succ_bb = block.as_ref().get_next_bb()[1];
                     let block_map = map_info.ir_block_map.clone();
-                    let true_block = match block_map.get(&true_bb) {
+                    let true_succ_block = match block_map.get(&true_succ_bb) {
                         Some(block) => block,
                         None => unreachable!("true block not found"),
                     };
-                    let false_block = match block_map.get(&false_bb) {
+                    let false_succ_block = match block_map.get(&false_succ_bb) {
                         Some(block) => block,
                         None => unreachable!("false block not found"),
                     };
@@ -582,31 +582,31 @@ impl BB {
                             self.insts.push(pool.put_inst(LIRInst::new(
                                 inst_kind,
                                 vec![
-                                    Operand::Addr(false_bb.as_ref().get_name().to_string()),
+                                    Operand::Addr(false_succ_bb.as_ref().get_name().to_string()),
                                     lhs_reg,
                                     rhs_reg,
                                 ],
                             )));
                             self.push_back(pool.put_inst(LIRInst::new(
                                 InstrsType::Jump,
-                                vec![Operand::Addr(true_bb.as_ref().get_name().to_string())],
+                                vec![Operand::Addr(true_succ_bb.as_ref().get_name().to_string())],
                             )));
 
                             inst.replace_op(vec![Operand::Addr(
-                                false_bb.as_ref().get_name().to_string(),
+                                false_succ_bb.as_ref().get_name().to_string(),
                             )]);
                             let obj_inst = pool.put_inst(inst);
                             map_info
                                 .block_branch
                                 .insert(pool.put_block(self.clone()), obj_inst);
                             let this = self.clone();
-                            true_block
+                            true_succ_block
                                 .as_mut()
                                 .in_edge
                                 .push(pool.put_block(this.clone()));
-                            false_block.as_mut().in_edge.push(pool.put_block(this));
+                            false_succ_block.as_mut().in_edge.push(pool.put_block(this));
                             self.out_edge
-                                .append(vec![*true_block, *false_block].as_mut());
+                                .append(vec![*true_succ_block, *false_succ_block].as_mut());
                         }
                         _ => {
                             unreachable!("cond is not binary condition judgement, to improve")
