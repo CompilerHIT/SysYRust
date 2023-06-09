@@ -2,11 +2,14 @@ pub mod ast;
 pub mod context;
 pub mod error;
 pub mod irgen;
+pub mod typesearch;
 
 #[derive(Debug, Clone, Copy)]
 pub enum ExpValue {
     Float(f32),
     Int(i32),
+    True,
+    False,
     None,
 }
 
@@ -14,6 +17,7 @@ pub enum RetInitVec {
     Float(Vec<f32>),
     Int(Vec<i32>),
 }
+
 
 pub fn init_padding_int(vec: &mut Vec<i32>, dimension_now: Vec<i32>) {
     let mut total = 1;

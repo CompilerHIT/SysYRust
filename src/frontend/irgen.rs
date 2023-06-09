@@ -13,7 +13,7 @@ use crate::ir::module::Module;
 use crate::utility::{ObjPool, ObjPtr};
 
 pub struct Kit<'a> {
-    context_mut: &'a mut Context<'a>,
+    pub context_mut: &'a mut Context<'a>,
     pool_inst_mut: &'a mut ObjPool<Inst>,
     pool_func_mut: &'a mut ObjPool<Function>,
     pool_bb_mut: &'a mut ObjPool<BasicBlock>,
@@ -477,6 +477,9 @@ pub trait Process {
     fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error>;
 }
 
+
+
+
 impl Process for CompUnit {
     type Ret = i32;
     type Message = (i32);
@@ -607,6 +610,9 @@ impl Process for ConstDecl {
                                 ExpValue::None => {
                                     unreachable!()
                                 }
+                                _=>{
+                                    unreachable!()
+                                }
                             })
                             .collect(); //生成维度vec
 
@@ -720,6 +726,9 @@ impl Process for ConstDecl {
                                     unreachable!()
                                 }
                                 ExpValue::None => {
+                                    unreachable!()
+                                }
+                                _=>{
                                     unreachable!()
                                 }
                             })
@@ -976,6 +985,9 @@ impl Process for VarDecl {
                                     ExpValue::None => {
                                         unreachable!()
                                     }
+                                    _=>{
+                                        unreachable!()
+                                    }
                                 })
                                 .collect(); //生成维度vec
 
@@ -1055,6 +1067,9 @@ impl Process for VarDecl {
                                         unreachable!()
                                     }
                                     ExpValue::None => {
+                                        unreachable!()
+                                    }
+                                    _=>{
                                         unreachable!()
                                     }
                                 })
@@ -1184,6 +1199,9 @@ impl Process for VarDecl {
                                     ExpValue::None => {
                                         unreachable!()
                                     }
+                                    _=>{
+                                        unreachable!()
+                                    }
                                 })
                                 .collect(); //生成维度vec
 
@@ -1252,6 +1270,9 @@ impl Process for VarDecl {
                                         unreachable!()
                                     }
                                     ExpValue::None => {
+                                        unreachable!()
+                                    }
+                                    _=>{
                                         unreachable!()
                                     }
                                 })
@@ -1344,6 +1365,9 @@ impl Process for InitVal {
                             unreachable!()
                         }
                     },
+                    _=>{
+                        unreachable!()
+                    }
                 }
                 match tp {
                     Type::Float | Type::ConstFloat => Ok((RetInitVec::Float(vecf), inst_vec)),
@@ -1831,9 +1855,30 @@ impl Process for Return {
     type Message = (i32);
     fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
         if let Some(exp) = &mut self.exp {
-            let (inst, _) = exp.process(Type::Int, kit_mut).unwrap(); //这里可能有问题
-            let ret_inst = kit_mut.pool_inst_mut.make_return(inst);
+            let (inst, val) = exp.process(Type::Int, kit_mut).unwrap(); //这里可能有问题
+            match val {
+                ExpValue::Float(f) =>{
+                    let inst_float = kit_mut.pool_inst_mut.make_float_const(f);
+                    let ret_inst = kit_mut.pool_inst_mut.make_return(inst_float);
+                    kit_mut.context_mut.push_inst_bb(inst_float);
             kit_mut.context_mut.push_inst_bb(ret_inst);
+                }
+                ExpValue::Int(i) =>{
+                    let inst_int = kit_mut.pool_inst_mut.make_int_const(i);
+                    let ret_inst = kit_mut.pool_inst_mut.make_return(inst_int);
+                    kit_mut.context_mut.push_inst_bb(inst_int);
+            kit_mut.context_mut.push_inst_bb(ret_inst);
+                }
+                ExpValue::None =>{
+                    let ret_inst = kit_mut.pool_inst_mut.make_return(inst);
+            kit_mut.context_mut.push_inst_bb(ret_inst);
+                }
+                _=>{
+                    unreachable!()
+                }
+            }
+            // let ret_inst = kit_mut.pool_inst_mut.make_return(inst);
+            // kit_mut.context_mut.push_inst_bb(ret_inst);
             Ok(1)
         } else {
             // let ret_inst = kit_mut.pool_inst_mut.make_return(inst);
@@ -1881,10 +1926,10 @@ impl Process for LVal {
         if self.exp_vec.is_empty() {
             //如果为空
             if sym_tmp.dimension.len() > self.exp_vec.len() {
-                println!("{:?}取指针", &self.id);
+                // println!("{:?}取指针", &self.id);
                 (var, symbol) = kit_mut.get_var(&self.id, None, true).unwrap();
             } else {
-                println!("{:?}不取指针", &self.id);
+                // println!("{:?}不取指针", &self.id);
                 (var, symbol) = kit_mut.get_var(&self.id, None, false).unwrap();
             }
             // (var, symbol) = kit_mut.get_var(&self.id, None).unwrap();
@@ -1931,6 +1976,9 @@ impl Process for LVal {
                         let inst_oprand = kit_mut.pool_inst_mut.make_mul(inst_exp, inst_base_now); //构造这一维的偏移的inst
                         inst_add_vec.push((inst_base_now, inst_oprand, ExpValue::None));
                         //将inst和数push入vec中
+                    }
+                    _=>{
+                        unreachable!()
                     }
                 }
                 index = index + 1;
@@ -2156,14 +2204,48 @@ impl Process for Number {
     fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
         match self {
             Number::FloatConst(f) => {
-                if let Some(inst) = kit_mut.context_mut.get_const_float(*f) {
-                    // println!("找到：{:?}", f);
-                    return Ok((inst, ExpValue::Float(*f)));
-                } else {
-                    let inst = kit_mut.pool_inst_mut.make_float_const(*f);
-                    kit_mut.context_mut.add_const_float(*f, inst);
-                    // println!("没找到：{:?}", f);
-                    return Ok((inst, ExpValue::Float(*f)));
+                // if let Some(inst) = kit_mut.context_mut.get_const_float(*f) {
+                //     // println!("找到：{:?}", f);
+                //     return Ok((inst, ExpValue::Float(*f)));
+                // } else {
+                //     let inst = kit_mut.pool_inst_mut.make_float_const(*f);
+                //     kit_mut.context_mut.add_const_float(*f, inst);
+                //     // println!("没找到：{:?}", f);
+                //     return Ok((inst, ExpValue::Float(*f)));
+                // }
+
+                match input {
+                    Type::ConstInt | Type::Int => {
+                        let f = *f as i32;
+                        if let Some(inst) = kit_mut.context_mut.get_const_int(f) {
+                            // println!("找到：{:?}", f);
+                            return Ok((inst, ExpValue::Int(f)));
+                        } else {
+                            let inst = kit_mut.pool_inst_mut.make_int_const(f);
+                            kit_mut.context_mut.add_const_int(f, inst);
+                            // println!("没找到：{:?}", f);
+                            // println!("intconst:{}", i);
+                            return Ok((inst, ExpValue::Int(f)));
+                        }
+                    }
+                    // Type::Float =>{
+
+                    // }
+                    Type::ConstFloat | Type::Float => {
+                        if let Some(inst) = kit_mut.context_mut.get_const_float(*f) {
+                            // println!("找到：{:?}", i);
+                            return Ok((inst, ExpValue::Float(*f)));
+                        } else {
+                            // println!("没找到常量:{:?}",i);
+                            let inst = kit_mut.pool_inst_mut.make_float_const(*f);
+                            kit_mut.context_mut.add_const_float(*f, inst);
+                            // println!("没找到：{:?}", i);
+                            // println!("intconst:{}", i);
+                            return Ok((inst, ExpValue::Float(*f)));
+                        }
+                    } // Type::Int =>{
+
+                      // }
                 }
             }
             Number::IntConst(i) => {
@@ -2542,25 +2624,170 @@ impl Process for RelOp {
 }
 
 impl Process for RelExp {
-    type Ret = i32;
-    type Message = (i32);
+    type Ret = (ObjPtr<Inst>, ExpValue);
+    type Message = (Type);
     fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
-        todo!();
+        match self {
+            RelExp::AddExp(addexp) => addexp.process(input, kit_mut),
+            RelExp::OpExp((relexp, op, addexp)) => {
+                let (mut inst_left, val_left) = relexp.process(input, kit_mut).unwrap();
+                let (mut inst_right, val_right) = addexp.process(input, kit_mut).unwrap();
+                match val_left {
+                    ExpValue::Float(f) =>{
+                        inst_left = kit_mut.pool_inst_mut.make_float_const(f);
+                        kit_mut.context_mut.push_inst_bb(inst_left);
+                    }
+                    ExpValue::Int(i) =>{
+                        inst_left = kit_mut.pool_inst_mut.make_int_const(i);
+                        kit_mut.context_mut.push_inst_bb(inst_left);
+                    }
+                    _ =>{}
+                }
+                match val_right {
+                    ExpValue::Float(f) =>{
+                        inst_right = kit_mut.pool_inst_mut.make_float_const(f);
+                        kit_mut.context_mut.push_inst_bb(inst_right);
+                    }
+                    ExpValue::Int(i) =>{
+                        inst_right = kit_mut.pool_inst_mut.make_int_const(i);
+                        kit_mut.context_mut.push_inst_bb(inst_right);
+                    }
+                    _ =>{}
+                }//这里可以进一步优化,计算cond是否恒为真或假
+                match op {
+                    RelOp::Greater =>{
+                        let inst_cond = kit_mut.pool_inst_mut.make_gt(inst_left, inst_right);
+                        kit_mut.context_mut.push_inst_bb(inst_cond);
+                        Ok((inst_cond,ExpValue::None))//这里可能可以优化，只考虑左操作数和右操作数只有一个的情况
+                    }
+                    RelOp::GreaterOrEqual =>{
+                        let inst_cond = kit_mut.pool_inst_mut.make_ge(inst_left, inst_right);
+                        kit_mut.context_mut.push_inst_bb(inst_cond);
+                        Ok((inst_cond,ExpValue::None))
+                    }
+                    RelOp::Less =>{
+                        let inst_cond = kit_mut.pool_inst_mut.make_lt(inst_left, inst_right);
+                        kit_mut.context_mut.push_inst_bb(inst_cond);
+                        Ok((inst_cond,ExpValue::None))
+                    }
+                    RelOp::LessOrEqual =>{
+                        let inst_cond = kit_mut.pool_inst_mut.make_le(inst_left, inst_right);
+                        kit_mut.context_mut.push_inst_bb(inst_cond);
+                        Ok((inst_cond,ExpValue::None))
+                    }
+                }
+            }
+        }
     }
 }
 impl Process for EqExp {
-    type Ret = i32;
-    type Message = (i32);
+    type Ret = (ObjPtr<Inst>, ExpValue);
+    type Message = (Type);
     fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
-        todo!();
+        match self {
+            EqExp::RelExp(relexp) =>{
+                relexp.process(input, kit_mut)
+            }
+            EqExp::EqualExp((eqexp,relexp)) =>{
+                let (mut inst_left,val_left) = eqexp.process(input, kit_mut).unwrap();
+                let (mut inst_right,val_right) = relexp.process(input, kit_mut).unwrap();
+                match val_left {
+                    ExpValue::Float(f) =>{
+                        inst_left = kit_mut.pool_inst_mut.make_float_const(f);
+                        kit_mut.context_mut.push_inst_bb(inst_left);
+                    }
+                    ExpValue::Int(i) =>{
+                        inst_left = kit_mut.pool_inst_mut.make_int_const(i);
+                        kit_mut.context_mut.push_inst_bb(inst_left);
+                    }
+                    _ =>{}
+                }
+                match val_right {
+                    ExpValue::Float(f) =>{
+                        inst_right = kit_mut.pool_inst_mut.make_float_const(f);
+                        kit_mut.context_mut.push_inst_bb(inst_right);
+                    }
+                    ExpValue::Int(i) =>{
+                        inst_right = kit_mut.pool_inst_mut.make_int_const(i);
+                        kit_mut.context_mut.push_inst_bb(inst_right);
+                    }
+                    _ =>{}
+                }//这里可以进一步优化,计算cond是否恒为真或假
+                let inst_eq = kit_mut.pool_inst_mut.make_eq(inst_left, inst_right);
+                kit_mut.context_mut.push_inst_bb(inst_eq);
+                Ok((inst_eq,ExpValue::None))
+            }
+            EqExp::NotEqualExp((eqexp,relexp)) =>{
+                let (mut inst_left,val_left) = eqexp.process(input, kit_mut).unwrap();
+                let (mut inst_right,val_right) = relexp.process(input, kit_mut).unwrap();
+                match val_left {
+                    ExpValue::Float(f) =>{
+                        inst_left = kit_mut.pool_inst_mut.make_float_const(f);
+                        kit_mut.context_mut.push_inst_bb(inst_left);
+                    }
+                    ExpValue::Int(i) =>{
+                        inst_left = kit_mut.pool_inst_mut.make_int_const(i);
+                        kit_mut.context_mut.push_inst_bb(inst_left);
+                    }
+                    _ =>{}
+                }
+                match val_right {
+                    ExpValue::Float(f) =>{
+                        inst_right = kit_mut.pool_inst_mut.make_float_const(f);
+                        kit_mut.context_mut.push_inst_bb(inst_right);
+                    }
+                    ExpValue::Int(i) =>{
+                        inst_right = kit_mut.pool_inst_mut.make_int_const(i);
+                        kit_mut.context_mut.push_inst_bb(inst_right);
+                    }
+                    _ =>{}
+                }//这里可以进一步优化,计算cond是否恒为真或假
+                let inst_ne = kit_mut.pool_inst_mut.make_ne(inst_left, inst_right);
+                kit_mut.context_mut.push_inst_bb(inst_ne);
+                Ok((inst_ne,ExpValue::None))
+            }
+        }
     }
 }
 
 impl Process for LAndExp {
-    type Ret = i32;
-    type Message = (i32);
+    type Ret = (ObjPtr<Inst>, ExpValue);
+    type Message = (Type);
     fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
-        todo!();
+        match self {
+            LAndExp::EqExp(eqexp) =>{
+                eqexp.process(input, kit_mut)
+            }
+            LAndExp::AndExp((landexp,eqexp)) =>{
+                let (mut inst_left,val_left) = landexp.process(input, kit_mut).unwrap();
+                let (mut inst_right,val_right) = eqexp.process(input, kit_mut).unwrap();
+                match val_left {
+                    ExpValue::Float(f) =>{
+                        inst_left = kit_mut.pool_inst_mut.make_float_const(f);
+                        kit_mut.context_mut.push_inst_bb(inst_left);
+                    }
+                    ExpValue::Int(i) =>{
+                        inst_left = kit_mut.pool_inst_mut.make_int_const(i);
+                        kit_mut.context_mut.push_inst_bb(inst_left);
+                    }
+                    _ =>{}
+                }
+                match val_right {
+                    ExpValue::Float(f) =>{
+                        inst_right = kit_mut.pool_inst_mut.make_float_const(f);
+                        kit_mut.context_mut.push_inst_bb(inst_right);
+                    }
+                    ExpValue::Int(i) =>{
+                        inst_right = kit_mut.pool_inst_mut.make_int_const(i);
+                        kit_mut.context_mut.push_inst_bb(inst_right);
+                    }
+                    _ =>{}
+                }//这里可以进一步优化,计算cond是否恒为真或假
+                let inst_and = kit_mut.pool_inst_mut.make_and(inst_left, inst_right);
+                kit_mut.context_mut.push_inst_bb(inst_and);
+                Ok((inst_and,ExpValue::None))
+            }
+        }
     }
 }
 impl Process for ConstExp {
@@ -2572,10 +2799,21 @@ impl Process for ConstExp {
 }
 
 impl Process for LOrExp {
-    type Ret = i32;
-    type Message = (i32);
+    type Ret = (ObjPtr<Inst>, ExpValue);
+    type Message = (Type);
     fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
-        todo!();
+        match self {
+            LOrExp::LAndExp(landexp) =>{
+                landexp.process(input, kit_mut)
+            }
+            LOrExp::OrExp((lorexp,landexp)) =>{
+                let (inst_left,val_left) = lorexp.process(input, kit_mut).unwrap();
+                let (inst_right,val_right) = landexp.process(input, kit_mut).unwrap();
+                let inst_or = kit_mut.pool_inst_mut.make_or(inst_left, inst_right);
+                kit_mut.context_mut.push_inst_bb(inst_or);
+                Ok((inst_or,ExpValue::None))//这里或许可以优化
+            }
+        }
     }
 }
 
@@ -2634,6 +2872,7 @@ pub fn offset_calculate(id: &str, exp_vec: &mut Vec<Exp>, kit_mut: &mut Kit) -> 
                 inst_add_vec.push((inst_base_now, inst_oprand, ExpValue::None));
                 //将inst和数push入vec中
             }
+            _=>{unreachable!()}
         }
         index = index + 1;
     }
