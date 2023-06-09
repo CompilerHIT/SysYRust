@@ -1,6 +1,7 @@
 use std::{
     fmt::Debug,
     hash::Hash,
+    ops::{Deref, DerefMut},
     ptr::eq,
     {pin::Pin, ptr::NonNull},
 };
@@ -27,6 +28,19 @@ impl<T> ObjPtr<T> {
 
     pub fn new(ptr: &T) -> Self {
         unsafe { Self(NonNull::new_unchecked(ptr as *const _ as *mut _)) }
+    }
+}
+
+impl<T> Deref for ObjPtr<T> {
+    type Target = T;
+    fn deref(&self) -> &Self::Target {
+        self.as_ref()
+    }
+}
+
+impl<T> DerefMut for ObjPtr<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.as_mut()
     }
 }
 
