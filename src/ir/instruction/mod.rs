@@ -172,7 +172,7 @@ impl Inst {
         self.list.set_next(inst);
         p.list.set_prev(inst);
         inst.as_mut().list.set_prev(ObjPtr::new(self));
-        inst.as_mut().list.set_next(ObjPtr::new(self));
+        inst.as_mut().list.set_next(ObjPtr::new(p));
     }
 
     /// 把自己从指令中移除
