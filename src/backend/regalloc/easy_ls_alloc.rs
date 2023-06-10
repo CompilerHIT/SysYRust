@@ -3,7 +3,6 @@ use crate::algorithm::graphalgo::Graph;
 use crate::backend::block::BB;
 use crate::backend::func::Func;
 use crate::backend::instrs::LIRInst;
-use crate::backend::operand::Reg;
 use crate::backend::regalloc::regalloc::Regalloc;
 use crate::backend::regalloc::structs::{FuncAllocStat, RegUsedStat};
 use crate::container::bitmap::Bitmap;
@@ -252,7 +251,7 @@ impl Allocator {
             }
 
             for reg in it.as_ref().get_reg_def() {
-
+                
                 if !reg.is_virtual() {
                     continue;
                 }
@@ -368,11 +367,16 @@ impl Regalloc for Allocator {
         let (spillings, dstr) = self.allocRegister();
         let (stack_size, bb_stack_sizes) = Allocator::countStackSize(func, &spillings);
         // let stack_size=spillings.len(); //TO REMOVE
-        FuncAllocStat {
+        let mut out=FuncAllocStat {
             stack_size,
             bb_stack_sizes,
             spillings,
             dstr,
+        };
+        for i in 0..=63{
+            out.dstr.insert(i, i);
         }
+        out
+
     }
 }
