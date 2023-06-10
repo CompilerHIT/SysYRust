@@ -21,6 +21,105 @@ pub struct Kit<'a> {
 }
 
 impl Kit<'_> {
+    pub fn init_external_funcs(&mut self) {
+        let inst_getint = self.pool_func_mut.new_function();
+        inst_getint.as_mut().set_return_type(IrType::Int);
+
+        let inst_getch = self.pool_func_mut.new_function();
+        inst_getch.as_mut().set_return_type(IrType::Int);
+
+        let inst_getfloat = self.pool_func_mut.new_function();
+        inst_getfloat.as_mut().set_return_type(IrType::Float);
+
+        let inst_getarray = self.pool_func_mut.new_function();
+        let param_getarray = self.pool_inst_mut.make_param(IrType::IntPtr);
+        inst_getarray
+            .as_mut()
+            .set_parameter("a".to_string(), param_getarray); //
+        inst_getarray.as_mut().set_return_type(IrType::Int);
+
+        let inst_getfarray = self.pool_func_mut.new_function();
+        let param_getfarray = self.pool_inst_mut.make_param(IrType::FloatPtr);
+        inst_getfarray
+            .as_mut()
+            .set_parameter("a".to_string(), param_getfarray); //
+        inst_getfarray.as_mut().set_return_type(IrType::Int);
+
+        let inst_putint = self.pool_func_mut.new_function();
+        let param_putint = self.pool_inst_mut.make_param(IrType::Int);
+        inst_putint
+            .as_mut()
+            .set_parameter("a".to_string(), param_putint); //
+        inst_putint.as_mut().set_return_type(IrType::Void);
+
+        let inst_putch = self.pool_func_mut.new_function();
+        let param_putch = self.pool_inst_mut.make_param(IrType::Int);
+        inst_putch
+            .as_mut()
+            .set_parameter("a".to_string(), param_putch); //
+        inst_putch.as_mut().set_return_type(IrType::Void);
+
+        let inst_putfloat = self.pool_func_mut.new_function();
+        let param_putfloat = self.pool_inst_mut.make_param(IrType::Float);
+        inst_putfloat
+            .as_mut()
+            .set_parameter("a".to_string(), param_putfloat); //
+        inst_putfloat.as_mut().set_return_type(IrType::Void);
+
+        let inst_putarray = self.pool_func_mut.new_function();
+        let param_putarray1 = self.pool_inst_mut.make_param(IrType::Int);
+        let param_putarray2 = self.pool_inst_mut.make_param(IrType::IntPtr);
+        inst_putarray
+            .as_mut()
+            .set_parameter("a".to_string(), param_putarray1); //
+        inst_putarray
+            .as_mut()
+            .set_parameter("b".to_string(), param_putarray2); //
+        inst_putarray.as_mut().set_return_type(IrType::Void);
+
+        let inst_putfarray = self.pool_func_mut.new_function();
+        let param_putfarray1 = self.pool_inst_mut.make_param(IrType::Int);
+        let param_putfarray2 = self.pool_inst_mut.make_param(IrType::FloatPtr);
+        inst_putfarray
+            .as_mut()
+            .set_parameter("a".to_string(), param_putfarray1); //
+        inst_putfarray
+            .as_mut()
+            .set_parameter("b".to_string(), param_putfarray2); //
+        inst_putfarray.as_mut().set_return_type(IrType::Void);
+
+        self.context_mut
+            .module_mut
+            .push_function("getin".to_string(), inst_getint);
+        self.context_mut
+            .module_mut
+            .push_function("getch".to_string(), inst_getch);
+        self.context_mut
+            .module_mut
+            .push_function("getfloat".to_string(), inst_getfloat);
+        self.context_mut
+            .module_mut
+            .push_function("getarray".to_string(), inst_getarray);
+        self.context_mut
+            .module_mut
+            .push_function("getfarray".to_string(), inst_getfarray);
+        self.context_mut
+            .module_mut
+            .push_function("putint".to_string(), inst_putint);
+        self.context_mut
+            .module_mut
+            .push_function("putch".to_string(), inst_putch);
+        self.context_mut
+            .module_mut
+            .push_function("putfloat".to_string(), inst_putfloat);
+        self.context_mut
+            .module_mut
+            .push_function("putarray".to_string(), inst_putarray);
+        self.context_mut
+            .module_mut
+            .push_function("putfarray".to_string(), inst_putfarray);
+    }
+
     pub fn push_inst(&mut self, inst_ptr: ObjPtr<Inst>) {
         self.context_mut.push_inst_bb(inst_ptr);
     }
@@ -34,6 +133,9 @@ impl Kit<'_> {
             //     "填phi,函数头basicblock名:{:?}",
             //     func.as_ref().get_head().get_name()
             // );
+            if func.is_empty_bb() {
+                continue;
+            }
             let head_bb_temp = func.as_ref().get_head();
             self.phi_padding_bb(head_bb_temp); //填充该函数中所有bb中的phi
         }
@@ -751,6 +853,7 @@ pub fn irgen(
         pool_bb_mut,
         pool_func_mut,
     };
+    kit_mut.init_external_funcs();
     compunit.process(1, &mut kit_mut);
     kit_mut.phi_padding_allfunctions();
 }
