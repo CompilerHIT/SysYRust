@@ -1586,6 +1586,7 @@ impl GenerateAsm for BB {
             print!("{}:\n", self.label);
         }
         for inst in self.insts.iter() {
+            inst.as_mut().v_to_phy(context.get_reg_map().clone());
             inst.as_mut().generate(context.clone(), f)?;
         }
         Ok(())

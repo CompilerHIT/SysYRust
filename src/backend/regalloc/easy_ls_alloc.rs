@@ -252,10 +252,6 @@ impl Allocator {
 
             for reg in it.as_ref().get_reg_def() {
 
-                println!("LIR kind {:?}",it.get_type());
-                println!("reg def {:?}",reg);
-                println!("dstr_size {:?}",dstr);
-                
                 if !reg.is_virtual() {
                     continue;
                 }

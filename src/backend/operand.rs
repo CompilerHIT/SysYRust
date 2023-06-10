@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::utility::ScalarType;
 
 pub const REG_COUNT: i32 = 32;
@@ -124,10 +126,6 @@ impl Reg {
                 _ => panic!("Invalid Physic Float Register Id"),
             }
         }
-    }
-
-    pub fn map_id(&mut self, dst: i32) {
-        self.id = dst;
     }
 
     // ra, t0, t1-2, a0-1, a2-7, t3-6

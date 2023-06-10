@@ -269,6 +269,7 @@ impl Func {
             Ok(f) => f,
             Err(e) => panic!("Error: {}", e),
         };
+        let map = self.context.get_reg_map().clone();
         self.context.as_mut().set_prologue_event(move || {
             let mut builder = AsmBuilder::new(&mut f1);
             // addi sp -stack_size
