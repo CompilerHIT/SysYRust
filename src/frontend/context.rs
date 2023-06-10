@@ -79,11 +79,11 @@ impl Context<'_> {
     pub fn push_inst_bb(&mut self, inst_ptr: ObjPtr<Inst>) {
         match self.bb_now_mut {
             InfuncChoice::InFunc(bbptr) => {
-                // println!(
-                //     "指令{:?}插入bb{:?}中",
-                //     inst_ptr.get_kind(),
-                //     bbptr.get_name()
-                // );
+                println!(
+                    "指令{:?}插入bb{:?}中",
+                    inst_ptr.get_kind(),
+                    bbptr.get_name()
+                );
                 let bb = bbptr.as_mut();
                 bb.push_back(inst_ptr)
             }
@@ -103,6 +103,7 @@ impl Context<'_> {
     }
 
     pub fn bb_now_set(&mut self, bb: ObjPtr<BasicBlock>) {
+        println!("现在处于块{:?}中", bb.get_name());
         self.bb_now_mut = InfuncChoice::InFunc(bb);
     }
 

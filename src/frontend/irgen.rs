@@ -2092,35 +2092,24 @@ impl Process for If {
     fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
         let (inst_cond, val_cond) = self.cond.process(Type::Int, kit_mut).unwrap();
         let inst_branch = kit_mut.pool_inst_mut.make_br(inst_cond);
-        // match kit_mut.context_mut.bb_now_mut {
-        //     InfuncChoice::InFunc(bb) => {
-        //         // println!("生成跳转指令,插入bb:{:?}", bb.get_name());
-        //     }
-        //     _ => {}
-        // }
-
         kit_mut.context_mut.push_inst_bb(inst_branch);
         let bb_if_name = kit_mut.context_mut.get_newbb_name();
         let inst_bb_if = kit_mut.pool_bb_mut.new_basic_block(bb_if_name.clone());
         kit_mut.context_mut.is_branch_map.insert(bb_if_name, false); //初始化
-        match kit_mut.context_mut.bb_now_mut {
-            InfuncChoice::InFunc(bb_now) => {
-                kit_mut
-                    .context_mut
-                    .is_branch_map
-                    .insert(bb_now.get_name().to_string(), true); //标志该块出现分支
-            }
-            _ => {
-                unreachable!()
-            }
-        }
+                                                                     // match kit_mut.context_mut.bb_now_mut {
+                                                                     //     InfuncChoice::InFunc(bb_now) => {
+                                                                     //         kit_mut
+                                                                     //             .context_mut
+                                                                     //             .is_branch_map
+                                                                     //             .insert(bb_now.get_name().to_string(), true); //标志该块出现分支
+                                                                     //     }
+                                                                     //     _ => {
+                                                                     //         unreachable!()
+                                                                     //     }
+                                                                     // }
 
         if let Some(stmt_else) = &mut self.else_then {
             //如果有else语句
-            // println!("有ifelse");
-            // if let Some(bb_successor) = input {
-            // println!("有指定后继块");
-            //如果指定了该节点分支前的后继块
             let bb_else_name = kit_mut.context_mut.get_newbb_name();
             let inst_bb_else = kit_mut.pool_bb_mut.new_basic_block(bb_else_name.clone());
             kit_mut
@@ -2140,6 +2129,8 @@ impl Process for If {
 
             match kit_mut.context_mut.bb_now_mut {
                 InfuncChoice::InFunc(bb_now) => {
+                    println!("下一块:{:?}", inst_bb_else.get_name());
+                    println!("下一块:{:?}", inst_bb_if.get_name());
                     bb_now.as_mut().add_next_bb(inst_bb_else); //先放判断为假的else语句
                     bb_now.as_mut().add_next_bb(inst_bb_if);
                 }
@@ -2150,174 +2141,42 @@ impl Process for If {
             kit_mut.context_mut.bb_now_set(inst_bb_else); //设置现在所在的bb块，准备归约
             stmt_else.process(Some(inst_bb_successor), kit_mut).unwrap(); //向该分支块内生成指令
                                                                           //加一条直接跳转语句
-
-            // match kit_mut.context_mut.bb_now_mut {
-            //     InfuncChoice::InFunc(bb) => {
-            //         println!("生成jmp指令,插入bb:{:?}", bb.get_name());
-            //     }
-            //     _ => {}
-            // }
             kit_mut
                 .context_mut
                 .push_inst_bb(kit_mut.pool_inst_mut.make_jmp()); //bb_mut_now是else分支的叶子交汇点
+            match kit_mut.context_mut.bb_now_mut {
+                InfuncChoice::InFunc(bb_now) => {
+                    println!("下一块:{:?}", inst_bb_successor.get_name());
+                    bb_now.as_mut().add_next_bb(inst_bb_successor); //向if分支的叶子交汇点bb_now_mut插入下一个节点
+                }
+                _ => {
+                    unreachable!()
+                }
+            }
 
-            let branch_flag_else = kit_mut
-                .context_mut
-                .is_branch_map
-                .get(inst_bb_else.get_name())
-                .unwrap();
-            // if !branch_flag_else {
-            //     //如果else块未分支
-            //     inst_bb_else.as_mut().add_next_bb(inst_bb_successor); //向分支添加下一个块
-            // } else {
-            // match kit_mut.context_mut.bb_now_mut {
-            //     InfuncChoice::InFunc(bb_now) => {
-            //         println!("下一块:{:?}", inst_bb_successor.get_name());
-            //         bb_now.as_mut().add_next_bb(inst_bb_successor); //向else分支的叶子交汇点bb_now_mut插入下一个节点
-            //     }
-            //     _ => {
-            //         unreachable!()
-            //     }
-            // }
-            // }
+            // let branch_flag_else = kit_mut
+            //     .context_mut
+            //     .is_branch_map
+            //     .get(inst_bb_else.get_name())
+            //     .unwrap();
             kit_mut.context_mut.bb_now_set(inst_bb_if);
             self.then.process(Some(inst_bb_successor), kit_mut).unwrap();
-            //加一条直接跳转语句
-            // match kit_mut.context_mut.bb_now_mut {
-            //     InfuncChoice::InFunc(bb) => {
-            //         println!("生成jmp指令,插入bb:{:?}", bb.get_name());
-            //     }
-            //     _ => {}
-            // }
             kit_mut
                 .context_mut
                 .push_inst_bb(kit_mut.pool_inst_mut.make_jmp()); //bb_now_mut是if语句块的叶子交汇点
-
-            // inst_bb_if.as_mut().add_next_bb(inst_bb_successor); //向分支添加下一个块
-            // match kit_mut.context_mut.bb_now_mut {
-            //     InfuncChoice::InFunc(bb_now) => {
-            //         println!("下一块:{:?}", inst_bb_successor.get_name());
-            //         bb_now.as_mut().add_next_bb(inst_bb_successor); //向else分支的叶子交汇点bb_now_mut插入下一个节点
-            //     }
-            //     _ => {
-            //         unreachable!()
-            //     }
-            // }
-
+            match kit_mut.context_mut.bb_now_mut {
+                InfuncChoice::InFunc(bb_now) => {
+                    println!("下一块:{:?}", inst_bb_successor.get_name());
+                    bb_now.as_mut().add_next_bb(inst_bb_successor); //向if分支的叶子交汇点bb_now_mut插入下一个节点
+                }
+                _ => {
+                    unreachable!()
+                }
+            }
             kit_mut.context_mut.bb_now_set(inst_bb_successor); //设置现在所在的bb
-                                                               // } else {
-                                                               //     //如果没指定后继块,自己生成一块
-                                                               //     println!("没指定后继块");
-                                                               //     let bb_else_name = kit_mut.context_mut.get_newbb_name();
-                                                               //     let inst_bb_else = kit_mut.pool_bb_mut.new_basic_block(bb_else_name.clone());
-                                                               //     kit_mut
-                                                               //         .context_mut
-                                                               //         .is_branch_map
-                                                               //         .insert(bb_else_name, false); //初始化
-
-        //     //生成一块新的bb
-        //     let bb_successor_name = kit_mut.context_mut.get_newbb_name();
-        //     let inst_bb_successor = kit_mut
-        //         .pool_bb_mut
-        //         .new_basic_block(bb_successor_name.clone());
-        //     kit_mut
-        //         .context_mut
-        //         .is_branch_map
-        //         .insert(bb_successor_name, false); //初始化
-
-        //     match kit_mut.context_mut.bb_now_mut {
-        //         InfuncChoice::InFunc(bb_now) => {
-        //             bb_now.as_mut().add_next_bb(inst_bb_else); //先放判断为假的else语句
-        //             bb_now.as_mut().add_next_bb(inst_bb_if);
-        //         }
-        //         _ => {
-        //             unreachable!()
-        //         }
-        //     }
-        //     kit_mut.context_mut.bb_now_set(inst_bb_else); //设置现在所在的bb块，准备归约
-        //     stmt_else.process(Some(inst_bb_successor), kit_mut).unwrap(); //向该分支块内生成指令
-        //                                                                   //加一条直接跳转语句
-        //     match kit_mut.context_mut.bb_now_mut {
-        //         InfuncChoice::InFunc(bb) => {
-        //             println!("生成jmp指令,插入bb:{:?}", bb.get_name());
-        //         }
-        //         _ => {}
-        //     }
-        //     kit_mut
-        //         .context_mut
-        //         .push_inst_bb(kit_mut.pool_inst_mut.make_jmp()); //bb_mut_now是else分支的叶子交汇点
-
-        //     let branch_flag_else = kit_mut
-        //         .context_mut
-        //         .is_branch_map
-        //         .get(inst_bb_else.get_name())
-        //         .unwrap();
-        //     // if !branch_flag_else {
-        //     //     //如果else块未分支
-        //     //     inst_bb_else.as_mut().add_next_bb(inst_bb_successor); //向分支添加下一个块
-        //     // } else {
-        //     match kit_mut.context_mut.bb_now_mut {
-        //         InfuncChoice::InFunc(bb_now) => {
-        //             println!("下一块:{:?}", inst_bb_successor.get_name());
-        //             bb_now.as_mut().add_next_bb(inst_bb_successor); //向else分支的叶子交汇点bb_now_mut插入下一个节点
-        //         }
-        //         _ => {
-        //             unreachable!()
-        //         }
-        //     }
-        //     // }
-        //     kit_mut.context_mut.bb_now_set(inst_bb_if);
-        //     self.then.process(Some(inst_bb_successor), kit_mut).unwrap();
-        //     //加一条直接跳转语句
-        //     match kit_mut.context_mut.bb_now_mut {
-        //         InfuncChoice::InFunc(bb) => {
-        //             println!("生成jmp指令,插入bb:{:?}", bb.get_name());
-        //         }
-        //         _ => {}
-        //     }
-        //     kit_mut
-        //         .context_mut
-        //         .push_inst_bb(kit_mut.pool_inst_mut.make_jmp()); //bb_now_mut是if语句块的叶子交汇点
-
-        //     // inst_bb_if.as_mut().add_next_bb(inst_bb_successor); //向分支添加下一个块
-        //     match kit_mut.context_mut.bb_now_mut {
-        //         InfuncChoice::InFunc(bb_now) => {
-        //             println!("下一块:{:?}", inst_bb_successor.get_name());
-        //             bb_now.as_mut().add_next_bb(inst_bb_successor); //向else分支的叶子交汇点bb_now_mut插入下一个节点
-        //         }
-        //         _ => {
-        //             unreachable!()
-        //         }
-        //     }
-
-        //     kit_mut.context_mut.bb_now_set(inst_bb_successor); //设置现在所在的bb
-        // }
         } else {
             // println!("有if没else");
             //没有else语句块
-            // let bb_successor_name = kit_mut.context_mut.get_newbb_name();
-            // let inst_bb_successor = kit_mut.pool_bb_mut.new_basic_block(bb_successor_name);
-            // match kit_mut.context_mut.bb_now_mut {
-            //     InfuncChoice::InFunc(bb_now) => {
-            //         bb_now.as_mut().add_next_bb(inst_bb_successor); //先放判断为假的
-            //         bb_now.as_mut().add_next_bb(inst_bb_if);
-            //     }
-            //     _ => {
-            //         unreachable!()
-            //     }
-            // }
-            // //没有else块,只有if块
-            // kit_mut.context_mut.bb_now_set(inst_bb_if);
-            // self.then.process(input, kit_mut).unwrap();
-            // //加一条直接跳转语句
-            // kit_mut
-            //     .context_mut
-            //     .push_inst_bb(kit_mut.pool_inst_mut.make_jmp());
-            // inst_bb_if.as_mut().add_next_bb(inst_bb_successor); //向分支添加下一个块
-            // kit_mut.context_mut.bb_now_set(inst_bb_successor); //设置现在所在的bb
-
-            // if let Some(bb_successor) = input {
-            // println!("有指定后继块");
             //如果指定了该节点分支前的后继块
             //生成一块新的bb
             let bb_successor_name = kit_mut.context_mut.get_newbb_name();
@@ -2331,6 +2190,8 @@ impl Process for If {
 
             match kit_mut.context_mut.bb_now_mut {
                 InfuncChoice::InFunc(bb_now) => {
+                    println!("下一块:{:?}", inst_bb_successor.get_name());
+                    println!("下一块:{:?}", inst_bb_if.get_name());
                     bb_now.as_mut().add_next_bb(inst_bb_successor); //先放判断为假的else语句
                     bb_now.as_mut().add_next_bb(inst_bb_if);
                 }
@@ -2340,85 +2201,20 @@ impl Process for If {
             }
             kit_mut.context_mut.bb_now_set(inst_bb_if);
             self.then.process(Some(inst_bb_successor), kit_mut).unwrap();
-            //加一条直接跳转语句
-            // match kit_mut.context_mut.bb_now_mut {
-            //     InfuncChoice::InFunc(bb) => {
-            //         println!("生成jmp指令,插入bb:{:?}", bb.get_name());
-            //     }
-            //     _ => {}
-            // }
             kit_mut
                 .context_mut
                 .push_inst_bb(kit_mut.pool_inst_mut.make_jmp()); //bb_now_mut是if语句块的叶子交汇点
 
-            // inst_bb_if.as_mut().add_next_bb(inst_bb_successor); //向分支添加下一个块
             match kit_mut.context_mut.bb_now_mut {
                 InfuncChoice::InFunc(bb_now) => {
-                    // println!("下一块:{:?}", inst_bb_successor.get_name());
+                    println!("下一块:{:?}", inst_bb_successor.get_name());
                     bb_now.as_mut().add_next_bb(inst_bb_successor); //向if分支的叶子交汇点bb_now_mut插入下一个节点
                 }
                 _ => {
                     unreachable!()
                 }
             }
-
             kit_mut.context_mut.bb_now_set(inst_bb_successor); //设置现在所在的bb
-                                                               // } else {
-                                                               //     //如果没指定后继块,自己生成一块
-                                                               //     println!("没指定后继块");
-                                                               //     // let bb_else_name = kit_mut.context_mut.get_newbb_name();
-                                                               //     // let inst_bb_else = kit_mut.pool_bb_mut.new_basic_block(bb_else_name.clone());
-                                                               //     // kit_mut
-                                                               //     //     .context_mut
-                                                               //     //     .is_branch_map
-                                                               //     //     .insert(bb_else_name, false); //初始化
-
-            //     //生成一块新的bb
-            //     let bb_successor_name = kit_mut.context_mut.get_newbb_name();
-            //     let inst_bb_successor = kit_mut
-            //         .pool_bb_mut
-            //         .new_basic_block(bb_successor_name.clone());
-            //     kit_mut
-            //         .context_mut
-            //         .is_branch_map
-            //         .insert(bb_successor_name, false); //初始化
-
-            //     match kit_mut.context_mut.bb_now_mut {
-            //         InfuncChoice::InFunc(bb_now) => {
-            //             bb_now.as_mut().add_next_bb(inst_bb_successor); //先放判断为假的else语句
-            //             bb_now.as_mut().add_next_bb(inst_bb_if);
-            //         }
-            //         _ => {
-            //             unreachable!()
-            //         }
-            //     }
-            //     // }
-            //     kit_mut.context_mut.bb_now_set(inst_bb_if);
-            //     self.then.process(Some(inst_bb_successor), kit_mut).unwrap();
-            //     //加一条直接跳转语句
-            //     match kit_mut.context_mut.bb_now_mut {
-            //         InfuncChoice::InFunc(bb) => {
-            //             println!("生成jmp指令,插入bb:{:?}", bb.get_name());
-            //         }
-            //         _ => {}
-            //     }
-            //     kit_mut
-            //         .context_mut
-            //         .push_inst_bb(kit_mut.pool_inst_mut.make_jmp()); //bb_now_mut是if语句块的叶子交汇点
-
-            //     // inst_bb_if.as_mut().add_next_bb(inst_bb_successor); //向分支添加下一个块
-            //     match kit_mut.context_mut.bb_now_mut {
-            //         InfuncChoice::InFunc(bb_now) => {
-            //             println!("下一块:{:?}", inst_bb_successor.get_name());
-            //             bb_now.as_mut().add_next_bb(inst_bb_successor); //向else分支的叶子交汇点bb_now_mut插入下一个节点
-            //         }
-            //         _ => {
-            //             unreachable!()
-            //         }
-            //     }
-
-            //     kit_mut.context_mut.bb_now_set(inst_bb_successor); //设置现在所在的bb
-            // }
         }
         Ok(1)
     }
