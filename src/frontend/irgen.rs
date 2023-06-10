@@ -1802,7 +1802,7 @@ impl Process for FuncDef {
                 kit_mut
                     .context_mut
                     .push_func_module(id.to_string(), func_ptr);
-                blk.process(None, kit_mut);
+                blk.process((None, None), kit_mut);
                 kit_mut.context_mut.delete_layer();
                 return Ok(1);
             }
@@ -1831,7 +1831,7 @@ impl Process for FuncDef {
                     func_mut.set_parameter(name, param); //这里
                 }
 
-                blk.process(None, kit_mut);
+                blk.process((None, None), kit_mut);
                 kit_mut.context_mut.delete_layer();
                 return Ok(1);
             }
@@ -1967,7 +1967,7 @@ impl Process for FuncFParam {
 }
 impl Process for Block {
     type Ret = i32;
-    type Message = (Option<ObjPtr<BasicBlock>>);
+    type Message = (Option<ObjPtr<BasicBlock>>, Option<ObjPtr<BasicBlock>>);
     fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
         kit_mut.context_mut.add_layer();
         for item in &mut self.block_vec {
@@ -1980,7 +1980,7 @@ impl Process for Block {
 
 impl Process for BlockItem {
     type Ret = i32;
-    type Message = (Option<ObjPtr<BasicBlock>>);
+    type Message = (Option<ObjPtr<BasicBlock>>, Option<ObjPtr<BasicBlock>>);
     fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
         match self {
             BlockItem::Decl(decl) => {
@@ -1997,7 +1997,7 @@ impl Process for BlockItem {
 }
 impl Process for Stmt {
     type Ret = i32;
-    type Message = (Option<ObjPtr<BasicBlock>>);
+    type Message = (Option<ObjPtr<BasicBlock>>, Option<ObjPtr<BasicBlock>>);
     fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
         match self {
             Stmt::Assign(assign) => {
@@ -2005,7 +2005,7 @@ impl Process for Stmt {
                 Ok(1)
             }
             Stmt::ExpStmt(exp_stmt) => {
-                exp_stmt.process((Type::Int, input), kit_mut); //这里可能有问题
+                exp_stmt.process((Type::Int, input.0, input.1), kit_mut); //这里可能有问题
                 Ok(1)
             }
             Stmt::Block(blk) => {
@@ -2039,7 +2039,7 @@ impl Process for Stmt {
 
 impl Process for Assign {
     type Ret = i32;
-    type Message = (Option<ObjPtr<BasicBlock>>);
+    type Message = (Option<ObjPtr<BasicBlock>>, Option<ObjPtr<BasicBlock>>);
     fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
         let lval = &mut self.lval;
         let symbol = kit_mut.get_var_symbol(&lval.id).unwrap();
@@ -2125,7 +2125,7 @@ impl Process for Assign {
 }
 impl Process for ExpStmt {
     type Ret = i32;
-    type Message = (Type, Option<ObjPtr<BasicBlock>>);
+    type Message = (Type, Option<ObjPtr<BasicBlock>>, Option<ObjPtr<BasicBlock>>);
     fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
         Ok(1)
     }
@@ -2133,7 +2133,7 @@ impl Process for ExpStmt {
 
 impl Process for If {
     type Ret = i32;
-    type Message = (Option<ObjPtr<BasicBlock>>);
+    type Message = (Option<ObjPtr<BasicBlock>>, Option<ObjPtr<BasicBlock>>);
     fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
         let (inst_cond, val_cond) = self.cond.process(Type::Int, kit_mut).unwrap();
         let inst_branch = kit_mut.pool_inst_mut.make_br(inst_cond);
@@ -2184,8 +2184,8 @@ impl Process for If {
                 }
             }
             kit_mut.context_mut.bb_now_set(inst_bb_else); //设置现在所在的bb块，准备归约
-            stmt_else.process(Some(inst_bb_successor), kit_mut).unwrap(); //向该分支块内生成指令
-                                                                          //加一条直接跳转语句
+            stmt_else.process(input, kit_mut).unwrap(); //向该分支块内生成指令
+                                                        //加一条直接跳转语句
             kit_mut
                 .context_mut
                 .push_inst_bb(kit_mut.pool_inst_mut.make_jmp()); //bb_mut_now是else分支的叶子交汇点
@@ -2205,7 +2205,7 @@ impl Process for If {
             //     .get(inst_bb_else.get_name())
             //     .unwrap();
             kit_mut.context_mut.bb_now_set(inst_bb_if);
-            self.then.process(Some(inst_bb_successor), kit_mut).unwrap();
+            self.then.process(input, kit_mut).unwrap();
             kit_mut
                 .context_mut
                 .push_inst_bb(kit_mut.pool_inst_mut.make_jmp()); //bb_now_mut是if语句块的叶子交汇点
@@ -2245,7 +2245,7 @@ impl Process for If {
                 }
             }
             kit_mut.context_mut.bb_now_set(inst_bb_if);
-            self.then.process(Some(inst_bb_successor), kit_mut).unwrap();
+            self.then.process(input, kit_mut).unwrap();
             kit_mut
                 .context_mut
                 .push_inst_bb(kit_mut.pool_inst_mut.make_jmp()); //bb_now_mut是if语句块的叶子交汇点
@@ -2266,7 +2266,7 @@ impl Process for If {
 }
 impl Process for While {
     type Ret = i32;
-    type Message = (Option<ObjPtr<BasicBlock>>);
+    type Message = (Option<ObjPtr<BasicBlock>>, Option<ObjPtr<BasicBlock>>);
     fn process(&mut self, _input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
         let (inst_cond, val_cond) = self.cond.process(Type::Int, kit_mut).unwrap();
         let inst_branch = kit_mut.pool_inst_mut.make_br(inst_cond);
@@ -2286,8 +2286,10 @@ impl Process for While {
         }
         kit_mut.context_mut.bb_now_set(block_while_head); //设置当前basicblock
                                                           // println!("while_body process starts");
-        self.body.process(None, kit_mut).unwrap(); //在块内生成指令
-                                                   // println!("while_body process finished");
+        self.body
+            .process((Some(block_while_head), Some(block_false)), kit_mut)
+            .unwrap(); //在块内生成指令
+                       // println!("while_body process finished");
         let (inst_cond, val_cond) = self.cond.process(Type::Int, kit_mut).unwrap(); //当前块中放入cond
                                                                                     // println!("cond process finished");
         let inst_branch = kit_mut.pool_inst_mut.make_br(inst_cond);
@@ -2313,22 +2315,48 @@ impl Process for While {
 
 impl Process for Break {
     type Ret = i32;
-    type Message = (Option<ObjPtr<BasicBlock>>);
+    type Message = (Option<ObjPtr<BasicBlock>>, Option<ObjPtr<BasicBlock>>);
     fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
-        todo!();
+        let inst_jmp = kit_mut.pool_inst_mut.make_jmp();
+        kit_mut.context_mut.push_inst_bb(inst_jmp);
+        match kit_mut.context_mut.bb_now_mut {
+            InfuncChoice::InFunc(bb_now) => {
+                let (_, false_opt) = input;
+                if let Some(bb_false) = false_opt {
+                    bb_now.as_mut().add_next_bb(bb_false);
+                }
+            }
+            _ => {
+                unreachable!()
+            }
+        }
+        Ok(1)
     }
 }
 impl Process for Continue {
     type Ret = i32;
-    type Message = (Option<ObjPtr<BasicBlock>>);
+    type Message = (Option<ObjPtr<BasicBlock>>, Option<ObjPtr<BasicBlock>>);
     fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
-        todo!();
+        let inst_jmp = kit_mut.pool_inst_mut.make_jmp();
+        kit_mut.context_mut.push_inst_bb(inst_jmp);
+        match kit_mut.context_mut.bb_now_mut {
+            InfuncChoice::InFunc(bb_now) => {
+                let (head_opt, _) = input;
+                if let Some(bb_false) = head_opt {
+                    bb_now.as_mut().add_next_bb(bb_false);
+                }
+            }
+            _ => {
+                unreachable!()
+            }
+        }
+        Ok(1)
     }
 }
 
 impl Process for Return {
     type Ret = i32;
-    type Message = (Option<ObjPtr<BasicBlock>>);
+    type Message = (Option<ObjPtr<BasicBlock>>, Option<ObjPtr<BasicBlock>>);
     fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
         if let Some(exp) = &mut self.exp {
             let (inst, val) = exp.process(Type::Int, kit_mut).unwrap(); //这里可能有问题
