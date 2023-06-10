@@ -108,7 +108,10 @@ impl Reg {
                 10..=17 => format!("a{}", self.id - 10),
                 18..=27 => format!("s{}", self.id - 16),
                 28..=31 => format!("t{}", self.id - 25),
-                _ => panic!("Invalid Physic Integer Register Id"),
+                _ => {
+                    println!("id: {}", self.id);
+                    panic!("Invalid Physic Integer Register Id")
+                },
             }
         } else {
             match self.id {

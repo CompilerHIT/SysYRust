@@ -5,7 +5,7 @@ use std::fs::File;
 impl GenerateAsm for LIRInst {
     fn generate(&mut self, context: ObjPtr<Context>, f: &mut File) -> Result<()> {
         let mut builder = AsmBuilder::new(f);
-        self.v_to_phy(context.as_ref().get_reg_map().clone());
+        self.v_to_phy(context.get_reg_map().clone());
         match self.get_type() {
             InstrsType::Binary(op) => {
                 let op = match op {
@@ -20,6 +20,7 @@ impl GenerateAsm for LIRInst {
                     BinaryOp::Shl => "sll",
                     BinaryOp::Shr => "srl",
                     BinaryOp::Sar => "sra",
+                    BinaryOp::Mulhs => "mulhs",
                 };
                 let mut is_imm = false;
                 let dst = match self.get_dst() {

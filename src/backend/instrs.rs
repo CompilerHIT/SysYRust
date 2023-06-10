@@ -36,6 +36,8 @@ pub enum BinaryOp {
     Shr,
     /// Shift right arithmetic.
     Sar,
+    /// 执行带符号整数高位乘法操作
+    Mulhs,
 }
 
 /// 单目运算符
