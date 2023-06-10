@@ -218,7 +218,7 @@ impl Context<'_> {
                         map.insert(temps, inst);
                         self.bb_map.insert(bbname.to_string(), map);
                     }
-                    // println!("bbname:{:?}插入:{:?}",bbname,s);
+                    // println!("bbname:{:?}插入:{:?}", bbname, s);
                     return true;
                 }
             }
@@ -378,7 +378,7 @@ impl Context<'_> {
     ) -> bool {
         let s1 = s.clone();
         if (self.has_var_now(s1)) {
-            println!("当前作用域中已声明过变量{:?}", s);
+            // println!("当前作用域中已声明过变量{:?}", s);
             return false;
         }
         let temps = self.add_prefix(s.to_string());

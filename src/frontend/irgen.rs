@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use super::context::Type;
 use super::{ast::*, context::Context};
 use super::{init_padding_float, init_padding_int, ExpValue, RetInitVec};
@@ -73,9 +75,7 @@ impl Kit<'_> {
             // println!("phi_list长度:{:?}", vec_phi.len());
             for (name_changed, inst_phi, phi_is_padded) in vec_phi.clone() {
                 // println!("填phi{:?}:{:?}", name_changed, inst_phi.get_kind());
-                // if !phi_is_padded {
                 self.phi_padding_inst(&name_changed, inst_phi, bb);
-                // }
             }
         } else {
             // println!("phi填过了,跳过");
@@ -85,16 +85,26 @@ impl Kit<'_> {
                 .phi_list
                 .insert(bbname.to_string(), (vec![], true));
         }
-        // if is_padded {}
-        // for (name_changed, inst_phi, is_padded_phi) in vec_phi {
-        //     println!("填phi{:?}:{:?}", name_changed, inst_phi.get_kind());
-        //     // if !is_padded_phi {
-        //     self.phi_padding_inst(&name_changed, inst_phi, bb);
-        //     // }
-        // }
         //判断是否是最后一个bb
         let bb_success = bb.get_next_bb();
         for bb_next in bb_success {
+            if bb_next.get_name() == bb.get_name() {
+                // println!("自己插过phi了");
+                continue;
+            }
+            if let Some((vec_phi_temp, is_padded_temp)) =
+                self.context_mut.phi_list.get(bb_next.get_name())
+            {
+                // println!("有phi");
+                vec_phi = vec_phi_temp.clone();
+                is_padded = *is_padded_temp;
+                if is_padded {
+                    continue;
+                }
+            } else {
+                // println!("没phi");
+                continue;
+            }
             self.phi_padding_bb(*bb_next);
         }
     }
@@ -141,14 +151,49 @@ impl Kit<'_> {
                         let inst_phi = self.pool_inst_mut.make_float_phi();
                         bb.as_mut().push_front(inst_phi);
                         //填phi
+                        if let Some(inst_map) = self.context_mut.bb_map.get_mut(bbname) {
+                            inst_map.insert(var_name_changed.to_string(), inst_phi);
+                        } else {
+                            let mut map = HashMap::new();
+                            map.insert(var_name_changed.to_string(), inst_phi);
+                            self.context_mut.bb_map.insert(bbname.to_string(), map);
+                        }
                         self.phi_padding_inst(var_name_changed, inst_phi, bb);
+                        // self.context_mut
+                        //     .bb_map
+                        //     .get_mut(bbname)
+                        //     .and_then(|var_inst_map_insert| {
+                        //         var_inst_map_insert.insert(var_name_changed.to_string(), inst_phi)
+                        //     });
+
                         Ok(inst_phi)
                     }
                     Type::ConstInt | Type::Int => {
                         let inst_phi = self.pool_inst_mut.make_int_phi();
                         bb.as_mut().push_front(inst_phi);
                         //填phi
+                        // println!("没找到,向{:?}里插phi", bb.get_name());
+                        // self.context_mut.update_var_scope(
+                        //     var_name_changed,
+                        //     inst_phi,
+                        //     bb.get_name(),
+                        // );
+
+                        if let Some(inst_map) = self.context_mut.bb_map.get_mut(bbname) {
+                            inst_map.insert(var_name_changed.to_string(), inst_phi);
+                        } else {
+                            let mut map = HashMap::new();
+                            map.insert(var_name_changed.to_string(), inst_phi);
+                            self.context_mut.bb_map.insert(bbname.to_string(), map);
+                        }
                         self.phi_padding_inst(var_name_changed, inst_phi, bb);
+                        // self.context_mut
+                        //     .bb_map
+                        //     .get_mut(bbname)
+                        //     .and_then(|var_inst_map_insert| {
+                        //         var_inst_map_insert.insert(var_name_changed.to_string(), inst_phi)
+                        //     });
+
                         Ok(inst_phi)
                     }
                 }
@@ -2223,7 +2268,46 @@ impl Process for While {
     type Ret = i32;
     type Message = (Option<ObjPtr<BasicBlock>>);
     fn process(&mut self, _input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
-        todo!();
+        let (inst_cond, val_cond) = self.cond.process(Type::Int, kit_mut).unwrap();
+        let inst_branch = kit_mut.pool_inst_mut.make_br(inst_cond);
+        kit_mut.context_mut.push_inst_bb(inst_branch); //当前basicblock中放入branch指令
+        let block_while_head_name = kit_mut.context_mut.get_newbb_name();
+        let block_while_head = kit_mut.pool_bb_mut.new_basic_block(block_while_head_name); //生成新的块(false)
+        let block_false_name = kit_mut.context_mut.get_newbb_name();
+        let block_false = kit_mut.pool_bb_mut.new_basic_block(block_false_name); //生成新的块(false)
+        match kit_mut.context_mut.bb_now_mut {
+            InfuncChoice::InFunc(bb_now) => {
+                bb_now.as_mut().add_next_bb(block_false);
+                bb_now.as_mut().add_next_bb(block_while_head);
+            }
+            _ => {
+                unreachable!()
+            }
+        }
+        kit_mut.context_mut.bb_now_set(block_while_head); //设置当前basicblock
+                                                          // println!("while_body process starts");
+        self.body.process(None, kit_mut).unwrap(); //在块内生成指令
+                                                   // println!("while_body process finished");
+        let (inst_cond, val_cond) = self.cond.process(Type::Int, kit_mut).unwrap(); //当前块中放入cond
+                                                                                    // println!("cond process finished");
+        let inst_branch = kit_mut.pool_inst_mut.make_br(inst_cond);
+        kit_mut.context_mut.push_inst_bb(inst_branch); //当前basicblock中放入branch指令
+        match kit_mut.context_mut.bb_now_mut {
+            //当前块是while_body所有叶子节点的交汇点
+            InfuncChoice::InFunc(bb_now) => {
+                // println!("下一个节点:{:?}", block_false.get_name());
+                // println!("下一个节点:{:?}", block_while_head.get_name());
+                bb_now.as_mut().add_next_bb(block_false);
+                bb_now.as_mut().add_next_bb(block_while_head);
+            }
+            _ => {
+                unreachable!()
+            }
+        }
+        // println!("set");
+        kit_mut.context_mut.bb_now_set(block_false);
+        // todo!()
+        Ok(1)
     }
 }
 
