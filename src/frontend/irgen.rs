@@ -2129,8 +2129,8 @@ impl Process for If {
 
             match kit_mut.context_mut.bb_now_mut {
                 InfuncChoice::InFunc(bb_now) => {
-                    println!("下一块:{:?}", inst_bb_else.get_name());
-                    println!("下一块:{:?}", inst_bb_if.get_name());
+                    // println!("下一块:{:?}", inst_bb_else.get_name());
+                    // println!("下一块:{:?}", inst_bb_if.get_name());
                     bb_now.as_mut().add_next_bb(inst_bb_else); //先放判断为假的else语句
                     bb_now.as_mut().add_next_bb(inst_bb_if);
                 }
@@ -2146,7 +2146,7 @@ impl Process for If {
                 .push_inst_bb(kit_mut.pool_inst_mut.make_jmp()); //bb_mut_now是else分支的叶子交汇点
             match kit_mut.context_mut.bb_now_mut {
                 InfuncChoice::InFunc(bb_now) => {
-                    println!("下一块:{:?}", inst_bb_successor.get_name());
+                    // println!("下一块:{:?}", inst_bb_successor.get_name());
                     bb_now.as_mut().add_next_bb(inst_bb_successor); //向if分支的叶子交汇点bb_now_mut插入下一个节点
                 }
                 _ => {
@@ -2166,7 +2166,7 @@ impl Process for If {
                 .push_inst_bb(kit_mut.pool_inst_mut.make_jmp()); //bb_now_mut是if语句块的叶子交汇点
             match kit_mut.context_mut.bb_now_mut {
                 InfuncChoice::InFunc(bb_now) => {
-                    println!("下一块:{:?}", inst_bb_successor.get_name());
+                    // println!("下一块:{:?}", inst_bb_successor.get_name());
                     bb_now.as_mut().add_next_bb(inst_bb_successor); //向if分支的叶子交汇点bb_now_mut插入下一个节点
                 }
                 _ => {
@@ -2190,8 +2190,8 @@ impl Process for If {
 
             match kit_mut.context_mut.bb_now_mut {
                 InfuncChoice::InFunc(bb_now) => {
-                    println!("下一块:{:?}", inst_bb_successor.get_name());
-                    println!("下一块:{:?}", inst_bb_if.get_name());
+                    // println!("下一块:{:?}", inst_bb_successor.get_name());
+                    // println!("下一块:{:?}", inst_bb_if.get_name());
                     bb_now.as_mut().add_next_bb(inst_bb_successor); //先放判断为假的else语句
                     bb_now.as_mut().add_next_bb(inst_bb_if);
                 }
@@ -2207,7 +2207,7 @@ impl Process for If {
 
             match kit_mut.context_mut.bb_now_mut {
                 InfuncChoice::InFunc(bb_now) => {
-                    println!("下一块:{:?}", inst_bb_successor.get_name());
+                    // println!("下一块:{:?}", inst_bb_successor.get_name());
                     bb_now.as_mut().add_next_bb(inst_bb_successor); //向if分支的叶子交汇点bb_now_mut插入下一个节点
                 }
                 _ => {
