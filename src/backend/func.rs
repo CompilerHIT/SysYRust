@@ -243,16 +243,15 @@ impl Func {
         let ra = Reg::new(1, ScalarType::Int);
 
         self.calc_live();
-        println!("start");
         let mut allocator = Allocator::new();
         let alloc_stat = allocator.alloc(self);
-        println!("finish");
 
         self.reg_alloc_info = alloc_stat;
         self.context.as_mut().set_reg_map(&self.reg_alloc_info.dstr);
-        println!("map_size: {}", self.reg_alloc_info.dstr.len());
+        println!("dstr map info{:?}", self.reg_alloc_info.dstr);
 
         let mut stack_size = self.reg_alloc_info.stack_size as i32;
+        println!("stack_size: {}", stack_size);
         if let Some(addition_stack_info) = self.stack_addr.front() {
             stack_size += addition_stack_info.get_pos() + addition_stack_info.get_size();
         }
@@ -270,6 +269,7 @@ impl Func {
             Ok(f) => f,
             Err(e) => panic!("Error: {}", e),
         };
+        let map = self.context.get_reg_map().clone();
         self.context.as_mut().set_prologue_event(move || {
             let mut builder = AsmBuilder::new(&mut f1);
             // addi sp -stack_size

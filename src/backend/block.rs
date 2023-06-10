@@ -191,29 +191,35 @@ impl BB {
                             // x % y == x - (x / y) *y
                             // % 0 % 1 % 2^n 特殊判断
                             match rhs.as_ref().get_kind() {
-                                InstKind::ConstInt(imm) => {
-                                    match imm {
-                                        0 => {
-                                            lhs_reg = self
-                                                .resolve_operand(func, lhs, true, map_info, pool);
-                                            self.insts.push(pool.put_inst(LIRInst::new(
-                                                InstrsType::OpReg(SingleOp::IMv),
-                                                vec![dst_reg, lhs_reg],
-                                            )));
-                                        }
-                                        1 | -1 => {
-                                            self.insts.push(pool.put_inst(LIRInst::new(
-                                                InstrsType::OpReg(SingleOp::IMv),
-                                                vec![dst_reg, Operand::IImm(IImm::new(0))],
-                                            )));
-                                        }
-                                        _ => {
-                                            self.resolve_opt_rem(
-                                                func, map_info, dst_reg, lhs, imm, pool,
-                                            );
-                                        }
+                                InstKind::ConstInt(imm) => match imm {
+                                    0 => {
+                                        lhs_reg =
+                                            self.resolve_operand(func, lhs, true, map_info, pool);
+                                        self.insts.push(pool.put_inst(LIRInst::new(
+                                            InstrsType::OpReg(SingleOp::IMv),
+                                            vec![dst_reg, lhs_reg],
+                                        )));
                                     }
-                                }
+                                    1 | -1 => {
+                                        self.insts.push(pool.put_inst(LIRInst::new(
+                                            InstrsType::OpReg(SingleOp::Li),
+                                            vec![dst_reg, Operand::IImm(IImm::new(0))],
+                                        )));
+                                    }
+                                    _ => {
+                                        self.resolve_opt_rem(
+                                            func, map_info, dst_reg, lhs, imm, pool,
+                                        );
+                                        // lhs_reg =
+                                        //     self.resolve_operand(func, lhs, true, map_info, pool);
+                                        // rhs_reg =
+                                        //     self.resolve_operand(func, rhs, false, map_info, pool);
+                                        // self.insts.push(pool.put_inst(LIRInst::new(
+                                        //     InstrsType::Binary(BinaryOp::Rem),
+                                        //     vec![dst_reg, lhs_reg, rhs_reg],
+                                        // )));
+                                    }
+                                },
                                 _ => {
                                     assert!(
                                         lhs.as_ref().get_ir_type() == IrType::Int
@@ -1308,7 +1314,7 @@ impl BB {
 
     fn resolve_opt_mul(&mut self, dst: Operand, src: Operand, imm: i32, pool: &mut BackendPool) {
         let abs = imm.abs();
-        let is_neg = imm < 0 ;
+        let is_neg = imm < 0;
         match abs {
             0 => {
                 self.insts.push(pool.put_inst(LIRInst::new(
@@ -1398,7 +1404,7 @@ impl BB {
                     let temp = Operand::Reg(Reg::init(ScalarType::Int));
                     if !can_opt {
                         self.insts.push(pool.put_inst(LIRInst::new(
-                            InstrsType::OpReg(SingleOp::IMv),
+                            InstrsType::OpReg(SingleOp::Li),
                             vec![temp.clone(), Operand::IImm(IImm::new(imm))],
                         )));
                         self.insts.push(pool.put_inst(LIRInst::new(
@@ -1436,12 +1442,12 @@ impl BB {
     }
 
     fn resolve_opt_div(&mut self, dst: Operand, src: Operand, imm: i32, pool: &mut BackendPool) {
-        let abs  = imm.abs();
+        let abs = imm.abs();
         let is_neg = imm < 0;
         match abs {
             0 => {
                 unreachable!("div by zero");
-            },
+            }
             1 => {
                 if is_neg {
                     self.insts.push(pool.put_inst(LIRInst::new(
@@ -1454,55 +1460,64 @@ impl BB {
                         vec![dst, src],
                     )))
                 }
-            },
+            }
             _ => {
                 if is_opt_num(abs) {
                     self.insts.push(pool.put_inst(LIRInst::new(
                         InstrsType::Binary(BinaryOp::Sar),
-                        vec![
-                            dst,
-                            src,
-                            Operand::IImm(IImm::new(log2(abs))),
-                        ],
+                        vec![dst, src, Operand::IImm(IImm::new(log2(abs)))],
                     )))
                 } else {
-                    let two31 : u32 = 1 << 31;
-                    let t = two31 + (abs as u32 >> 31);
-                    let anc = t - 1 - t % (abs as u32);
-                    let p = 31;
-                    let q1 = two31 / anc;
-                    // let r1 = 
-                    let carry = ((1 << 31) - (1 << 31) % abs - 1) as i64;
-                    let mut bits : i64 = 32;
-                    let long_abs = abs as i64;
-                    while (1 << bits) <= (carry * (long_abs - (1 << bits) % long_abs)) {
-                        bits += 1;
+                    let (two31, uabs, mut p, mut delta) =
+                        (1 << 31 as u32, abs as u32, 31, 0 as u32);
+                    let t = two31 + (uabs >> 31);
+                    let anc = t - 1 - t % uabs;
+                    let (mut q1, mut q2) = (two31 / anc, two31 / uabs);
+                    let (mut r1, mut r2) = (two31 - q1 * anc, two31 - q2 * uabs);
+
+                    loop {
+                        p += 1;
+                        q1 *= 2;
+                        r1 *= 2;
+
+                        if r1 >= anc {
+                            q1 += 1;
+                            r1 -= anc;
+                        }
+                        q2 *= 2;
+                        r2 *= 2;
+                        if r2 >= uabs {
+                            q2 += 1;
+                            r2 -= uabs;
+                        }
+                        delta = uabs - r2;
+                        if q1 < delta || (q1 == delta && r1 == 0) {
+                            break;
+                        }
                     }
-                    let max_div = ((1 << bits) + long_abs - (1 << bits) % long_abs) / long_abs;
-                    let quo = bits - 32;
-                    self.resolve_opt_mul(dst.clone(), src.clone(), max_div as i32, pool);
+
+                    let mut magic = (q2 + 1) as i32;
+                    if is_neg {
+                        magic = -magic;
+                    }
+                    let shift = p - 32;
+                    let tmp = Operand::Reg(Reg::init(ScalarType::Int));
                     self.insts.push(pool.put_inst(LIRInst::new(
-                        InstrsType::Binary(BinaryOp::Sar),
-                        vec![
-                            dst.clone(),
-                            dst.clone(),
-                            Operand::IImm(IImm::new(quo as i32)),
-                        ],
+                        InstrsType::OpReg(SingleOp::Li),
+                        vec![tmp.clone(), Operand::IImm(IImm::new(magic))],
+                    )));
+                    self.insts.push(pool.put_inst(LIRInst::new(
+                        InstrsType::Binary(BinaryOp::Mulhs),
+                        vec![tmp.clone(), tmp.clone(), src.clone()],
                     )));
                     self.insts.push(pool.put_inst(LIRInst::new(
                         InstrsType::Binary(BinaryOp::Add),
-                        vec![dst.clone(), dst.clone(), src],
+                        vec![tmp.clone(), src.clone(), tmp.clone()],
                     )));
                     self.insts.push(pool.put_inst(LIRInst::new(
                         InstrsType::Binary(BinaryOp::Shr),
-                        vec![dst.clone(), dst.clone(), Operand::IImm(IImm::new(31))],
+                        vec![tmp.clone(), tmp.clone(), Operand::IImm(IImm::new(shift))],
                     )));
-                    if is_neg {
-                        self.insts.push(pool.put_inst(LIRInst::new(
-                            InstrsType::OpReg(SingleOp::INeg),
-                            vec![dst.clone(), dst],
-                        )))
-                    }
                 }
             }
         }
@@ -1535,38 +1550,26 @@ impl BB {
             )));
             self.insts.push(pool.put_inst(LIRInst::new(
                 InstrsType::Binary(BinaryOp::Shr),
-                vec![
-                    tmp.clone(),
-                    tmp.clone(),
-                    Operand::IImm(IImm::new(32 - k)),
-                ],
+                vec![tmp.clone(), tmp.clone(), Operand::IImm(IImm::new(32 - k))],
             )));
             self.insts.push(pool.put_inst(LIRInst::new(
                 InstrsType::Binary(BinaryOp::Add),
-                vec![
-                    dst.clone(),
-                    dst.clone(),
-                    tmp.clone(),
-                ],
+                vec![dst.clone(), dst.clone(), tmp.clone()],
             )));
             self.insts.push(pool.put_inst(LIRInst::new(
                 InstrsType::Binary(BinaryOp::And),
-                vec![
-                    dst.clone(),
-                    dst.clone(),
-                    Operand::IImm(IImm::new(abs - 1)),
-                ],
+                vec![dst.clone(), dst.clone(), Operand::IImm(IImm::new(abs - 1))],
             )));
             self.insts.push(pool.put_inst(LIRInst::new(
                 InstrsType::Binary(BinaryOp::Sub),
-                vec![
-                    dst.clone(),
-                    dst.clone(),
-                    tmp.clone(),
-                ],
+                vec![dst.clone(), dst.clone(), tmp.clone()],
             )));
         } else {
-
+            let rhs_reg = self.load_iimm_to_ireg(imm, pool);
+            self.insts.push(pool.put_inst(LIRInst::new(
+                InstrsType::Binary(BinaryOp::Rem),
+                vec![dst, lhs_reg, rhs_reg],
+            )));
         }
     }
 
@@ -1583,6 +1586,7 @@ impl GenerateAsm for BB {
             print!("{}:\n", self.label);
         }
         for inst in self.insts.iter() {
+            inst.as_mut().v_to_phy(context.get_reg_map().clone());
             inst.as_mut().generate(context.clone(), f)?;
         }
         Ok(())

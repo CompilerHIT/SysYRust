@@ -42,7 +42,7 @@ impl<'f> AsmBuilder<'f> {
                 writeln!(self.f, "    {op}iw {dest}, {lhs}, {rhs}")
             }
         } else {
-            if op == "or" || op == "xor" || op == "and" {
+            if op == "or" || op == "xor" || op == "and" || op == "mulhs" {
                 writeln!(self.f, "    {op} {dest}, {lhs}, {rhs}")
             } else {
                 writeln!(self.f, "    {op}w {dest}, {lhs}, {rhs}")
