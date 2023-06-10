@@ -17,6 +17,7 @@ pub struct Context<'a> {
     pub symbol_table: HashMap<String, Symbol>,
     pub param_usage_table: HashMap<String, bool>,
     pub bb_map: HashMap<String, HashMap<String, ObjPtr<Inst>>>,
+    pub phi_list: HashMap<String, (Vec<(String, ObjPtr<Inst>)>, bool)>,
     pub bb_now_mut: InfuncChoice,
     pub module_mut: &'a mut Module,
     num_bb: i64,
@@ -52,6 +53,7 @@ impl Context<'_> {
             var_map: HashMap::new(),
             bb_map: HashMap::new(),
             param_usage_table: HashMap::new(),
+            phi_list: HashMap::new(),
             bb_now_mut: InfuncChoice::NInFunc(),
             module_mut,
             num_bb: 0,
@@ -64,11 +66,11 @@ impl Context<'_> {
     /* -------------------------------------------------------------------------- */
     /*                               for bb_now_mut                               */
     /* -------------------------------------------------------------------------- */
-    pub fn get_newbb_name(&mut self)->String{
-        self.num_bb = self.num_bb+1;
+    pub fn get_newbb_name(&mut self) -> String {
+        self.num_bb = self.num_bb + 1;
         self.num_bb.to_string()
     }
-    
+
     pub fn push_inst_bb(&mut self, inst_ptr: ObjPtr<Inst>) {
         match self.bb_now_mut {
             InfuncChoice::InFunc(bbptr) => {
@@ -156,16 +158,12 @@ impl Context<'_> {
     }
 
     pub fn update_var_scope_now(&mut self, s: &str, inst: ObjPtr<Inst>) -> bool {
-        self.update_var_scope(s, inst, self.bb_now_mut)
-    }
-
-    pub fn update_var_scope(&mut self, s: &str, inst: ObjPtr<Inst>, bb: InfuncChoice) -> bool {
         let mut bbname = " ";
-        // println!("进来了");
-        match bb {
+        match self.bb_now_mut {
             InfuncChoice::InFunc(bbptr) => {
                 let bbn = bbptr.as_mut();
                 bbname = bbn.get_name();
+                self.update_var_scope(s, inst, &bbname)
             }
             InfuncChoice::NInFunc() => {
                 if self.get_layer() == -1 {
@@ -174,29 +172,28 @@ impl Context<'_> {
                 } else if self.get_layer() == 0 {
                     bbname = "params";
                 }
-                // bbname = "notinblock";
-                // let kind = inst.as_ref().get_kind();
-                // match tp {
-                //     Type::ConstFloat =>{
-                //         let inst_temp =
-                //         self.push_var_bb(s.to_string(), inst);
-                //     }
-                //     Type::ConstFloat =>{
-
-                //     }
-                //     Type::Float =>{
-
-                //     }
-                //     Type::Int =>{
-
-                //     }
-                //     // InstKind
-                //     _=>{}
-                // }
-
-                // self.push_var_bb(s.to_string(), inst);
+                self.update_var_scope(s, inst, &bbname)
             }
         }
+    }
+
+    pub fn update_var_scope(&mut self, s: &str, inst: ObjPtr<Inst>, bbname: &str) -> bool {
+        // let mut bbname = " ";
+        // println!("进来了");
+        // match bb {
+        //     InfuncChoice::InFunc(bbptr) => {
+        //         let bbn = bbptr.as_mut();
+        //         bbname = bbn.get_name();
+        //     }
+        //     InfuncChoice::NInFunc() => {
+        //         if self.get_layer() == -1 {
+        //             bbname = "notinblock";
+        //             self.push_var_bb(s.to_string(), inst);
+        //         } else if self.get_layer() == 0 {
+        //             bbname = "params";
+        //         }
+        //     }
+        // }
         if self.var_map.contains_key(s) {
             if let Some(vec) = self.var_map.get_mut(s) {
                 // println!("进来了");
@@ -374,6 +371,7 @@ impl Context<'_> {
         let temps = self.add_prefix(s.to_string());
         if self.var_map.contains_key(s) {
             if let Some(vec) = self.var_map.get_mut(s) {
+                // println!("插入符号{:?}", temps);
                 // let temps = self.add_prefix(s.to_string()).as_str();
                 vec.push((temps.to_string(), self.layer));
                 self.symbol_table.insert(
@@ -390,6 +388,7 @@ impl Context<'_> {
                 );
             }
         } else {
+            // println!("插入符号{:?}", temps);
             let mut v = vec![];
             // let temps = self.add_prefix(s.to_string());
             v.push((temps.to_string(), self.layer));
@@ -429,10 +428,10 @@ impl Context<'_> {
             loop {
                 if let Some(index) = vec.iter().position(|(_, layer)| *layer == self.layer) {
                     let (name_changed, _) = vec.remove(index);
-                    self.symbol_table.remove(&name_changed);
-                    for (_, inst_map) in &mut self.bb_map {
-                        inst_map.remove(&name_changed);
-                    }
+                    // self.symbol_table.remove(&name_changed); //符号表先不急着删除
+                    // for (_, inst_map) in &mut self.bb_map {//这里也不急着删除
+                    //     inst_map.remove(&name_changed);
+                    // }
                 } else {
                     break;
                 }
@@ -460,4 +459,16 @@ impl Context<'_> {
         self.index = self.index + 1;
         self.index.to_string() + s.as_str()
     }
+
+    /* -------------------------------------------------------------------------- */
+    /*                               for phi_list                                 */
+    /* -------------------------------------------------------------------------- */
+    // pub fn add_phi_bb(&mut self,bbname: &str,inst_phi:ObjPtr<Inst>){
+    //     self.phi_list.get(k).and_then(|phi_inst_map|phi_inst_map.get(index))
+    //     let inst_opt = self
+    //         .context_mut
+    //         .bb_map
+    //         .get(bbname)
+    //         .and_then(|var_inst_map| var_inst_map.get(&name_changed));
+    // }
 }

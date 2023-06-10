@@ -4,4 +4,5 @@ pub enum Error {
     VariableNotFound,
     PushPhiInGlobalDomain,
     MultipleDeclaration,
+    FindVarError,
 }
