@@ -171,6 +171,8 @@ impl LIRInst {
                     if let Some(id) = map.get(&reg.get_id()) {
                         reg.map_id(id.clone());
                     } else {
+                        println!("{:?}", reg.get_id());
+                        println!("{:?}", map);
                         panic!("not find physic mapping");
                     }
                 }

@@ -3,6 +3,7 @@ pub use std::collections::{HashSet, VecDeque};
 pub use std::fs::File;
 pub use std::hash::{Hash, Hasher};
 pub use std::io::Result;
+use std::vec;
 
 use crate::backend::func::Func;
 use crate::backend::instrs::Operand;
@@ -207,23 +208,9 @@ impl BB {
                                             )));
                                         }
                                         _ => {
-                                            if is_opt_num(imm) || is_opt_num(-imm) {
-                                                //TODO: 暂时不使用优化
-                                                self.resolve_opt_rem(
-                                                    func, map_info, dst_reg, lhs, rhs, pool,
-                                                );
-                                            } else {
-                                                lhs_reg = self.resolve_operand(
-                                                    func, lhs, true, map_info, pool,
-                                                );
-                                                rhs_reg = self.resolve_operand(
-                                                    func, rhs, true, map_info, pool,
-                                                );
-                                                self.insts.push(pool.put_inst(LIRInst::new(
-                                                    InstrsType::Binary(BinaryOp::Rem),
-                                                    vec![dst_reg, lhs_reg, rhs_reg],
-                                                )));
-                                            }
+                                            self.resolve_opt_rem(
+                                                func, map_info, dst_reg, lhs, imm, pool,
+                                            );
                                         }
                                     }
                                 }
@@ -1063,38 +1050,6 @@ impl BB {
                 }
                 InstrsType::Call => {
                     // call 指令不会发生偏移量的溢出
-                    // let mut flag = false;
-                    // let mut distance = 0;
-                    // let target = match inst_ref.get_label() {
-                    //     Operand::Addr(label) => label,
-                    //     _ => unreachable!("call must have a label"),
-                    // };
-                    // for (_, f) in func_map.iter() {
-                    //     if &f.as_ref().label == target || f.as_ref().label == func.as_ref().label {
-                    //         if !flag {
-                    //             flag = true;
-                    //         } else {
-                    //             break;
-                    //         }
-                    //     }
-                    //     if flag {
-                    //         distance += f.as_ref().cal_func_size();
-                    //     }
-                    //     if !operand::is_imm_20bs(distance as i32) {
-                    //         let name = format!("overflow_{}", get_tmp_bb());
-                    //         let tmp = pool.put_block(BB::new(&name));
-                    //         func.as_mut().blocks.insert(0, tmp);
-                    //         self.insts.insert(
-                    //             pos,
-                    //             pool.put_inst(LIRInst::new(
-                    //                 InstrsType::Jump,
-                    //                 vec![Operand::Addr(name)],
-                    //             )),
-                    //         );
-                    //         pos += 1;
-                    //         distance -= operand::IMM_20_Bs as usize;
-                    //     }
-                    // }
                 }
                 _ => {}
             }
@@ -1353,10 +1308,7 @@ impl BB {
 
     fn resolve_opt_mul(&mut self, dst: Operand, src: Operand, imm: i32, pool: &mut BackendPool) {
         let abs = imm.abs();
-        let is_neg = match imm < 0 {
-            true => true,
-            false => false,
-        };
+        let is_neg = imm < 0 ;
         match abs {
             0 => {
                 self.insts.push(pool.put_inst(LIRInst::new(
@@ -1484,12 +1436,76 @@ impl BB {
     }
 
     fn resolve_opt_div(&mut self, dst: Operand, src: Operand, imm: i32, pool: &mut BackendPool) {
-        //TODO: 暂时不使用优化
-        let reg = self.resolve_iimm(imm, pool);
-        self.insts.push(pool.put_inst(LIRInst::new(
-            InstrsType::Binary(BinaryOp::Div),
-            vec![dst, src, reg],
-        )));
+        let abs  = imm.abs();
+        let is_neg = imm < 0;
+        match abs {
+            0 => {
+                unreachable!("div by zero");
+            },
+            1 => {
+                if is_neg {
+                    self.insts.push(pool.put_inst(LIRInst::new(
+                        InstrsType::OpReg(SingleOp::INeg),
+                        vec![dst, src],
+                    )))
+                } else {
+                    self.insts.push(pool.put_inst(LIRInst::new(
+                        InstrsType::OpReg(SingleOp::IMv),
+                        vec![dst, src],
+                    )))
+                }
+            },
+            _ => {
+                if is_opt_num(abs) {
+                    self.insts.push(pool.put_inst(LIRInst::new(
+                        InstrsType::Binary(BinaryOp::Sar),
+                        vec![
+                            dst,
+                            src,
+                            Operand::IImm(IImm::new(log2(abs))),
+                        ],
+                    )))
+                } else {
+                    let two31 : u32 = 1 << 31;
+                    let t = two31 + (abs as u32 >> 31);
+                    let anc = t - 1 - t % (abs as u32);
+                    let p = 31;
+                    let q1 = two31 / anc;
+                    // let r1 = 
+                    let carry = ((1 << 31) - (1 << 31) % abs - 1) as i64;
+                    let mut bits : i64 = 32;
+                    let long_abs = abs as i64;
+                    while (1 << bits) <= (carry * (long_abs - (1 << bits) % long_abs)) {
+                        bits += 1;
+                    }
+                    let max_div = ((1 << bits) + long_abs - (1 << bits) % long_abs) / long_abs;
+                    let quo = bits - 32;
+                    self.resolve_opt_mul(dst.clone(), src.clone(), max_div as i32, pool);
+                    self.insts.push(pool.put_inst(LIRInst::new(
+                        InstrsType::Binary(BinaryOp::Sar),
+                        vec![
+                            dst.clone(),
+                            dst.clone(),
+                            Operand::IImm(IImm::new(quo as i32)),
+                        ],
+                    )));
+                    self.insts.push(pool.put_inst(LIRInst::new(
+                        InstrsType::Binary(BinaryOp::Add),
+                        vec![dst.clone(), dst.clone(), src],
+                    )));
+                    self.insts.push(pool.put_inst(LIRInst::new(
+                        InstrsType::Binary(BinaryOp::Shr),
+                        vec![dst.clone(), dst.clone(), Operand::IImm(IImm::new(31))],
+                    )));
+                    if is_neg {
+                        self.insts.push(pool.put_inst(LIRInst::new(
+                            InstrsType::OpReg(SingleOp::INeg),
+                            vec![dst.clone(), dst],
+                        )))
+                    }
+                }
+            }
+        }
     }
 
     fn resolve_opt_rem(
@@ -1498,16 +1514,60 @@ impl BB {
         map: &mut Mapping,
         dst: Operand,
         lhs: ObjPtr<Inst>,
-        rhs: ObjPtr<Inst>,
+        imm: i32,
         pool: &mut BackendPool,
     ) {
-        //TODO:
         let lhs_reg = self.resolve_operand(func, lhs, true, map, pool);
-        let rhs_reg = self.resolve_operand(func, rhs, true, map, pool);
-        self.insts.push(pool.put_inst(LIRInst::new(
-            InstrsType::Binary(BinaryOp::Rem),
-            vec![dst, lhs_reg, rhs_reg],
-        )));
+        let abs = imm.abs();
+        let is_neg = imm < 0;
+        if is_opt_num(abs) {
+            let k = log2(abs);
+            // r = ((n + t) & (2^k - 1)) - t
+            // t = (n >> k - 1) >> 32 - k
+            let tmp = Operand::Reg(Reg::init(ScalarType::Int));
+            self.insts.push(pool.put_inst(LIRInst::new(
+                InstrsType::Binary(BinaryOp::Sar),
+                vec![
+                    tmp.clone(),
+                    lhs_reg.clone(),
+                    Operand::IImm(IImm::new(k - 1)),
+                ],
+            )));
+            self.insts.push(pool.put_inst(LIRInst::new(
+                InstrsType::Binary(BinaryOp::Shr),
+                vec![
+                    tmp.clone(),
+                    tmp.clone(),
+                    Operand::IImm(IImm::new(32 - k)),
+                ],
+            )));
+            self.insts.push(pool.put_inst(LIRInst::new(
+                InstrsType::Binary(BinaryOp::Add),
+                vec![
+                    dst.clone(),
+                    dst.clone(),
+                    tmp.clone(),
+                ],
+            )));
+            self.insts.push(pool.put_inst(LIRInst::new(
+                InstrsType::Binary(BinaryOp::And),
+                vec![
+                    dst.clone(),
+                    dst.clone(),
+                    Operand::IImm(IImm::new(abs - 1)),
+                ],
+            )));
+            self.insts.push(pool.put_inst(LIRInst::new(
+                InstrsType::Binary(BinaryOp::Sub),
+                vec![
+                    dst.clone(),
+                    dst.clone(),
+                    tmp.clone(),
+                ],
+            )));
+        } else {
+
+        }
     }
 
     // fn clear_reg_info(&mut self) {
