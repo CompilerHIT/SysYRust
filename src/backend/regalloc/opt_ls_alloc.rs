@@ -1,8 +1,20 @@
+// 优化线性寄存器分配
+/*
+已实现优化:
+
+待实现优化:
+1.寄存器合并
+
+
+ */
+
+
 use crate::algorithm::graphalgo;
 use crate::algorithm::graphalgo::Graph;
 use crate::backend::block::BB;
 use crate::backend::func::Func;
 use crate::backend::instrs::LIRInst;
+use crate::backend::operand::Reg;
 use crate::backend::regalloc::regalloc::Regalloc;
 use crate::backend::regalloc::structs::{FuncAllocStat, RegUsedStat};
 use crate::container::bitmap::Bitmap;
@@ -251,7 +263,6 @@ impl Allocator {
             }
 
             for reg in it.as_ref().get_reg_def() {
-                
                 if !reg.is_virtual() {
                     continue;
                 }
@@ -290,18 +301,17 @@ impl Allocator {
                         spillings.insert(id);
                     } else {
                         tmpwindow.pop_back();
-                        dstr.insert(id, *dstr.get(&maxID).unwrap()); //给新寄存器分配旧寄存器所有的寄存器
-                        dstr.remove(&maxID); //解除旧末虚拟寄存器与实际寄存器的契约
+                        dstr.insert(id, *dstr.get(&maxID).unwrap()); //给新寄存器分配旧寄存器所有寄存器
+                        dstr.remove(&maxID); //接触旧末虚拟寄存器与实际寄存器的契约
                         tmpwindow.push(RegInterval::new(id, end)); //把心的分配结果加入窗口
                     }
                 };
-
-                // TODO,逻辑判断选择不同的分配方案
+                // 逻辑判断选择不同的分配方案
                 if reg.get_type() == ScalarType::Int
                 // 如果是通用寄存器
                 {
                     if let Some(ereg) = regUsedStat.get_available_ireg() {
-                        // 如果还有多余的通用寄存器使用
+                        // 如果抛弃新寄存器
                         dstr.insert(id, ereg);
                         regUsedStat.use_ireg(ereg);
                         iwindow.push(RegInterval::new(id, end))
@@ -312,7 +322,7 @@ impl Allocator {
                 // 如果是浮点寄存器
                 else if reg.get_type() == ScalarType::Float {
                     if let Some(ereg) = regUsedStat.get_available_freg() {
-                        // 如果还有多余的浮点寄存器
+                        // 如果抛弃新寄存器
                         dstr.insert(id, ereg);
                         regUsedStat.use_freg(ereg); //记录float_entity_reg为被使用状态
                         fwindow.push(RegInterval::new(id, end))
@@ -367,16 +377,11 @@ impl Regalloc for Allocator {
         let (spillings, dstr) = self.allocRegister();
         let (stack_size, bb_stack_sizes) = Allocator::countStackSize(func, &spillings);
         // let stack_size=spillings.len(); //TO REMOVE
-        let mut out=FuncAllocStat {
+        FuncAllocStat {
             stack_size,
             bb_stack_sizes,
             spillings,
             dstr,
-        };
-        for i in 0..=63{
-            out.dstr.insert(i, i);
         }
-        out
-
     }
 }
