@@ -248,9 +248,10 @@ impl Func {
 
         self.reg_alloc_info = alloc_stat;
         self.context.as_mut().set_reg_map(&self.reg_alloc_info.dstr);
-        println!("spill map info{:?}", self.reg_alloc_info.spillings);
+        println!("dstr map info{:?}", self.reg_alloc_info.dstr);
 
         let mut stack_size = self.reg_alloc_info.stack_size as i32;
+        println!("stack_size: {}", stack_size);
         if let Some(addition_stack_info) = self.stack_addr.front() {
             stack_size += addition_stack_info.get_pos() + addition_stack_info.get_size();
         }

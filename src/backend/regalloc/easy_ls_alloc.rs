@@ -254,6 +254,7 @@ impl Allocator {
 
                 println!("LIR kind {:?}",it.get_type());
                 println!("reg def {:?}",reg);
+                println!("dstr_size {:?}",dstr);
                 
                 if !reg.is_virtual() {
                     continue;
@@ -376,10 +377,6 @@ impl Regalloc for Allocator {
             spillings,
             dstr,
         };
-        for i in 0..=63{
-            out.dstr.insert(i, i);
-        }
         out
-
     }
 }
