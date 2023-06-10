@@ -244,6 +244,8 @@ impl Allocator {
                         let iereg: i32 = *dstr.get(&min.id).unwrap();
                         regUsedStat.release_ireg(iereg);
                         iwindow.pop_front();
+                    }else{
+                        break;
                     }
                 }
             }
@@ -254,6 +256,8 @@ impl Allocator {
                         let fereg: i32 = *dstr.get(&min.id).unwrap();
                         regUsedStat.release_freg(fereg);
                         fwindow.pop_front();
+                    }else{
+                        break;
                     }
                 }
             }

@@ -116,6 +116,7 @@ impl RegUsedStat {
     }
     // 占有一个浮点寄存器
     pub fn use_freg(&mut self, reg: i32) {
+        let reg=reg-32;
         self.fregs_used |= 1 << reg;
     }
 }
