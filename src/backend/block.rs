@@ -235,24 +235,7 @@ impl BB {
                                 }
                             };
                         }
-                        BinOp::And => {
-                            lhs_reg = self.resolve_operand(func, lhs, true, map_info, pool);
-                            rhs_reg = self.resolve_operand(func, rhs, false, map_info, pool);
-                            self.insts.push(pool.put_inst(LIRInst::new(
-                                InstrsType::Binary(BinaryOp::And),
-                                vec![dst_reg, lhs_reg, rhs_reg],
-                            )));
-                        }
-                        BinOp::Or => {
-                            lhs_reg = self.resolve_operand(func, lhs, true, map_info, pool);
-                            rhs_reg = self.resolve_operand(func, rhs, false, map_info, pool);
-                            self.insts.push(pool.put_inst(LIRInst::new(
-                                InstrsType::Binary(BinaryOp::Or),
-                                vec![dst_reg, lhs_reg, rhs_reg],
-                            )));
-                        }
                         _ => {
-                            unreachable!("more binary op to resolve");
                         }
                     }
                 }
@@ -527,7 +510,7 @@ impl BB {
                     }
 
                     // if branch
-                    let cond_ref = inst_ref.get_br_cond().as_ref();
+                    let cond_ref = inst_ref.get_br_cond();
 
                     let false_cond_bb = block.as_ref().get_next_bb()[0];
                     let true_cond_bb = block.as_ref().get_next_bb()[1];
