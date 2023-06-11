@@ -21,7 +21,7 @@ impl ObjPool<Inst> {
         };
 
         let inst = self.put(Inst::new(
-            crate::ir::ir_type::IrType::IntPtr,
+            ptr.get_ir_type(),
             InstKind::Gep,
             vec![ptr, offset],
         ));
