@@ -438,6 +438,7 @@ impl Process for ConstInitVal {
                             RetInitVec::Int(vec_ret_int),
                         ));
                     }
+                    _=>{todo!()}
                 }
 
                 // match tp {
@@ -952,6 +953,7 @@ impl Process for InitVal {
                 match tp {
                     Type::Float | Type::ConstFloat => Ok((RetInitVec::Float(vecf), inst_vec)),
                     Type::Int | Type::ConstInt => Ok((RetInitVec::Int(veci), inst_vec)),
+                    _=>{todo!()}
                 }
                 // Err(Error::Todo)
             }
@@ -1048,6 +1050,7 @@ impl Process for InitVal {
                         init_padding_int(&mut vec_val_i, vec_dimension_now);
                         Ok((RetInitVec::Int(vec_val_i), vec_inst_init))
                     }
+                    _=>{todo!()}
                 }
 
                 // Err(Error::Todo)
@@ -1191,6 +1194,13 @@ impl Process for FuncFParam {
                                 }
                             }
                         }
+                        // println!("形参:var_name:{:?},param类型:{:?}",id,param.get_ir_type());
+                        //             match kit_mut.context_mut.bb_now_mut {
+                        //                 InfuncChoice::InFunc(bb) =>{
+                        //                     println!("所在bb{:?}",bb.get_name());
+                        //                 }
+                        //                 _=>{}
+                        //             }
                         kit_mut.context_mut.add_var(
                             id,
                             Type::Float,
@@ -1332,6 +1342,7 @@ impl Process for Assign {
             Type::Int => {
                 mes = Type::Int;
             }
+            _=>{todo!()}
         }
 
         // println!("zhe");
@@ -1360,6 +1371,7 @@ impl Process for Assign {
                     let inst_store = kit_mut.pool_inst_mut.make_int_store(inst_ptr, inst_r);
                     kit_mut.context_mut.push_inst_bb(inst_store);
                 }
+                _=>{todo!()}
             }
 
             // }
@@ -1382,6 +1394,7 @@ impl Process for Assign {
                         let inst_store = kit_mut.pool_inst_mut.make_int_store(global_inst, inst_r);
                         kit_mut.context_mut.push_inst_bb(inst_store);
                     }
+                    _=>{todo!()}
                 }
             }
             kit_mut
@@ -1664,7 +1677,10 @@ impl Process for Return {
             // let ret_inst = kit_mut.pool_inst_mut.make_return(inst);
             // kit_mut.context_mut.push_inst_bb(ret_inst);
             // Ok(1)
-            todo!()
+            let ret_inst = kit_mut.pool_inst_mut.make_return_void();
+                    kit_mut.context_mut.push_inst_bb(ret_inst);
+            // todo!()
+            Ok(1)
         }
     }
 }
@@ -1710,6 +1726,7 @@ impl Process for LVal {
                 (var, symbol) = kit_mut.get_var(&self.id, None, true).unwrap();
             } else {
                 // println!("{:?}不取指针", &self.id);
+                let inst_offset_temp = kit_mut.pool_inst_mut.make_int_const(0);
                 (var, symbol) = kit_mut.get_var(&self.id, None, false).unwrap();
             }
             // (var, symbol) = kit_mut.get_var(&self.id, None).unwrap();
@@ -1731,7 +1748,7 @@ impl Process for LVal {
             let mut imm_flag = true;
             index = 0;
             for exp in &mut self.exp_vec {
-                let (inst_exp, val) = exp.process(input, kit_mut).unwrap();
+                let (inst_exp, val) = exp.process(Type::Int, kit_mut).unwrap();///介里维度
                 match val {
                     ExpValue::Int(i) => {
                         let inst_base_now =
@@ -1957,7 +1974,75 @@ impl Process for LVal {
                     }
                 }
             }
+            _=>{
+                match symbol.tp {
+                    Type::Int | Type::ConstInt => {
+                match var.as_ref().get_kind() {
+                    InstKind::Load => {
+                        let mut val_ret = ExpValue::None;
+
+                        match var.as_ref().get_ptr().as_ref().get_kind() {
+                            InstKind::GlobalConstInt(i) => {
+                                val_ret = ExpValue::Int(i);
+                            }
+                            _ => {}
+                        }
+
+                        return Ok((var, val_ret));
+                    }
+                    _ => {
+                        // println!("var:{:?},var_type:{:?}",var.as_ref().get_kind(),var.as_ref().get_ir_type());
+                        let mut val_ret = ExpValue::None;
+                        match var.as_ref().get_kind() {
+                            InstKind::ConstInt(i)
+                            | InstKind::GlobalInt(i)
+                            | InstKind::GlobalConstInt(i) => {
+                                val_ret = ExpValue::Int(i);
+                            }
+                            _ => {}
+                        }
+
+                        return Ok((var, val_ret));
+                    }
+                }
+            }
+            Type::Float | Type::ConstFloat => {
+                match var.as_ref().get_kind() {
+                    InstKind::Load => {
+                        let mut val_ret = ExpValue::None;
+
+                        match var.as_ref().get_ptr().as_ref().get_kind() {
+                            InstKind::GlobalConstInt(i) => {
+                                val_ret = ExpValue::Int(i);
+                            }
+                            _ => {}
+                        }
+
+                        return Ok((var, val_ret));
+                    }
+                    _ => {
+                        // println!("var:{:?},var_type:{:?}",var.as_ref().get_kind(),var.as_ref().get_ir_type());
+                        let mut val_ret = ExpValue::None;
+                        match var.as_ref().get_kind() {
+                            InstKind::ConstInt(i)
+                            | InstKind::GlobalInt(i)
+                            | InstKind::GlobalConstInt(i) => {
+                                val_ret = ExpValue::Int(i);
+                            }
+                            _ => {}
+                        }
+
+                        return Ok((var, val_ret));
+                    }
+                }
+            }
+            _=>{todo!()}
+
+
+            
+            }
         }
+    }
         // if symbol.is_array {
         //     todo!();
         // } else {
@@ -2024,6 +2109,7 @@ impl Process for Number {
                             return Ok((inst, ExpValue::Float(*f)));
                         }
                     } // Type::Int =>{
+                        _=>{todo!()}
 
                       // }
                 }
@@ -2059,6 +2145,7 @@ impl Process for Number {
                             return Ok((inst, ExpValue::Int(*i)));
                         }
                     } // Type::Int =>{
+                        _=>{todo!()}
 
                       // }
                 }
@@ -2127,9 +2214,12 @@ impl Process for UnaryExp {
                         IrType::Float => {
                             fparams_type_vec.push(Type::Float);
                         }
-                        IrType::Int | IrType::FloatPtr | IrType::IntPtr => {
+                        IrType::Int  => {
                             //这里可能得改
                             fparams_type_vec.push(Type::Int);
+                        }
+                        IrType::FloatPtr | IrType::IntPtr =>{
+                            fparams_type_vec.push(Type::NotForce);
                         }
                         _ => {
                             unreachable!()

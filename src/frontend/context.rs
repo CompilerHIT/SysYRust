@@ -34,6 +34,7 @@ pub enum Type {
     Float,
     ConstInt,
     ConstFloat,
+    NotForce,
 }
 
 #[derive(Clone)]

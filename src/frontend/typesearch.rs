@@ -130,6 +130,7 @@ impl TypeProcess for PrimaryExp {
                 match sym.tp {
                     Type::ConstFloat | Type::Float => Ok(3),
                     Type::ConstInt | Type::Int => Ok(1),
+                    _=>{todo!()}
                 }
             }
             PrimaryExp::Number(imm) => {
