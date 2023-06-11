@@ -52,6 +52,10 @@ impl User {
         &self.use_list
     }
 
+    pub fn remove_operand(&mut self, index: usize) {
+        self.operands.remove(index);
+    }
+
     /// 表示当前指令被使用，将其加入use list
     /// 一个指令可能被一个指令重复使用两次，所以可能存在有相同的指令
     pub fn add_user(&mut self, inst: &Inst) {
