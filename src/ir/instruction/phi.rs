@@ -34,7 +34,7 @@ impl Inst {
     /// * 'index' - 操作数的索引
     pub fn set_operand(&mut self, mut operand: ObjPtr<Inst>, index: usize) {
         // 正确性检查
-        debug_assert_eq!(self.get_ir_type(), operand.as_ref().get_ir_type());
+        debug_assert_eq!(self.get_ir_type(), operand.get_ir_type());
 
         // 修改use list
         self.user.get_operand(index).remove_user(self);
@@ -42,5 +42,27 @@ impl Inst {
 
         // 更新操作数的使用者
         self.user.set_operand(index, operand);
+    }
+
+    /// 将一个操作数替换为另一个操作数
+    /// # Arguments
+    /// * 'old' - 被替换的操作数
+    /// * 'new' - 新的操作数
+    pub fn replace_operand(&mut self, old: ObjPtr<Inst>, new: ObjPtr<Inst>) {
+        let index = self.get_operands().iter().position(|x| *x == old).unwrap();
+        self.set_operand(new, index);
+    }
+
+    /// 删除一个操作数
+    /// # Arguments
+    /// * 'operand' - 被删除的操作数
+    pub fn remove_operand(&mut self, operand: ObjPtr<Inst>) {
+        let index = self
+            .get_operands()
+            .iter()
+            .position(|x| *x == operand)
+            .unwrap();
+        self.user.get_operand(index).remove_user(self);
+        self.user.remove_operand(index);
     }
 }
