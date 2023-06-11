@@ -359,29 +359,6 @@ impl Allocator {
 
 impl Regalloc for Allocator {
     fn alloc(&mut self, func: &Func) -> FuncAllocStat {
-        // TODO第一次遍历，块深度标记
-        self.dfs_bbs(func.entry.unwrap());
-        //print!("pass dfs_bb");
-        // 第二次遍历,指令深度标记
-        self.passed.clear();
-        self.inst_record(func.entry.unwrap());
-        self.passed.clear();
-        //print!("pass inst_record");
-        // 第三次遍历,指令遍历，寄存器interval标记
-        self.interval_anaylise();
-        // for (regid,id) in self.intervals.iter() {
-        //     //println!("{regid},{id}");
-        // }
-        //print!("pass interval analyze");
-        // 第四次遍历，堆滑动窗口更新获取FuncAllocStat
-        let (spillings, dstr) = self.allocRegister();
-        let (stack_size, bb_stack_sizes) = Allocator::countStackSize(func, &spillings);
-        // let stack_size=spillings.len(); //TO REMOVE
-        FuncAllocStat {
-            stack_size,
-            bb_stack_sizes,
-            spillings,
-            dstr,
-        }
+        
     }
 }
