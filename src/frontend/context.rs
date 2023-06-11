@@ -10,7 +10,7 @@ use crate::{
     utility::ObjPtr,
 };
 
-use super::irgen::InfuncChoice;
+use super::InfuncChoice;
 
 pub struct Context<'a> {
     pub var_map: HashMap<String, Vec<(String, i64)>>,
