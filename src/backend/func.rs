@@ -7,6 +7,7 @@ pub use std::io::Result;
 use std::io::Write;
 use std::vec::Vec;
 
+use super::instrs::InstrsType;
 use super::{structs::*, BackendPool};
 use crate::backend::asm_builder::AsmBuilder;
 use crate::backend::block::*;
@@ -87,7 +88,8 @@ impl Func {
 
         // entry shouldn't generate for asm, called label for entry should always be false
         let label = &self.label;
-        let entry = pool.put_block(BB::new(&format!(".entry_{label}")));
+        let mut entry = pool.put_block(BB::new(&format!(".entry_{label}")));
+        entry.showed = false;
         self.entry = Some(entry);
         self.blocks.push(self.entry.unwrap());
 
@@ -137,6 +139,9 @@ impl Func {
             }
             let block = self.blocks[index];
             if block != self.entry.unwrap() {
+                if i == 0 {
+                    block.as_mut().showed = false;
+                }
                 let basicblock = info.block_ir_map.get(&block).unwrap();
                 if i + 1 < self.blocks.len() {
                     let next_block = Some(self.blocks[i + 1]);
@@ -159,6 +164,40 @@ impl Func {
                 i += 1;
             }
             index += 1;
+        }
+
+        // 第三遍pass，拆phi
+        for block in self.blocks.iter() {
+            if block.insts.len() == 0 {
+                continue;
+            }
+            let mut index = block.insts.len() - 1;
+            loop {
+                match block.insts[index].get_type() {
+                    InstrsType::Ret(..) | InstrsType::Branch(..) | InstrsType::Jump => {
+                        if index == 0 {
+                            break;
+                        }
+                        index -= 1;
+                    }
+                    _ => {
+                        break;
+                    }
+                }
+            }
+            if index != 0 {
+                index += 1;
+            }
+            if let Some(mut target) = info.phis_to_block.get_mut(&block.label) {
+                while let Some(inst) = target.pop() {
+                    println!("phi inst{:?} {:?}, pos {}", block.label,inst.as_ref(), index);
+                    block.as_mut().insts.insert(index, inst);
+                }
+            } 
+            let mut phis = block.phis.clone();
+            while let Some(inst) = phis.pop() {
+                block.as_mut().insts.insert(index, inst);
+            }
         }
         self.update(this);
     }

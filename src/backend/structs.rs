@@ -215,7 +215,8 @@ pub struct Mapping {
     pub array_slot_map: HashMap<ObjPtr<Inst>, i32>,
 
     pub val_map: HashMap<ObjPtr<Inst>, Operand>,
-    pub block_branch: HashMap<ObjPtr<BB>, ObjPtr<LIRInst>>,
+    pub block_branch: HashMap<String, ObjPtr<LIRInst>>,
+    pub phis_to_block: HashMap<String, Vec<ObjPtr<LIRInst>>>,
     // pub func_
 }
 
@@ -227,6 +228,7 @@ impl Mapping {
             array_slot_map: HashMap::new(),
             val_map: HashMap::new(),
             block_branch: HashMap::new(),
+            phis_to_block: HashMap::new(),
         }
     }
 }

@@ -14,6 +14,7 @@ use crate::ir::instruction::{BinOp, Inst, InstKind, UnOp};
 use crate::ir::ir_type::IrType;
 use crate::utility::{ObjPtr, ScalarType};
 
+use super::instrs::AsmBuilder;
 use super::operand::ARG_REG_COUNT;
 use super::{structs::*, BackendPool};
 use crate::backend::operand;
@@ -28,7 +29,7 @@ pub const NUM_SIZE: i32 = 4;
 #[derive(Clone)]
 pub struct BB {
     pub label: String,
-    pub called: bool,
+    pub showed: bool,
 
     pub insts: Vec<ObjPtr<LIRInst>>,
 
@@ -40,6 +41,8 @@ pub struct BB {
     pub live_in: HashSet<Reg>,
     pub live_out: HashSet<Reg>,
 
+    pub phis: Vec<ObjPtr<LIRInst>>,
+
     global_map: HashMap<ObjPtr<Inst>, Operand>,
 }
 
@@ -47,7 +50,7 @@ impl BB {
     pub fn new(label: &str) -> Self {
         Self {
             label: label.to_string(),
-            called: false,
+            showed: true,
             insts: Vec::new(),
             in_edge: Vec::new(),
             out_edge: Vec::new(),
@@ -56,6 +59,7 @@ impl BB {
             live_in: HashSet::new(),
             live_out: HashSet::new(),
             global_map: HashMap::new(),
+            phis: Vec::new(),
         }
     }
 
@@ -235,8 +239,7 @@ impl BB {
                                 }
                             };
                         }
-                        _ => {
-                        }
+                        _ => {}
                     }
                 }
                 InstKind::Unary(op) => {
@@ -494,14 +497,10 @@ impl BB {
                             None => panic!("jump block not found"),
                         };
                         if *jump_block != next_blocks.unwrap() {
-                            inst.replace_op(vec![Operand::Addr(
-                                next_bb.as_ref().get_name().to_string(),
-                            )]);
+                            inst.replace_op(vec![Operand::Addr(jump_block.label.to_string())]);
                             let obj_inst = pool.put_inst(inst);
                             self.insts.push(obj_inst);
-                            map_info
-                                .block_branch
-                                .insert(pool.put_block(self.clone()), obj_inst);
+                            map_info.block_branch.insert(self.label.clone(), obj_inst);
                         }
                         let this = self.clone();
                         jump_block.as_mut().in_edge.push(pool.put_block(this));
@@ -554,23 +553,21 @@ impl BB {
                             self.insts.push(pool.put_inst(LIRInst::new(
                                 inst_kind,
                                 vec![
-                                    Operand::Addr(true_cond_bb.as_ref().get_name().to_string()),
+                                    Operand::Addr(false_succ_block.label.to_string()),
                                     lhs_reg,
                                     rhs_reg,
                                 ],
                             )));
                             self.push_back(pool.put_inst(LIRInst::new(
                                 InstrsType::Jump,
-                                vec![Operand::Addr(false_cond_bb.as_ref().get_name().to_string())],
+                                vec![Operand::Addr(true_succ_block.label.to_string())],
                             )));
 
                             inst.replace_op(vec![Operand::Addr(
                                 true_cond_bb.as_ref().get_name().to_string(),
                             )]);
                             let obj_inst = pool.put_inst(inst);
-                            map_info
-                                .block_branch
-                                .insert(pool.put_block(self.clone()), obj_inst);
+                            map_info.block_branch.insert(self.label.clone(), obj_inst);
                             let this = self.clone();
                             true_succ_block
                                 .as_mut()
@@ -767,33 +764,43 @@ impl BB {
                         _ => unreachable!("phi reg must be reg"),
                     };
                     assert!(kind != ScalarType::Void);
-                    let inst_kind = match kind {
+                    let mut inst_kind = match kind {
                         ScalarType::Int => InstrsType::OpReg(SingleOp::IMv),
                         ScalarType::Float => InstrsType::OpReg(SingleOp::FMv),
                         _ => unreachable!("mv must be int or float"),
                     };
-                    self.insts.insert(
-                        0,
-                        pool.put_inst(LIRInst::new(inst_kind, vec![temp.clone(), phi_reg])),
-                    );
+                    
+                    println!("phi reg: {:?}, tmp: {:?}", phi_reg.clone(), temp.clone());
+                    self.phis
+                        .push(pool.put_inst(LIRInst::new(inst_kind, vec![phi_reg, temp.clone()])));
+
                     inst_ref.get_operands().iter().for_each(|op| {
-                        let src_reg = self.resolve_operand(func, *op, true, map_info, pool);
+                        println!("op: {:?}", op.get_kind());
+                        let src_reg = self.resolve_operand(func, *op, false, map_info, pool);
+                        inst_kind = match src_reg {
+                            Operand::Reg(reg) => match reg.get_type() {
+                                ScalarType::Int => InstrsType::OpReg(SingleOp::IMv),
+                                ScalarType::Float => InstrsType::OpReg(SingleOp::FMv),
+                                _ => unreachable!("mv must be int or float"),
+                            },
+                            Operand::IImm(_) => InstrsType::OpReg(SingleOp::Li),
+                            _ => unreachable!("phi operand must be reg or iimm"),
+                        };
                         let inst = LIRInst::new(inst_kind, vec![temp.clone(), src_reg]);
                         let obj_inst = pool.put_inst(inst);
                         let incoming_block = map_info
                             .ir_block_map
                             .get(&op.as_ref().get_parent_bb())
-                            .unwrap();
-                        if map_info.block_branch.contains_key(incoming_block) {
-                            let b_inst = map_info.block_branch.get(incoming_block).unwrap();
-                            for i in 0..self.insts.len() {
-                                if self.insts[i] == *b_inst {
-                                    self.insts.insert(i, obj_inst);
-                                    break;
-                                }
-                            }
+                            .unwrap()
+                            .label
+                            .clone();
+
+                        if let Some(insts) = map_info.phis_to_block.get_mut(&incoming_block) {
+                            insts.push(obj_inst);
                         } else {
-                            self.push_back(obj_inst);
+                            map_info
+                                .phis_to_block
+                                .insert(incoming_block, vec![obj_inst]);
                         }
                     });
                 }
@@ -998,6 +1005,9 @@ impl BB {
                     let mut i = 0;
                     let (mut flag, mut first_j) = (false, true);
                     loop {
+                        if i >= func.as_ref().blocks.len() {
+                            break;
+                        }
                         let block_ref = func.as_ref().blocks[i];
                         if &self.label == &block_ref.as_ref().label {
                             flag = true;
@@ -1565,8 +1575,9 @@ impl BB {
 }
 impl GenerateAsm for BB {
     fn generate(&mut self, context: ObjPtr<Context>, f: &mut File) -> Result<()> {
-        if self.called {
-            print!("{}:\n", self.label);
+        if self.showed {
+            let mut builder = AsmBuilder::new(f);
+            builder.show_block(&self.label)?;
         }
         for inst in self.insts.iter() {
             inst.as_mut().v_to_phy(context.get_reg_map().clone());

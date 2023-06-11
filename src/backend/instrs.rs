@@ -100,6 +100,7 @@ pub enum InstrsType {
     // LoadGlobal,
 }
 
+#[derive(Debug)]
 pub struct LIRInst {
     inst_type: InstrsType,
     // 0:Dst, 1...n:Srcs

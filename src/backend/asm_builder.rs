@@ -161,7 +161,7 @@ impl<'f> AsmBuilder<'f> {
     }
 
     pub fn b(&mut self, cond: &str, lhs: &str, rhs: &str, label: &str) -> Result<()> {
-        writeln!(self.f, "    {cond}    {lhs}, {rhs}, {label}")
+        writeln!(self.f, "    b{cond}    {lhs}, {rhs}, {label}")
     }
 
     pub fn j(&mut self, label: &str) -> Result<()> {
@@ -177,6 +177,10 @@ impl<'f> AsmBuilder<'f> {
         writeln!(self.f, "	.align	1");
         writeln!(self.f, "	.globl	{label}");
         writeln!(self.f, "    .type {label}, @function");
+        writeln!(self.f, "{label}:")
+    }
+
+    pub fn show_block(&mut self, label: &str) -> Result<()> {
         writeln!(self.f, "{label}:")
     }
 
