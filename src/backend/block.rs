@@ -839,9 +839,6 @@ impl BB {
             }
             let inst = self.insts[index];
             let spills = inst.is_spill(spill);
-            for s in func.spill_stack_map.iter() {
-                println!("spill: {:?}", s);
-            }
             if spills.is_empty() {
                 index += 1;
                 continue;
@@ -849,9 +846,11 @@ impl BB {
                 let (mut store_num, mut slot) = (0, vec![]);
                 for id in spills.iter() {
                     if let Some(offset) = func.spill_stack_map.get(&id) {
+                        println!("exist slot{:?}", offset);
                         slot.push(*offset);
                     } else {
                         let stack_slot = StackSlot::new(start_pos + store_num * ADDR_SIZE, ADDR_SIZE);
+                        println!("new slot{:?}", stack_slot);
                         slot.push(stack_slot);
                         store_num += 1;
                     };
@@ -859,20 +858,24 @@ impl BB {
                 let offset = start_pos + store_num * ADDR_SIZE;
                 for i in 0..spills.len() as i32 {
                     let reg = Operand::Reg(Reg::new(5 + i, ScalarType::Int));
-                    self.insts.insert(index, pool.put_inst(LIRInst::new(
+                    let mut ins = LIRInst::new(
                         InstrsType::StoreToStack,
                         vec![reg, Operand::IImm(IImm::new(offset + i * ADDR_SIZE))]
-                    )));
+                    );
+                    ins.set_double();
+                    self.insts.insert(index, pool.put_inst(ins));
                     index += 1;
                 }
                 for i in 0..spills.len() as i32 {
                     let reg = Operand::Reg(Reg::new(5 + i, ScalarType::Int));
                     let stack_slot = slot[i as usize];
                     if func.spill_stack_map.contains_key(&spills[i as usize]) {
-                        self.insts.insert(index, pool.put_inst(LIRInst::new(
+                        let mut ins = LIRInst::new(
                             InstrsType::LoadFromStack,
                             vec![reg, Operand::IImm(IImm::new(stack_slot.get_pos()))]
-                        )));
+                        );
+                        ins.set_double();
+                        self.insts.insert(index, pool.put_inst(ins));
                         println!("spill: {:?}", stack_slot.get_pos());
                         index += 1;
                     } else {
@@ -882,25 +885,39 @@ impl BB {
                 for i in 0..spills.len() as i32 {
                     inst.as_mut().replace(spills[i as usize], 5 + i)
                 }
+
                 index += 1;
+
                 for i in 0..spills.len() as i32 {
                     let reg = Operand::Reg(Reg::new(5 + i, ScalarType::Int));
                     let stack_slot = slot[i as usize];
-                    self.insts.insert(index, pool.put_inst(LIRInst::new(
+                    match self.insts[index-1].get_dst() {
+                        Operand::Reg(ireg) => {
+                            if ireg.get_id() != 5 + i {
+                                continue;
+                            }
+                        }
+                        _ => {}
+                    }
+                    let mut ins = LIRInst::new(
                         InstrsType::StoreToStack,
                         vec![reg, Operand::IImm(IImm::new(stack_slot.get_pos()))]
-                    )));
+                    );
+                    ins.set_double();
+                    self.insts.insert(index, pool.put_inst(ins));
                     index += 1;
                 }
+
                 for i in 0..spills.len() as i32 {
                     let reg = Operand::Reg(Reg::new(5 + i, ScalarType::Int));
-                    self.insts.insert(index, pool.put_inst(LIRInst::new(
+                    let mut ins = LIRInst::new(
                         InstrsType::LoadFromStack,
-                        vec![reg, Operand::IImm(IImm::new(offset + i * ADDR_SIZE))]
-                    )));
+                        vec![reg, Operand::IImm(IImm::new(offset + i * ADDR_SIZE))]);
+                    ins.set_double();
+                    self.insts.insert(index, pool.put_inst(ins));
                     index += 1;
                 }
-                start_pos += offset;
+                start_pos = offset;
             }
         }
     }
