@@ -25,6 +25,7 @@ use crate::utility::{ObjPtr, ScalarType};
 
 #[derive(Clone)]
 pub struct Func {
+    pub is_extern: bool,
     pub label: String,
     pub blocks: Vec<ObjPtr<BB>>,
     pub stack_addr: LinkedList<StackSlot>,
@@ -51,6 +52,7 @@ pub struct Func {
 impl Func {
     pub fn new(name: &str, context: ObjPtr<Context>) -> Self {
         Self {
+            is_extern: false,
             label: name.to_string(),
             blocks: Vec::new(),
             stack_addr: LinkedList::new(),
@@ -92,6 +94,12 @@ impl Func {
         entry.showed = false;
         self.entry = Some(entry);
         self.blocks.push(self.entry.unwrap());
+
+        //判断是否是外部函数
+        if ir_func.is_empty_bb() {
+            self.is_extern = true;
+            return;
+        }
 
         // 第一遍pass
         let fblock = ir_func.get_head();
@@ -400,6 +408,9 @@ impl Func {
 
 impl GenerateAsm for Func {
     fn generate(&mut self, _: ObjPtr<Context>, f: &mut File) -> Result<()> {
+        if self.is_extern {
+            return Ok(());
+        }
         if self.const_array.len() > 0 {
             writeln!(f, "	.section	.data\n   .align  3")?;
         }
