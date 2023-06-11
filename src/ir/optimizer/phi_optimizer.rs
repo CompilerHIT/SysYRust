@@ -64,8 +64,17 @@ fn remove_duplicate_phi(mut phi: ObjPtr<Inst>) {
 
 /// 删除参数为自身的phi
 fn remove_self_phi(mut phi: ObjPtr<Inst>) {
-    while let Some(index) = phi.get_operands().iter().position(|&x| x == phi) {
-        phi.remove_operand_by_index(index);
+    //while let Some(index) = phi.get_operands().iter().position(|&x| x == phi) {
+    //phi.remove_operand_by_index(index);
+    //}
+    loop {
+        if let Some(index) = phi.get_operands().iter().position(|&x| x == phi) {
+            println!("{index}");
+            debug_assert_eq!(phi, phi.get_operands()[index]);
+            phi.remove_operand_by_index(index);
+        } else {
+            break;
+        }
     }
 }
 
