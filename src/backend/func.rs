@@ -170,6 +170,7 @@ impl Func {
         }
 
         // 第三遍pass，拆phi
+        let mut size = 0;
         for block in self.blocks.iter() {
             if block.insts.len() == 0 {
                 continue;
@@ -206,7 +207,9 @@ impl Func {
             while let Some(inst) = phis.pop() {
                 block.as_mut().insts.insert(0, inst);
             }
+            size += block.insts.len();
         }
+        println!("phi insert size: {}", size);
         self.update(this);
     }
 
@@ -426,6 +429,11 @@ impl GenerateAsm for Func {
         }
         AsmBuilder::new(f).show_func(&self.label)?;
         self.context.as_mut().call_prologue_event();
+        let mut size = 0;
+        for block in self.blocks.iter() {
+            size += block.insts.len();
+        }
+        println!("tatol {}", size);
         for block in self.blocks.iter() {
             block.as_mut().generate(self.context, f)?;
         }

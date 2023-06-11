@@ -175,13 +175,17 @@ impl Inst {
         inst.as_mut().list.set_next(ObjPtr::new(p));
     }
 
-    /// 把自己从指令中移除
+    /// 把自己从指令中移除并删除use
     pub fn remove_self(&mut self) {
         let next = self.list.get_next().as_mut();
         let prev = self.list.get_prev().as_mut();
 
         next.list.set_prev(ObjPtr::new(prev));
         prev.list.set_next(ObjPtr::new(next));
+
+        self.get_operands().iter().for_each(|op| {
+            op.as_mut().remove_user(self);
+        });
 
         self.list.next = None;
         self.list.prev = None;

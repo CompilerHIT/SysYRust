@@ -6,8 +6,11 @@ pub mod function;
 pub mod instruction;
 pub mod ir_type;
 pub mod module;
+mod optimizer;
 pub mod user;
 pub mod value;
+
+pub use optimizer::optimizer_run;
 
 /// 侵入式链表
 #[derive(Debug)]

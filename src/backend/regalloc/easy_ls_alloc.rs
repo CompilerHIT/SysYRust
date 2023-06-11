@@ -17,7 +17,6 @@ use std::collections::VecDeque;
 
 // 摆烂的深度优先指令编码简单实现的线性扫描寄存器分配
 pub struct Allocator {
-    func: Option<Box<Func>>,
     depths: HashMap<ObjPtr<BB>, usize>,
     passed: HashSet<ObjPtr<BB>>,
     lines: Vec<ObjPtr<LIRInst>>,
@@ -72,7 +71,6 @@ struct BlockGraph {
 impl Allocator {
     pub fn new() -> Allocator {
         Allocator {
-            func: Option::None,
             passed: HashSet::new(),
             lines: Vec::new(),
             base: 0,
@@ -177,13 +175,15 @@ impl Allocator {
         while !walk.is_empty() {
             let cur = walk.pop_front().unwrap();
             let mut bbspillings: HashSet<i32> = HashSet::new();
+            println!("{}",cur.label);
             for reg in &cur.as_ref().live_in {
                 if spillings.contains(&reg.get_id()) {
                     bbspillings.insert(reg.get_id());
                 }
             }
-
-            bb_stack_sizes.insert(cur, bbspillings.len()*8);
+            let start=bbspillings.len()*8;
+            bb_stack_sizes.insert(cur, start);
+            bbspillings.clear();
             // 统计spilling数量
             for inst in &cur.as_ref().insts {
                 for reg in inst.as_ref().get_reg_def() {
@@ -197,8 +197,8 @@ impl Allocator {
                     }
                 }
             }
-            if bbspillings.len()*8 > stackSize {
-                stackSize = bbspillings.len()*8;
+            if bbspillings.len()*8+start > stackSize {
+                stackSize = bbspillings.len()*8+start;
             }
             // 扩展未扩展的节点
             for bb in &cur.as_ref().out_edge {
@@ -218,7 +218,7 @@ impl Allocator {
         let mut dstr: HashMap<i32, i32> = HashMap::new();
         // 寄存器分配的长度限制
         // 可用寄存器
-        let mut regUsedStat = RegUsedStat::new();
+        let mut reg_used_stat = RegUsedStat::new();
         let mut iwindow: PriorityDeque<RegInterval> = PriorityDeque::new();
         let mut fwindow: PriorityDeque<RegInterval> = PriorityDeque::new();
         // 遍历指令
@@ -229,7 +229,7 @@ impl Allocator {
                     if min.end <= i {
                         // 获取已经使用寄存器号，释放
                         let iereg: i32 = *dstr.get(&min.id).unwrap();
-                        regUsedStat.release_ireg(iereg);
+                        reg_used_stat.release_ireg(iereg);
                         iwindow.pop_front();
                     }else{
                         break;
@@ -241,7 +241,7 @@ impl Allocator {
                 if let Some(min) = fwindow.front() {
                     if min.end <= i {
                         let fereg: i32 = *dstr.get(&min.id).unwrap();
-                        regUsedStat.release_freg(fereg);
+                        reg_used_stat.release_freg(fereg);
                         fwindow.pop_front();
                     }else{
                         break;
@@ -302,10 +302,10 @@ impl Allocator {
                 if reg.get_type() == ScalarType::Int
                 // 如果是通用寄存器
                 {
-                    if let Some(ereg) = regUsedStat.get_available_ireg() {
+                    if let Some(ereg) = reg_used_stat.get_available_ireg() {
                         // 如果还有多余的通用寄存器使用
                         dstr.insert(id, ereg);
-                        regUsedStat.use_ireg(ereg);
+                        reg_used_stat.use_ireg(ereg);
                         iwindow.push(RegInterval::new(id, end))
                     } else {
                         spill_reg_for(&mut iwindow);
@@ -313,10 +313,10 @@ impl Allocator {
                 }
                 // 如果是浮点寄存器
                 else if reg.get_type() == ScalarType::Float {
-                    if let Some(ereg) = regUsedStat.get_available_freg() {
+                    if let Some(ereg) = reg_used_stat.get_available_freg() {
                         // 如果还有多余的浮点寄存器
                         dstr.insert(id, ereg);
-                        regUsedStat.use_freg(ereg); //记录float_entity_reg为被使用状态
+                        reg_used_stat.use_freg(ereg); //记录float_entity_reg为被使用状态
                         fwindow.push(RegInterval::new(id, end))
                     } else {
                         spill_reg_for(&mut fwindow);
@@ -354,21 +354,19 @@ impl Allocator {
 impl Regalloc for Allocator {
     fn alloc(&mut self, func: &Func) -> FuncAllocStat {
         // TODO第一次遍历，块深度标记
+        self.passed.clear();
         self.dfs_bbs(func.entry.unwrap());
-        //print!("pass dfs_bb");
         // 第二次遍历,指令深度标记
         self.passed.clear();
         self.inst_record(func.entry.unwrap());
-        self.passed.clear();
-        //print!("pass inst_record");
         // 第三次遍历,指令遍历，寄存器interval标记
         self.interval_anaylise();
-        // for (regid,id) in self.intervals.iter() {
-        //     //println!("{regid},{id}");
-        // }
-        //print!("pass interval analyze");
+
         // 第四次遍历，堆滑动窗口更新获取FuncAllocStat
         let (spillings, dstr) = self.allocRegister();
+        println!("_______________________________________________");
+        println!("{}",func.label);
+        println!("{:?}",spillings);
         let (stack_size, bb_stack_sizes) = Allocator::countStackSize(func, &spillings);
         // let stack_size=spillings.len(); //TO REMOVE
         let mut out=FuncAllocStat {
@@ -377,6 +375,7 @@ impl Regalloc for Allocator {
             spillings,
             dstr,
         };
+        // println!("{:?}",out.spillings);
         out
     }
 }

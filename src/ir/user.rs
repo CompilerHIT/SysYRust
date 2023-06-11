@@ -44,12 +44,20 @@ impl User {
         self.operands[index] = operand;
     }
 
+    pub fn set_operands(&mut self, operands: Vec<ObjPtr<Inst>>) {
+        self.operands = operands;
+    }
+
     pub fn push_operand(&mut self, operand: ObjPtr<Inst>) {
         self.operands.push(operand)
     }
 
     pub fn get_use_list(&self) -> &Vec<ObjPtr<Inst>> {
         &self.use_list
+    }
+
+    pub fn remove_operand(&mut self, index: usize) {
+        self.operands.remove(index);
     }
 
     /// 表示当前指令被使用，将其加入use list
@@ -68,7 +76,7 @@ impl User {
 
     /// 当前指令不再被使用，删除将对方从use list中删除
     pub fn delete_user(&mut self, inst: &Inst) {
-        debug_assert!(!self.use_list.contains(&ObjPtr::new(inst)), "delete_user()",);
+        debug_assert!(self.use_list.contains(&ObjPtr::new(inst)), "delete_user()",);
         let index = self.find_use(inst);
         self.use_list.remove(index);
     }

@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::env;
 
 use lalrpop_util::lalrpop_mod;
 use sysylib::backend::module::AsmModule;
@@ -16,6 +17,9 @@ fn main() {
 }
 
 fn run_main() {
+    // ---------------------测试代码---------------------
+    env::set_var("RUST_BACKTRACE", "1");
+    // --------------------------------------------------
     use clap::{App, Arg};
     // 获取命令行解析
     let matches = App::new("compiler")
@@ -60,6 +64,9 @@ fn run_main() {
         &mut pool_bb,
         &mut pool_func,
     );
+
+    // ir优化
+    sysylib::ir::optimizer_run(&mut module, o1_option);
 
     // 后端解析
     generate_asm(filename, output, &mut AsmModule::new(&module));

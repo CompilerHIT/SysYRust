@@ -827,10 +827,11 @@ impl BB {
         &mut self,
         func: ObjPtr<Func>,
         spill: &HashSet<i32>,
-        pos: i32,
+        start_pos: i32,
         pool: &mut BackendPool,
     ) {
         let mut index = 0;
+        let mut pos = start_pos;
         loop {
             if index >= self.insts.len() {
                 break;
@@ -842,11 +843,13 @@ impl BB {
             if id != -1 {
                 //FIXME:暂时使用double进行栈操作，且未处理浮点数
                 inst.replace(id, 5);
+                println!("inst: {:?}", inst);
+
                 let mut store = LIRInst::new(
                     InstrsType::StoreToStack,
                     vec![
                         Operand::Reg(Reg::new(5, ScalarType::Int)),
-                        Operand::IImm(IImm::new(pos)),
+                        Operand::IImm(IImm::new(pos + ADDR_SIZE)),
                     ],
                 );
                 store.set_double();
@@ -867,16 +870,18 @@ impl BB {
                                 Operand::IImm(IImm::new(offset)),
                             ],
                         );
-                        if size == 8 {
+                        if size == ADDR_SIZE {
                             load.set_double();
-                        } else if size == 4 {
+                        } else if size == NUM_SIZE {
                         } else {
                             unreachable!("local variable must be 4 or 8 bytes");
                         }
                         self.insts.insert(index, pool.put_inst(load));
                         index += 1;
                     }
-                    None => {}
+                    None => {
+                        offset = pos;
+                    }
                 }
 
                 index += 1;
@@ -884,12 +889,12 @@ impl BB {
                     InstrsType::StoreToStack,
                     vec![
                         Operand::Reg(Reg::new(5, ScalarType::Int)),
-                        Operand::IImm(IImm::new(pos)),
+                        Operand::IImm(IImm::new(offset)),
                     ],
                 );
                 store.set_double();
                 self.insts.insert(index, pool.put_inst(store));
-                let slot = StackSlot::new(pos, 8);
+                let slot = StackSlot::new(offset, ADDR_SIZE);
                 func.as_mut().stack_addr.push_back(slot);
                 func.as_mut().spill_stack_map.insert(id, slot);
 
@@ -898,11 +903,12 @@ impl BB {
                     InstrsType::LoadFromStack,
                     vec![
                         Operand::Reg(Reg::new(5, ScalarType::Int)),
-                        Operand::IImm(IImm::new(pos)),
+                        Operand::IImm(IImm::new(pos + ADDR_SIZE)),
                     ],
                 );
                 load.set_double();
                 self.insts.insert(index, pool.put_inst(load));
+                pos += ADDR_SIZE;
             } else {
                 index += 1;
             }
@@ -918,7 +924,7 @@ impl BB {
             let inst_ref = self.insts[pos].as_ref();
             match inst_ref.get_type() {
                 InstrsType::Load | InstrsType::Store => {
-                    let temp = Operand::Reg(Reg::init(ScalarType::Int));
+                    let temp = Operand::Reg(Reg::new(3, ScalarType::Int));
                     let offset = inst_ref.get_offset().get_data();
                     if operand::is_imm_12bs(offset) {
                         break;
@@ -939,7 +945,7 @@ impl BB {
                     ]);
                 }
                 InstrsType::LoadFromStack | InstrsType::StoreToStack => {
-                    let temp = Operand::Reg(Reg::init(ScalarType::Int));
+                    let temp = Operand::Reg(Reg::new(3, ScalarType::Int));
                     let offset = inst_ref.get_stack_offset().get_data();
                     if operand::is_imm_12bs(offset) {
                         break;
@@ -964,7 +970,7 @@ impl BB {
                     ]);
                 }
                 InstrsType::LoadParamFromStack | InstrsType::StoreParamToStack => {
-                    let temp = Operand::Reg(Reg::init(ScalarType::Int));
+                    let temp = Operand::Reg(Reg::new(3, ScalarType::Int));
                     let offset = func.as_ref().reg_alloc_info.stack_size as i32
                         - inst_ref.get_stack_offset().get_data();
                     if operand::is_imm_12bs(offset) {
