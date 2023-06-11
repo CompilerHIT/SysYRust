@@ -173,6 +173,7 @@ impl LIRInst {
             match self.operands[index] {
                 Operand::Reg(ref mut reg) => {
                     if !reg.is_physic() {
+                        println!("v_to_phy: {:?}", reg);
                         let new = map[&reg.get_id()];
                         self.operands[index] = Operand::Reg(Reg::new(new, reg.get_type()));
                     }

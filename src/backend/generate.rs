@@ -119,7 +119,7 @@ impl GenerateAsm for LIRInst {
                 if !operand::is_imm_12bs(self.get_stack_offset().get_data()) {
                     panic!("illegal offset");
                 }
-                let src = match self.get_lhs() {
+                let src = match self.get_dst() {
                     Operand::Reg(reg) => reg,
                     _ => panic!("src of store must be reg, to improve"),
                 };
