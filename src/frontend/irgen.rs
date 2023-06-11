@@ -1,6 +1,9 @@
+use std::collections::HashMap;
+
 use super::context::Type;
+use super::kit::Kit;
 use super::{ast::*, context::Context};
-use super::{init_padding_float, init_padding_int, ExpValue, RetInitVec};
+use super::{init_padding_float, init_padding_int, ExpValue, InfuncChoice, RetInitVec};
 use crate::frontend::context::Symbol;
 use crate::frontend::error::Error;
 use crate::frontend::typesearch::TypeProcess;
@@ -10,662 +13,6 @@ use crate::ir::instruction::{Inst, InstKind};
 use crate::ir::ir_type::IrType;
 use crate::ir::module::Module;
 use crate::utility::{ObjPool, ObjPtr};
-
-pub struct Kit<'a> {
-    pub context_mut: &'a mut Context<'a>,
-    pool_inst_mut: &'a mut ObjPool<Inst>,
-    pool_func_mut: &'a mut ObjPool<Function>,
-    pool_bb_mut: &'a mut ObjPool<BasicBlock>,
-}
-
-impl Kit<'_> {
-    pub fn push_inst(&mut self, inst_ptr: ObjPtr<Inst>) {
-        self.context_mut.push_inst_bb(inst_ptr);
-    }
-
-    pub fn phi_padding_allfunctions(&mut self) {
-        //填充所有函数中的phi
-        // println!("填phi开始");
-        let mut vec_funcs = self.get_functions().unwrap().clone();
-        for func in vec_funcs {
-            // println!(
-            //     "填phi,函数头basicblock名:{:?}",
-            //     func.as_ref().get_head().get_name()
-            // );
-            let head_bb_temp = func.as_ref().get_head();
-            self.phi_padding_bb(head_bb_temp); //填充该函数中所有bb中的phi
-        }
-    }
-
-    pub fn get_functions(&self) -> Option<Vec<(ObjPtr<Function>)>> {
-        //获得函数ptr
-        let mut vec_funcs = vec![];
-        if !self.context_mut.module_mut.get_all_func().is_empty() {
-            vec_funcs = self
-                .context_mut
-                .module_mut
-                .get_all_func()
-                .iter()
-                .map(|(x, y)| *y)
-                .collect();
-            Some(vec_funcs)
-        } else {
-            None
-        }
-    }
-
-    pub fn phi_padding_bb(&mut self, bb: ObjPtr<BasicBlock>) {
-        //填充该bb中的phi
-        // println!("bbnow:name:{:?}", bb.get_name());
-        let bbname = bb.get_name();
-        let option_phi = self.context_mut.phi_list.get(bbname);
-        let mut vec_phi = vec![];
-        let mut is_padded = false;
-        if let Some((vec_phi_temp, is_padded_temp)) = option_phi {
-            // println!("有phi");
-            vec_phi = vec_phi_temp.clone();
-            is_padded = *is_padded_temp;
-        } else {
-            // println!("没phi");
-        }
-        if !is_padded {
-            //没被填过
-            for (name_changed, inst_phi) in vec_phi.clone() {
-                // println!("填phi{:?}:{:?}", name_changed, inst_phi.get_kind());
-                self.phi_padding_inst(&name_changed, inst_phi, bb);
-            }
-        } else {
-            // println!("phi填过了,跳过");
-        }
-        if !is_padded {
-            self.context_mut
-                .phi_list
-                .insert(bbname.to_string(), (vec_phi.clone(), true));
-        }
-        // if is_padded {}
-        // for (name_changed, inst_phi) in vec_phi {
-        //     println!("填phi{:?}:{:?}", name_changed, inst_phi.get_kind());
-        //     self.phi_padding_inst(&name_changed, inst_phi, bb);
-        // }
-        //判断是否是最后一个bb
-        let bb_success = bb.get_next_bb();
-        for bb_next in bb_success {
-            self.phi_padding_bb(*bb_next);
-        }
-    }
-
-    pub fn phi_padding_inst(
-        &mut self,
-        name_changed: &str,
-        inst_phi: ObjPtr<Inst>,
-        bb: ObjPtr<BasicBlock>,
-    ) {
-        //填充bb中的变量为name_changed的inst_phi
-        let vec_pre = bb.get_up_bb();
-        for pre in vec_pre {
-            let inst_find = self.find_var(*pre, &name_changed).unwrap();
-            inst_phi.as_mut().add_operand(inst_find); //向上找,填充
-                                                      // println!("其参数为:{:?}", inst_find.get_kind());
-        }
-    }
-
-    pub fn find_var(
-        &mut self,
-        bb: ObjPtr<BasicBlock>,
-        var_name_changed: &str,
-    ) -> Result<ObjPtr<Inst>, Error> {
-        let bbname = bb.get_name();
-        let inst_opt = self
-            .context_mut
-            .bb_map
-            .get(bbname)
-            .and_then(|var_inst_map| var_inst_map.get(var_name_changed));
-        if let Some(inst_var) = inst_opt {
-            Ok(*inst_var)
-        } else {
-            let sym_opt = self.context_mut.symbol_table.get(var_name_changed);
-            if let Some(sym) = sym_opt {
-                let inst_phi = self
-                    .push_phi(var_name_changed.to_string(), sym.tp, bb)
-                    .unwrap();
-                //填phi
-                self.phi_padding_inst(var_name_changed, inst_phi, bb);
-                Ok(inst_phi)
-            } else {
-                // println!("没找到符号{:?}", var_name_changed);
-                // println!("符号表长度:{:?}", self.context_mut.symbol_table.len());
-                Err(Error::FindVarError)
-            }
-        }
-    }
-
-    pub fn add_var(
-        &mut self,
-        s: &str,
-        tp: Type,
-        is_array: bool,
-        is_param: bool,
-        array_inst: Option<ObjPtr<Inst>>,
-        global_inst: Option<ObjPtr<Inst>>,
-        dimension: Vec<i32>,
-    ) {
-        self.context_mut.add_var(
-            s,
-            tp,
-            is_array,
-            is_param,
-            array_inst,
-            global_inst,
-            dimension,
-        );
-    }
-
-    pub fn param_used(&mut self, s: &str) {
-        // let inst = self.context_mut.module_mut.get_var(s);
-
-        let mut name_changed = " ".to_string();
-        let mut layer_var = 0;
-
-        self.context_mut
-            .var_map
-            .get(s)
-            .and_then(|vec_temp| vec_temp.last())
-            .and_then(|(last_elm, layer)| {
-                name_changed = last_elm.clone();
-                layer_var = *layer;
-                self.context_mut.symbol_table.get(last_elm)
-            }); //获得改名后的名字
-
-        self.context_mut
-            .param_usage_table
-            .insert(name_changed, true);
-    }
-
-    // pub fn update_var(&mut self, s: &str, inst: ObjPtr<Inst>) -> bool {
-    //     self.context_mut.update_var_scope(s, inst)
-    // }
-
-    pub fn push_phi(
-        &mut self,
-        name: String,
-        tp: Type,
-        bb: ObjPtr<BasicBlock>,
-    ) -> Result<ObjPtr<Inst>, Error> {
-        match tp {
-            Type::ConstFloat | Type::Float => {
-                let inst_phi = self.pool_inst_mut.make_float_phi();
-                bb.as_mut().push_front(inst_phi);
-                self.context_mut
-                    .update_var_scope(name.as_str(), inst_phi, bb.get_name());
-                if let Some((phi_list, _)) = self.context_mut.phi_list.get_mut(bb.get_name()) {
-                    //如果有philist
-                    // println!(
-                    //     "有philist,插入phi{:?}进入philist{:?}",
-                    //     inst_phi.get_kind(),
-                    //     name
-                    // );
-                    phi_list.push((name, inst_phi));
-                } else {
-                    // println!(
-                    //     "没有philist,插入phi{:?}进入philist{:?}",
-                    //     inst_phi.get_kind(),
-                    //     name
-                    // );
-                    //如果没有,生成新的philist,插入
-                    let mut vec = vec![];
-                    vec.push((name, inst_phi));
-                    self.context_mut
-                        .phi_list
-                        .insert(bb.get_name().to_string(), (vec, false));
-                }
-                Ok(inst_phi)
-            }
-            Type::ConstInt | Type::Int => {
-                let inst_phi = self.pool_inst_mut.make_int_phi();
-                bb.as_mut().push_front(inst_phi);
-                self.context_mut
-                    .update_var_scope(name.as_str(), inst_phi, bb.get_name());
-                if let Some((phi_list, is_padded)) =
-                    self.context_mut.phi_list.get_mut(bb.get_name())
-                {
-                    //如果有philist
-                    // println!(
-                    //     "有philist,插入phi{:?}进入philist{:?}",
-                    //     inst_phi.get_kind(),
-                    //     bb.get_name()
-                    // );
-                    phi_list.push((name, inst_phi));
-                } else {
-                    // println!(
-                    //     "没有philist,插入phi{:?}进入philist{:?}",
-                    //     inst_phi.get_kind(),
-                    //     bb.get_name()
-                    // );
-                    //如果没有,生成新的philist,插入
-                    let mut vec = vec![];
-                    vec.push((name, inst_phi));
-                    self.context_mut
-                        .phi_list
-                        .insert(bb.get_name().to_string(), (vec, false));
-                }
-                Ok(inst_phi)
-            }
-        }
-    }
-
-    pub fn get_var_symbol(&mut self, s: &str) -> Result<Symbol, Error> {
-        let sym_opt = self
-            .context_mut
-            .var_map
-            .get(s)
-            .and_then(|vec_temp| vec_temp.last())
-            .and_then(|(last_elm, _)| self.context_mut.symbol_table.get(last_elm))
-            .map(|x| x.clone());
-        if let Some(sym) = sym_opt {
-            return Ok(sym);
-        }
-        Err(Error::VariableNotFound)
-    }
-
-    // pub fn get_var_symbol()
-
-    pub fn get_var(
-        &mut self,
-        s: &str,
-        offset: Option<ObjPtr<Inst>>,
-        bool_get_ptr: bool,
-    ) -> Result<(ObjPtr<Inst>, Symbol), Error> {
-        // let bb = self.context_mut.bb_now_mut;
-        match self.context_mut.bb_now_mut {
-            InfuncChoice::InFunc(bb) => {
-                if let Some((inst, symbol)) = self.get_var_bb(s, bb, offset, bool_get_ptr) {
-                    return Ok((inst, symbol));
-                }
-            }
-            InfuncChoice::NInFunc() => {
-                let inst = self.context_mut.module_mut.get_var(s);
-                let mut name_changed = " ".to_string();
-                let mut layer_var = 0;
-
-                let sym_opt = self
-                    .context_mut
-                    .var_map
-                    .get(s)
-                    .and_then(|vec_temp| vec_temp.last())
-                    .and_then(|(last_elm, layer)| {
-                        name_changed = last_elm.clone();
-                        layer_var = *layer;
-                        self.context_mut.symbol_table.get(last_elm)
-                    })
-                    .map(|x| x.clone());
-                let mut bbname = "notinblock";
-
-                let inst_opt = self
-                    .context_mut
-                    .bb_map
-                    .get(bbname)
-                    .and_then(|var_inst_map| var_inst_map.get(&name_changed));
-
-                if let Some(sym) = sym_opt {
-                    // println!("找到变量{:?}",s);
-                    return Ok((inst, sym));
-                }
-                // InfuncChoice::NInFunc() => {
-                //     return todo!();;
-                // }
-            }
-        }
-        // println!("没找到变量:{:?}",s);
-        return Err(Error::VariableNotFound);
-    }
-
-    pub fn get_var_bb(
-        &mut self,
-        s: &str,
-        bb: ObjPtr<BasicBlock>,
-        offset: Option<ObjPtr<Inst>>,
-        bool_get_ptr: bool,
-    ) -> Option<(ObjPtr<Inst>, Symbol)> {
-        let mut name_changed = " ".to_string();
-        let mut layer_var = 0;
-
-        let sym_opt = self
-            .context_mut
-            .var_map
-            .get(s)
-            .and_then(|vec_temp| vec_temp.last())
-            .and_then(|(last_elm, layer)| {
-                name_changed = last_elm.clone();
-                layer_var = *layer;
-                self.context_mut.symbol_table.get(last_elm)
-            })
-            .map(|x| x.clone());
-
-        let mut bbname = bb.as_ref().get_name();
-
-        // let mut is_const = false;
-
-        if layer_var == -1 {
-            bbname = "notinblock"; //全局变量,const和一般类型需要分开处理吗?
-        }
-        // else if layer_var == 0 {
-        //     // bbname = "params";
-        //     if let Some(is_used) = self.context_mut.param_usage_table.get(&name_changed) {
-        //         if !is_used {
-        //             // println!("进来了");
-        //             bbname = "params";
-        //         }
-
-        //     }
-        // }//函数参数不再单独处理
-
-        let inst_opt = self
-            .context_mut
-            .bb_map
-            .get(bbname)
-            .and_then(|var_inst_map| var_inst_map.get(&name_changed));
-
-        if let Some(sym) = sym_opt {
-            // println!("进来了");
-            // println!("找到变量{:?}",s);
-
-            //应该先判断是不是数组，以防bbmap中找不到报错
-            if let Some(inst_array) = sym.array_inst {
-                // println!("找到数组变量{:?},不插phi", s);
-                // println!("bbname:{:?}", bbname);
-                //如果是数组
-                let mut inst_ret = self.pool_inst_mut.make_int_const(-1129);
-                match sym.tp {
-                    Type::Float | Type::ConstFloat => {
-                        //判断类型
-                        if layer_var < 0 {
-                            //是否是全局
-                            if let Some(offset) = offset {
-                                //有偏移
-                                // let ptr = self.pool_inst_mut.make_gep(inst_array, offset);
-                                // inst_ret = self.pool_inst_mut.make_global_float_array_load(ptr);
-                                if bool_get_ptr {
-                                    //如果是需要取指针(向函数传递数组指针)
-                                    let ptr_array =
-                                        self.pool_inst_mut.make_global_float_array_load(inst_array); //获得数组第一个元素(全局变量元素都是指针)
-                                    inst_ret = self.pool_inst_mut.make_gep(ptr_array, offset); //获得特定指针
-                                                                                               // inst_ret = self.pool_inst_mut.make_float_load(ptr); //获得元素值
-                                                                                               // inst_ret = self.pool_inst_mut.make_gep(ptr_array, offset);
-                                                                                               // self.context_mut.push_inst_bb(offset); //这里需要向bb插入offset吗
-                                    self.context_mut.push_inst_bb(ptr_array); //哪些不插入到块中?
-                                                                              // self.context_mut.push_inst_bb(ptr);
-                                    self.context_mut.push_inst_bb(inst_ret);
-                                } else {
-                                    let ptr_array =
-                                        self.pool_inst_mut.make_global_float_array_load(inst_array); //获得数组第一个元素(全局变量元素都是指针)
-                                    let ptr = self.pool_inst_mut.make_gep(ptr_array, offset); //获得特定指针
-                                    inst_ret = self.pool_inst_mut.make_float_load(ptr); //获得元素值
-                                                                                        // inst_ret = self.pool_inst_mut.make_gep(ptr_array, offset);
-                                                                                        // self.context_mut.push_inst_bb(offset); //这里需要向bb插入offset吗
-                                    self.context_mut.push_inst_bb(ptr_array); //哪些不插入到块中?
-                                    self.context_mut.push_inst_bb(ptr);
-                                    self.context_mut.push_inst_bb(inst_ret);
-                                }
-                            } else {
-                                //没给偏移
-                                if bool_get_ptr {
-                                    let ptr_array =
-                                        self.pool_inst_mut.make_global_float_array_load(inst_array); //获得数组第一个元素(全局变量元素都是指针)
-                                    let inst_offset_temp = self.pool_inst_mut.make_int_const(0);
-                                    inst_ret =
-                                        self.pool_inst_mut.make_gep(ptr_array, inst_offset_temp); //获得特定指针
-                                                                                                  // inst_ret = self.pool_inst_mut.make_float_load(ptr); //获得元素值
-                                                                                                  // inst_ret = self.pool_inst_mut.make_gep(ptr_array, offset);
-                                                                                                  // self.context_mut.push_inst_bb(offset); //这里需要向bb插入offset吗
-                                    self.context_mut.push_inst_bb(ptr_array); //哪些不插入到块中?
-                                    self.context_mut.push_inst_bb(inst_offset_temp);
-                                    // self.context_mut.push_inst_bb(ptr);
-                                    self.context_mut.push_inst_bb(inst_ret);
-                                } else {
-                                    unreachable!("没给偏移")
-                                }
-                            }
-                            //  else {
-                            //     //没偏移
-                            //     let ptr =
-                            //         self.pool_inst_mut.make_global_float_array_load(inst_array);
-                            //     inst_ret = self.pool_inst_mut.make_gep(ptr, );
-                            //     self.context_mut.push_inst_bb(inst_ret);
-                            // }
-                        } else {
-                            //不是全局
-                            if let Some(offset) = offset {
-                                //有偏移
-                                if bool_get_ptr {
-                                    //如果是需要取指针(向函数传递数组指针)
-                                    inst_ret = self.pool_inst_mut.make_gep(inst_array, offset); //获得特定指针
-                                    self.context_mut.push_inst_bb(inst_ret);
-                                } else {
-                                    let ptr = self.pool_inst_mut.make_gep(inst_array, offset);
-                                    inst_ret = self.pool_inst_mut.make_float_load(ptr);
-                                    // inst_ret = self.pool_inst_mut.make_gep(inst_array, offset);
-                                    // self.context_mut.push_inst_bb(offset); //这里需要向bb插入offset吗
-                                    self.context_mut.push_inst_bb(ptr);
-                                    self.context_mut.push_inst_bb(inst_ret);
-                                }
-                            } else {
-                                if bool_get_ptr {
-                                    let inst_offset_temp = self.pool_inst_mut.make_int_const(0);
-                                    inst_ret =
-                                        self.pool_inst_mut.make_gep(inst_array, inst_offset_temp); //获得特定指针
-                                                                                                   // inst_ret = self.pool_inst_mut.make_float_load(ptr); //获得元素值
-                                                                                                   // inst_ret = self.pool_inst_mut.make_gep(ptr_array, offset);
-                                                                                                   // self.context_mut.push_inst_bb(offset); //这里需要向bb插入offset吗
-                                    self.context_mut.push_inst_bb(inst_offset_temp); //哪些不插入到块中?
-                                                                                     // self.context_mut.push_inst_bb(ptr);
-                                    self.context_mut.push_inst_bb(inst_ret);
-                                } else {
-                                    unreachable!("没给偏移")
-                                }
-                                //没偏移
-                            }
-                        }
-                    }
-                    Type::Int | Type::ConstInt => {
-                        if layer_var < 0 {
-                            //是否是全局
-                            if let Some(offset) = offset {
-                                //有偏移
-                                // let ptr = self.pool_inst_mut.make_gep(inst_array, offset);
-                                // inst_ret = self.pool_inst_mut.make_global_float_array_load(ptr);
-                                if bool_get_ptr {
-                                    //如果是需要取指针(向函数传递数组指针)
-                                    let ptr_array =
-                                        self.pool_inst_mut.make_global_int_array_load(inst_array); //获得数组第一个元素(全局变量元素都是指针)
-                                    inst_ret = self.pool_inst_mut.make_gep(ptr_array, offset); //获得特定指针
-                                                                                               // inst_ret = self.pool_inst_mut.make_float_load(ptr); //获得元素值
-                                                                                               // inst_ret = self.pool_inst_mut.make_gep(ptr_array, offset);
-                                                                                               // self.context_mut.push_inst_bb(offset); //这里需要向bb插入offset吗
-                                    self.context_mut.push_inst_bb(ptr_array); //哪些不插入到块中?
-                                                                              // self.context_mut.push_inst_bb(ptr);
-                                    self.context_mut.push_inst_bb(inst_ret);
-                                } else {
-                                    let ptr_array =
-                                        self.pool_inst_mut.make_global_int_array_load(inst_array); //获得数组第一个元素(全局变量元素都是指针)
-                                    let ptr = self.pool_inst_mut.make_gep(ptr_array, offset); //获得特定指针
-                                    inst_ret = self.pool_inst_mut.make_int_load(ptr); //获得元素值
-                                                                                      // inst_ret = self.pool_inst_mut.make_gep(ptr_array, offset);
-                                                                                      // self.context_mut.push_inst_bb(offset); //这里需要向bb插入offset吗
-                                    self.context_mut.push_inst_bb(ptr_array); //哪些不插入到块中?
-                                    self.context_mut.push_inst_bb(ptr);
-                                    self.context_mut.push_inst_bb(inst_ret);
-                                }
-                            } else {
-                                //没给偏移
-                                if bool_get_ptr {
-                                    let ptr_array =
-                                        self.pool_inst_mut.make_global_int_array_load(inst_array); //获得数组第一个元素(全局变量元素都是指针)
-                                    let inst_offset_temp = self.pool_inst_mut.make_int_const(0);
-                                    inst_ret =
-                                        self.pool_inst_mut.make_gep(ptr_array, inst_offset_temp); //获得特定指针
-                                                                                                  // inst_ret = self.pool_inst_mut.make_float_load(ptr); //获得元素值
-                                                                                                  // inst_ret = self.pool_inst_mut.make_gep(ptr_array, offset);
-                                                                                                  // self.context_mut.push_inst_bb(offset); //这里需要向bb插入offset吗
-                                    self.context_mut.push_inst_bb(ptr_array); //哪些不插入到块中?
-                                    self.context_mut.push_inst_bb(inst_offset_temp);
-                                    // self.context_mut.push_inst_bb(ptr);
-                                    self.context_mut.push_inst_bb(inst_ret);
-                                } else {
-                                    unreachable!("没给偏移")
-                                }
-                            }
-                            //  else {
-                            //     //没偏移
-                            //     let ptr =
-                            //         self.pool_inst_mut.make_global_float_array_load(inst_array);
-                            //     inst_ret = self.pool_inst_mut.make_gep(ptr, );
-                            //     self.context_mut.push_inst_bb(inst_ret);
-                            // }
-                        } else {
-                            //不是全局
-                            if let Some(offset) = offset {
-                                //有偏移
-                                if bool_get_ptr {
-                                    //如果是需要取指针(向函数传递数组指针)
-                                    inst_ret = self.pool_inst_mut.make_gep(inst_array, offset); //获得特定指针
-                                    self.context_mut.push_inst_bb(inst_ret);
-                                } else {
-                                    let ptr = self.pool_inst_mut.make_gep(inst_array, offset);
-                                    inst_ret = self.pool_inst_mut.make_int_load(ptr);
-                                    // inst_ret = self.pool_inst_mut.make_gep(inst_array, offset);
-                                    // self.context_mut.push_inst_bb(offset); //这里需要向bb插入offset吗
-                                    self.context_mut.push_inst_bb(ptr);
-                                    self.context_mut.push_inst_bb(inst_ret);
-                                }
-                            } else {
-                                if bool_get_ptr {
-                                    let inst_offset_temp = self.pool_inst_mut.make_int_const(0);
-                                    inst_ret =
-                                        self.pool_inst_mut.make_gep(inst_array, inst_offset_temp); //获得特定指针
-                                                                                                   // inst_ret = self.pool_inst_mut.make_float_load(ptr); //获得元素值
-                                                                                                   // inst_ret = self.pool_inst_mut.make_gep(ptr_array, offset);
-                                                                                                   // self.context_mut.push_inst_bb(offset); //这里需要向bb插入offset吗
-                                    self.context_mut.push_inst_bb(inst_offset_temp); //哪些不插入到块中?
-                                                                                     // self.context_mut.push_inst_bb(ptr);
-                                    self.context_mut.push_inst_bb(inst_ret);
-                                } else {
-                                    unreachable!("没给偏移")
-                                }
-                                //没偏移
-                            }
-                        }
-                    }
-                }
-                return Some((inst_ret, sym));
-            } else {
-                //不是数组的情况
-                if layer_var < 0 {
-                    // println!("找到全局变量{:?},不插phi", s);
-                    // println!("bbname:{:?}", bbname);
-                    //全局也肯定能找到
-                    //如果是全局变量
-                    // let mut inst_ret = self.pool_inst_mut.make_int_const(-1129);
-                    // bbname = "notinblock";//全局变量,const和一般类型需要分开处理吗?
-                    //这里返回一条load指令
-                    match sym.tp {
-                        Type::ConstFloat | Type::Float => {
-                            if let Some(inst_global) = sym.global_inst {
-                                //全局也肯定能找到
-                                let inst_ret =
-                                    self.pool_inst_mut.make_global_float_load(inst_global);
-                                self.context_mut.push_inst_bb(inst_ret); //这里
-                                return Some((inst_ret, sym));
-                            }
-
-                            // return Some((inst_load, sym));
-                        }
-                        Type::ConstInt | Type::Int => {
-                            if let Some(inst_global) = sym.global_inst {
-                                let inst_ret = self.pool_inst_mut.make_global_int_load(inst_global);
-                                self.context_mut.push_inst_bb(inst_ret); //这里
-                                return Some((inst_ret, sym));
-                            }
-                            // return Some((inst_load, sym));
-                        }
-                    }
-                } else {
-                    if let Some(inst) = inst_opt {
-                        // println!("找到变量{:?},不插phi", s);
-                        // println!("bbname:{:?}", bbname);
-                        //找到变量
-                        let mut inst_ret = *inst;
-                        if layer_var < 0 {
-                            //如果是全局变量
-                            // bbname = "notinblock";//全局变量,const和一般类型需要分开处理吗?
-                            //这里返回一条load指令
-                            match sym.tp {
-                                Type::ConstFloat | Type::Float => {
-                                    inst_ret = self.pool_inst_mut.make_global_float_load(inst_ret);
-                                    self.context_mut.push_inst_bb(inst_ret); //这里
-                                                                             // return Some((inst_load, sym));
-                                }
-                                Type::ConstInt | Type::Int => {
-                                    inst_ret = self.pool_inst_mut.make_global_int_load(inst_ret);
-                                    self.context_mut.push_inst_bb(inst_ret);
-                                    // return Some((inst_load, sym));
-                                }
-                            }
-                        }
-
-                        return Some((inst_ret, sym));
-                    } else {
-                        // println!("没找到变量{:?},插phi", s);
-                        // println!("bbname:{:?}", bbname);
-
-                        //没找到
-                        // bb.as_ref().
-                        match sym.tp {
-                            Type::ConstFloat | Type::Float => {
-                                let phi_inst = self
-                                    .push_phi(name_changed.clone(), Type::Float, bb)
-                                    .unwrap();
-                                // if let Some(vec) = self.context_mut.phi_list.get_mut(bbname) {
-                                //     //有philist,直接加入philist中
-                                //     vec.push((name_changed.clone(), phi_inst));
-                                // } else {
-                                //     //该bb没有philist,新建philist,加入philist中
-                                //     let mut v = vec![];
-                                //     v.push((name_changed.clone(), phi_inst));
-                                //     self.context_mut.phi_list.insert(bbname.to_string(), v);
-                                // }
-                                return Some((phi_inst, sym));
-                            }
-                            Type::ConstInt | Type::Int => {
-                                let phi_inst =
-                                    self.push_phi(name_changed.clone(), Type::Int, bb).unwrap();
-                                // if let Some(vec) = self.context_mut.phi_list.get_mut(bbname) {
-                                //     //有philist,直接加入philist中
-                                //     vec.push((name_changed.clone(), phi_inst));
-                                // } else {
-                                //     //该bb没有philist,新建philist,加入philist中
-                                //     let mut v = vec![];
-                                //     v.push((name_changed.clone(), phi_inst));
-                                //     self.context_mut.phi_list.insert(bbname.to_string(), v);
-                                // }
-                                return Some((phi_inst, sym));
-                            }
-                        }
-
-                        // let phiinst_mut = phiinst.as_mut();
-                        // let bb_mut = bb.as_mut();
-                        // for preccessor in bb_mut.get_up_bb() {
-                        //     if let Some((temp, symbol)) = self.get_var_bb(s, *preccessor) {
-                        //         phiinst_mut.add_operand(temp);
-                        //     }
-                        // }
-                        // return Option::Some((phiinst, sym));
-                    }
-                }
-            }
-        }
-        Option::None
-    }
-}
 
 pub fn irgen(
     compunit: &mut CompUnit,
@@ -682,14 +29,9 @@ pub fn irgen(
         pool_bb_mut,
         pool_func_mut,
     };
+    kit_mut.init_external_funcs();
     compunit.process(1, &mut kit_mut);
-    // kit_mut.phi_padding_allfunctions();
-}
-
-#[derive(Clone, Copy)]
-pub enum InfuncChoice {
-    InFunc(ObjPtr<BasicBlock>),
-    NInFunc(),
+    kit_mut.phi_padding_allfunctions();
 }
 
 pub trait Process {
@@ -712,7 +54,8 @@ impl Process for CompUnit {
         // for i in &kit_mut.context_mut.symbol_table {
         //     println!("有变量:{:?}", i.0);
         // }
-        kit_mut.phi_padding_allfunctions();
+
+        // kit_mut.phi_padding_allfunctions();
         return Ok(1);
         todo!();
     }
@@ -1732,7 +1075,7 @@ impl Process for FuncDef {
                 kit_mut
                     .context_mut
                     .push_func_module(id.to_string(), func_ptr);
-                blk.process(1, kit_mut);
+                blk.process((None, None), kit_mut);
                 kit_mut.context_mut.delete_layer();
                 return Ok(1);
             }
@@ -1761,7 +1104,7 @@ impl Process for FuncDef {
                     func_mut.set_parameter(name, param); //这里
                 }
 
-                blk.process(1, kit_mut);
+                blk.process((None, None), kit_mut);
                 kit_mut.context_mut.delete_layer();
                 return Ok(1);
             }
@@ -1897,7 +1240,7 @@ impl Process for FuncFParam {
 }
 impl Process for Block {
     type Ret = i32;
-    type Message = (i32);
+    type Message = (Option<ObjPtr<BasicBlock>>, Option<ObjPtr<BasicBlock>>);
     fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
         kit_mut.context_mut.add_layer();
         for item in &mut self.block_vec {
@@ -1910,11 +1253,11 @@ impl Process for Block {
 
 impl Process for BlockItem {
     type Ret = i32;
-    type Message = (i32);
+    type Message = (Option<ObjPtr<BasicBlock>>, Option<ObjPtr<BasicBlock>>);
     fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
         match self {
             BlockItem::Decl(decl) => {
-                decl.process(input, kit_mut);
+                decl.process(1, kit_mut);
                 return Ok(1);
             }
             BlockItem::Stmt(stmt) => {
@@ -1927,7 +1270,7 @@ impl Process for BlockItem {
 }
 impl Process for Stmt {
     type Ret = i32;
-    type Message = (i32);
+    type Message = (Option<ObjPtr<BasicBlock>>, Option<ObjPtr<BasicBlock>>);
     fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
         match self {
             Stmt::Assign(assign) => {
@@ -1935,7 +1278,7 @@ impl Process for Stmt {
                 Ok(1)
             }
             Stmt::ExpStmt(exp_stmt) => {
-                exp_stmt.process(Type::Int, kit_mut); //这里可能有问题
+                exp_stmt.process((Type::Int, input.0, input.1), kit_mut); //这里可能有问题
                 Ok(1)
             }
             Stmt::Block(blk) => {
@@ -1969,7 +1312,7 @@ impl Process for Stmt {
 
 impl Process for Assign {
     type Ret = i32;
-    type Message = (i32);
+    type Message = (Option<ObjPtr<BasicBlock>>, Option<ObjPtr<BasicBlock>>);
     fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
         let lval = &mut self.lval;
         let symbol = kit_mut.get_var_symbol(&lval.id).unwrap();
@@ -2055,27 +1398,60 @@ impl Process for Assign {
 }
 impl Process for ExpStmt {
     type Ret = i32;
-    type Message = (Type);
+    type Message = (Type, Option<ObjPtr<BasicBlock>>, Option<ObjPtr<BasicBlock>>);
     fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
+        if let Some(exp) = &mut self.exp {
+            exp.process(input.0, kit_mut);
+        }
         Ok(1)
     }
 }
 
 impl Process for If {
     type Ret = i32;
-    type Message = (i32);
+    type Message = (Option<ObjPtr<BasicBlock>>, Option<ObjPtr<BasicBlock>>);
     fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
         let (inst_cond, val_cond) = self.cond.process(Type::Int, kit_mut).unwrap();
         let inst_branch = kit_mut.pool_inst_mut.make_br(inst_cond);
         kit_mut.context_mut.push_inst_bb(inst_branch);
         let bb_if_name = kit_mut.context_mut.get_newbb_name();
-        let inst_bb_if = kit_mut.pool_bb_mut.new_basic_block(bb_if_name);
+        let inst_bb_if = kit_mut.pool_bb_mut.new_basic_block(bb_if_name.clone());
+        kit_mut.context_mut.is_branch_map.insert(bb_if_name, false); //初始化
+                                                                     // match kit_mut.context_mut.bb_now_mut {
+                                                                     //     InfuncChoice::InFunc(bb_now) => {
+                                                                     //         kit_mut
+                                                                     //             .context_mut
+                                                                     //             .is_branch_map
+                                                                     //             .insert(bb_now.get_name().to_string(), true); //标志该块出现分支
+                                                                     //     }
+                                                                     //     _ => {
+                                                                     //         unreachable!()
+                                                                     //     }
+                                                                     // }
+
         if let Some(stmt_else) = &mut self.else_then {
             //如果有else语句
             let bb_else_name = kit_mut.context_mut.get_newbb_name();
-            let inst_bb_else = kit_mut.pool_bb_mut.new_basic_block(bb_else_name);
+            let inst_bb_else = kit_mut.pool_bb_mut.new_basic_block(bb_else_name.clone());
+            kit_mut
+                .context_mut
+                .is_branch_map
+                .insert(bb_else_name, false); //初始化
+
+            //生成一块新的bb
+            let bb_successor_name = kit_mut.context_mut.get_newbb_name();
+            let inst_bb_successor = kit_mut
+                .pool_bb_mut
+                .new_basic_block(bb_successor_name.clone());
+            kit_mut
+                .context_mut
+                .is_branch_map
+                .insert(bb_successor_name, false); //初始化
+
             match kit_mut.context_mut.bb_now_mut {
                 InfuncChoice::InFunc(bb_now) => {
+                    // println!("下一块:{:?}", inst_bb_else.get_name());
+                    // println!("下一块:{:?}", inst_bb_if.get_name());
                     bb_now.as_mut().add_next_bb(inst_bb_else); //先放判断为假的else语句
                     bb_now.as_mut().add_next_bb(inst_bb_if);
                 }
@@ -2088,39 +1464,77 @@ impl Process for If {
                                                         //加一条直接跳转语句
             kit_mut
                 .context_mut
-                .push_inst_bb(kit_mut.pool_inst_mut.make_jmp());
-            kit_mut.context_mut.bb_now_set(inst_bb_if);
-            self.then.process(input, kit_mut).unwrap();
-            //加一条直接跳转语句
-            kit_mut
-                .context_mut
-                .push_inst_bb(kit_mut.pool_inst_mut.make_jmp());
-            //生成一块新的bb
-            let bb_successor_name = kit_mut.context_mut.get_newbb_name();
-            let inst_bb_successor = kit_mut.pool_bb_mut.new_basic_block(bb_successor_name);
-            inst_bb_if.as_mut().add_next_bb(inst_bb_successor); //向分支添加下一个块
-            inst_bb_else.as_mut().add_next_bb(inst_bb_successor); //向分支添加下一个块
-            kit_mut.context_mut.bb_now_set(inst_bb_successor); //设置现在所在的bb
-        } else {
-            let bb_successor_name = kit_mut.context_mut.get_newbb_name();
-            let inst_bb_successor = kit_mut.pool_bb_mut.new_basic_block(bb_successor_name);
+                .push_inst_bb(kit_mut.pool_inst_mut.make_jmp()); //bb_mut_now是else分支的叶子交汇点
             match kit_mut.context_mut.bb_now_mut {
                 InfuncChoice::InFunc(bb_now) => {
-                    bb_now.as_mut().add_next_bb(inst_bb_successor); //先放判断为假的
+                    // println!("下一块:{:?}", inst_bb_successor.get_name());
+                    bb_now.as_mut().add_next_bb(inst_bb_successor); //向if分支的叶子交汇点bb_now_mut插入下一个节点
+                }
+                _ => {
+                    unreachable!()
+                }
+            }
+
+            // let branch_flag_else = kit_mut
+            //     .context_mut
+            //     .is_branch_map
+            //     .get(inst_bb_else.get_name())
+            //     .unwrap();
+            kit_mut.context_mut.bb_now_set(inst_bb_if);
+            self.then.process(input, kit_mut).unwrap();
+            kit_mut
+                .context_mut
+                .push_inst_bb(kit_mut.pool_inst_mut.make_jmp()); //bb_now_mut是if语句块的叶子交汇点
+            match kit_mut.context_mut.bb_now_mut {
+                InfuncChoice::InFunc(bb_now) => {
+                    // println!("下一块:{:?}", inst_bb_successor.get_name());
+                    bb_now.as_mut().add_next_bb(inst_bb_successor); //向if分支的叶子交汇点bb_now_mut插入下一个节点
+                }
+                _ => {
+                    unreachable!()
+                }
+            }
+            kit_mut.context_mut.bb_now_set(inst_bb_successor); //设置现在所在的bb
+        } else {
+            // println!("有if没else");
+            //没有else语句块
+            //如果指定了该节点分支前的后继块
+            //生成一块新的bb
+            let bb_successor_name = kit_mut.context_mut.get_newbb_name();
+            let inst_bb_successor = kit_mut
+                .pool_bb_mut
+                .new_basic_block(bb_successor_name.clone());
+            kit_mut
+                .context_mut
+                .is_branch_map
+                .insert(bb_successor_name, false); //初始化
+
+            match kit_mut.context_mut.bb_now_mut {
+                InfuncChoice::InFunc(bb_now) => {
+                    // println!("下一块:{:?}", inst_bb_successor.get_name());
+                    // println!("下一块:{:?}", inst_bb_if.get_name());
+                    bb_now.as_mut().add_next_bb(inst_bb_successor); //先放判断为假的else语句
                     bb_now.as_mut().add_next_bb(inst_bb_if);
                 }
                 _ => {
                     unreachable!()
                 }
             }
-            //没有else块,只有if块
             kit_mut.context_mut.bb_now_set(inst_bb_if);
             self.then.process(input, kit_mut).unwrap();
-            //加一条直接跳转语句
             kit_mut
                 .context_mut
-                .push_inst_bb(kit_mut.pool_inst_mut.make_jmp());
-            inst_bb_if.as_mut().add_next_bb(inst_bb_successor); //向分支添加下一个块
+                .push_inst_bb(kit_mut.pool_inst_mut.make_jmp()); //bb_now_mut是if语句块的叶子交汇点
+
+            match kit_mut.context_mut.bb_now_mut {
+                InfuncChoice::InFunc(bb_now) => {
+                    // println!("下一块:{:?}", inst_bb_successor.get_name());
+                    bb_now.as_mut().add_next_bb(inst_bb_successor); //向if分支的叶子交汇点bb_now_mut插入下一个节点
+                }
+                _ => {
+                    unreachable!()
+                }
+            }
             kit_mut.context_mut.bb_now_set(inst_bb_successor); //设置现在所在的bb
         }
         Ok(1)
@@ -2128,30 +1542,97 @@ impl Process for If {
 }
 impl Process for While {
     type Ret = i32;
-    type Message = (i32);
+    type Message = (Option<ObjPtr<BasicBlock>>, Option<ObjPtr<BasicBlock>>);
     fn process(&mut self, _input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
-        todo!();
+        let (inst_cond, val_cond) = self.cond.process(Type::Int, kit_mut).unwrap();
+        let inst_branch = kit_mut.pool_inst_mut.make_br(inst_cond);
+        kit_mut.context_mut.push_inst_bb(inst_branch); //当前basicblock中放入branch指令
+        let block_while_head_name = kit_mut.context_mut.get_newbb_name();
+        let block_while_head = kit_mut.pool_bb_mut.new_basic_block(block_while_head_name); //生成新的块(false)
+        let block_false_name = kit_mut.context_mut.get_newbb_name();
+        let block_false = kit_mut.pool_bb_mut.new_basic_block(block_false_name); //生成新的块(false)
+        match kit_mut.context_mut.bb_now_mut {
+            InfuncChoice::InFunc(bb_now) => {
+                bb_now.as_mut().add_next_bb(block_false);
+                bb_now.as_mut().add_next_bb(block_while_head);
+            }
+            _ => {
+                unreachable!()
+            }
+        }
+        kit_mut.context_mut.bb_now_set(block_while_head); //设置当前basicblock
+                                                          // println!("while_body process starts");
+        self.body
+            .process((Some(block_while_head), Some(block_false)), kit_mut)
+            .unwrap(); //在块内生成指令
+                       // println!("while_body process finished");
+        let (inst_cond, val_cond) = self.cond.process(Type::Int, kit_mut).unwrap(); //当前块中放入cond
+                                                                                    // println!("cond process finished");
+        let inst_branch = kit_mut.pool_inst_mut.make_br(inst_cond);
+        kit_mut.context_mut.push_inst_bb(inst_branch); //当前basicblock中放入branch指令
+        match kit_mut.context_mut.bb_now_mut {
+            //当前块是while_body所有叶子节点的交汇点
+            InfuncChoice::InFunc(bb_now) => {
+                // println!("下一个节点:{:?}", block_false.get_name());
+                // println!("下一个节点:{:?}", block_while_head.get_name());
+                bb_now.as_mut().add_next_bb(block_false);
+                bb_now.as_mut().add_next_bb(block_while_head);
+            }
+            _ => {
+                unreachable!()
+            }
+        }
+        // println!("set");
+        kit_mut.context_mut.bb_now_set(block_false);
+        // todo!()
+        Ok(1)
     }
 }
 
 impl Process for Break {
     type Ret = i32;
-    type Message = (i32);
+    type Message = (Option<ObjPtr<BasicBlock>>, Option<ObjPtr<BasicBlock>>);
     fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
-        todo!();
+        let inst_jmp = kit_mut.pool_inst_mut.make_jmp();
+        kit_mut.context_mut.push_inst_bb(inst_jmp);
+        match kit_mut.context_mut.bb_now_mut {
+            InfuncChoice::InFunc(bb_now) => {
+                let (_, false_opt) = input;
+                if let Some(bb_false) = false_opt {
+                    bb_now.as_mut().add_next_bb(bb_false);
+                }
+            }
+            _ => {
+                unreachable!()
+            }
+        }
+        Ok(1)
     }
 }
 impl Process for Continue {
     type Ret = i32;
-    type Message = (i32);
+    type Message = (Option<ObjPtr<BasicBlock>>, Option<ObjPtr<BasicBlock>>);
     fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
-        todo!();
+        let inst_jmp = kit_mut.pool_inst_mut.make_jmp();
+        kit_mut.context_mut.push_inst_bb(inst_jmp);
+        match kit_mut.context_mut.bb_now_mut {
+            InfuncChoice::InFunc(bb_now) => {
+                let (head_opt, _) = input;
+                if let Some(bb_false) = head_opt {
+                    bb_now.as_mut().add_next_bb(bb_false);
+                }
+            }
+            _ => {
+                unreachable!()
+            }
+        }
+        Ok(1)
     }
 }
 
 impl Process for Return {
     type Ret = i32;
-    type Message = (i32);
+    type Message = (Option<ObjPtr<BasicBlock>>, Option<ObjPtr<BasicBlock>>);
     fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
         if let Some(exp) = &mut self.exp {
             let (inst, val) = exp.process(Type::Int, kit_mut).unwrap(); //这里可能有问题

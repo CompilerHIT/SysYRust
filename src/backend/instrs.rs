@@ -36,6 +36,8 @@ pub enum BinaryOp {
     Shr,
     /// Shift right arithmetic.
     Sar,
+    /// 执行带符号整数高位乘法操作
+    Mulhs,
 }
 
 /// 单目运算符
@@ -98,10 +100,11 @@ pub enum InstrsType {
     // LoadGlobal,
 }
 
+#[derive(Debug)]
 pub struct LIRInst {
     inst_type: InstrsType,
     // 0:Dst, 1...n:Srcs
-    operands: Vec<Operand>,
+    pub operands: Vec<Operand>,
     // param cnts in call instruction: (ints, floats)
     param_cnt: (i32, i32),
     // call指令的跳转到函数
@@ -162,22 +165,22 @@ impl LIRInst {
 
     // mapping virtual reg_id to physic reg_id, 物理寄存器不映射
     pub fn v_to_phy(&mut self, map: HashMap<i32, i32>) {
-        for operand in &self.operands {
-            match operand {
-                Operand::Reg(mut reg) => {
-                    if reg.is_physic() {
-                        continue;
-                    }
-                    if let Some(id) = map.get(&reg.get_id()) {
-                        reg.map_id(id.clone());
-                    } else {
-                        println!("{:?}", reg.get_id());
-                        println!("{:?}", map);
-                        panic!("not find physic mapping");
+        let mut index = 0;
+        loop {
+            if index >= self.operands.len() {
+                break;
+            }
+            match self.operands[index] {
+                Operand::Reg(ref mut reg) => {
+                    if !reg.is_physic() {
+                        println!("v_to_phy: {:?}", reg);
+                        let new = map[&reg.get_id()];
+                        self.operands[index] = Operand::Reg(Reg::new(new, reg.get_type()));
                     }
                 }
                 _ => {}
             }
+            index += 1;
         }
     }
 
@@ -196,15 +199,20 @@ impl LIRInst {
     }
 
     pub fn replace(&mut self, old: i32, new: i32) {
-        for op in &mut self.operands {
-            match op {
-                Operand::Reg(reg) => {
+        let mut index = 0;
+        loop {
+            if index >= self.operands.len() {
+                break;
+            }
+            match self.operands[index] {
+                Operand::Reg(ref mut reg) => {
                     if reg.get_id() == old {
-                        reg.map_id(new);
+                        self.operands[index] = Operand::Reg(Reg::new(new, reg.get_type()));
                     }
                 }
                 _ => {}
             }
+            index += 1;
         }
     }
 

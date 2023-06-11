@@ -7,6 +7,7 @@ pub use std::io::Result;
 use std::io::Write;
 use std::vec::Vec;
 
+use super::instrs::InstrsType;
 use super::{structs::*, BackendPool};
 use crate::backend::asm_builder::AsmBuilder;
 use crate::backend::block::*;
@@ -24,6 +25,7 @@ use crate::utility::{ObjPtr, ScalarType};
 
 #[derive(Clone)]
 pub struct Func {
+    pub is_extern: bool,
     pub label: String,
     pub blocks: Vec<ObjPtr<BB>>,
     pub stack_addr: LinkedList<StackSlot>,
@@ -50,6 +52,7 @@ pub struct Func {
 impl Func {
     pub fn new(name: &str, context: ObjPtr<Context>) -> Self {
         Self {
+            is_extern: false,
             label: name.to_string(),
             blocks: Vec::new(),
             stack_addr: LinkedList::new(),
@@ -77,7 +80,6 @@ impl Func {
         pool: &mut BackendPool,
     ) {
         let mut info = Mapping::new();
-
         // 处理全局变量&数组
         let globl = &module.global_var_list;
         globl.iter().for_each(|(inst, var)| {
@@ -87,9 +89,16 @@ impl Func {
 
         // entry shouldn't generate for asm, called label for entry should always be false
         let label = &self.label;
-        let entry = pool.put_block(BB::new(&format!(".entry_{label}")));
+        let mut entry = pool.put_block(BB::new(&format!(".entry_{label}")));
+        entry.showed = false;
         self.entry = Some(entry);
         self.blocks.push(self.entry.unwrap());
+
+        //判断是否是外部函数
+        if ir_func.is_empty_bb() {
+            self.is_extern = true;
+            return;
+        }
 
         // 第一遍pass
         let fblock = ir_func.get_head();
@@ -104,12 +113,15 @@ impl Func {
 
         let mut block_seq = 0;
         self.blocks.push(first_block);
-
+        let mut visited : HashSet<ObjPtr<BasicBlock>> = HashSet::new();
         while let Some(fblock) = tmp.pop_front() {
             let next_blocks = fblock.as_ref().get_next_bb();
-            next_blocks
-                .iter()
-                .for_each(|block| tmp.push_back(block.clone()));
+            println!("next_blocks len: {:?}", next_blocks.len());
+            next_blocks.iter().for_each(|block| {
+                if visited.insert(block.clone()) {
+                    tmp.push_back(block.clone())
+                }
+            });
             if block_seq == 0 {
                 block_seq += 1;
                 continue;
@@ -137,28 +149,63 @@ impl Func {
             }
             let block = self.blocks[index];
             if block != self.entry.unwrap() {
+                println!("start build block");
+                if i == 0 {
+                    block.as_mut().showed = false;
+                }
                 let basicblock = info.block_ir_map.get(&block).unwrap();
                 if i + 1 < self.blocks.len() {
                     let next_block = Some(self.blocks[i + 1]);
-                    block.as_mut().construct(
-                        this,
-                        *basicblock,
-                        next_block,
-                        &mut info,
-                        pool,
-                    );
+                    block
+                        .as_mut()
+                        .construct(this, *basicblock, next_block, &mut info, pool);
                 } else {
-                    block.as_mut().construct(
-                        this,
-                        *basicblock,
-                        None,
-                        &mut info,
-                        pool,
-                    );
+                    block
+                        .as_mut()
+                        .construct(this, *basicblock, None, &mut info, pool);
                 }
                 i += 1;
             }
             index += 1;
+        }
+
+        // 第三遍pass，拆phi
+        for block in self.blocks.iter() {
+            if block.insts.len() == 0 {
+                continue;
+            }
+            let mut index = block.insts.len() - 1;
+            loop {
+                match block.insts[index].get_type() {
+                    InstrsType::Ret(..) | InstrsType::Branch(..) | InstrsType::Jump => {
+                        if index == 0 {
+                            break;
+                        }
+                        index -= 1;
+                    }
+                    _ => {
+                        break;
+                    }
+                }
+            }
+            if index != 0 {
+                index += 1;
+            }
+            if let Some(mut target) = info.phis_to_block.get_mut(&block.label) {
+                while let Some(inst) = target.pop() {
+                    println!(
+                        "phi inst{:?} {:?}, pos {}",
+                        block.label,
+                        inst.as_ref(),
+                        index
+                    );
+                    block.as_mut().insts.insert(index, inst);
+                }
+            }
+            let mut phis = block.phis.clone();
+            while let Some(inst) = phis.pop() {
+                block.as_mut().insts.insert(0, inst);
+            }
         }
         self.update(this);
     }
@@ -243,16 +290,15 @@ impl Func {
         let ra = Reg::new(1, ScalarType::Int);
 
         self.calc_live();
-        println!("start");
         let mut allocator = Allocator::new();
         let alloc_stat = allocator.alloc(self);
-        println!("finish");
 
         self.reg_alloc_info = alloc_stat;
         self.context.as_mut().set_reg_map(&self.reg_alloc_info.dstr);
-        println!("map_size: {}", self.reg_alloc_info.dstr.len());
+        println!("dstr map info{:?}", self.reg_alloc_info.dstr);
 
         let mut stack_size = self.reg_alloc_info.stack_size as i32;
+        println!("stack_size: {}", stack_size);
         if let Some(addition_stack_info) = self.stack_addr.front() {
             stack_size += addition_stack_info.get_pos() + addition_stack_info.get_size();
         }
@@ -270,6 +316,7 @@ impl Func {
             Ok(f) => f,
             Err(e) => panic!("Error: {}", e),
         };
+        let map = self.context.get_reg_map().clone();
         self.context.as_mut().set_prologue_event(move || {
             let mut builder = AsmBuilder::new(&mut f1);
             // addi sp -stack_size
@@ -361,6 +408,9 @@ impl Func {
 
 impl GenerateAsm for Func {
     fn generate(&mut self, _: ObjPtr<Context>, f: &mut File) -> Result<()> {
+        if self.is_extern {
+            return Ok(());
+        }
         if self.const_array.len() > 0 {
             writeln!(f, "	.section	.data\n   .align  3")?;
         }

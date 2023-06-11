@@ -251,7 +251,7 @@ impl Allocator {
             }
 
             for reg in it.as_ref().get_reg_def() {
-                
+
                 if !reg.is_virtual() {
                     continue;
                 }
@@ -378,10 +378,6 @@ impl Regalloc for Allocator {
             spillings,
             dstr,
         };
-        for i in 0..=31{
-            out.dstr.insert(i, i);
-        }
         out
-
     }
 }

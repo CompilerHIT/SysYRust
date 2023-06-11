@@ -10,16 +10,19 @@ use crate::{
     utility::ObjPtr,
 };
 
-use super::irgen::InfuncChoice;
+use super::InfuncChoice;
 
 pub struct Context<'a> {
     pub var_map: HashMap<String, Vec<(String, i64)>>,
     pub symbol_table: HashMap<String, Symbol>,
     pub param_usage_table: HashMap<String, bool>,
     pub bb_map: HashMap<String, HashMap<String, ObjPtr<Inst>>>,
-    pub phi_list: HashMap<String, (Vec<(String, ObjPtr<Inst>)>, bool)>,
+    pub phi_list: HashMap<String, (Vec<(String, ObjPtr<Inst>, bool)>, bool)>,
+    pub is_branch_map: HashMap<String, bool>,
     pub bb_now_mut: InfuncChoice,
     pub module_mut: &'a mut Module,
+    // pub is_branch: bool,
+    // pub is_else: bool,
     num_bb: i64,
     index: i64,
     layer: i64,
@@ -54,8 +57,10 @@ impl Context<'_> {
             bb_map: HashMap::new(),
             param_usage_table: HashMap::new(),
             phi_list: HashMap::new(),
+            is_branch_map: HashMap::new(),
             bb_now_mut: InfuncChoice::NInFunc(),
             module_mut,
+            // is_branch: false,
             num_bb: 0,
             index: 0,
             layer: -1,
@@ -74,6 +79,11 @@ impl Context<'_> {
     pub fn push_inst_bb(&mut self, inst_ptr: ObjPtr<Inst>) {
         match self.bb_now_mut {
             InfuncChoice::InFunc(bbptr) => {
+                // println!(
+                //     "指令{:?}插入bb{:?}中",
+                //     inst_ptr.get_kind(),
+                //     bbptr.get_name()
+                // );
                 let bb = bbptr.as_mut();
                 bb.push_back(inst_ptr)
             }
@@ -93,6 +103,7 @@ impl Context<'_> {
     }
 
     pub fn bb_now_set(&mut self, bb: ObjPtr<BasicBlock>) {
+        // println!("现在处于块{:?}中", bb.get_name());
         self.bb_now_mut = InfuncChoice::InFunc(bb);
     }
 
@@ -207,7 +218,7 @@ impl Context<'_> {
                         map.insert(temps, inst);
                         self.bb_map.insert(bbname.to_string(), map);
                     }
-                    // println!("bbname:{:?}插入:{:?}",bbname,s);
+                    // println!("bbname:{:?}插入:{:?}", bbname, s);
                     return true;
                 }
             }
@@ -222,6 +233,7 @@ impl Context<'_> {
 
         match &mut self.bb_now_mut {
             InfuncChoice::InFunc(bbptr) => {
+                // println!("指令{:?}插入bb{:?}中", inst.get_kind(), bbptr.get_name());
                 let bb = bbptr.as_mut();
                 bb.push_back(inst);
                 v.push((temps.clone(), 1));
@@ -258,6 +270,7 @@ impl Context<'_> {
         let temps = self.add_prefix(s.clone());
         match &mut self.bb_now_mut {
             InfuncChoice::InFunc(bbptr) => {
+                // println!("指令{:?}插入bb{:?}中", inst.get_kind(), bbptr.get_name());
                 let bb = bbptr.as_mut();
                 bb.push_back(inst); //应该往头节点插，往头节点取
                 v.push((temps.clone(), 1));
@@ -365,7 +378,7 @@ impl Context<'_> {
     ) -> bool {
         let s1 = s.clone();
         if (self.has_var_now(s1)) {
-            println!("当前作用域中已声明过变量{:?}", s);
+            // println!("当前作用域中已声明过变量{:?}", s);
             return false;
         }
         let temps = self.add_prefix(s.to_string());
