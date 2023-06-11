@@ -65,4 +65,9 @@ impl Inst {
         self.user.get_operand(index).remove_user(self);
         self.user.remove_operand(index);
     }
+
+    pub fn remove_operand_by_index(&mut self, index: usize) {
+        self.user.get_operand(index).remove_user(self);
+        self.user.remove_operand(index);
+    }
 }
