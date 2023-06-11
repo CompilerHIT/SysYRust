@@ -841,10 +841,9 @@ impl BB {
             let mut offset = 0;
             let mut size = 0;
             if id != -1 {
-                println!("spill: {}", id);
-                println!("pos: {}", pos);
                 //FIXME:暂时使用double进行栈操作，且未处理浮点数
                 inst.replace(id, 5);
+                println!("inst: {:?}", inst);
 
                 let mut store = LIRInst::new(
                     InstrsType::StoreToStack,
@@ -925,7 +924,7 @@ impl BB {
             let inst_ref = self.insts[pos].as_ref();
             match inst_ref.get_type() {
                 InstrsType::Load | InstrsType::Store => {
-                    let temp = Operand::Reg(Reg::init(ScalarType::Int));
+                    let temp = Operand::Reg(Reg::new(3, ScalarType::Int));
                     let offset = inst_ref.get_offset().get_data();
                     if operand::is_imm_12bs(offset) {
                         break;
@@ -946,7 +945,7 @@ impl BB {
                     ]);
                 }
                 InstrsType::LoadFromStack | InstrsType::StoreToStack => {
-                    let temp = Operand::Reg(Reg::init(ScalarType::Int));
+                    let temp = Operand::Reg(Reg::new(3, ScalarType::Int));
                     let offset = inst_ref.get_stack_offset().get_data();
                     if operand::is_imm_12bs(offset) {
                         break;
@@ -971,7 +970,7 @@ impl BB {
                     ]);
                 }
                 InstrsType::LoadParamFromStack | InstrsType::StoreParamToStack => {
-                    let temp = Operand::Reg(Reg::init(ScalarType::Int));
+                    let temp = Operand::Reg(Reg::new(3, ScalarType::Int));
                     let offset = func.as_ref().reg_alloc_info.stack_size as i32
                         - inst_ref.get_stack_offset().get_data();
                     if operand::is_imm_12bs(offset) {
