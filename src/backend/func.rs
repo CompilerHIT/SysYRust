@@ -194,12 +194,6 @@ impl Func {
             }
             if let Some(mut target) = info.phis_to_block.get_mut(&block.label) {
                 while let Some(inst) = target.pop() {
-                    println!(
-                        "phi inst{:?} {:?}, pos {}",
-                        block.label,
-                        inst.as_ref(),
-                        index
-                    );
                     block.as_mut().insts.insert(index, inst);
                 }
             }

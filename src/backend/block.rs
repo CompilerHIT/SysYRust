@@ -769,7 +769,7 @@ impl BB {
                         ScalarType::Float => InstrsType::OpReg(SingleOp::FMv),
                         _ => unreachable!("mv must be int or float"),
                     };
-                    
+
                     println!("phi reg: {:?}, tmp: {:?}", phi_reg.clone(), temp.clone());
                     self.phis
                         .push(pool.put_inst(LIRInst::new(inst_kind, vec![phi_reg, temp.clone()])));
@@ -827,90 +827,80 @@ impl BB {
         &mut self,
         func: ObjPtr<Func>,
         spill: &HashSet<i32>,
-        start_pos: i32,
+        pos: i32,
         pool: &mut BackendPool,
     ) {
-        let mut index = 0;
-        let mut pos = start_pos;
+        println!("pos: {}", pos);
+        let mut start_pos = pos;
+        let mut index = 0; 
         loop {
             if index >= self.insts.len() {
                 break;
             }
-            let inst = self.insts[index].as_mut();
-            let id = inst.is_spill(spill);
-            let mut offset = 0;
-            let mut size = 0;
-            if id != -1 {
-                //FIXME:暂时使用double进行栈操作，且未处理浮点数
-                inst.replace(id, 5);
-                println!("inst: {:?}", inst);
-
-                let mut store = LIRInst::new(
-                    InstrsType::StoreToStack,
-                    vec![
-                        Operand::Reg(Reg::new(5, ScalarType::Int)),
-                        Operand::IImm(IImm::new(pos + ADDR_SIZE)),
-                    ],
-                );
-                store.set_double();
-                self.insts.insert(index, pool.put_inst(store));
+            let inst = self.insts[index];
+            let spills = inst.is_spill(spill);
+            for s in func.spill_stack_map.iter() {
+                println!("spill: {:?}", s);
+            }
+            if spills.is_empty() {
                 index += 1;
-
-                //FIXME:直接恢复，故不需存栈信息
-                // func.as_mut().stack_addr.push_back(StackSlot::new(pos, 8));
-
-                match func.as_ref().spill_stack_map.get(&id) {
-                    Some(slot) => {
-                        offset = slot.get_pos();
-                        size = slot.get_size();
-                        let mut load = LIRInst::new(
+                continue;
+            } else {
+                let (mut store_num, mut slot) = (0, vec![]);
+                for id in spills.iter() {
+                    if let Some(offset) = func.spill_stack_map.get(&id) {
+                        slot.push(*offset);
+                    } else {
+                        let stack_slot = StackSlot::new(start_pos + store_num * ADDR_SIZE, ADDR_SIZE);
+                        slot.push(stack_slot);
+                        store_num += 1;
+                    };
+                }
+                let offset = start_pos + store_num * ADDR_SIZE;
+                for i in 0..spills.len() as i32 {
+                    let reg = Operand::Reg(Reg::new(5 + i, ScalarType::Int));
+                    self.insts.insert(index, pool.put_inst(LIRInst::new(
+                        InstrsType::StoreToStack,
+                        vec![reg, Operand::IImm(IImm::new(offset + i * ADDR_SIZE))]
+                    )));
+                    index += 1;
+                }
+                for i in 0..spills.len() as i32 {
+                    let reg = Operand::Reg(Reg::new(5 + i, ScalarType::Int));
+                    let stack_slot = slot[i as usize];
+                    if func.spill_stack_map.contains_key(&spills[i as usize]) {
+                        self.insts.insert(index, pool.put_inst(LIRInst::new(
                             InstrsType::LoadFromStack,
-                            vec![
-                                Operand::Reg(Reg::new(5, ScalarType::Int)),
-                                Operand::IImm(IImm::new(offset)),
-                            ],
-                        );
-                        if size == ADDR_SIZE {
-                            load.set_double();
-                        } else if size == NUM_SIZE {
-                        } else {
-                            unreachable!("local variable must be 4 or 8 bytes");
-                        }
-                        self.insts.insert(index, pool.put_inst(load));
+                            vec![reg, Operand::IImm(IImm::new(stack_slot.get_pos()))]
+                        )));
+                        println!("spill: {:?}", stack_slot.get_pos());
                         index += 1;
-                    }
-                    None => {
-                        offset = pos;
+                    } else {
+                        func.as_mut().spill_stack_map.insert(spills[i as usize], stack_slot);
                     }
                 }
-
+                for i in 0..spills.len() as i32 {
+                    inst.as_mut().replace(spills[i as usize], 5 + i)
+                }
                 index += 1;
-                store = LIRInst::new(
-                    InstrsType::StoreToStack,
-                    vec![
-                        Operand::Reg(Reg::new(5, ScalarType::Int)),
-                        Operand::IImm(IImm::new(offset)),
-                    ],
-                );
-                store.set_double();
-                self.insts.insert(index, pool.put_inst(store));
-                let slot = StackSlot::new(offset, ADDR_SIZE);
-                func.as_mut().stack_addr.push_back(slot);
-                func.as_mut().spill_stack_map.insert(id, slot);
-
-                index += 1;
-                let mut load = LIRInst::new(
-                    InstrsType::LoadFromStack,
-                    vec![
-                        Operand::Reg(Reg::new(5, ScalarType::Int)),
-                        Operand::IImm(IImm::new(pos + ADDR_SIZE)),
-                    ],
-                );
-                load.set_double();
-                self.insts.insert(index, pool.put_inst(load));
-                pos += ADDR_SIZE;
-            } else {
-                index += 1;
+                for i in 0..spills.len() as i32 {
+                    let reg = Operand::Reg(Reg::new(5 + i, ScalarType::Int));
+                    let stack_slot = slot[i as usize];
+                    self.insts.insert(index, pool.put_inst(LIRInst::new(
+                        InstrsType::StoreToStack,
+                        vec![reg, Operand::IImm(IImm::new(stack_slot.get_pos()))]
+                    )));
+                    index += 1;
+                }
+                for i in 0..spills.len() as i32 {
+                    let reg = Operand::Reg(Reg::new(5 + i, ScalarType::Int));
+                    self.insts.insert(index, pool.put_inst(LIRInst::new(
+                        InstrsType::LoadFromStack,
+                        vec![reg, Operand::IImm(IImm::new(offset + i * ADDR_SIZE))]
+                    )));
+                    index += 1;
+                }
+                start_pos += offset;
             }
         }
     }
@@ -1585,6 +1575,7 @@ impl GenerateAsm for BB {
             builder.show_block(&self.label)?;
         }
         for inst in self.insts.iter() {
+            // println!("generate inst: {:?}", inst);
             inst.as_mut().v_to_phy(context.get_reg_map().clone());
             inst.as_mut().generate(context.clone(), f)?;
         }
