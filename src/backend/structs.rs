@@ -45,7 +45,7 @@ impl GlobalVar {
     }
 }
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub struct StackSlot {
     pos: i32,
     size: i32,

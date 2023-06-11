@@ -173,11 +173,8 @@ impl LIRInst {
             match self.operands[index] {
                 Operand::Reg(ref mut reg) => {
                     if !reg.is_physic() {
-                        println!("v_to_phy: {:?}", reg);
                         if let Some(new) = map.get(&reg.get_id()) {
                             self.operands[index] = Operand::Reg(Reg::new(*new, reg.get_type()));
-                        } else {
-                            self.operands[index] = Operand::Reg(Reg::new(5, reg.get_type()));
                         }
                     }
                 }
@@ -187,20 +184,19 @@ impl LIRInst {
         }
     }
 
-    pub fn is_spill(&self, id: &HashSet<i32>) -> i32 {
+    pub fn is_spill(&self, id: &HashSet<i32>) -> Vec<i32> {
+        let mut res = Vec::new();
         for op in &self.operands {
             match op {
                 Operand::Reg(reg) => {
                     if id.contains(&reg.get_id()) {
-                        return reg.get_id();
+                        res.push(reg.get_id());
                     }
                 }
-                _ => {
-                    return -1
-                }
+                _ => {}
             }
         }
-        -1
+        res
     }
 
     pub fn replace(&mut self, old: i32, new: i32) {

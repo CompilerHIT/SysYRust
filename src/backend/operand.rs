@@ -83,7 +83,7 @@ impl Reg {
             ScalarType::Int => unsafe {
                 let mut id = I_REG_ID;
                 I_REG_ID += 1;
-                while id >= 0 && id <= 4 {
+                while id >= 0 && id <= 4 || id == 10 {
                     id = I_REG_ID;
                     I_REG_ID += 1;
                 }
