@@ -76,7 +76,7 @@ impl User {
 
     /// 当前指令不再被使用，删除将对方从use list中删除
     pub fn delete_user(&mut self, inst: &Inst) {
-        debug_assert!(!self.use_list.contains(&ObjPtr::new(inst)), "delete_user()",);
+        debug_assert!(self.use_list.contains(&ObjPtr::new(inst)), "delete_user()",);
         let index = self.find_use(inst);
         self.use_list.remove(index);
     }
