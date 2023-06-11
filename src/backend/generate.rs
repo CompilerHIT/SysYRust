@@ -115,6 +115,7 @@ impl GenerateAsm for LIRInst {
             }
 
             InstrsType::StoreToStack => {
+                println!("store to stack, {:?}", self);
                 let mut builder = AsmBuilder::new(f);
                 if !operand::is_imm_12bs(self.get_stack_offset().get_data()) {
                     panic!("illegal offset");

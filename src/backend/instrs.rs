@@ -192,7 +192,9 @@ impl LIRInst {
                         return reg.get_id();
                     }
                 }
-                _ => {}
+                _ => {
+                    return -1
+                }
             }
         }
         -1
