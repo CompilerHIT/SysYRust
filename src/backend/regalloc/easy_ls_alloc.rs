@@ -255,6 +255,9 @@ impl Allocator {
                 if !reg.is_virtual() {
                     continue;
                 }
+                
+                
+                
                 let id = reg.get_id();
                 // 如果已经在dstr的key中，也就是已经分配，则忽略处理
                 if dstr.contains_key(&id) {
@@ -321,6 +324,8 @@ impl Allocator {
                     }
                 }
             }
+        
+            
         }
         (spillings, dstr)
     }
@@ -373,7 +378,7 @@ impl Regalloc for Allocator {
             spillings,
             dstr,
         };
-        for i in 0..=63{
+        for i in 0..=31{
             out.dstr.insert(i, i);
         }
         out
