@@ -1400,6 +1400,9 @@ impl Process for ExpStmt {
     type Ret = i32;
     type Message = (Type, Option<ObjPtr<BasicBlock>>, Option<ObjPtr<BasicBlock>>);
     fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
+        if let Some(exp) = &mut self.exp {
+            exp.process(input.0, kit_mut);
+        }
         Ok(1)
     }
 }
