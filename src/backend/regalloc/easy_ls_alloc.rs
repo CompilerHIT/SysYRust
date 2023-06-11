@@ -183,7 +183,7 @@ impl Allocator {
                 }
             }
 
-            bb_stack_sizes.insert(cur, bbspillings.len());
+            bb_stack_sizes.insert(cur, bbspillings.len()*8);
             // 统计spilling数量
             for inst in &cur.as_ref().insts {
                 for reg in inst.as_ref().get_reg_def() {
@@ -196,11 +196,10 @@ impl Allocator {
                         bbspillings.insert(reg.get_id());
                     }
                 }
-                if bbspillings.len() > stackSize {
-                    stackSize = bbspillings.len();
-                }
             }
-
+            if bbspillings.len()*8 > stackSize {
+                stackSize = bbspillings.len()*8;
+            }
             // 扩展未扩展的节点
             for bb in &cur.as_ref().out_edge {
                 if passed.contains(&bb) {
