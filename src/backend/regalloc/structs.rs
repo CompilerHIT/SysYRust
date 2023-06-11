@@ -60,10 +60,10 @@ impl RegUsedStat {
         //     return Some(1);
         // }
 
-        if self.iregs_used & (1 << 3) == 0 {
-            // gp寄存器x3,后面可能保留不分配用来做优化
-            return Some(3);
-        }
+        // if self.iregs_used & (1 << 3) == 0 {
+        //     // gp寄存器x3,后面可能保留不分配用来做优化
+        //     return Some(3);
+        // }
         if self.iregs_used & (1 << 8) == 0 {
             return Some(8);
         }

@@ -83,7 +83,7 @@ impl Reg {
             ScalarType::Int => unsafe {
                 let mut id = I_REG_ID;
                 I_REG_ID += 1;
-                while id == 0 || id == 1 || id == 2 || id == 4 {
+                while id >= 0 && id <= 4 {
                     id = I_REG_ID;
                     I_REG_ID += 1;
                 }
@@ -130,7 +130,6 @@ impl Reg {
 
     // ra, t0, t1-2, a0-1, a2-7, t3-6
     // f0-7, f10-17, f28-31
-    //FIXME: ABI是否对gp(x3)进行了规定？
     pub fn is_caller_save(&self) -> bool {
         match self.r_type {
             ScalarType::Int => {
@@ -162,13 +161,12 @@ impl Reg {
     }
 
     // sp for both callee and special
-    // zero, sp, tp, ra
-    //FIXME: ABI是否对gp进行了规定？
+    // zero, sp, tp, ra, gp
     pub fn is_special(&self) -> bool {
         if self.r_type == ScalarType::Float {
             return false;
         }
-        self.id == 0 || self.id == 2 || self.id == 4 || self.id == 1
+        self.id >= 0 && self.id <= 4
     }
 
     pub fn is_allocable(&self) -> bool {

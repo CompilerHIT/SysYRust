@@ -49,11 +49,6 @@ impl<'a> AsmModule<'a> {
         self.handle_spill(pool);
         // 检查地址溢出，插入间接寻址
         self.handle_overflow(pool);
-        // 第二次分配寄存器
-        println!("start second allocate reg");
-        self.allocate_reg(f);
-        println!("start handle spill");
-        self.handle_spill(pool);
         self.generate_global_var(f);
         println!("start generate");
         self.generate_asm(f, pool);
