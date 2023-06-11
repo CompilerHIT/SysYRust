@@ -216,11 +216,12 @@ impl Kit<'_> {
         bb: ObjPtr<BasicBlock>,
     ) {
         //填充bb中的变量为name_changed的inst_phi
+        println!("填phi:{:?},所在bb:{:?}", name_changed, bb.get_name());
         let vec_pre = bb.get_up_bb();
         for pre in vec_pre {
             let inst_find = self.find_var(*pre, &name_changed).unwrap();
             inst_phi.as_mut().add_operand(inst_find); //向上找,填充
-                                                      // println!("其参数为:{:?}", inst_find.get_kind());
+            println!("其参数为:{:?}", inst_find.get_kind());
         }
     }
 
@@ -229,7 +230,7 @@ impl Kit<'_> {
         bb: ObjPtr<BasicBlock>,
         var_name_changed: &str,
     ) -> Result<ObjPtr<Inst>, Error> {
-        // println!("在bb:{:?}中找", bb.get_name());
+        println!("在bb:{:?}中找", bb.get_name());
         let bbname = bb.get_name();
         let inst_opt = self
             .context_mut
@@ -237,10 +238,10 @@ impl Kit<'_> {
             .get(bbname)
             .and_then(|var_inst_map| var_inst_map.get(var_name_changed));
         if let Some(inst_var) = inst_opt {
-            // println!("找到了,返回{:?}", inst_var.get_kind());
+            println!("找到了,返回{:?}", inst_var.get_kind());
             Ok(*inst_var)
         } else {
-            // println!("没找到,插phi");
+            println!("没找到,插phi");
             let sym_opt = self.context_mut.symbol_table.get(var_name_changed);
             if let Some(sym) = sym_opt {
                 // let inst_phi = self
@@ -363,8 +364,18 @@ impl Kit<'_> {
                 let inst_phi = self.pool_inst_mut.make_float_phi();
                 // println!("指令{:?}插入bb{:?}中", inst_phi.get_kind(), bb.get_name());
                 bb.as_mut().push_front(inst_phi);
-                self.context_mut
-                    .update_var_scope(name.as_str(), inst_phi, bb.get_name());
+                // self.context_mut
+                //     .update_var_scope(name.as_str(), inst_phi, bb.get_name());
+
+                if let Some(inst_map) = self.context_mut.bb_map.get_mut(bb.get_name()) {
+                    inst_map.insert(name.clone(), inst_phi);
+                } else {
+                    let mut map = HashMap::new();
+                    map.insert(name.clone(), inst_phi);
+                    self.context_mut
+                        .bb_map
+                        .insert(bb.get_name().to_string(), map);
+                }
                 if let Some((phi_list, _)) = self.context_mut.phi_list.get_mut(bb.get_name()) {
                     //如果有philist
                     // println!(
@@ -392,8 +403,17 @@ impl Kit<'_> {
                 let inst_phi = self.pool_inst_mut.make_int_phi();
                 // println!("指令{:?}插入bb{:?}中", inst_phi.get_kind(), bb.get_name());
                 bb.as_mut().push_front(inst_phi);
-                self.context_mut
-                    .update_var_scope(name.as_str(), inst_phi, bb.get_name());
+                // self.context_mut
+                //     .update_var_scope(name.as_str(), inst_phi, bb.get_name());
+                if let Some(inst_map) = self.context_mut.bb_map.get_mut(bb.get_name()) {
+                    inst_map.insert(name.clone(), inst_phi);
+                } else {
+                    let mut map = HashMap::new();
+                    map.insert(name.clone(), inst_phi);
+                    self.context_mut
+                        .bb_map
+                        .insert(bb.get_name().to_string(), map);
+                }
                 if let Some((phi_list, is_padded)) =
                     self.context_mut.phi_list.get_mut(bb.get_name())
                 {
@@ -807,6 +827,9 @@ impl Kit<'_> {
                             Type::ConstInt | Type::Int => {
                                 let phi_inst =
                                     self.push_phi(name_changed.clone(), Type::Int, bb).unwrap();
+
+                                // let phi_inst = self.push_phi(s.to_string(), Type::Int, bb).unwrap();
+
                                 // if let Some(vec) = self.context_mut.phi_list.get_mut(bbname) {
                                 //     //有philist,直接加入philist中
                                 //     vec.push((name_changed.clone(), phi_inst));
