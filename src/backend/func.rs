@@ -80,7 +80,6 @@ impl Func {
         pool: &mut BackendPool,
     ) {
         let mut info = Mapping::new();
-
         // 处理全局变量&数组
         let globl = &module.global_var_list;
         globl.iter().for_each(|(inst, var)| {
@@ -114,12 +113,15 @@ impl Func {
 
         let mut block_seq = 0;
         self.blocks.push(first_block);
-
+        let mut visited : HashSet<ObjPtr<BasicBlock>> = HashSet::new();
         while let Some(fblock) = tmp.pop_front() {
             let next_blocks = fblock.as_ref().get_next_bb();
-            next_blocks
-                .iter()
-                .for_each(|block| tmp.push_back(block.clone()));
+            println!("next_blocks len: {:?}", next_blocks.len());
+            next_blocks.iter().for_each(|block| {
+                if visited.insert(block.clone()) {
+                    tmp.push_back(block.clone())
+                }
+            });
             if block_seq == 0 {
                 block_seq += 1;
                 continue;
@@ -147,27 +149,20 @@ impl Func {
             }
             let block = self.blocks[index];
             if block != self.entry.unwrap() {
+                println!("start build block");
                 if i == 0 {
                     block.as_mut().showed = false;
                 }
                 let basicblock = info.block_ir_map.get(&block).unwrap();
                 if i + 1 < self.blocks.len() {
                     let next_block = Some(self.blocks[i + 1]);
-                    block.as_mut().construct(
-                        this,
-                        *basicblock,
-                        next_block,
-                        &mut info,
-                        pool,
-                    );
+                    block
+                        .as_mut()
+                        .construct(this, *basicblock, next_block, &mut info, pool);
                 } else {
-                    block.as_mut().construct(
-                        this,
-                        *basicblock,
-                        None,
-                        &mut info,
-                        pool,
-                    );
+                    block
+                        .as_mut()
+                        .construct(this, *basicblock, None, &mut info, pool);
                 }
                 i += 1;
             }
@@ -198,10 +193,15 @@ impl Func {
             }
             if let Some(mut target) = info.phis_to_block.get_mut(&block.label) {
                 while let Some(inst) = target.pop() {
-                    println!("phi inst{:?} {:?}, pos {}", block.label,inst.as_ref(), index);
+                    println!(
+                        "phi inst{:?} {:?}, pos {}",
+                        block.label,
+                        inst.as_ref(),
+                        index
+                    );
                     block.as_mut().insts.insert(index, inst);
                 }
-            } 
+            }
             let mut phis = block.phis.clone();
             while let Some(inst) = phis.pop() {
                 block.as_mut().insts.insert(index, inst);
