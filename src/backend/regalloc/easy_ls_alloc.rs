@@ -183,7 +183,7 @@ impl Allocator {
                 }
             }
 
-            bb_stack_sizes.insert(cur, bbspillings.len());
+            bb_stack_sizes.insert(cur, bbspillings.len()*8);
             // 统计spilling数量
             for inst in &cur.as_ref().insts {
                 for reg in inst.as_ref().get_reg_def() {
@@ -196,11 +196,10 @@ impl Allocator {
                         bbspillings.insert(reg.get_id());
                     }
                 }
-                if bbspillings.len() > stackSize {
-                    stackSize = bbspillings.len();
-                }
             }
-
+            if bbspillings.len()*8 > stackSize {
+                stackSize = bbspillings.len()*8;
+            }
             // 扩展未扩展的节点
             for bb in &cur.as_ref().out_edge {
                 if passed.contains(&bb) {
@@ -255,6 +254,9 @@ impl Allocator {
                 if !reg.is_virtual() {
                     continue;
                 }
+                
+                
+                
                 let id = reg.get_id();
                 // 如果已经在dstr的key中，也就是已经分配，则忽略处理
                 if dstr.contains_key(&id) {
@@ -321,6 +323,8 @@ impl Allocator {
                     }
                 }
             }
+        
+            
         }
         (spillings, dstr)
     }
