@@ -88,7 +88,7 @@ impl Kit<'_> {
 
         self.context_mut
             .module_mut
-            .push_function("getin".to_string(), inst_getint);
+            .push_function("getint".to_string(), inst_getint);
         self.context_mut
             .module_mut
             .push_function("getch".to_string(), inst_getch);
