@@ -842,7 +842,6 @@ impl BB {
             if id != -1 {
                 //FIXME:暂时使用double进行栈操作，且未处理浮点数
                 inst.replace(id, 5);
-
                 let mut store = LIRInst::new(
                     InstrsType::StoreToStack,
                     vec![

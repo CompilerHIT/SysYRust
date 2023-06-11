@@ -204,7 +204,7 @@ impl Func {
             }
             let mut phis = block.phis.clone();
             while let Some(inst) = phis.pop() {
-                block.as_mut().insts.insert(index, inst);
+                block.as_mut().insts.insert(0, inst);
             }
         }
         self.update(this);
