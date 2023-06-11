@@ -44,6 +44,13 @@ impl Inst {
         self.user.set_operand(index, operand);
     }
 
+    /// 这个函数非常危险，因为其将原来的operends设置为新的operands,但并没有修改use_list
+    /// # Arguments
+    /// * 'operands' - 操作数列表
+    pub fn set_operands(&mut self, operands: Vec<ObjPtr<Inst>>) {
+        self.user.set_operands(operands);
+    }
+
     /// 将一个操作数替换为另一个操作数
     /// # Arguments
     /// * 'old' - 被替换的操作数

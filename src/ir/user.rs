@@ -44,6 +44,10 @@ impl User {
         self.operands[index] = operand;
     }
 
+    pub fn set_operands(&mut self, operands: Vec<ObjPtr<Inst>>) {
+        self.operands = operands;
+    }
+
     pub fn push_operand(&mut self, operand: ObjPtr<Inst>) {
         self.operands.push(operand)
     }
