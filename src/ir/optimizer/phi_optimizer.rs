@@ -64,24 +64,18 @@ fn remove_duplicate_phi(mut phi: ObjPtr<Inst>) {
 
 /// 删除参数为自身的phi
 fn remove_self_phi(mut phi: ObjPtr<Inst>) {
-    //while let Some(index) = phi.get_operands().iter().position(|&x| x == phi) {
-    //phi.remove_operand_by_index(index);
-    //}
-    loop {
-        if let Some(index) = phi.get_operands().iter().position(|&x| x == phi) {
-            println!("{index}");
-            debug_assert_eq!(phi, phi.get_operands()[index]);
-            phi.remove_operand_by_index(index);
-        } else {
-            break;
-        }
+    while let Some(index) = phi.get_operands().iter().position(|&x| x == phi) {
+        phi.remove_operand_by_index(index);
     }
 }
 
 /// 递归清除phi的单参数问题
 fn trace_single_phi(mut phi: ObjPtr<Inst>) {
+    debug_assert_eq!(1, phi.get_operands().len());
     // 追踪该参数，匹配参数的类型
     let op = phi.get_operands()[0];
+
+    debug_assert_ne!(op, phi);
 
     let mut replace = || {
         for user in phi.get_use_list().iter() {

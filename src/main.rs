@@ -65,6 +65,7 @@ fn run_main() {
         &mut pool_func,
     );
 
+    drop(compunit);
     // ir优化
     sysylib::ir::optimizer_run(&mut module, o1_option);
 
