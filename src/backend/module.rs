@@ -39,7 +39,9 @@ impl<'a> AsmModule<'a> {
             func.construct(&self, ir_func, func_seq, pool);
             let func_ptr = pool.put_func(func);
             self.func_map.push((iter.clone(), func_ptr));
-            func_seq += 1;
+            if !iter.is_empty_bb() {
+                func_seq += 1;
+            }
         }
     }
 

@@ -774,7 +774,11 @@ impl BB {
                     self.phis
                         .push(pool.put_inst(LIRInst::new(inst_kind, vec![phi_reg, temp.clone()])));
 
-                    inst_ref.get_operands().iter().for_each(|op| {
+                    let mut op_list : HashSet<ObjPtr<Inst>> = HashSet::new();
+                    for op in ir_block_inst.get_operands().iter() {
+                        if !op_list.insert(*op) {
+                            continue
+                        }
                         println!("op: {:?}", op.get_kind());
                         let src_reg = self.resolve_operand(func, *op, false, map_info, pool);
                         inst_kind = match src_reg {
@@ -796,13 +800,17 @@ impl BB {
                             .clone();
 
                         if let Some(insts) = map_info.phis_to_block.get_mut(&incoming_block) {
-                            insts.push(obj_inst);
+                            println!("insert phi inst: {:?}", obj_inst);
+                            insts.insert(obj_inst);
                         } else {
+                            println!("insert phi inst: {:?}", obj_inst);
+                            let mut set = HashSet::new();
+                            set.insert(obj_inst);
                             map_info
                                 .phis_to_block
-                                .insert(incoming_block, vec![obj_inst]);
+                                .insert(incoming_block, set);
                         }
-                    });
+                    }
                 }
                 _ => {
                     // do nothing
@@ -830,7 +838,6 @@ impl BB {
         pos: i32,
         pool: &mut BackendPool,
     ) {
-        println!("pos: {}", pos);
         let mut start_pos = pos;
         let mut index = 0; 
         loop {
@@ -843,30 +850,19 @@ impl BB {
                 index += 1;
                 continue;
             } else {
+                let len = spills.len() as i32;
                 let (mut store_num, mut slot) = (0, vec![]);
                 for id in spills.iter() {
                     if let Some(offset) = func.spill_stack_map.get(&id) {
-                        println!("exist slot{:?}", offset);
                         slot.push(*offset);
                     } else {
                         let stack_slot = StackSlot::new(start_pos + store_num * ADDR_SIZE, ADDR_SIZE);
-                        println!("new slot{:?}", stack_slot);
                         slot.push(stack_slot);
                         store_num += 1;
                     };
                 }
                 let offset = start_pos + store_num * ADDR_SIZE;
-                for i in 0..spills.len() as i32 {
-                    let reg = Operand::Reg(Reg::new(5 + i, ScalarType::Int));
-                    let mut ins = LIRInst::new(
-                        InstrsType::StoreToStack,
-                        vec![reg, Operand::IImm(IImm::new(offset + i * ADDR_SIZE))]
-                    );
-                    ins.set_double();
-                    self.insts.insert(index, pool.put_inst(ins));
-                    index += 1;
-                }
-                for i in 0..spills.len() as i32 {
+                for i in 0..len {
                     let reg = Operand::Reg(Reg::new(5 + i, ScalarType::Int));
                     let stack_slot = slot[i as usize];
                     if func.spill_stack_map.contains_key(&spills[i as usize]) {
@@ -876,19 +872,23 @@ impl BB {
                         );
                         ins.set_double();
                         self.insts.insert(index, pool.put_inst(ins));
-                        println!("spill: {:?}", stack_slot.get_pos());
                         index += 1;
                     } else {
                         func.as_mut().spill_stack_map.insert(spills[i as usize], stack_slot);
                     }
                 }
-                for i in 0..spills.len() as i32 {
+                for i in 0..len {
+                    println!("{i}------------------");
+                    // println!("{} inst: {:?}", self.label, self.insts[index-2]);
+                    // println!("{} inst: {:?}", self.label, self.insts[index-1]);
+                    println!("{} replace inst: {:?}", self.label, inst);
+                    println!("------------------");
                     inst.as_mut().replace(spills[i as usize], 5 + i)
                 }
 
                 index += 1;
 
-                for i in 0..spills.len() as i32 {
+                for i in 0..len {
                     let reg = Operand::Reg(Reg::new(5 + i, ScalarType::Int));
                     let stack_slot = slot[i as usize];
                     match self.insts[index-1].get_dst() {
@@ -908,18 +908,12 @@ impl BB {
                     index += 1;
                 }
 
-                for i in 0..spills.len() as i32 {
-                    let reg = Operand::Reg(Reg::new(5 + i, ScalarType::Int));
-                    let mut ins = LIRInst::new(
-                        InstrsType::LoadFromStack,
-                        vec![reg, Operand::IImm(IImm::new(offset + i * ADDR_SIZE))]);
-                    ins.set_double();
-                    self.insts.insert(index, pool.put_inst(ins));
-                    index += 1;
-                }
                 start_pos = offset;
             }
         }
+        println!("---------------------------");
+        println!("{:?}", func.spill_stack_map);
+        println!("---------------------------");
     }
 
     pub fn handle_overflow(&mut self, func: ObjPtr<Func>, pool: &mut BackendPool) {

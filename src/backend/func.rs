@@ -193,8 +193,10 @@ impl Func {
                 index += 1;
             }
             if let Some(mut target) = info.phis_to_block.get_mut(&block.label) {
-                while let Some(inst) = target.pop() {
-                    block.as_mut().insts.insert(index, inst);
+                for inst in target.iter() {
+                    println!("label: {}", block.label);
+                    println!("insert phi to last: {:?}", inst);
+                    block.as_mut().insts.insert(index, *inst);
                 }
             }
             let mut phis = block.phis.clone();
@@ -204,6 +206,14 @@ impl Func {
             size += block.insts.len();
         }
         println!("phi insert size: {}", size);
+
+        for block in self.blocks.iter() {
+            println!("-----------------");
+            println!("block: {:?}", block.label);
+            for inst in block.insts.iter() {
+                println!("row inst: {:?}", inst);
+            }
+        }
         self.update(this);
     }
 
@@ -442,15 +452,4 @@ fn set_append(blocks: &Vec<ObjPtr<BasicBlock>>) -> HashSet<ObjPtr<BasicBlock>> {
         set.insert(block.clone());
     }
     set
-}
-
-impl Hash for ObjPtr<BB> {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.as_ref().label.hash(state);
-    }
-}
-impl Hash for ObjPtr<BasicBlock> {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.as_ref().get_name().hash(state);
-    }
 }

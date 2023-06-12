@@ -68,7 +68,7 @@ impl RegUsedStat {
             return Some(8);
         }
 
-        for i in 5..=9 {
+        for i in 8..=9 {
             if self.iregs_used & (1 << i) == 0 {
                 return Some(i);
             }
