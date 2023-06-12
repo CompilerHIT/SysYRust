@@ -216,7 +216,7 @@ pub struct Mapping {
 
     pub val_map: HashMap<ObjPtr<Inst>, Operand>,
     pub block_branch: HashMap<String, ObjPtr<LIRInst>>,
-    pub phis_to_block: HashMap<String, Vec<ObjPtr<LIRInst>>>,
+    pub phis_to_block: HashMap<String, HashSet<ObjPtr<LIRInst>>>,
     // pub func_
 }
 
@@ -233,11 +233,6 @@ impl Mapping {
     }
 }
 
-impl Hash for ObjPtr<Inst> {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        std::ptr::hash(self.as_ref(), state);
-    }
-}
 
 #[derive(Clone)]
 pub struct IntArray {

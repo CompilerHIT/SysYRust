@@ -8,4 +8,5 @@ data/
 /data
 *.sy
 log
+out
 __pycache__
