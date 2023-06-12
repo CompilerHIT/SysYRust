@@ -52,6 +52,14 @@ impl Module {
         }
     }
 
+    /// 用于遍历所有全局变量
+    pub fn get_all_var(&self) -> Vec<(&String, ObjPtr<Inst>)> {
+        self.global_variable
+            .iter()
+            .map(|(name, var)| (name, var.clone()))
+            .collect()
+    }
+
     /// 用于遍历所有函数
     pub fn get_all_func(&self) -> Vec<(&String, ObjPtr<Function>)> {
         self.function

@@ -66,6 +66,10 @@ fn run_main() {
     );
 
     drop(compunit);
+
+    // ir打印
+    sysylib::ir::dump_now(&module);
+
     // ir优化
     sysylib::ir::optimizer_run(&mut module, o1_option);
 

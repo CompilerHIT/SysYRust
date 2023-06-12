@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use crate::utility::ScalarType;
 
 pub const REG_COUNT: i32 = 32;

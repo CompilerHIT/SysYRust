@@ -2,6 +2,7 @@
 
 use crate::utility::ObjPtr;
 pub mod basicblock;
+mod dump_ir;
 pub mod function;
 pub mod instruction;
 pub mod ir_type;
@@ -10,6 +11,7 @@ mod optimizer;
 pub mod user;
 pub mod value;
 
+pub use dump_ir::dump_now;
 pub use optimizer::optimizer_run;
 
 /// 侵入式链表
