@@ -51,7 +51,7 @@ pub fn dump_func(
     text = format!("{}  parameters:\n", text);
     for (name, inst) in func.get_params() {
         text = format!(
-            "{}    %{} = %{}\n",
+            "{}    %{} = {}\n",
             text,
             map_get_name(map, inst.clone()),
             name
@@ -149,7 +149,11 @@ pub fn dump_inst(
             }
         }
         InstKind::Call(callee) => {
-            text = format!("{}%{} = call {}\n", text, name, callee);
+            text = format!("{}%{} = call {} Parameter: ", text, name, callee);
+            for arg in inst.get_operands() {
+                text = format!("{}%{} ", text, map_get_name(map, arg.clone()));
+            }
+            text += "\n";
         }
         InstKind::Gep => {
             text = format!(
