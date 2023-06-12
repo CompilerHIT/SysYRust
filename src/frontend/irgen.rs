@@ -967,6 +967,8 @@ impl Process for InitVal {
                 for i in layer_now..dimension.len() {
                     after = after * dimension[i];
                 } //计算当前维度每增1对应多少元素
+                ////这里:!
+                after = dimension[dimension.len()-1];
                 let mut vec_dimension_now = vec![];
                 for i in (layer_now - 1)..dimension.len() {
                     vec_dimension_now.push(dimension[i]);
