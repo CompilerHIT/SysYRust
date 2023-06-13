@@ -101,6 +101,33 @@ impl RegUsedStat {
         None
     }
 
+
+
+    // 获取剩余的可用通用寄存器
+    pub fn get_rest_iregs(&self)->Vec<i32>{
+        let mut out=Vec::new();
+        for i in 0..=31 {
+            if self.is_available_ireg(i){
+                out.push(i);
+            }
+        }
+        out
+    }
+
+    // 获取剩余的可用浮点寄存器
+    pub fn get_rest_fregs(&self)->Vec<i32>{
+        let mut out=Vec::new();
+        for i in 32..=63 {
+            if self.is_available_freg(i){
+                out.push(i);
+            }
+        }
+        out
+    }
+
+
+
+
     // 释放一个通用寄存器
     pub fn release_ireg(&mut self, reg: i32) {
         self.iregs_used &= !(1 << reg);
