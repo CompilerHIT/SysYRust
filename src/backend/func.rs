@@ -300,6 +300,8 @@ impl Func {
         self.calc_live();
         let mut allocator = Allocator::new();
         let alloc_stat = allocator.alloc(self);
+        // // 替换为图着色寄存器分配器
+        // let alloc_stat=crate::backend::regalloc::easy_gc_alloc::Allocator::new().alloc(&self);
 
         self.reg_alloc_info = alloc_stat;
         self.context.as_mut().set_reg_map(&self.reg_alloc_info.dstr);

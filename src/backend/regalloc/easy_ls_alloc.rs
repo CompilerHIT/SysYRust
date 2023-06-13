@@ -9,7 +9,6 @@ use crate::container::bitmap::Bitmap;
 use crate::container::prioritydeque::PriorityDeque;
 use crate::utility::ObjPtr;
 use crate::utility::ScalarType;
-use std::borrow::Borrow;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::collections::HashSet;
