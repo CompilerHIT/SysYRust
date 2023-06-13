@@ -1633,7 +1633,10 @@ impl Process for Break {
             InfuncChoice::InFunc(bb_now) => {
                 let (_, false_opt) = input;
                 if let Some(bb_false) = false_opt {
-                    bb_now.as_mut().add_next_bb(bb_false);
+                    if bb_now.get_next_bb().len()<=1{
+                        bb_now.as_mut().add_next_bb(bb_false);
+                    }
+                    // bb_now.as_mut().add_next_bb(bb_false);
                 }
             }
             _ => {
@@ -1653,7 +1656,9 @@ impl Process for Continue {
             InfuncChoice::InFunc(bb_now) => {
                 let (head_opt, _) = input;
                 if let Some(bb_false) = head_opt {
+                    if bb_now.get_next_bb().len()<=1{
                     bb_now.as_mut().add_next_bb(bb_false);
+                    }
                 }
             }
             _ => {
