@@ -228,6 +228,14 @@ impl LIRInst {
     pub fn replace_label(&mut self, label: String) {
         self.operands[0] = Operand::Addr(label);
     }
+
+    pub fn get_regs(&self)->Vec<Reg> {
+        let mut out =Vec::new();
+        self.get_reg_def().iter().for_each(|e|{out.push(*e);});
+        self.get_reg_use().iter().for_each(|e|{out.push(*e);});
+        out
+    }
+
     // instr's def/use regs
     pub fn get_reg_def(&self) -> Vec<Reg> {
         match self.inst_type {
