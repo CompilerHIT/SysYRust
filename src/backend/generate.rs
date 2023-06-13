@@ -192,16 +192,21 @@ impl GenerateAsm for LIRInst {
                     CmpOp::Le => "le",
                     CmpOp::Gt => "gt",
                     CmpOp::Ge => "ge",
+                    CmpOp::Eqz => "eqz",
                 };
                 let lhs = match self.get_lhs() {
                     Operand::Reg(reg) => reg.to_string(),
                     _ => unreachable!("branch block's lhs must be reg"),
                 };
-                let rhs = match self.get_rhs() {
-                    Operand::Reg(reg) => reg.to_string(),
-                    _ => unreachable!("branch block's rhs must be reg"),
-                };
-                builder.b(cond, &lhs, &rhs, &label)?;
+                if cond != "eqz" {
+                    let rhs = match self.get_rhs() {
+                        Operand::Reg(reg) => reg.to_string(),
+                        _ => unreachable!("branch block's rhs must be reg"),
+                    };
+                    builder.b(cond, &lhs, &rhs, &label)?;
+                } else {
+                    builder.beqz(&lhs, &label)?;
+                }
                 Ok(())
             }
             InstrsType::Jump => {

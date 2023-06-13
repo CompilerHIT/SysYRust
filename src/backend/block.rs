@@ -611,7 +611,40 @@ impl BB {
                                 .append(vec![*true_succ_block, *false_succ_block].as_mut());
                         }
                         _ => {
-                            unreachable!("cond is not binary condition judgement, to improve")
+                            println!("{:?}", cond_ref.get_kind());
+                            let lhs_reg = self.resolve_operand(
+                                func,
+                                cond_ref,
+                                true,
+                                map_info,
+                                pool,
+                            );
+                            let inst_kind = InstrsType::Branch(CmpOp::Eqz);
+                            self.insts.push(pool.put_inst(LIRInst::new(
+                                inst_kind,
+                                vec![
+                                    Operand::Addr(false_succ_block.label.to_string()),
+                                    lhs_reg,
+                                ],
+                            )));
+                            self.push_back(pool.put_inst(LIRInst::new(
+                                InstrsType::Jump,
+                                vec![Operand::Addr(true_succ_block.label.to_string())],
+                            )));
+
+                            inst.replace_op(vec![Operand::Addr(
+                                true_cond_bb.as_ref().get_name().to_string(),
+                            )]);
+                            let obj_inst = pool.put_inst(inst);
+                            map_info.block_branch.insert(self.label.clone(), obj_inst);
+                            let this = self.clone();
+                            true_succ_block
+                                .as_mut()
+                                .in_edge
+                                .push(pool.put_block(this.clone()));
+                            false_succ_block.as_mut().in_edge.push(pool.put_block(this));
+                            self.out_edge
+                                .append(vec![*true_succ_block, *false_succ_block].as_mut());
                         }
                     }
                 }

@@ -68,6 +68,7 @@ pub enum CmpOp {
     Lt,
     Ge,
     Le,
+    Eqz,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
