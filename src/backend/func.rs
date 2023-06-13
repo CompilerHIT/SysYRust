@@ -176,10 +176,12 @@ impl Func {
                 continue;
             }
             let mut index = block.insts.len() - 1;
+            let mut insert_before = false;
             loop {
                 match block.insts[index].get_type() {
                     InstrsType::Ret(..) | InstrsType::Branch(..) | InstrsType::Jump => {
                         if index == 0 {
+                            insert_before = true;
                             break;
                         }
                         index -= 1;
@@ -189,7 +191,7 @@ impl Func {
                     }
                 }
             }
-            if index != 0 {
+            if !insert_before {
                 index += 1;
             }
             if let Some(mut target) = info.phis_to_block.get_mut(&block.label) {
