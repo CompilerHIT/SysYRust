@@ -214,6 +214,20 @@ impl Func {
                 println!("row inst: {:?}", inst);
             }
         }
+
+        // 第四遍pass，建立出入边关系
+        for block in self.blocks.iter() {
+            println!("-----------------");
+            println!("{}", block.label);
+            for out in block.out_edge.iter() {
+                println!("out: {}", out.label);
+                println!("reg info:\ndef: {:?}\nuse: {:?}\nin: {:?}\n out: {:?}\n", out.live_def, out.live_use, out.live_in, out.live_out);
+            }
+            for in_edge in block.in_edge.iter() {
+                println!("in: {}", in_edge.label);
+                println!("reg info:\ndef: {:?}\nuse: {:?}\nin: {:?}\n out: {:?}\n", in_edge.live_def, in_edge.live_use, in_edge.live_in, in_edge.live_out);
+            }
+        }
         self.update(this);
     }
 
@@ -255,7 +269,7 @@ impl Func {
 
     pub fn calc_live(&mut self) {
         let mut queue: VecDeque<(ObjPtr<BB>, Reg)> = VecDeque::new();
-        for block in self.blocks.clone().iter() {
+        for block in self.blocks.iter() {
             block.as_mut().live_use.clear();
             block.as_mut().live_def.clear();
             for it in block.as_ref().insts.iter().rev() {
@@ -313,8 +327,7 @@ impl Func {
         //栈对齐 - 调用func时sp需按16字节对齐
         stack_size = stack_size / 16 * 16 + 16;
 
-        let mut offset = stack_size;
-        self.context.as_mut().set_offset(offset - 8);
+        self.context.as_mut().set_offset(stack_size - 8);
         let mut f1 = match f.try_clone() {
             Ok(f) => f,
             Err(e) => panic!("Error: {}", e),
@@ -327,16 +340,13 @@ impl Func {
         self.context.as_mut().set_prologue_event(move || {
             let mut builder = AsmBuilder::new(&mut f1);
             // addi sp -stack_size
-            builder.addi("sp", "sp", -offset);
-            offset -= 8;
-            builder.s(&ra.to_string(), "sp", offset, false, true);
+            builder.addi("sp", "sp", -stack_size);
+            builder.s(&ra.to_string(), "sp", stack_size - 8, false, true);
         });
 
-        let mut offset = stack_size;
         self.context.as_mut().set_epilogue_event(move || {
             let mut builder = AsmBuilder::new(&mut f2);
-            offset -= 8;
-            builder.l(&ra.to_string(), "sp", offset, false, true);
+            builder.l(&ra.to_string(), "sp", stack_size - 8, false, true);
             builder.addi("sp", "sp", stack_size);
         });
 

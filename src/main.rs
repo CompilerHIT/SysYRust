@@ -71,7 +71,7 @@ fn run_main() {
     sysylib::ir::dump_now(&module);
 
     // ir优化
-    sysylib::ir::optimizer_run(&mut module, o1_option);
+    // sysylib::ir::optimizer_run(&mut module, o1_option);
 
     // 后端解析
     generate_asm(filename, output, &mut AsmModule::new(&module));
