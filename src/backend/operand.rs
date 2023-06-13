@@ -5,8 +5,8 @@ pub const ARG_REG_COUNT: i32 = 8;
 pub const REG_SP: i32 = 2;
 pub const IMM_12_Bs: i32 = 2047;
 pub const IMM_20_Bs: i32 = 524287;
-pub static mut I_REG_ID: i32 = 0;
-pub static mut F_REG_ID: i32 = 0;
+pub static mut I_REG_ID: i32 = 32;
+pub static mut F_REG_ID: i32 = 32;
 
 #[derive(Clone, Copy, PartialEq, Hash, Eq, Debug)]
 pub struct Reg {
@@ -164,7 +164,7 @@ impl Reg {
         if self.r_type == ScalarType::Float {
             return false;
         }
-        self.id >= 0 && self.id <= 4
+        self.id >= 0 && self.id <= 7
     }
 
     pub fn is_allocable(&self) -> bool {
