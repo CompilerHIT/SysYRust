@@ -42,7 +42,7 @@ impl GenerateAsm for LIRInst {
                     }
                     _ => panic!("rhs of binary op must be reg or imm, to improve"),
                 };
-                builder.op2(op, &dst, &lhs, &rhs, is_imm)?;
+                builder.op2(op, &dst, &lhs, &rhs, is_imm, self.is_double())?;
                 Ok(())
             }
             InstrsType::OpReg(op) => {

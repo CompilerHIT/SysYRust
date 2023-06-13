@@ -353,11 +353,7 @@ impl BB {
                             // 数组成员若是int型则不超过32位，使用word
                             // ld dst array_offset(sp) # get label(base addr)
                             // lw dst 4 * gep_offset(dst)
-                            println!("occur");
-                            let offset = addr.as_ref().get_gep_offset().as_ref().get_int_bond() * 4;
-                            println!("gep offset: {}", offset);
-                            let dst_reg =
-                                self.resolve_operand(func, ir_block_inst, true, map_info, pool);
+                            let mut src_reg = Operand::IImm(IImm::new(0));
                             let index = addr.as_ref().get_gep_ptr();
                             if let Some(head) = map_info.array_slot_map.get(&index) {
                                 //TODO:判断地址合法
@@ -367,22 +363,55 @@ impl BB {
                                 );
                                 load.set_double();
                                 self.insts.push(pool.put_inst(load));
-                                self.insts.push(pool.put_inst(LIRInst::new(
-                                    InstrsType::Load,
-                                    vec![
-                                        dst_reg.clone(),
-                                        dst_reg.clone(),
-                                        Operand::IImm(IImm::new(offset)),
-                                    ],
-                                )));
+                                src_reg = dst_reg.clone();
                             } else {
                                 // 找不到，认为是全局数组，全局数组的访问是load -> gep -> load -> alloca
-                                let src_reg =
+                                src_reg =
                                     self.resolve_operand(func, index, true, map_info, pool);
-                                self.insts.push(pool.put_inst(LIRInst::new(
-                                    InstrsType::Load,
-                                    vec![dst_reg, src_reg, Operand::IImm(IImm::new(offset))],
-                                )));
+                            }
+                            match addr.get_gep_offset().get_kind() {
+                                InstKind::ConstInt(imm) | InstKind::GlobalConstInt(imm) | InstKind::GlobalInt(imm) => {
+                                    let offset = imm * 4;
+                                    let dst_reg =
+                                        self.resolve_operand(func, ir_block_inst, true, map_info, pool);
+                                        self.insts.push(pool.put_inst(LIRInst::new(
+                                            InstrsType::Load,
+                                            vec![
+                                                dst_reg,
+                                                src_reg,
+                                                Operand::IImm(IImm::new(offset)),
+                                            ],
+                                        )));
+                                }
+                                _ => {
+                                    let offset = self.resolve_operand(func, addr.get_gep_offset(), true, map_info, pool);
+                                    self.insts.push(pool.put_inst(LIRInst::new(
+                                        InstrsType::Binary(BinaryOp::Shl),
+                                        vec![
+                                            offset.clone(),
+                                            offset.clone(),
+                                            Operand::IImm(IImm::new(2)),
+                                        ],
+                                    )));
+                                    let mut inst = LIRInst::new(
+                                        InstrsType::Binary(BinaryOp::Add),
+                                        vec![
+                                            dst_reg.clone(),
+                                            src_reg.clone(),
+                                            offset,
+                                        ],
+                                    );
+                                    inst.set_double();
+                                    self.insts.push(pool.put_inst(inst));
+                                    self.insts.push(pool.put_inst(LIRInst::new(
+                                        InstrsType::Load,
+                                        vec![
+                                            dst_reg.clone(),
+                                            dst_reg,
+                                            Operand::IImm(IImm::new(0)),
+                                        ],
+                                    )));
+                                }
                             }
                         }
                         InstKind::Alloca(..) => {
@@ -546,7 +575,11 @@ impl BB {
                                 BinOp::Le => InstrsType::Branch(CmpOp::Le),
                                 BinOp::Gt => InstrsType::Branch(CmpOp::Gt),
                                 BinOp::Lt => InstrsType::Branch(CmpOp::Lt),
+                                // BinOp::And => 
                                 _ => {
+                                    println!("{:?}", cond);
+                                    println!("left{:?}", cond_ref.get_lhs().get_kind());
+                                    println!("right{:?}", cond_ref.get_rhs().get_kind());
                                     unreachable!("no condition match")
                                 }
                             };
@@ -791,6 +824,7 @@ impl BB {
                             _ => unreachable!("phi operand must be reg or iimm"),
                         };
                         let inst = LIRInst::new(inst_kind, vec![temp.clone(), src_reg]);
+                        println!("save to insert phi inst: {:?}", inst);
                         let obj_inst = pool.put_inst(inst);
                         let incoming_block = map_info
                             .ir_block_map

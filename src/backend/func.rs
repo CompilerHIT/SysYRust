@@ -116,7 +116,6 @@ impl Func {
         let mut visited : HashSet<ObjPtr<BasicBlock>> = HashSet::new();
         while let Some(fblock) = tmp.pop_front() {
             let next_blocks = fblock.as_ref().get_next_bb();
-            println!("next_blocks len: {:?}", next_blocks.len());
             next_blocks.iter().for_each(|block| {
                 if visited.insert(block.clone()) {
                     tmp.push_back(block.clone())
@@ -214,20 +213,6 @@ impl Func {
             println!("block: {:?}", block.label);
             for inst in block.insts.iter() {
                 println!("row inst: {:?}", inst);
-            }
-        }
-
-        // 第四遍pass，建立出入边关系
-        for block in self.blocks.iter() {
-            println!("-----------------");
-            println!("{}", block.label);
-            for out in block.out_edge.iter() {
-                println!("out: {}", out.label);
-                println!("reg info:\ndef: {:?}\nuse: {:?}\nin: {:?}\n out: {:?}\n", out.live_def, out.live_use, out.live_in, out.live_out);
-            }
-            for in_edge in block.in_edge.iter() {
-                println!("in: {}", in_edge.label);
-                println!("reg info:\ndef: {:?}\nuse: {:?}\nin: {:?}\n out: {:?}\n", in_edge.live_def, in_edge.live_use, in_edge.live_in, in_edge.live_out);
             }
         }
         self.update(this);

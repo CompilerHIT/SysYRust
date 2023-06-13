@@ -33,16 +33,16 @@ impl<'f> AsmBuilder<'f> {
         writeln!(self.f, "    ret")
     }
 
-    pub fn op2(&mut self, op: &str, dest: &str, lhs: &str, rhs: &str, is_imm: bool) -> Result<()> {
+    pub fn op2(&mut self, op: &str, dest: &str, lhs: &str, rhs: &str, is_imm: bool, is_double: bool) -> Result<()> {
         //FIXME: mul使用w是否有超过32位的用例
         if is_imm {
-            if op == "or" || op == "xor" || op == "and" {
+            if op == "or" || op == "xor" || op == "and" || is_double{
                 writeln!(self.f, "    {op}i {dest}, {lhs}, {rhs}")
             } else {
                 writeln!(self.f, "    {op}iw {dest}, {lhs}, {rhs}")
             }
         } else {
-            if op == "or" || op == "xor" || op == "and" || op == "mulhs" {
+            if op == "or" || op == "xor" || op == "and" || op == "mulhs" || is_double{
                 writeln!(self.f, "    {op} {dest}, {lhs}, {rhs}")
             } else {
                 writeln!(self.f, "    {op}w {dest}, {lhs}, {rhs}")
