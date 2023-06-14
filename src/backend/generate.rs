@@ -1,7 +1,6 @@
 use super::{instrs::*, operand};
 use crate::backend::operand::ToString;
 use std::fs::File;
-//FIXME: virtue id to real id
 impl GenerateAsm for LIRInst {
     fn generate(&mut self, context: ObjPtr<Context>, f: &mut File) -> Result<()> {
         let mut builder = AsmBuilder::new(f);
@@ -42,6 +41,16 @@ impl GenerateAsm for LIRInst {
                     }
                     _ => panic!("rhs of binary op must be reg or imm, to improve"),
                 };
+                if is_imm {
+                    match op {
+                        "add" | "sub" | "and" | "or" | "xor" => {
+                            is_imm = true;
+                        },
+                        _ => {
+                            is_imm = false;
+                        }
+                    }
+                }
                 builder.op2(op, &dst, &lhs, &rhs, is_imm, self.is_double())?;
                 Ok(())
             }
