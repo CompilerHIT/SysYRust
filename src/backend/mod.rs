@@ -1,12 +1,13 @@
 mod asm_builder;
-mod block;
-mod func;
+pub mod block;
+pub mod func;
 mod generate;
 mod instrs;
 pub mod module;
 pub mod operand;
 pub mod regalloc;
 pub mod structs;
+mod block_handle;
 
 use std::fs::File;
 use std::io::Write;
