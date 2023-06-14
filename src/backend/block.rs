@@ -866,6 +866,7 @@ impl BB {
                         let obj_inst = pool.put_inst(inst);
                         let incoming_block = map_info
                             .ir_block_map
+                            //FIXME: 对接phi优化
                             .get(&op.as_ref().get_parent_bb())
                             .unwrap()
                             .label

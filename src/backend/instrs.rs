@@ -251,7 +251,7 @@ impl LIRInst {
             },
             InstrsType::Call => {
                 let mut set = Vec::new();
-                let cnt: i32 = REG_COUNT;
+                let cnt: i32 = REG_COUNT - 1;
                 let mut n = cnt;
                 while n > 0 {
                     let ireg = Reg::new(cnt - n, ScalarType::Int);
