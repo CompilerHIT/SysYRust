@@ -7,7 +7,6 @@ pub mod module;
 pub mod operand;
 pub mod regalloc;
 pub mod structs;
-mod block_handle;
 
 use std::fs::File;
 use std::io::Write;
