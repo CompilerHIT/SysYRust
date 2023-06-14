@@ -770,7 +770,7 @@ impl BB {
                     while i < ARG_REG_COUNT {
                         if let Some(slot) = func.as_ref().spill_stack_map.get(&i) {
                             let mut inst = LIRInst::new(
-                                InstrsType::LoadFromStack,
+                                InstrsType::LoadParamFromStack,
                                 vec![
                                     Operand::Reg(Reg::new(i + 10, ScalarType::Int)),
                                     Operand::IImm(IImm::new(slot.get_pos())),
@@ -917,11 +917,15 @@ impl BB {
             }
             let mut i = 0;
             let mut caller_regs: HashSet<i32> = HashSet::new();
+            let (icnt, fcnt) = inst.get_param_cnts();
             //FIXME: solve float regs
             match inst.get_type() {
                 InstrsType::Call => {
                     for op in inst.get_reg_def().iter() {
                         if let Some(reg) = reg_mapping.get(&op.get_id()) {
+                            if op.get_id() - 10 < icnt && op.get_id() >= 10 {
+                                continue;
+                            }
                             caller_regs.insert(*reg);
                         }
                     }
