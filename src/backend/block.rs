@@ -1303,8 +1303,8 @@ impl BB {
                 vec![reg.clone(), iimm],
             )));
         } else {
-            let op1 = Operand::IImm(IImm::new(imm >> 12));
-            let op2 = Operand::IImm(IImm::new(imm & 0xfff));
+            let op1 = Operand::IImm(IImm::new(imm >> 11));
+            let op2 = Operand::IImm(IImm::new(imm & 0x7ff));
             self.insts.push(pool.put_inst(LIRInst::new(
                 InstrsType::OpReg(SingleOp::Lui),
                 vec![reg.clone(), op1],
