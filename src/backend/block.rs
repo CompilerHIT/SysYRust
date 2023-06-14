@@ -8,7 +8,7 @@ use std::vec;
 use crate::backend::func::Func;
 use crate::backend::instrs::Operand;
 use crate::backend::instrs::{BinaryOp, CmpOp, InstrsType, LIRInst, SingleOp};
-use crate::backend::operand::{IImm, Reg, F_REG_ID, I_REG_ID};
+use crate::backend::operand::{IImm, Reg};
 use crate::ir::basicblock::BasicBlock;
 use crate::ir::instruction::{BinOp, Inst, InstKind, UnOp};
 use crate::ir::ir_type::IrType;
@@ -74,6 +74,11 @@ impl BB {
         map_info: &mut Mapping,
         pool: &mut BackendPool,
     ) {
+        println!(">>>>{}", block.get_name());
+        if block.is_empty() {
+            self.showed = false;
+            return;
+        }
         let mut ir_block_inst = block.as_ref().get_head_inst();
         loop {
             let inst_ref = ir_block_inst.as_ref();
@@ -521,10 +526,14 @@ impl BB {
                     let mut inst = LIRInst::new(InstrsType::Jump, vec![]);
                     if inst_ref.is_jmp() {
                         let next_bb = block.as_ref().get_next_bb()[0];
+                        if next_bb.is_empty() {
+                            break;
+                        }
                         let jump_block = match map_info.ir_block_map.get(&next_bb) {
                             Some(block) => block,
                             None => panic!("jump block not found"),
                         };
+                        
                         if *jump_block != next_blocks.unwrap() {
                             inst.replace_op(vec![Operand::Addr(jump_block.label.to_string())]);
                             let obj_inst = pool.put_inst(inst);
@@ -653,7 +662,8 @@ impl BB {
                             unreachable!("call arg type not match, either be int or float")
                         }
                     }
-
+                    let (x, y) = func.max_params;
+                    func.as_mut().max_params = (max(x, icnt), max(y, fcnt));
                     for arg in arg_list.iter().rev() {
                         match arg.as_ref().get_param_type() {
                             IrType::Int | IrType::IntPtr => {
