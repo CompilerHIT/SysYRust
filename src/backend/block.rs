@@ -654,9 +654,10 @@ impl BB {
                     let mut icnt = 0;
                     let mut fcnt = 0;
                     for arg in arg_list {
-                        if arg.as_ref().get_param_type() == IrType::Int {
+                        let param_type = arg.get_param_type();
+                        if param_type == IrType::Int || param_type == IrType::IntPtr || param_type == IrType::FloatPtr  {
                             icnt += 1
-                        } else if arg.as_ref().get_param_type() == IrType::Float {
+                        } else if param_type == IrType::Float {
                             fcnt += 1
                         } else {
                             unreachable!("call arg type not match, either be int or float")
@@ -1327,7 +1328,7 @@ impl BB {
         if !map.val_map.contains_key(&src) {
             let params = &func.as_ref().params;
             let reg = match src.as_ref().get_param_type() {
-                IrType::Int => Operand::Reg(Reg::init(ScalarType::Int)),
+                IrType::Int | IrType::IntPtr | IrType::FloatPtr => Operand::Reg(Reg::init(ScalarType::Int)),
                 IrType::Float => Operand::Reg(Reg::init(ScalarType::Float)),
                 _ => unreachable!("cannot reach, param either int or float"),
             };
@@ -1395,7 +1396,22 @@ impl BB {
                         }
                         fnum += 1;
                     }
-                    _ => unreachable!("cannot reach, param either int or float"),
+                    IrType::IntPtr | IrType::FloatPtr => {
+                        if let Some(addr) = map.array_slot_map.get(&p) {
+                            let mut  load = pool.put_inst(LIRInst::new(
+                                InstrsType::LoadParamFromStack,
+                                vec![reg.clone(), Operand::IImm(IImm::new(*addr))],
+                            ));
+                            load.set_double();
+                            self.insts.push(load);
+                        } else {
+                            unreachable!("use array as param must declare first");
+                        }
+                    }
+                    _ => { 
+                        println!("{:?}", p.get_param_type());
+                        unreachable!("cannot reach, param must be int, float or ptr")
+                    },
                 }
             }
             reg
