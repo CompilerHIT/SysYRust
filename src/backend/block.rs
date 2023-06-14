@@ -861,7 +861,7 @@ impl BB {
                         let obj_inst = pool.put_inst(inst);
                         let incoming_block = map_info
                             .ir_block_map
-                            .get(&op.as_ref().get_parent_bb())
+                            .get(&ir_block_inst.get_phi_predecessor(*op))
                             .unwrap()
                             .label
                             .clone();
