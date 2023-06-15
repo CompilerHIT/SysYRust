@@ -8,7 +8,7 @@ use std::vec;
 use crate::backend::func::Func;
 use crate::backend::instrs::Operand;
 use crate::backend::instrs::{BinaryOp, CmpOp, InstrsType, LIRInst, SingleOp};
-use crate::backend::operand::{IImm, Reg, F_REG_ID, I_REG_ID};
+use crate::backend::operand::{IImm, Reg};
 use crate::ir::basicblock::BasicBlock;
 use crate::ir::instruction::{BinOp, Inst, InstKind, UnOp};
 use crate::ir::ir_type::IrType;
@@ -74,6 +74,11 @@ impl BB {
         map_info: &mut Mapping,
         pool: &mut BackendPool,
     ) {
+        println!(">>>>{}", block.get_name());
+        if block.is_empty() {
+            self.showed = false;
+            return;
+        }
         let mut ir_block_inst = block.as_ref().get_head_inst();
         loop {
             let inst_ref = ir_block_inst.as_ref();
@@ -366,25 +371,33 @@ impl BB {
                                 src_reg = dst_reg.clone();
                             } else {
                                 // 找不到，认为是全局数组，全局数组的访问是load -> gep -> load -> alloca
-                                src_reg =
-                                    self.resolve_operand(func, index, true, map_info, pool);
+                                src_reg = self.resolve_operand(func, index, true, map_info, pool);
                             }
                             match addr.get_gep_offset().get_kind() {
-                                InstKind::ConstInt(imm) | InstKind::GlobalConstInt(imm) | InstKind::GlobalInt(imm) => {
+                                InstKind::ConstInt(imm)
+                                | InstKind::GlobalConstInt(imm)
+                                | InstKind::GlobalInt(imm) => {
                                     let offset = imm * 4;
-                                    let dst_reg =
-                                        self.resolve_operand(func, ir_block_inst, true, map_info, pool);
-                                        self.insts.push(pool.put_inst(LIRInst::new(
-                                            InstrsType::Load,
-                                            vec![
-                                                dst_reg,
-                                                src_reg,
-                                                Operand::IImm(IImm::new(offset)),
-                                            ],
-                                        )));
+                                    let dst_reg = self.resolve_operand(
+                                        func,
+                                        ir_block_inst,
+                                        true,
+                                        map_info,
+                                        pool,
+                                    );
+                                    self.insts.push(pool.put_inst(LIRInst::new(
+                                        InstrsType::Load,
+                                        vec![dst_reg, src_reg, Operand::IImm(IImm::new(offset))],
+                                    )));
                                 }
                                 _ => {
-                                    let offset = self.resolve_operand(func, addr.get_gep_offset(), true, map_info, pool);
+                                    let offset = self.resolve_operand(
+                                        func,
+                                        addr.get_gep_offset(),
+                                        true,
+                                        map_info,
+                                        pool,
+                                    );
                                     self.insts.push(pool.put_inst(LIRInst::new(
                                         InstrsType::Binary(BinaryOp::Shl),
                                         vec![
@@ -395,21 +408,13 @@ impl BB {
                                     )));
                                     let mut inst = LIRInst::new(
                                         InstrsType::Binary(BinaryOp::Add),
-                                        vec![
-                                            dst_reg.clone(),
-                                            src_reg.clone(),
-                                            offset,
-                                        ],
+                                        vec![dst_reg.clone(), src_reg.clone(), offset],
                                     );
                                     inst.set_double();
                                     self.insts.push(pool.put_inst(inst));
                                     self.insts.push(pool.put_inst(LIRInst::new(
                                         InstrsType::Load,
-                                        vec![
-                                            dst_reg.clone(),
-                                            dst_reg,
-                                            Operand::IImm(IImm::new(0)),
-                                        ],
+                                        vec![dst_reg.clone(), dst_reg, Operand::IImm(IImm::new(0))],
                                     )));
                                 }
                             }
@@ -521,10 +526,14 @@ impl BB {
                     let mut inst = LIRInst::new(InstrsType::Jump, vec![]);
                     if inst_ref.is_jmp() {
                         let next_bb = block.as_ref().get_next_bb()[0];
+                        if next_bb.is_empty() {
+                            break;
+                        }
                         let jump_block = match map_info.ir_block_map.get(&next_bb) {
                             Some(block) => block,
                             None => panic!("jump block not found"),
                         };
+                        
                         if *jump_block != next_blocks.unwrap() {
                             inst.replace_op(vec![Operand::Addr(jump_block.label.to_string())]);
                             let obj_inst = pool.put_inst(inst);
@@ -575,7 +584,7 @@ impl BB {
                                 BinOp::Le => InstrsType::Branch(CmpOp::Le),
                                 BinOp::Gt => InstrsType::Branch(CmpOp::Gt),
                                 BinOp::Lt => InstrsType::Branch(CmpOp::Lt),
-                                // BinOp::And => 
+                                // BinOp::And =>
                                 _ => {
                                     println!("{:?}", cond);
                                     println!("left{:?}", cond_ref.get_lhs().get_kind());
@@ -612,20 +621,12 @@ impl BB {
                         }
                         _ => {
                             println!("{:?}", cond_ref.get_kind());
-                            let lhs_reg = self.resolve_operand(
-                                func,
-                                cond_ref,
-                                true,
-                                map_info,
-                                pool,
-                            );
+                            let lhs_reg =
+                                self.resolve_operand(func, cond_ref, true, map_info, pool);
                             let inst_kind = InstrsType::Branch(CmpOp::Eqz);
                             self.insts.push(pool.put_inst(LIRInst::new(
                                 inst_kind,
-                                vec![
-                                    Operand::Addr(false_succ_block.label.to_string()),
-                                    lhs_reg,
-                                ],
+                                vec![Operand::Addr(false_succ_block.label.to_string()), lhs_reg],
                             )));
                             self.push_back(pool.put_inst(LIRInst::new(
                                 InstrsType::Jump,
@@ -653,15 +654,17 @@ impl BB {
                     let mut icnt = 0;
                     let mut fcnt = 0;
                     for arg in arg_list {
-                        if arg.as_ref().get_param_type() == IrType::Int {
+                        let param_type = arg.get_param_type();
+                        if param_type == IrType::Int || param_type == IrType::IntPtr || param_type == IrType::FloatPtr  {
                             icnt += 1
-                        } else if arg.as_ref().get_param_type() == IrType::Float {
+                        } else if param_type == IrType::Float {
                             fcnt += 1
                         } else {
                             unreachable!("call arg type not match, either be int or float")
                         }
                     }
-
+                    let (x, y) = func.max_params;
+                    func.as_mut().max_params = (max(x, icnt), max(y, fcnt));
                     for arg in arg_list.iter().rev() {
                         match arg.as_ref().get_param_type() {
                             IrType::Int | IrType::IntPtr => {
@@ -778,7 +781,7 @@ impl BB {
                     while i < ARG_REG_COUNT {
                         if let Some(slot) = func.as_ref().spill_stack_map.get(&i) {
                             let mut inst = LIRInst::new(
-                                InstrsType::LoadFromStack,
+                                InstrsType::LoadParamFromStack,
                                 vec![
                                     Operand::Reg(Reg::new(i + 10, ScalarType::Int)),
                                     Operand::IImm(IImm::new(slot.get_pos())),
@@ -840,10 +843,10 @@ impl BB {
                     self.phis
                         .push(pool.put_inst(LIRInst::new(inst_kind, vec![phi_reg, temp.clone()])));
 
-                    let mut op_list : HashSet<ObjPtr<Inst>> = HashSet::new();
+                    let mut op_list: HashSet<ObjPtr<Inst>> = HashSet::new();
                     for op in ir_block_inst.get_operands().iter() {
                         if !op_list.insert(*op) {
-                            continue
+                            continue;
                         }
                         println!("op: {:?}", op.get_kind());
                         let src_reg = self.resolve_operand(func, *op, false, map_info, pool);
@@ -861,7 +864,7 @@ impl BB {
                         let obj_inst = pool.put_inst(inst);
                         let incoming_block = map_info
                             .ir_block_map
-                            .get(&op.as_ref().get_parent_bb())
+                            .get(&ir_block_inst.get_phi_predecessor(*op))
                             .unwrap()
                             .label
                             .clone();
@@ -873,9 +876,7 @@ impl BB {
                             println!("insert phi inst: {:?}", obj_inst);
                             let mut set = HashSet::new();
                             set.insert(obj_inst);
-                            map_info
-                                .phis_to_block
-                                .insert(incoming_block, set);
+                            map_info.phis_to_block.insert(incoming_block, set);
                         }
                     }
                 }
@@ -907,13 +908,69 @@ impl BB {
         pool: &mut BackendPool,
     ) {
         let mut start_pos = pos;
-        let mut index = 0; 
+        let mut index = 0;
+        let mut reg_mapping: HashMap<i32, i32> = HashMap::new();
         loop {
             if index >= self.insts.len() {
                 break;
             }
             let inst = self.insts[index];
             let spills = inst.is_spill(spill);
+            for op in inst.operands.iter() {
+                match op {
+                    Operand::Reg(reg) => {
+                        if let Some(phy_id) = func.reg_alloc_info.dstr.get(&reg.get_id()) {
+                            reg_mapping.insert(*phy_id, reg.get_id());
+                        } else {
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            let mut i = 0;
+            let mut caller_regs: HashSet<i32> = HashSet::new();
+            let (icnt, fcnt) = inst.get_param_cnts();
+            //FIXME: solve float regs
+            match inst.get_type() {
+                InstrsType::Call => {
+                    for op in inst.get_reg_def().iter() {
+                        if let Some(reg) = reg_mapping.get(&op.get_id()) {
+                            if op.get_id() - 10 < icnt && op.get_id() >= 10 {
+                                continue;
+                            }
+                            caller_regs.insert(*reg);
+                        }
+                    }
+                    for (i, id) in caller_regs.iter().enumerate() {
+                        let offset = start_pos + i as i32 * ADDR_SIZE;
+                        let mut ins = LIRInst::new(
+                            InstrsType::StoreToStack,
+                            vec![
+                                Operand::Reg(Reg::new(*id, ScalarType::Int)),
+                                Operand::IImm(IImm::new(offset)),
+                            ],
+                        );
+                        ins.set_double();
+                        self.insts.insert(index, pool.put_inst(ins));
+                        index += 1;
+                    }
+                    index += 1;
+                    for (i, id) in caller_regs.iter().enumerate() {
+                        let offset = start_pos + i as i32 * ADDR_SIZE;
+                        let mut ins = LIRInst::new(
+                            InstrsType::LoadFromStack,
+                            vec![
+                                Operand::Reg(Reg::new(*id, ScalarType::Int)),
+                                Operand::IImm(IImm::new(offset)),
+                            ],
+                        );
+                        ins.set_double();
+                        self.insts.insert(index, pool.put_inst(ins));
+                        index += 1;
+                    }
+                }
+                _ => {}
+            }
             if spills.is_empty() {
                 index += 1;
                 continue;
@@ -924,7 +981,8 @@ impl BB {
                     if let Some(offset) = func.spill_stack_map.get(&id) {
                         slot.push(*offset);
                     } else {
-                        let stack_slot = StackSlot::new(start_pos + store_num * ADDR_SIZE, ADDR_SIZE);
+                        let stack_slot =
+                            StackSlot::new(start_pos + store_num * ADDR_SIZE, ADDR_SIZE);
                         slot.push(stack_slot);
                         store_num += 1;
                     };
@@ -936,13 +994,15 @@ impl BB {
                     if func.spill_stack_map.contains_key(&spills[i as usize]) {
                         let mut ins = LIRInst::new(
                             InstrsType::LoadFromStack,
-                            vec![reg, Operand::IImm(IImm::new(stack_slot.get_pos()))]
+                            vec![reg, Operand::IImm(IImm::new(stack_slot.get_pos()))],
                         );
                         ins.set_double();
                         self.insts.insert(index, pool.put_inst(ins));
                         index += 1;
                     } else {
-                        func.as_mut().spill_stack_map.insert(spills[i as usize], stack_slot);
+                        func.as_mut()
+                            .spill_stack_map
+                            .insert(spills[i as usize], stack_slot);
                     }
                 }
                 for i in 0..len {
@@ -959,7 +1019,7 @@ impl BB {
                 for i in 0..len {
                     let reg = Operand::Reg(Reg::new(5 + i, ScalarType::Int));
                     let stack_slot = slot[i as usize];
-                    match self.insts[index-1].get_dst() {
+                    match self.insts[index - 1].get_dst() {
                         Operand::Reg(ireg) => {
                             if ireg.get_id() != 5 + i {
                                 continue;
@@ -969,7 +1029,7 @@ impl BB {
                     }
                     let mut ins = LIRInst::new(
                         InstrsType::StoreToStack,
-                        vec![reg, Operand::IImm(IImm::new(stack_slot.get_pos()))]
+                        vec![reg, Operand::IImm(IImm::new(stack_slot.get_pos()))],
                     );
                     ins.set_double();
                     self.insts.insert(index, pool.put_inst(ins));
@@ -1245,8 +1305,8 @@ impl BB {
                 vec![reg.clone(), iimm],
             )));
         } else {
-            let op1 = Operand::IImm(IImm::new(imm >> 12));
-            let op2 = Operand::IImm(IImm::new(imm & 0xfff));
+            let op1 = Operand::IImm(IImm::new(imm >> 11));
+            let op2 = Operand::IImm(IImm::new(imm & 0x7ff));
             self.insts.push(pool.put_inst(LIRInst::new(
                 InstrsType::OpReg(SingleOp::Lui),
                 vec![reg.clone(), op1],
@@ -1269,7 +1329,7 @@ impl BB {
         if !map.val_map.contains_key(&src) {
             let params = &func.as_ref().params;
             let reg = match src.as_ref().get_param_type() {
-                IrType::Int => Operand::Reg(Reg::init(ScalarType::Int)),
+                IrType::Int | IrType::IntPtr | IrType::FloatPtr => Operand::Reg(Reg::init(ScalarType::Int)),
                 IrType::Float => Operand::Reg(Reg::init(ScalarType::Float)),
                 _ => unreachable!("cannot reach, param either int or float"),
             };
@@ -1337,7 +1397,22 @@ impl BB {
                         }
                         fnum += 1;
                     }
-                    _ => unreachable!("cannot reach, param either int or float"),
+                    IrType::IntPtr | IrType::FloatPtr => {
+                        if let Some(addr) = map.array_slot_map.get(&p) {
+                            let mut  load = pool.put_inst(LIRInst::new(
+                                InstrsType::LoadParamFromStack,
+                                vec![reg.clone(), Operand::IImm(IImm::new(*addr))],
+                            ));
+                            load.set_double();
+                            self.insts.push(load);
+                        } else {
+                            unreachable!("use array as param must declare first");
+                        }
+                    }
+                    _ => { 
+                        println!("{:?}", p.get_param_type());
+                        unreachable!("cannot reach, param must be int, float or ptr")
+                    },
                 }
             }
             reg

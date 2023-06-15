@@ -60,6 +60,20 @@ impl Inst {
         self.set_operand(new, index);
     }
 
+    /// 获得phi指令的操作数对应的前继基本快
+    /// 使用时确保该操作数是phi指令的操作数
+    pub fn get_phi_predecessor(&self, operand: ObjPtr<Inst>) -> ObjPtr<BasicBlock> {
+        for (index, op) in self.get_operands().iter().enumerate() {
+            debug_assert_eq!(op.get_parent_bb(), self.get_parent_bb().get_up_bb()[index]);
+        }
+        let index = self
+            .get_operands()
+            .iter()
+            .position(|x| *x == operand)
+            .unwrap();
+        self.get_parent_bb().get_up_bb()[index]
+    }
+
     /// 删除一个操作数
     /// # Arguments
     /// * 'operand' - 被删除的操作数

@@ -47,6 +47,7 @@ pub struct Func {
 
     pub const_array: HashSet<IntArray>,
     pub floats: Vec<(String, f32)>,
+    pub max_params: (i32, i32),
 }
 
 /// reg_num, stack_addr, caller_stack_addr考虑借助回填实现
@@ -71,6 +72,7 @@ impl Func {
             spill_stack_map: HashMap::new(),
             const_array: HashSet::new(),
             floats: Vec::new(),
+            max_params: (0, 0)
         }
     }
 
@@ -366,6 +368,8 @@ impl Func {
         if let Some(addition_stack_info) = self.stack_addr.front() {
             stack_size += addition_stack_info.get_pos() + addition_stack_info.get_size();
         }
+        let (icnt, fcnt) = self.max_params;
+        stack_size += (icnt + fcnt) * 8;
 
         //栈对齐 - 调用func时sp需按16字节对齐
         stack_size = stack_size / 16 * 16 + 16;
@@ -463,6 +467,7 @@ impl Func {
         self.stack_addr = func_ref.stack_addr.clone();
         self.spill_stack_map = func_ref.spill_stack_map.clone();
         self.const_array = func_ref.const_array.clone();
+        self.max_params = func_ref.max_params;
     }
 }
 

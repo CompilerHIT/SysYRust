@@ -1,6 +1,6 @@
 mod asm_builder;
-mod block;
-mod func;
+pub mod block;
+pub mod func;
 mod generate;
 mod instrs;
 pub mod module;
