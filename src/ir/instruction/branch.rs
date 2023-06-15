@@ -8,9 +8,6 @@ impl ObjPool<Inst> {
     /// # Returns
     /// 返回创建的条件跳转指令
     pub fn make_br(&mut self, mut cond: ObjPtr<Inst>) -> ObjPtr<Inst> {
-        // 正确性检查
-        debug_assert!(cond.get_ir_type() == IrType::Int || cond.get_ir_type() == IrType::ConstInt);
-
         let ir_type = IrType::Void;
         let kind = InstKind::Branch;
         let operands = vec![cond];
