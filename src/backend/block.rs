@@ -370,13 +370,11 @@ impl BB {
                                 self.insts.push(pool.put_inst(load));
                                 src_reg = dst_reg.clone();
                             } else {
-                                // 找不到，认为是全局数组，全局数组的访问是load -> gep -> load -> alloca
+                                // 找不到，认为是全局数组或者参数，全局数组的访问是load -> gep -> load -> alloca
                                 src_reg = self.resolve_operand(func, index, true, map_info, pool);
                             }
                             match addr.get_gep_offset().get_kind() {
-                                InstKind::ConstInt(imm)
-                                | InstKind::GlobalConstInt(imm)
-                                | InstKind::GlobalInt(imm) => {
+                                InstKind::ConstInt(imm) | InstKind::GlobalConstInt(imm) => {
                                     let offset = imm * 4;
                                     let dst_reg = self.resolve_operand(
                                         func,
@@ -448,19 +446,14 @@ impl BB {
                     match addr.as_ref().get_kind() {
                         InstKind::Gep => {
                             let mut load_new = true;
-                            let addr_reg = match map_info.val_map.get(&addr.as_ref().get_gep_ptr())
-                            {
+                            let mut addr_reg = match map_info.val_map.get(&addr.get_gep_ptr()) {
                                 Some(reg) => {
                                     load_new = false;
                                     reg.clone()
                                 }
                                 None => Operand::Reg(Reg::init(ScalarType::Int)),
                             };
-                            if let Some(base) =
-                                map_info.array_slot_map.get(&addr.as_ref().get_gep_ptr())
-                            {
-                                let offset =
-                                    addr.as_ref().get_gep_offset().as_ref().get_int_bond() * 4;
+                            if let Some(base) = map_info.array_slot_map.get(&addr.get_gep_ptr()) {
                                 if load_new {
                                     let mut load = LIRInst::new(
                                         InstrsType::LoadParamFromStack,
@@ -469,12 +462,52 @@ impl BB {
                                     load.set_double();
                                     self.insts.push(pool.put_inst(load));
                                 }
-                                self.insts.push(pool.put_inst(LIRInst::new(
-                                    InstrsType::Store,
-                                    vec![addr_reg, value_reg, Operand::IImm(IImm::new(offset))],
-                                )));
                             } else {
-                                panic!("array not found");
+                                // 找不到，认为是全局数组或者参数
+                                addr_reg = self.resolve_operand(
+                                    func,
+                                    addr.get_gep_ptr(),
+                                    true,
+                                    map_info,
+                                    pool,
+                                );
+                            }
+                            match addr.get_gep_offset().get_kind() {
+                                InstKind::ConstInt(offset) | InstKind::GlobalConstInt(offset) => {
+                                    self.insts.push(pool.put_inst(LIRInst::new(
+                                        InstrsType::Store,
+                                        vec![addr_reg, value_reg, Operand::IImm(IImm::new(offset))],
+                                    )));
+                                }
+                                _ => {
+                                    let temp = self.resolve_operand(
+                                        func,
+                                        addr.get_gep_offset(),
+                                        true,
+                                        map_info,
+                                        pool,
+                                    );
+
+                                    self.insts.push(pool.put_inst(LIRInst::new(
+                                        InstrsType::Binary(BinaryOp::Shl),
+                                        vec![
+                                            temp.clone(),
+                                            temp.clone(),
+                                            Operand::IImm(IImm::new(2)),
+                                        ],
+                                    )));
+
+                                    let mut inst = LIRInst::new(
+                                        InstrsType::Binary(BinaryOp::Add),
+                                        vec![addr_reg.clone(), addr_reg.clone(), temp],
+                                    );
+                                    inst.set_double();
+                                    self.insts.push(pool.put_inst(inst));
+                                    self.insts.push(pool.put_inst(LIRInst::new(
+                                        InstrsType::Store,
+                                        vec![addr_reg, value_reg, Operand::IImm(IImm::new(0))],
+                                    )));
+                                }
                             }
                         }
                         _ => {
@@ -533,7 +566,7 @@ impl BB {
                             Some(block) => block,
                             None => panic!("jump block not found"),
                         };
-                        
+
                         if *jump_block != next_blocks.unwrap() {
                             inst.replace_op(vec![Operand::Addr(jump_block.label.to_string())]);
                             let obj_inst = pool.put_inst(inst);
@@ -655,7 +688,10 @@ impl BB {
                     let mut fcnt = 0;
                     for arg in arg_list {
                         let param_type = arg.get_param_type();
-                        if param_type == IrType::Int || param_type == IrType::IntPtr || param_type == IrType::FloatPtr  {
+                        if param_type == IrType::Int
+                            || param_type == IrType::IntPtr
+                            || param_type == IrType::FloatPtr
+                        {
                             icnt += 1
                         } else if param_type == IrType::Float {
                             fcnt += 1
@@ -684,14 +720,24 @@ impl BB {
                                     )));
                                 } else {
                                     // 保存在寄存器中的参数，从前往后
-                                    let src_reg =
-                                        self.resolve_operand(func, *arg, true, map_info, pool);
+                                    let src_reg = match arg.get_kind() {
+                                        InstKind::Gep => self.resolve_operand(
+                                            func,
+                                            arg.get_gep_ptr(),
+                                            true,
+                                            map_info,
+                                            pool,
+                                        ),
+                                        _ => self.resolve_operand(func, *arg, true, map_info, pool),
+                                    };
+                                    if let Operand::Reg(reg) = src_reg {
+                                        println!("arg kind {:?}, reg {:?}", arg.get_kind(), reg);
+                                    }
                                     let dst_reg =
                                         Operand::Reg(Reg::new(icnt + 10, ScalarType::Int));
                                     let stack_addr = &func.as_ref().stack_addr;
                                     let pos = stack_addr.front().unwrap().get_pos() + ADDR_SIZE;
-                                    let size = 8;
-                                    let slot = StackSlot::new(pos, size);
+                                    let slot = StackSlot::new(pos, ADDR_SIZE);
                                     func.as_mut().stack_addr.push_front(slot);
                                     func.as_mut().spill_stack_map.insert(icnt, slot);
                                     let mut inst = LIRInst::new(
@@ -918,8 +964,13 @@ impl BB {
             for op in inst.operands.iter() {
                 match op {
                     Operand::Reg(reg) => {
+                        //FIXME: solve float regs
                         if let Some(phy_id) = func.reg_alloc_info.dstr.get(&reg.get_id()) {
                             reg_mapping.insert(*phy_id, reg.get_id());
+                            let save_reg = Reg::new(*phy_id, reg.get_type());
+                            if save_reg.is_callee_save() {
+                                func.as_mut().callee_saved.insert(save_reg);
+                            }
                         } else {
                         }
                     }
@@ -1005,11 +1056,11 @@ impl BB {
                     }
                 }
                 for i in 0..len {
-                    println!("{i}------------------");
+                    // println!("{i}------------------");
                     // println!("{} inst: {:?}", self.label, self.insts[index-2]);
                     // println!("{} inst: {:?}", self.label, self.insts[index-1]);
-                    println!("{} replace inst: {:?}", self.label, inst);
-                    println!("------------------");
+                    // println!("{} replace inst: {:?}", self.label, inst);
+                    // println!("------------------");
                     inst.as_mut().replace(spills[i as usize], 5 + i)
                 }
 
@@ -1328,7 +1379,9 @@ impl BB {
         if !map.val_map.contains_key(&src) {
             let params = &func.as_ref().params;
             let reg = match src.as_ref().get_param_type() {
-                IrType::Int | IrType::IntPtr | IrType::FloatPtr => Operand::Reg(Reg::init(ScalarType::Int)),
+                IrType::Int | IrType::IntPtr | IrType::FloatPtr => {
+                    Operand::Reg(Reg::init(ScalarType::Int))
+                }
                 IrType::Float => Operand::Reg(Reg::init(ScalarType::Float)),
                 _ => unreachable!("cannot reach, param either int or float"),
             };
@@ -1398,7 +1451,7 @@ impl BB {
                     }
                     IrType::IntPtr | IrType::FloatPtr => {
                         if let Some(addr) = map.array_slot_map.get(&p) {
-                            let mut  load = pool.put_inst(LIRInst::new(
+                            let mut load = pool.put_inst(LIRInst::new(
                                 InstrsType::LoadParamFromStack,
                                 vec![reg.clone(), Operand::IImm(IImm::new(*addr))],
                             ));
@@ -1408,10 +1461,10 @@ impl BB {
                             unreachable!("use array as param must declare first");
                         }
                     }
-                    _ => { 
+                    _ => {
                         println!("{:?}", p.get_param_type());
                         unreachable!("cannot reach, param must be int, float or ptr")
-                    },
+                    }
                 }
             }
             reg

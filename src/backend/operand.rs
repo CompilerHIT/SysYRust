@@ -111,7 +111,7 @@ impl Reg {
                 _ => {
                     println!("id: {}", self.id);
                     panic!("Invalid Physic Integer Register Id")
-                },
+                }
             }
         } else {
             match self.id {

@@ -268,7 +268,7 @@ impl IntArray {
 impl GenerateAsm for IntArray {
     fn generate(&mut self, _: ObjPtr<Context>, f: &mut File) -> Result<()> {
         let mut builder = AsmBuilder::new(f);
-        builder.print_array(&self.value, self.name.clone());
+        builder.print_array(&self.value, self.name.clone(), self.size);
         Ok(())
     }
 }

@@ -48,7 +48,7 @@ impl<'a> AsmModule<'a> {
     pub fn generator(&mut self, f: &mut File, pool: &mut BackendPool) {
         self.build_lir(pool);
         self.allocate_reg(f);
-        self.handle_spill(pool);
+        self.handle_spill(pool, f);
         // 检查地址溢出，插入间接寻址
         self.handle_overflow(pool);
         self.generate_global_var(f);
@@ -58,20 +58,26 @@ impl<'a> AsmModule<'a> {
 
     fn handle_overflow(&mut self, pool: &mut BackendPool) {
         self.func_map.iter_mut().for_each(|(_, func)| {
-            func.as_mut().handle_overflow(pool);
+            if !func.is_extern {
+                func.as_mut().handle_overflow(pool);
+            }
         });
     }
 
     fn allocate_reg(&mut self, f: &mut File) {
         self.func_map.iter_mut().for_each(|(_, func)| {
             println!("allocate reg fun: {}", func.as_ref().label);
-            func.as_mut().allocate_reg(f);
+            if !func.is_extern {
+                func.as_mut().allocate_reg(f);
+            }
         });
     }
 
-    fn handle_spill(&mut self, pool: &mut BackendPool) {
+    fn handle_spill(&mut self, pool: &mut BackendPool, f: &mut File) {
         self.func_map.iter_mut().for_each(|(_, func)| {
-            func.as_mut().handle_spill(pool);
+            if !func.is_extern {
+                func.as_mut().handle_spill(pool, f);
+            }
         });
     }
 
@@ -141,7 +147,9 @@ impl<'a> AsmModule<'a> {
 
     fn generate_asm(&mut self, f: &mut File, pool: &mut BackendPool) {
         self.func_map.iter_mut().for_each(|(_, func)| {
-            func.as_mut().generate(pool.put_context(Context::new()), f);
+            if !func.is_extern {
+                func.as_mut().generate(pool.put_context(Context::new()), f);
+            }
         });
     }
 }

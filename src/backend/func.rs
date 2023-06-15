@@ -13,7 +13,7 @@ use crate::backend::asm_builder::AsmBuilder;
 use crate::backend::block::*;
 use crate::backend::instrs::{LIRInst, Operand};
 use crate::backend::module::AsmModule;
-use crate::backend::operand::{Reg, ARG_REG_COUNT};
+use crate::backend::operand::{IImm, Reg, ARG_REG_COUNT};
 use crate::backend::regalloc::{
     easy_ls_alloc::Allocator, regalloc::Regalloc, structs::FuncAllocStat,
 };
@@ -46,6 +46,8 @@ pub struct Func {
     pub const_array: HashSet<IntArray>,
     pub floats: Vec<(String, f32)>,
     pub max_params: (i32, i32),
+    //FIXME: resolve float regs
+    pub callee_saved: HashSet<Reg>,
 }
 
 /// reg_num, stack_addr, caller_stack_addr考虑借助回填实现
@@ -70,7 +72,8 @@ impl Func {
             spill_stack_map: HashMap::new(),
             const_array: HashSet::new(),
             floats: Vec::new(),
-            max_params: (0, 0)
+            max_params: (0, 0),
+            callee_saved: HashSet::new(),
         }
     }
 
@@ -115,7 +118,7 @@ impl Func {
 
         let mut block_seq = 0;
         self.blocks.push(first_block);
-        let mut visited : HashSet<ObjPtr<BasicBlock>> = HashSet::new();
+        let mut visited: HashSet<ObjPtr<BasicBlock>> = HashSet::new();
         while let Some(fblock) = tmp.pop_front() {
             let next_blocks = fblock.as_ref().get_next_bb();
             next_blocks.iter().for_each(|block| {
@@ -211,10 +214,10 @@ impl Func {
         println!("phi insert size: {}", size);
 
         for block in self.blocks.iter() {
-            println!("-----------------");
-            println!("block: {:?}", block.label);
+            // println!("-----------------");
+            // println!("block: {:?}", block.label);
             for inst in block.insts.iter() {
-                println!("row inst: {:?}", inst);
+                // println!("row inst: {:?}", inst);
             }
         }
         self.update(this);
@@ -297,8 +300,6 @@ impl Func {
 
     pub fn allocate_reg(&mut self, f: &mut File) {
         // 函数返回地址保存在ra中
-        let ra = Reg::new(1, ScalarType::Int);
-
         self.calc_live();
         let mut allocator = Allocator::new();
         let alloc_stat = allocator.alloc(self);
@@ -311,44 +312,11 @@ impl Func {
 
         let mut stack_size = self.reg_alloc_info.stack_size as i32;
         println!("stack_size: {}", stack_size);
-        if let Some(addition_stack_info) = self.stack_addr.front() {
-            stack_size += addition_stack_info.get_pos() + addition_stack_info.get_size();
-        }
+
         let (icnt, fcnt) = self.max_params;
         stack_size += (icnt + fcnt) * 8;
 
-        //栈对齐 - 调用func时sp需按16字节对齐
-        stack_size = stack_size / 16 * 16 + 16;
-
-        self.context.as_mut().set_offset(stack_size - 8);
-        let mut f1 = match f.try_clone() {
-            Ok(f) => f,
-            Err(e) => panic!("Error: {}", e),
-        };
-        let mut f2 = match f.try_clone() {
-            Ok(f) => f,
-            Err(e) => panic!("Error: {}", e),
-        };
-        let map = self.context.get_reg_map().clone();
-        self.context.as_mut().set_prologue_event(move || {
-            let mut builder = AsmBuilder::new(&mut f1);
-            // addi sp -stack_size
-            builder.addi("sp", "sp", -stack_size);
-            builder.s(&ra.to_string(), "sp", stack_size - 8, false, true);
-        });
-
-        self.context.as_mut().set_epilogue_event(move || {
-            let mut builder = AsmBuilder::new(&mut f2);
-            builder.l(&ra.to_string(), "sp", stack_size - 8, false, true);
-            builder.addi("sp", "sp", stack_size);
-        });
-
-        //TODO: for caller
-        // let mut pos = stack_size + reg_int_size as i32 * 8;
-        // for caller in self.caller_stack_addr.iter() {
-        //     caller.borrow_mut().set_pos(pos);
-        //     pos += caller.borrow().get_size();
-        // }
+        self.context.as_mut().set_offset(stack_size);
     }
 
     fn handle_parameters(&mut self, ir_func: &Function) {
@@ -385,7 +353,7 @@ impl Func {
         self.blocks[1].clone()
     }
 
-    pub fn handle_spill(&mut self, pool: &mut BackendPool) {
+    pub fn handle_spill(&mut self, pool: &mut BackendPool, f: &mut File) {
         let this = pool.put_func(self.clone());
         for block in self.blocks.iter() {
             let pos = match self.reg_alloc_info.bb_stack_sizes.get(&block) {
@@ -397,6 +365,7 @@ impl Func {
                 .handle_spill(this, &self.reg_alloc_info.spillings, pos, pool);
         }
         self.update(this);
+        self.save_callee(pool, f);
     }
 
     pub fn handle_overflow(&mut self, pool: &mut BackendPool) {
@@ -414,14 +383,72 @@ impl Func {
         self.spill_stack_map = func_ref.spill_stack_map.clone();
         self.const_array = func_ref.const_array.clone();
         self.max_params = func_ref.max_params;
+        self.callee_saved = func_ref.callee_saved.clone();
+    }
+
+    fn save_callee(&mut self, pool: &mut BackendPool, f: &mut File) {
+        let mut callee_map: HashMap<Reg, StackSlot> = HashMap::new();
+        if self.label == "main" {
+            self.build_stack_info(f, callee_map, true);
+            return;
+        }
+        for id in self.callee_saved.iter() {
+            let pos = self.stack_addr.front().unwrap().get_pos() + ADDR_SIZE;
+            let slot = StackSlot::new(pos, ADDR_SIZE);
+            self.stack_addr.push_front(slot);
+            //FIXME: resolve float regs
+            callee_map.insert(*id, slot);
+        }
+        self.build_stack_info(f, callee_map, false);
+    }
+    fn build_stack_info(&mut self, f: &mut File, map: HashMap<Reg, StackSlot>, is_main: bool) {
+        // 当完成callee save寄存器存栈后，可以得知开栈大小
+        let mut f1 = match f.try_clone() {
+            Ok(f) => f,
+            Err(e) => panic!("Error: {}", e),
+        };
+        let mut f2 = match f.try_clone() {
+            Ok(f) => f,
+            Err(e) => panic!("Error: {}", e),
+        };
+        let mut stack_size = self.context.get_offset();
+        if let Some(addition_stack_info) = self.stack_addr.front() {
+            stack_size += addition_stack_info.get_pos() + addition_stack_info.get_size();
+        }
+
+        //栈对齐 - 调用func时sp需按16字节对齐
+        stack_size = stack_size / 16 * 16 + 16;
+        self.context.as_mut().set_offset(stack_size - 8);
+
+        let ra = Reg::new(1, ScalarType::Int);
+        let map_clone = map.clone();
+        self.context.as_mut().set_prologue_event(move || {
+            let mut builder = AsmBuilder::new(&mut f1);
+            // addi sp -stack_size
+            builder.addi("sp", "sp", -stack_size);
+            builder.s(&ra.to_string(), "sp", stack_size - 8, false, true);
+            if !is_main {
+                for (reg, slot) in map.iter() {
+                    builder.s(&reg.to_string(), "sp", slot.get_pos(), false, true);
+                }
+            }
+        });
+
+        self.context.as_mut().set_epilogue_event(move || {
+            let mut builder = AsmBuilder::new(&mut f2);
+            if !is_main {
+                for (reg, slot) in map_clone.iter() {
+                    builder.l(&reg.to_string(), "sp", slot.get_pos(), false, true);
+                }
+            }
+            builder.l(&ra.to_string(), "sp", stack_size - 8, false, true);
+            builder.addi("sp", "sp", stack_size);
+        });
     }
 }
 
 impl GenerateAsm for Func {
     fn generate(&mut self, _: ObjPtr<Context>, f: &mut File) -> Result<()> {
-        if self.is_extern {
-            return Ok(());
-        }
         if self.const_array.len() > 0 {
             writeln!(f, "	.section	.data\n   .align  3")?;
         }
