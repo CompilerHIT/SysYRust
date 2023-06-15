@@ -701,7 +701,7 @@ fn dump_inst(
                 text += format!(
                     "[ {}, %{} ], ",
                     get_inst_value(op.clone(), local_map, global_map),
-                    inst.get_parent_bb().get_up_bb()[0].get_name()
+                    inst.get_phi_predecessor(op.clone()).get_name()
                 )
                 .as_str();
             }
