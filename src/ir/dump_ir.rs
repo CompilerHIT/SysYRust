@@ -35,6 +35,9 @@ pub fn dump_now(module: &Module) {
         text = format!("{}{}\n\n\n", text, dump_func(name, func, &mut global_map));
     }
 
+    // dump extern functions
+    text += format!("{}\n", dump_external_func()).as_str();
+
     // write to file
     let mut file = File::create("dump.ll").unwrap();
     file.write_all(text.as_bytes()).unwrap();
@@ -124,6 +127,35 @@ fn dump_global_var(var_name: &str, var: ObjPtr<Inst>) -> String {
     }
 }
 
+fn dump_external_func() -> String {
+    let mut ext_fun = Vec::new();
+    // IO functions
+    ext_fun.push("declare i32 @getint()\n");
+    ext_fun.push("declare i32 @getch()\n");
+    ext_fun.push("declare float @getfloat()\n");
+    ext_fun.push("declare void @getarray(ptr)\n");
+    ext_fun.push("declare void @getfarray(ptr)\n");
+    ext_fun.push("declare void @putint(i32)\n");
+    ext_fun.push("declare void @putch(i32)\n");
+    ext_fun.push("declare void @putfloat(float)\n");
+    ext_fun.push("declare void @putarray(i32, ptr)\n");
+    ext_fun.push("declare void @putfarray(i32, ptr)\n");
+    ext_fun.push("declare void @putf(i8*, i32, ... )\n");
+
+    // time functions
+    ext_fun.push("declare i32 @starttime()\n");
+    ext_fun.push("declare i32 @stoptime()\n");
+
+    let mut text = String::new();
+    text += "; External Functions\n";
+    for fun in ext_fun {
+        text += fun;
+    }
+    text += "; End External Functions\n";
+    text += "\n";
+    text
+}
+
 fn dump_func(
     func_name: &str,
     func: ObjPtr<Function>,
@@ -143,12 +175,11 @@ fn dump_func(
     );
 
     // dump head block
-    name_index += 1;
 
     let bb = func.get_head();
     let mut temp;
     (name_index, temp) = dump_block(bb, global_map, &mut local_map, name_index);
-    text = format!("{}{}:\n", text, temp);
+    text = format!("{}{}:\n{}\n", text, format!("bb_{}", bb.get_name()), temp);
     text += "\n";
 
     if bb.has_next_bb() {
@@ -161,7 +192,7 @@ fn dump_func(
         while let Some(bb) = queue.pop() {
             if !visited.contains(&bb) {
                 (name_index, temp) = dump_block(bb, global_map, &mut local_map, name_index);
-                text = format!("{}{}:\n{}", text, bb.get_name(), temp);
+                text = format!("{}{}:\n{}", text, format!("bb_{}", bb.get_name()), temp);
                 text += "\n";
                 visited.insert(bb);
             }
@@ -196,14 +227,13 @@ fn dump_parameter(
 ) -> (i32, String) {
     let mut text = String::new();
     for (_, var) in param.get_params().iter() {
-        local_map.insert(var.clone(), format!("%{}", name_index));
+        name_index = put_name(local_map, var.clone(), name_index);
         text += format!(
             "{} {}, ",
             dump_para_type(var.get_ir_type()),
             local_map.get(&var).unwrap()
         )
         .as_str();
-        name_index += 1;
     }
     if param.get_params().len() > 0 {
         text.truncate(text.len() - 2);
@@ -215,6 +245,7 @@ fn dump_para_type(ir_type: IrType) -> String {
     match ir_type {
         IrType::Int => "i32 noundef signext".to_string(),
         IrType::Float => "float noundef".to_string(),
+        IrType::IntPtr | IrType::FloatPtr => "ptr noundef".to_string(),
         _ => unreachable!(),
     }
 }
@@ -255,12 +286,12 @@ fn dump_inst(
         InstKind::Alloca(len) => {
             if let IrType::IntPtr = inst.get_ir_type() {
                 local_map.insert(inst, format!("%{}", name_index));
+                name_index += 1;
                 text = format!(
                     "  {} = alloca [{} x i32], align 4\n",
                     local_map.get(&inst).unwrap(),
                     len
                 );
-                name_index += 1;
 
                 // 数组初始化
                 text += format!("  ; init array begin!!!!\n").as_str();
@@ -273,7 +304,7 @@ fn dump_inst(
 
                 text += format!("  ; init array end!!!!\n").as_str();
             } else {
-                local_map.insert(inst, format!("%{}", name_index));
+                name_index = put_name(local_map, inst.clone(), name_index);
                 text = format!(
                     "  {} = alloca [{} x float], align 4\n",
                     local_map.get(&inst).unwrap(),
@@ -288,49 +319,67 @@ fn dump_inst(
                     text +=
                         format!("  store float {}, float* %{}, align 4\n", v, name_index).as_str();
                 }
-                name_index += 1;
             }
         }
         InstKind::Gep => {
             let ptr;
             let name;
-            local_map.insert(inst, format!("%{}", name_index));
-            name_index += 1;
+            name_index = put_name(local_map, inst, name_index);
             if let InstKind::Load = inst.get_ptr().get_kind() {
                 ptr = inst.get_ptr().get_ptr();
-                name = global_map.get(&ptr).unwrap();
+                name = global_map.get(&ptr).unwrap().clone();
             } else {
                 ptr = inst.get_ptr();
-                name = local_map.get(&ptr).unwrap();
+                name = local_map.get(&ptr).unwrap().clone();
             };
-            let len = ptr.get_array_length();
-
-            if let IrType::IntPtr = ptr.get_ir_type() {
-                text += format!(
-                    "  {} = getelementptr inbounds [{} x i32], [{} x i32]* {}, i32 0, i32 {}\n",
-                    local_map.get(&inst).unwrap(),
-                    len,
-                    len,
-                    name,
-                    get_inst_value(inst.get_gep_offset(), local_map, global_map)
-                )
-                .as_str();
+            if let InstKind::Parameter = ptr.get_kind() {
+                if let IrType::IntPtr = ptr.get_ir_type() {
+                    text += format!(
+                        "  {} = getelementptr inbounds i32, ptr {}, i32 {}\n",
+                        local_map.get(&inst).unwrap().clone(),
+                        name,
+                        get_inst_value(inst.get_gep_offset(), local_map, global_map)
+                    )
+                    .as_str();
+                } else {
+                    text += format!(
+                        "  {} = getelementptr inbounds float, ptr {}, i32 {}\n",
+                        local_map.get(&inst).unwrap().clone(),
+                        name,
+                        get_inst_value(inst.get_gep_offset(), local_map, global_map)
+                    )
+                    .as_str();
+                }
             } else {
-                text += format!(
+                let len = ptr.get_array_length();
+
+                if let IrType::IntPtr = ptr.get_ir_type() {
+                    text += format!(
+                        "  {} = getelementptr inbounds [{} x i32], [{} x i32]* {}, i32 0, i32 {}\n",
+                        local_map.get(&inst).unwrap().clone(),
+                        len,
+                        len,
+                        name,
+                        get_inst_value(inst.get_gep_offset(), local_map, global_map)
+                    )
+                    .as_str();
+                } else {
+                    text += format!(
                     "  {} = getelementptr inbounds [{} x float], [{} x float]* {}, i32 0, i32 {}\n",
-                    local_map.get(&inst).unwrap(),
+                    local_map.get(&inst).unwrap().clone(),
                     len,
                     len,
                     name,
                     get_inst_value(inst.get_gep_offset(), local_map, global_map)
                 )
-                .as_str();
+                    .as_str();
+                }
             }
         }
         InstKind::Load => match inst.get_ir_type() {
             IrType::IntPtr | IrType::FloatPtr => {}
             IrType::Int => {
-                local_map.insert(inst, format!("%{}", name_index));
+                name_index = put_name(local_map, inst, name_index);
                 let ptr = inst.get_ptr();
                 let ptr_name = if let Some(name) = local_map.get(&ptr) {
                     name
@@ -343,10 +392,9 @@ fn dump_inst(
                     ptr_name
                 )
                 .as_str();
-                name_index += 1;
             }
             IrType::Float => {
-                local_map.insert(inst, format!("%{}", name_index));
+                name_index = put_name(local_map, inst, name_index);
                 let ptr = inst.get_ptr();
                 let ptr_name = if let Some(name) = local_map.get(&ptr) {
                     name
@@ -359,7 +407,6 @@ fn dump_inst(
                     ptr_name
                 )
                 .as_str();
-                name_index += 1;
             }
             _ => unreachable!("No other type in load"),
         },
@@ -385,247 +432,226 @@ fn dump_inst(
         InstKind::Binary(op) => match op {
             BinOp::Add => {
                 if let IrType::Int = inst.get_ir_type() {
-                    local_map.insert(inst, format!("%{}", name_index));
+                    name_index = put_name(local_map, inst, name_index);
                     text += format!(
                         "  {} = add i32 {}, {}\n",
-                        local_map.get(&inst).unwrap(),
+                        local_map.get(&inst).unwrap().clone(),
                         get_inst_value(inst.get_lhs(), local_map, global_map),
                         get_inst_value(inst.get_rhs(), local_map, global_map)
                     )
                     .as_str();
-                    name_index += 1;
                 } else {
-                    local_map.insert(inst, format!("%{}", name_index));
+                    name_index = put_name(local_map, inst, name_index);
                     text += format!(
                         "  {} = fadd float {}, {}\n",
-                        local_map.get(&inst).unwrap(),
+                        local_map.get(&inst).unwrap().clone(),
                         get_inst_value(inst.get_lhs(), local_map, global_map),
                         get_inst_value(inst.get_rhs(), local_map, global_map)
                     )
                     .as_str();
-                    name_index += 1;
                 }
             }
             BinOp::Sub => {
                 if let IrType::Int = inst.get_ir_type() {
-                    local_map.insert(inst, format!("%{}", name_index));
+                    name_index = put_name(local_map, inst, name_index);
                     text += format!(
                         "  {} = sub i32 {}, {}\n",
-                        local_map.get(&inst).unwrap(),
+                        local_map.get(&inst).unwrap().clone(),
                         get_inst_value(inst.get_lhs(), local_map, global_map),
                         get_inst_value(inst.get_rhs(), local_map, global_map)
                     )
                     .as_str();
-                    name_index += 1;
                 } else {
-                    local_map.insert(inst, format!("%{}", name_index));
+                    name_index = put_name(local_map, inst, name_index);
                     text += format!(
                         "  {} = fsub float {}, {}\n",
-                        local_map.get(&inst).unwrap(),
+                        local_map.get(&inst).unwrap().clone(),
                         get_inst_value(inst.get_lhs(), local_map, global_map),
                         get_inst_value(inst.get_rhs(), local_map, global_map)
                     )
                     .as_str();
-                    name_index += 1;
                 }
             }
             BinOp::Mul => {
                 if let IrType::Int = inst.get_ir_type() {
-                    local_map.insert(inst, format!("%{}", name_index));
+                    name_index = put_name(local_map, inst, name_index);
                     text += format!(
                         "  {} = mul i32 {}, {}\n",
-                        local_map.get(&inst).unwrap(),
+                        local_map.get(&inst).unwrap().clone(),
                         get_inst_value(inst.get_lhs(), local_map, global_map),
                         get_inst_value(inst.get_rhs(), local_map, global_map)
                     )
                     .as_str();
-                    name_index += 1;
                 } else {
-                    local_map.insert(inst, format!("%{}", name_index));
+                    name_index = put_name(local_map, inst, name_index);
                     text += format!(
                         "  {} = fmul float {}, {}\n",
-                        local_map.get(&inst).unwrap(),
+                        local_map.get(&inst).unwrap().clone(),
                         get_inst_value(inst.get_lhs(), local_map, global_map),
                         get_inst_value(inst.get_rhs(), local_map, global_map)
                     )
                     .as_str();
-                    name_index += 1;
                 }
             }
             BinOp::Div => {
                 if let IrType::Int = inst.get_ir_type() {
-                    local_map.insert(inst, format!("%{}", name_index));
+                    name_index = put_name(local_map, inst, name_index);
                     text += format!(
                         "  {} = sdiv i32 {}, {}\n",
-                        local_map.get(&inst).unwrap(),
+                        local_map.get(&inst).unwrap().clone(),
                         get_inst_value(inst.get_lhs(), local_map, global_map),
                         get_inst_value(inst.get_rhs(), local_map, global_map)
                     )
                     .as_str();
-                    name_index += 1;
                 } else {
-                    local_map.insert(inst, format!("%{}", name_index));
+                    name_index = put_name(local_map, inst, name_index);
                     text += format!(
                         "  {} = fdiv float {}, {}\n",
-                        local_map.get(&inst).unwrap(),
+                        local_map.get(&inst).unwrap().clone(),
                         get_inst_value(inst.get_lhs(), local_map, global_map),
                         get_inst_value(inst.get_rhs(), local_map, global_map)
                     )
                     .as_str();
-                    name_index += 1;
                 }
             }
             BinOp::Rem => {
                 if let IrType::Int = inst.get_ir_type() {
-                    local_map.insert(inst, format!("%{}", name_index));
+                    name_index = put_name(local_map, inst, name_index);
                     text += format!(
                         "  {} = srem i32 {}, {}\n",
-                        local_map.get(&inst).unwrap(),
+                        local_map.get(&inst).unwrap().clone(),
                         get_inst_value(inst.get_lhs(), local_map, global_map),
                         get_inst_value(inst.get_rhs(), local_map, global_map)
                     )
                     .as_str();
-                    name_index += 1;
                 } else {
                     unreachable!("No float rem in ir");
                 }
             }
             BinOp::Gt => {
                 if let IrType::Int = inst.get_ir_type() {
+                    name_index = put_name(local_map, inst, name_index);
                     text += format!(
                         "  {} = icmp sgt i32 {}, {}\n",
-                        local_map.get(&inst).unwrap(),
+                        local_map.get(&inst).unwrap().clone(),
                         get_inst_value(inst.get_lhs(), local_map, global_map),
                         get_inst_value(inst.get_rhs(), local_map, global_map)
                     )
                     .as_str();
-                    local_map.insert(inst, format!("%{}", name_index));
-                    name_index += 1;
                 } else {
+                    name_index = put_name(local_map, inst, name_index);
                     text += format!(
                         "  {} = fcmp ogt float {}, {}\n",
-                        local_map.get(&inst).unwrap(),
+                        local_map.get(&inst).unwrap().clone(),
                         get_inst_value(inst.get_lhs(), local_map, global_map),
                         get_inst_value(inst.get_rhs(), local_map, global_map)
                     )
                     .as_str();
-                    local_map.insert(inst, format!("%{}", name_index));
-                    name_index += 1;
                 }
             }
             BinOp::Lt => {
                 if let IrType::Int = inst.get_ir_type() {
-                    local_map.insert(inst, format!("%{}", name_index));
+                    name_index = put_name(local_map, inst, name_index);
                     text += format!(
                         "  {} = icmp slt i32 {}, {}\n",
-                        local_map.get(&inst).unwrap(),
+                        local_map.get(&inst).unwrap().clone(),
                         get_inst_value(inst.get_lhs(), local_map, global_map),
                         get_inst_value(inst.get_rhs(), local_map, global_map)
                     )
                     .as_str();
-                    name_index += 1;
                 } else {
-                    local_map.insert(inst, format!("%{}", name_index));
+                    name_index = put_name(local_map, inst, name_index);
                     text += format!(
                         "  {} = fcmp olt float {}, {}\n",
-                        local_map.get(&inst).unwrap(),
+                        local_map.get(&inst).unwrap().clone(),
                         get_inst_value(inst.get_lhs(), local_map, global_map),
                         get_inst_value(inst.get_rhs(), local_map, global_map)
                     )
                     .as_str();
-                    name_index += 1;
                 }
             }
             BinOp::Ge => {
                 if let IrType::Int = inst.get_ir_type() {
-                    local_map.insert(inst, format!("%{}", name_index));
+                    name_index = put_name(local_map, inst, name_index);
                     text += format!(
                         "  {} = icmp sge i32 {}, {}\n",
-                        local_map.get(&inst).unwrap(),
+                        local_map.get(&inst).unwrap().clone(),
                         get_inst_value(inst.get_lhs(), local_map, global_map),
                         get_inst_value(inst.get_rhs(), local_map, global_map)
                     )
                     .as_str();
-                    name_index += 1;
                 } else {
-                    local_map.insert(inst, format!("%{}", name_index));
+                    name_index = put_name(local_map, inst, name_index);
                     text += format!(
                         "  {} = fcmp oge float {}, {}\n",
-                        local_map.get(&inst).unwrap(),
+                        local_map.get(&inst).unwrap().clone(),
                         get_inst_value(inst.get_lhs(), local_map, global_map),
                         get_inst_value(inst.get_rhs(), local_map, global_map),
                     )
                     .as_str();
-                    name_index += 1;
                 }
             }
             BinOp::Le => {
                 if let IrType::Int = inst.get_ir_type() {
-                    local_map.insert(inst, format!("%{}", name_index));
+                    name_index = put_name(local_map, inst, name_index);
                     text += format!(
                         "  {} = icmp sle i32 {}, {}\n",
-                        local_map.get(&inst).unwrap(),
+                        local_map.get(&inst).unwrap().clone(),
                         get_inst_value(inst.get_lhs(), local_map, global_map),
                         get_inst_value(inst.get_rhs(), local_map, global_map),
                     )
                     .as_str();
-                    name_index += 1;
                 } else {
-                    local_map.insert(inst, format!("%{}", name_index));
+                    name_index = put_name(local_map, inst, name_index);
                     text += format!(
                         "  {} = fcmp ole float {}, {}\n",
-                        local_map.get(&inst).unwrap(),
+                        local_map.get(&inst).unwrap().clone(),
                         get_inst_value(inst.get_lhs(), local_map, global_map),
                         get_inst_value(inst.get_rhs(), local_map, global_map),
                     )
                     .as_str();
-                    name_index += 1;
                 }
             }
             BinOp::Eq => {
                 if let IrType::Int = inst.get_ir_type() {
-                    local_map.insert(inst, format!("%{}", name_index));
+                    name_index = put_name(local_map, inst, name_index);
                     text += format!(
                         "  {} = icmp eq i32 {}, {}\n",
-                        local_map.get(&inst).unwrap(),
+                        local_map.get(&inst).unwrap().clone(),
                         get_inst_value(inst.get_lhs(), local_map, global_map),
                         get_inst_value(inst.get_rhs(), local_map, global_map),
                     )
                     .as_str();
-                    name_index += 1;
                 } else {
-                    local_map.insert(inst, format!("%{}", name_index));
+                    name_index = put_name(local_map, inst, name_index);
                     text += format!(
                         "  {} = fcmp oeq float {}, {}\n",
-                        local_map.get(&inst).unwrap(),
+                        local_map.get(&inst).unwrap().clone(),
                         get_inst_value(inst.get_lhs(), local_map, global_map),
                         get_inst_value(inst.get_rhs(), local_map, global_map),
                     )
                     .as_str();
-                    name_index += 1;
                 }
             }
             BinOp::Ne => {
                 if let IrType::Int = inst.get_ir_type() {
-                    local_map.insert(inst, format!("%{}", name_index));
+                    name_index = put_name(local_map, inst, name_index);
                     text += format!(
                         "  {} = icmp ne i32 {}, {}\n",
-                        local_map.get(&inst).unwrap(),
+                        local_map.get(&inst).unwrap().clone(),
                         get_inst_value(inst.get_lhs(), local_map, global_map),
                         get_inst_value(inst.get_rhs(), local_map, global_map),
                     )
                     .as_str();
-                    name_index += 1;
                 } else {
-                    local_map.insert(inst, format!("%{}", name_index));
+                    name_index = put_name(local_map, inst, name_index);
                     text += format!(
                         "  {} = fcmp one float {}, {}\n",
-                        local_map.get(&inst).unwrap(),
+                        local_map.get(&inst).unwrap().clone(),
                         get_inst_value(inst.get_lhs(), local_map, global_map),
                         get_inst_value(inst.get_rhs(), local_map, global_map),
                     )
                     .as_str();
-                    name_index += 1;
                 }
             }
             BinOp::And | BinOp::Or => {}
@@ -634,34 +660,31 @@ fn dump_inst(
             // 指令替换
             match op {
                 UnOp::Pos => {
-                    local_map.insert(inst, format!("%{}", name_index));
+                    name_index = put_name(local_map, inst, name_index);
                     text += format!(
                         "  {} = add i32 0, {}\n",
-                        local_map.get(&inst).unwrap(),
+                        local_map.get(&inst).unwrap().clone(),
                         get_inst_value(inst.get_unary_operand(), local_map, global_map),
                     )
                     .as_str();
-                    name_index += 1;
                 }
                 UnOp::Neg => {
-                    local_map.insert(inst, format!("%{}", name_index));
+                    name_index = put_name(local_map, inst, name_index);
                     text += format!(
                         "  {} = sub i32 0, {}\n",
-                        local_map.get(&inst).unwrap(),
+                        local_map.get(&inst).unwrap().clone(),
                         get_inst_value(inst.get_unary_operand(), local_map, global_map),
                     )
                     .as_str();
-                    name_index += 1;
                 }
                 UnOp::Not => {
-                    local_map.insert(inst, format!("%{}", name_index));
+                    name_index = put_name(local_map, inst, name_index);
                     text += format!(
                         "  {} = xor i1 {}, 1\n",
-                        local_map.get(&inst).unwrap(),
+                        local_map.get(&inst).unwrap().clone(),
                         get_inst_value(inst.get_unary_operand(), local_map, global_map),
                     )
                     .as_str();
-                    name_index += 1;
                 }
             }
         }
@@ -669,15 +692,15 @@ fn dump_inst(
             if inst.is_jmp() {
                 text += format!(
                     "  br label %{}\n",
-                    inst.get_parent_bb().get_next_bb()[0].get_name()
+                    format!("bb_{}", inst.get_parent_bb().get_next_bb()[0].get_name()).as_str()
                 )
                 .as_str();
             } else {
                 text += format!(
                     "  br i1 {}, label %{}, label %{}\n",
                     get_inst_value(inst.get_br_cond(), local_map, global_map),
-                    inst.get_true_bb().get_name(),
-                    inst.get_false_bb().get_name()
+                    format!("bb_{}", inst.get_true_bb().get_name()).as_str(),
+                    format!("bb_{}", inst.get_false_bb().get_name()).as_str()
                 )
                 .as_str();
             }
@@ -707,16 +730,19 @@ fn dump_inst(
             if param.len() >= 2 {
                 param.truncate(param.len() - 2);
             }
-            local_map.insert(inst, format!("%{}", name_index));
-            text += format!(
-                "  {} = call {} @{}({})\n",
-                local_map.get(&inst).unwrap(),
-                func_type,
-                callee,
-                param
-            )
-            .as_str();
-            name_index += 1;
+            if let IrType::Void = inst.get_ir_type() {
+                text += format!("  call {} @{}({})\n", func_type, callee, param).as_str();
+            } else {
+                name_index = put_name(local_map, inst, name_index);
+                text += format!(
+                    "  {} = call {} @{}({})\n",
+                    local_map.get(&inst).unwrap(),
+                    func_type,
+                    callee,
+                    param
+                )
+                .as_str();
+            }
         }
         InstKind::Parameter => unreachable!("No parameter in bb"),
         InstKind::Return => match inst.get_ir_type() {
@@ -740,24 +766,22 @@ fn dump_inst(
             _ => unreachable!("No Return in dump_inst"),
         },
         InstKind::FtoI => {
-            local_map.insert(inst, format!("%{}", name_index));
+            name_index = put_name(local_map, inst, name_index);
             text += format!(
                 "  {} = fptosi float {} to i32\n",
-                local_map.get(&inst).unwrap(),
+                local_map.get(&inst).unwrap().clone(),
                 get_inst_value(inst.get_float_to_int_value(), local_map, global_map),
             )
             .as_str();
-            name_index += 1;
         }
         InstKind::ItoF => {
-            local_map.insert(inst, format!("%{}", name_index));
+            name_index = put_name(local_map, inst, name_index);
             text += format!(
                 "  {} = sitofp i32 {} to float\n",
-                local_map.get(&inst).unwrap(),
+                local_map.get(&inst).unwrap().clone(),
                 get_inst_value(inst.get_int_to_float_value(), local_map, global_map),
             )
             .as_str();
-            name_index += 1;
         }
         InstKind::ConstInt(_) | InstKind::ConstFloat(_) => {
             // 常量不处理
@@ -769,13 +793,19 @@ fn dump_inst(
             unreachable!("No Global in bb")
         }
         InstKind::Phi => {
-            local_map.insert(inst, format!("%{}", name_index));
-            text += format!("  {} = phi ", local_map.get(&inst).unwrap()).as_str();
+            name_index = put_name(local_map, inst, name_index);
+
+            let phi_type = if let IrType::Int = inst.get_ir_type() {
+                "i32"
+            } else {
+                "float"
+            };
+            text += format!("  {} = phi {} ", local_map.get(&inst).unwrap(), phi_type).as_str();
             for op in inst.get_operands().iter() {
                 text += format!(
                     "[ {}, %{} ], ",
                     get_inst_value(op.clone(), local_map, global_map),
-                    inst.get_phi_predecessor(op.clone()).get_name()
+                    format!("bb_{}", inst.get_phi_predecessor(op.clone()).get_name()).as_str()
                 )
                 .as_str();
             }
@@ -789,11 +819,25 @@ fn dump_inst(
     (name_index, text)
 }
 
+fn put_name(
+    local_map: &mut HashMap<ObjPtr<Inst>, String>,
+    inst: ObjPtr<Inst>,
+    name_index: i32,
+) -> i32 {
+    if local_map.contains_key(&inst) {
+        name_index
+    } else {
+        local_map.insert(inst, format!("%{}", name_index));
+        name_index + 1
+    }
+}
+
 fn get_inst_value(
     inst: ObjPtr<Inst>,
-    local_map: &HashMap<ObjPtr<Inst>, String>,
+    local_map: &mut HashMap<ObjPtr<Inst>, String>,
     global_map: &HashMap<ObjPtr<Inst>, String>,
 ) -> String {
+    static mut NOTFOUND: i32 = 0;
     match inst.get_kind() {
         InstKind::ConstInt(value) => value.to_string(),
         InstKind::ConstFloat(value) => value.to_string(),
@@ -805,7 +849,15 @@ fn get_inst_value(
             } else if global_map.contains_key(&inst) {
                 global_map.get(&inst).unwrap().clone()
             } else {
-                unreachable!("value not found")
+                local_map.insert(
+                    inst,
+                    format!("%notfound{}", unsafe {
+                        NOTFOUND += 1;
+                        NOTFOUND
+                    }),
+                );
+                //println!("{}: {:?}", local_map.get(&inst).unwrap(), inst.get_kind());
+                local_map.get(&inst).unwrap().clone()
             }
         }
     }
