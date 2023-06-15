@@ -43,7 +43,7 @@ impl GenerateAsm for LIRInst {
                 };
                 if is_imm {
                     match op {
-                        "add" | "sub" | "and" | "or" | "xor" => {
+                        "add" | "sub" | "and" | "or" | "xor" | "sll" | "srl" | "sra" => {
                             is_imm = true;
                         },
                         _ => {
@@ -78,6 +78,9 @@ impl GenerateAsm for LIRInst {
                     Operand::Addr(addr) => addr.to_string(),
                     _ => unreachable!("src of single op must be reg or imm, to improve"),
                 };
+                if dst == src {
+                    return Ok(());
+                }
                 builder.op1(op, &dst, &src)?;
                 Ok(())
             }

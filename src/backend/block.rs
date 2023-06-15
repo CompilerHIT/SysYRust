@@ -440,8 +440,6 @@ impl BB {
                 InstKind::Store => {
                     let addr = inst_ref.get_dest();
                     let value = inst_ref.get_value();
-                    // println!("{:?}", addr.as_ref().get_kind());
-                    // println!("{:?}", value.as_ref().get_kind());
                     let value_reg = self.resolve_operand(func, value, true, map_info, pool);
                     match addr.as_ref().get_kind() {
                         InstKind::Gep => {
@@ -476,7 +474,7 @@ impl BB {
                                 InstKind::ConstInt(offset) | InstKind::GlobalConstInt(offset) => {
                                     self.insts.push(pool.put_inst(LIRInst::new(
                                         InstrsType::Store,
-                                        vec![addr_reg, value_reg, Operand::IImm(IImm::new(offset))],
+                                        vec![addr_reg, value_reg, Operand::IImm(IImm::new(offset * 4))],
                                     )));
                                 }
                                 _ => {
@@ -496,16 +494,17 @@ impl BB {
                                             Operand::IImm(IImm::new(2)),
                                         ],
                                     )));
-
+                                    let tmp = Operand::Reg(Reg::init(ScalarType::Int));
                                     let mut inst = LIRInst::new(
                                         InstrsType::Binary(BinaryOp::Add),
-                                        vec![addr_reg.clone(), addr_reg.clone(), temp],
+                                        vec![tmp.clone(), addr_reg.clone(), temp],
                                     );
+                                    // println!("addr_reg: {:?}, value_reg: {:?}", addr_reg, value_reg);
                                     inst.set_double();
                                     self.insts.push(pool.put_inst(inst));
                                     self.insts.push(pool.put_inst(LIRInst::new(
                                         InstrsType::Store,
-                                        vec![addr_reg, value_reg, Operand::IImm(IImm::new(0))],
+                                        vec![tmp, value_reg, Operand::IImm(IImm::new(0))],
                                     )));
                                 }
                             }
@@ -1307,8 +1306,10 @@ impl BB {
                 let op: Operand = match src.as_ref().get_ir_type() {
                     IrType::Int | IrType::IntPtr => Operand::Reg(Reg::init(ScalarType::Int)),
                     IrType::Float | IrType::FloatPtr => Operand::Reg(Reg::init(ScalarType::Float)),
-                    _ => unreachable!("cannot reach, resolve_operand func, false, pool"),
+                    _ => {unreachable!("cannot reach, resolve_operand func, false, pool")},
                 };
+                // println!("inst kind: {:?}", src.get_kind());
+                // println!("new reg: {:?}", op);
                 map.val_map.insert(src, op.clone());
                 op
             }
@@ -1389,7 +1390,7 @@ impl BB {
             let (mut inum, mut fnum) = (0, 0);
             for p in params {
                 match p.as_ref().get_param_type() {
-                    IrType::Int => {
+                    IrType::Int | IrType::IntPtr | IrType::FloatPtr => {
                         if src == *p {
                             if inum < ARG_REG_COUNT {
                                 let inst = LIRInst::new(
@@ -1448,18 +1449,6 @@ impl BB {
                             }
                         }
                         fnum += 1;
-                    }
-                    IrType::IntPtr | IrType::FloatPtr => {
-                        if let Some(addr) = map.array_slot_map.get(&p) {
-                            let mut load = pool.put_inst(LIRInst::new(
-                                InstrsType::LoadParamFromStack,
-                                vec![reg.clone(), Operand::IImm(IImm::new(*addr))],
-                            ));
-                            load.set_double();
-                            self.insts.push(load);
-                        } else {
-                            unreachable!("use array as param must declare first");
-                        }
                     }
                     _ => {
                         // println!("{:?}", p.get_param_type());
@@ -1781,7 +1770,7 @@ impl GenerateAsm for BB {
             builder.show_block(&self.label)?;
         }
         for inst in self.insts.iter() {
-            // // println!("generate inst: {:?}", inst);
+            // println!("generate inst: {:?}", inst);
             inst.as_mut().v_to_phy(context.get_reg_map().clone());
             inst.as_mut().generate(context.clone(), f)?;
         }

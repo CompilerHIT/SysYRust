@@ -323,7 +323,11 @@ impl Func {
         let mut iparam: Vec<_> = ir_func
             .get_params()
             .iter()
-            .filter(|(_, param)| param.as_ref().get_param_type() == IrType::Int)
+            .filter(|(_, param)| {
+                param.as_ref().get_param_type() == IrType::Int
+                    || param.get_param_type() == IrType::IntPtr
+                    || param.get_param_type() == IrType::FloatPtr
+            })
             .map(|(_, param)| param.clone())
             .collect();
         let mut fparam: Vec<_> = ir_func
@@ -450,7 +454,7 @@ impl Func {
 impl GenerateAsm for Func {
     fn generate(&mut self, _: ObjPtr<Context>, f: &mut File) -> Result<()> {
         if self.const_array.len() > 0 {
-            writeln!(f, "	.section	.data\n   .align  3")?;
+            writeln!(f, "	.data\n   .align  3")?;
         }
         for mut a in self.const_array.clone() {
             a.generate(self.context, f)?;
