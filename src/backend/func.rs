@@ -272,15 +272,15 @@ impl Func {
             println!("func:{}",self.label);
             while !que.is_empty() {
                 let cur_bb=que.pop_front().unwrap();
-                println!("block {}:",cur_bb.label);
-                println!("live in:");
-                println!("{:?}",cur_bb.live_in);
-                println!("live out:");
-                println!("{:?}",cur_bb.live_out);
-                println!("live use:");
-                println!("{:?}",cur_bb.live_use);
-                println!("live def:");
-                println!("{:?}",cur_bb.live_def);
+                // println!("block {}:",cur_bb.label);
+                // println!("live in:");
+                // println!("{:?}",cur_bb.live_in);
+                // println!("live out:");
+                // println!("{:?}",cur_bb.live_out);
+                // println!("live use:");
+                // println!("{:?}",cur_bb.live_use);
+                // println!("live def:");
+                // println!("{:?}",cur_bb.live_def);
                 for next in cur_bb.out_edge.iter() {
                     if passed_bb.contains(next) {continue;}
                     passed_bb.insert(*next);
@@ -289,7 +289,7 @@ impl Func {
             }
         };
 
-        println!("-----------------------------------before count live def,live use----------------------------");
+        // println!("-----------------------------------before count live def,live use----------------------------");
         printinterval();
 
         // 计算公式，live in 来自于所有前继的live out的集合 + 自身的live use
@@ -362,7 +362,8 @@ impl Func {
 
         self.reg_alloc_info = alloc_stat;
         self.context.as_mut().set_reg_map(&self.reg_alloc_info.dstr);
-        // println!("dstr map info{:?}", self.reg_alloc_info.dstr);
+        println!("dstr map info{:?}", self.reg_alloc_info.dstr);
+        println!("spills:{:?}", self.reg_alloc_info.spillings);
 
         let mut stack_size = self.reg_alloc_info.stack_size as i32;
         // println!("stack_size: {}", stack_size);
