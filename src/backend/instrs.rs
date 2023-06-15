@@ -10,6 +10,8 @@ use crate::backend::operand::*;
 pub use crate::backend::structs::{Context, GenerateAsm};
 pub use crate::utility::{ObjPtr, ScalarType};
 
+use super::operand;
+
 #[derive(Clone, PartialEq, Debug)]
 pub enum Operand {
     IImm(IImm),
@@ -285,11 +287,23 @@ impl LIRInst {
             | InstrsType::Load
             | InstrsType::Store
             | InstrsType::LoadFromStack
-            | InstrsType::StoreToStack
             | InstrsType::Branch(..)
             | InstrsType::Jump
-            | InstrsType::LoadParamFromStack
-            | InstrsType::StoreParamToStack => {
+            | InstrsType::LoadParamFromStack => {
+                let mut regs = self.operands.clone();
+                let mut res = Vec::new();
+                while let Some(operand) = regs.pop() {
+                    if operand == *self.get_dst() {
+                        continue;
+                    }
+                    match operand {
+                        Operand::Reg(reg) => res.push(reg),
+                        _ => {}
+                    }
+                }
+                res
+            }
+            InstrsType::StoreParamToStack | InstrsType::StoreToStack => {
                 let mut regs = self.operands.clone();
                 let mut res = Vec::new();
                 while let Some(operand) = regs.pop() {
