@@ -304,18 +304,18 @@ impl Func {
             block.as_mut().live_def.clear();
             for it in block.as_ref().insts.iter().rev() {
                 // println!("{:?}",it);
-                // for reg in it.as_ref().get_reg_def().into_iter() {
-                //     if reg.is_virtual() || reg.is_allocable() {
-                //         block.as_mut().live_use.remove(&reg);
-                //         block.as_mut().live_def.insert(reg);
-                //     }
-                // }
-                // for reg in it.as_ref().get_reg_use().into_iter() {
-                //     if reg.is_virtual() || reg.is_allocable() {
-                //         block.as_mut().live_def.remove(&reg);
-                //         block.as_mut().live_use.insert(reg);
-                //     }
-                // }
+                for reg in it.as_ref().get_reg_def().into_iter() {
+                    if reg.is_virtual() || reg.is_allocable() {
+                        block.as_mut().live_use.remove(&reg);
+                        block.as_mut().live_def.insert(reg);
+                    }
+                }
+                for reg in it.as_ref().get_reg_use().into_iter() {
+                    if reg.is_virtual() || reg.is_allocable() {
+                        block.as_mut().live_def.remove(&reg);
+                        block.as_mut().live_use.insert(reg);
+                    }
+                }
                 println!("use:{:?}",it.get_reg_use());
                 println!("def:{:?}",it.get_reg_def());
             }       
@@ -331,7 +331,7 @@ impl Func {
         println!("-----------------------------------before count live in,live out----------------------------");
         printinterval();
        
-        //TODO 然后计算live in 和live out
+        //然后计算live in 和live out
         while let Some(value) = queue.pop_front() {
             let (block, reg) = value;
             for pred in block.as_ref().in_edge.iter() {
@@ -355,8 +355,8 @@ impl Func {
         let ra = Reg::new(1, ScalarType::Int);
 
         self.calc_live();
-        // let mut allocator = Allocator::new();
-        let mut allocator =crate::backend::regalloc::easy_gc_alloc::Allocator::new();
+        let mut allocator = Allocator::new();
+        // let mut allocator =crate::backend::regalloc::easy_gc_alloc::Allocator::new();
         let alloc_stat = allocator.alloc(self);
 
         self.reg_alloc_info = alloc_stat;
