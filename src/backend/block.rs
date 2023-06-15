@@ -884,7 +884,7 @@ impl BB {
                         _ => unreachable!("mv must be int or float"),
                     };
 
-                    // println!("phi reg: {:?}, tmp: {:?}", phi_reg.clone(), temp.clone());
+                    println!("phi reg: {:?}, tmp: {:?}", phi_reg.clone(), temp.clone());
                     self.phis
                         .push(pool.put_inst(LIRInst::new(inst_kind, vec![phi_reg, temp.clone()])));
 
@@ -893,7 +893,7 @@ impl BB {
                         if !op_list.insert(*op) {
                             continue;
                         }
-                        // println!("op: {:?}", op.get_kind());
+                        println!("op: {:?}", op.get_kind());
                         let src_reg = self.resolve_operand(func, *op, false, map_info, pool);
                         inst_kind = match src_reg {
                             Operand::Reg(reg) => match reg.get_type() {
@@ -905,7 +905,7 @@ impl BB {
                             _ => unreachable!("phi operand must be reg or iimm"),
                         };
                         let inst = LIRInst::new(inst_kind, vec![temp.clone(), src_reg]);
-                        // println!("save to insert phi inst: {:?}", inst);
+                        println!("save to insert phi inst: {:?}", inst);
                         let obj_inst = pool.put_inst(inst);
                         let incoming_block = map_info
                             .ir_block_map
@@ -915,10 +915,10 @@ impl BB {
                             .clone();
 
                         if let Some(insts) = map_info.phis_to_block.get_mut(&incoming_block) {
-                            // println!("insert phi inst: {:?}", obj_inst);
+                            println!("insert phi inst: {:?}", obj_inst);
                             insts.insert(obj_inst);
                         } else {
-                            // println!("insert phi inst: {:?}", obj_inst);
+                            println!("insert phi inst: {:?}", obj_inst);
                             let mut set = HashSet::new();
                             set.insert(obj_inst);
                             map_info.phis_to_block.insert(incoming_block, set);
@@ -1770,7 +1770,7 @@ impl GenerateAsm for BB {
             builder.show_block(&self.label)?;
         }
         for inst in self.insts.iter() {
-            // println!("generate inst: {:?}", inst);
+            println!("generate inst: {:?}", inst);
             inst.as_mut().v_to_phy(context.get_reg_map().clone());
             inst.as_mut().generate(context.clone(), f)?;
         }

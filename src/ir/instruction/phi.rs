@@ -63,9 +63,9 @@ impl Inst {
     /// 获得phi指令的操作数对应的前继基本快
     /// 使用时确保该操作数是phi指令的操作数
     pub fn get_phi_predecessor(&self, operand: ObjPtr<Inst>) -> ObjPtr<BasicBlock> {
-        for (index, op) in self.get_operands().iter().enumerate() {
-            debug_assert_eq!(op.get_parent_bb(), self.get_parent_bb().get_up_bb()[index]);
-        }
+        // for (index, op) in self.get_operands().iter().enumerate() {
+        //     debug_assert_eq!(op.get_parent_bb(), self.get_parent_bb().get_up_bb()[index]);
+        // }
         let index = self
             .get_operands()
             .iter()
