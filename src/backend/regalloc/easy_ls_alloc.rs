@@ -145,6 +145,12 @@ impl Allocator {
                 }
                 self.intervals.insert(reg.get_id(), i);
             }
+            for reg in inst.get_reg_def() {
+                if !reg.is_virtual() {
+                    continue;
+                }
+                self.intervals.insert(reg.get_id(),i );
+            }
         }
     }
 
