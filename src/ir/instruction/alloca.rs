@@ -101,7 +101,7 @@ impl Inst {
     pub fn get_array_length(&self) -> i32 {
         // 正确性检查
         if let InstKind::Alloca(length) = self.get_kind() {
-            debug_assert!(self.user.get_operands_size() == 1);
+            debug_assert!(self.user.get_operands_size() == 0);
             length
         } else {
             unreachable!("Inst::get_array_length")

@@ -9,7 +9,7 @@ use crate::utility::ObjPtr;
 use super::{
     basicblock::BasicBlock,
     function::Function,
-    instruction::{BinOp, Inst, InstKind},
+    instruction::{BinOp, Inst, InstKind, UnOp},
     ir_type::IrType,
     module::Module,
 };
@@ -43,21 +43,30 @@ pub fn dump_now(module: &Module) {
 fn dump_global_var(var_name: &str, var: ObjPtr<Inst>) -> String {
     match var.get_kind() {
         InstKind::GlobalConstInt(value) => {
-            format!("{} = dso_local constant i32 {}, align 4", var_name, value)
+            format!(
+                "@{} = dso_local constant i32 {}, align 4\n",
+                var_name, value
+            )
         }
         InstKind::GlobalInt(value) => {
-            format!("{} = dso_local global i32 {}, align 4", var_name, value)
+            format!("@{} = dso_local global i32 {}, align 4\n", var_name, value)
         }
         InstKind::GlobalFloat(value) => {
-            format!("{} = dso_local global float {}, align 4", var_name, value)
+            format!(
+                "@{} = dso_local global float {}, align 4\n",
+                var_name, value
+            )
         }
         InstKind::GlobalConstFloat(value) => {
-            format!("{} = dso_local constant float {}, align 4", var_name, value)
+            format!(
+                "@{} = dso_local constant float {}, align 4\n",
+                var_name, value
+            )
         }
         InstKind::Alloca(value) => match var.get_ir_type() {
             IrType::IntPtr => {
                 let init = var.get_int_init();
-                let mut text = format!("{} = dso_local global ", var_name);
+                let mut text = format!("@{} = dso_local global ", var_name);
                 if value > init.len() as i32 {
                     let mut value_type = String::new();
                     let mut value_init = String::new();
@@ -68,22 +77,23 @@ fn dump_global_var(var_name: &str, var: ObjPtr<Inst>) -> String {
                     value_type += format!(" [{} x i32] ", value - init.len() as i32).as_str();
                     value_init +=
                         format!(" [{} x i32] zeroinitializer", value - init.len() as i32).as_str();
-                    text = format!("{} <{{{}}}> <{{{}}}", text, value_type, value_init);
+                    text = format!("{} <{{{}}}> <{{{}}}>", text, value_type, value_init);
                 } else {
                     let mut value_init = String::new();
                     for v in init {
                         value_init += format!(" i32 {},", v).as_str();
                     }
+                    value_init.truncate(value_init.len() - 1);
                     text = format!("{} [{} x i32] [{}]", text, value, value_init);
                 }
 
-                text += ", align 4";
+                text += ", align 4\n";
 
                 text
             }
             IrType::FloatPtr => {
                 let init = var.get_float_init();
-                let mut text = format!("{} = dso_local global ", var_name);
+                let mut text = format!("@{} = dso_local global ", var_name);
                 if value > init.len() as i32 {
                     let mut value_type = String::new();
                     let mut value_init = String::new();
@@ -104,7 +114,7 @@ fn dump_global_var(var_name: &str, var: ObjPtr<Inst>) -> String {
                     text = format!("{} [{} x float] [{}]", text, value, value_init);
                 }
 
-                text += ", align 4";
+                text += ", align 4\n";
 
                 text
             }
@@ -133,30 +143,36 @@ fn dump_func(
     );
 
     // dump head block
+    name_index += 1;
+
     let bb = func.get_head();
     let mut temp;
     (name_index, temp) = dump_block(bb, global_map, &mut local_map, name_index);
     text = format!("{}{}:\n", text, temp);
     text += "\n";
 
-    // dump other blocks
-    // bfs
-    let mut queue = Vec::new();
-    let mut visited = HashSet::new();
-    queue.insert(0, bb);
-    visited.insert(bb);
-    while let Some(bb) = queue.pop() {
-        if !visited.contains(&bb) {
-            (name_index, temp) = dump_block(bb, global_map, &mut local_map, name_index);
-            text = format!("{}{}:\n{}", text, bb.get_name(), temp);
-            text += "\n";
-            visited.insert(bb);
-        }
-        for succ in bb.get_next_bb() {
-            if !visited.contains(&succ) {
-                queue.insert(0, succ.clone());
+    if bb.has_next_bb() {
+        // dump other blocks
+        // bfs
+        let mut queue = Vec::new();
+        let mut visited = HashSet::new();
+        queue.insert(0, bb);
+        visited.insert(bb);
+        while let Some(bb) = queue.pop() {
+            if !visited.contains(&bb) {
+                (name_index, temp) = dump_block(bb, global_map, &mut local_map, name_index);
+                text = format!("{}{}:\n{}", text, bb.get_name(), temp);
+                text += "\n";
+                visited.insert(bb);
+            }
+            for succ in bb.get_next_bb() {
+                if !visited.contains(&succ) {
+                    queue.insert(0, succ.clone());
+                }
             }
         }
+    } else {
+        text.truncate(text.len() - 3);
     }
 
     text += "}\n";
@@ -189,7 +205,9 @@ fn dump_parameter(
         .as_str();
         name_index += 1;
     }
-    text.truncate(text.len() - 2);
+    if param.get_params().len() > 0 {
+        text.truncate(text.len() - 2);
+    }
     (name_index, text)
 }
 
@@ -269,57 +287,79 @@ fn dump_inst(
                     text += format!("  %{} = getelementptr inbounds [{} x float], [{} x float]* {}, i32 0, i32 {}\n", name_index, len, len, local_map.get(&inst).unwrap(), i).as_str();
                     text +=
                         format!("  store float {}, float* %{}, align 4\n", v, name_index).as_str();
-                    name_index += 1;
                 }
+                name_index += 1;
             }
         }
         InstKind::Gep => {
-            let ptr = inst.get_ptr();
+            let ptr;
+            let name;
+            local_map.insert(inst, format!("%{}", name_index));
+            name_index += 1;
+            if let InstKind::Load = inst.get_ptr().get_kind() {
+                ptr = inst.get_ptr().get_ptr();
+                name = global_map.get(&ptr).unwrap();
+            } else {
+                ptr = inst.get_ptr();
+                name = local_map.get(&ptr).unwrap();
+            };
             let len = ptr.get_array_length();
 
             if let IrType::IntPtr = ptr.get_ir_type() {
-                local_map.insert(inst, format!("%{}", name_index));
                 text += format!(
-                    "  %{} = getelementptr inbounds [{} x i32], [{} x i32]* {}, i32 0, i32 {}\n",
+                    "  {} = getelementptr inbounds [{} x i32], [{} x i32]* {}, i32 0, i32 {}\n",
                     local_map.get(&inst).unwrap(),
                     len,
                     len,
-                    local_map.get(&ptr).unwrap(),
-                    get_inst_value(inst, local_map, global_map)
+                    name,
+                    get_inst_value(inst.get_gep_offset(), local_map, global_map)
                 )
                 .as_str();
             } else {
-                local_map.insert(inst, format!("%{}", name_index));
                 text += format!(
-                    "  %{} = getelementptr inbounds [{} x float], [{} x float]* {}, i32 0, i32 {}\n",
+                    "  {} = getelementptr inbounds [{} x float], [{} x float]* {}, i32 0, i32 {}\n",
                     local_map.get(&inst).unwrap(),
                     len,
                     len,
-                    local_map.get(&ptr).unwrap(),
-                    get_inst_value(inst, local_map, global_map)
+                    name,
+                    get_inst_value(inst.get_gep_offset(), local_map, global_map)
                 )
-                .as_str()
+                .as_str();
             }
         }
         InstKind::Load => match inst.get_ir_type() {
             IrType::IntPtr | IrType::FloatPtr => {}
             IrType::Int => {
                 local_map.insert(inst, format!("%{}", name_index));
+                let ptr = inst.get_ptr();
+                let ptr_name = if let Some(name) = local_map.get(&ptr) {
+                    name
+                } else {
+                    global_map.get(&ptr).unwrap()
+                };
                 text += format!(
                     "  {} = load i32, i32* {}, align 4\n",
                     local_map.get(&inst).unwrap(),
-                    get_inst_value(inst, local_map, global_map)
+                    ptr_name
                 )
                 .as_str();
+                name_index += 1;
             }
             IrType::Float => {
                 local_map.insert(inst, format!("%{}", name_index));
+                let ptr = inst.get_ptr();
+                let ptr_name = if let Some(name) = local_map.get(&ptr) {
+                    name
+                } else {
+                    global_map.get(&ptr).unwrap()
+                };
                 text += format!(
                     "  {} = load float, float* {}, align 4\n",
                     local_map.get(&inst).unwrap(),
-                    get_inst_value(inst, local_map, global_map)
+                    ptr_name
                 )
                 .as_str();
+                name_index += 1;
             }
             _ => unreachable!("No other type in load"),
         },
@@ -328,7 +368,7 @@ fn dump_inst(
                 text += format!(
                     "  store i32 {}, i32* {}, align 4\n",
                     get_inst_value(inst.get_value(), local_map, global_map),
-                    get_inst_value(inst, local_map, global_map)
+                    get_inst_value(inst.get_ptr(), local_map, global_map)
                 )
                 .as_str();
             }
@@ -336,7 +376,7 @@ fn dump_inst(
                 text += format!(
                     "  store float {}, float* {}, align 4\n",
                     get_inst_value(inst.get_value(), local_map, global_map),
-                    get_inst_value(inst, local_map, global_map)
+                    get_inst_value(inst.get_ptr(), local_map, global_map)
                 )
                 .as_str();
             }
@@ -452,7 +492,6 @@ fn dump_inst(
             }
             BinOp::Gt => {
                 if let IrType::Int = inst.get_ir_type() {
-                    local_map.insert(inst, format!("%{}", name_index));
                     text += format!(
                         "  {} = icmp sgt i32 {}, {}\n",
                         local_map.get(&inst).unwrap(),
@@ -460,9 +499,9 @@ fn dump_inst(
                         get_inst_value(inst.get_rhs(), local_map, global_map)
                     )
                     .as_str();
+                    local_map.insert(inst, format!("%{}", name_index));
                     name_index += 1;
                 } else {
-                    local_map.insert(inst, format!("%{}", name_index));
                     text += format!(
                         "  {} = fcmp ogt float {}, {}\n",
                         local_map.get(&inst).unwrap(),
@@ -470,6 +509,8 @@ fn dump_inst(
                         get_inst_value(inst.get_rhs(), local_map, global_map)
                     )
                     .as_str();
+                    local_map.insert(inst, format!("%{}", name_index));
+                    name_index += 1;
                 }
             }
             BinOp::Lt => {
@@ -589,9 +630,40 @@ fn dump_inst(
             }
             BinOp::And | BinOp::Or => {}
         },
-        InstKind::Unary(_op) => {
-            // 不生成指令，等待前端修改，将其转换为对应的二元运算
-            unreachable!("No Unary in dump_inst");
+        InstKind::Unary(op) => {
+            // 指令替换
+            match op {
+                UnOp::Pos => {
+                    local_map.insert(inst, format!("%{}", name_index));
+                    text += format!(
+                        "  {} = add i32 0, {}\n",
+                        local_map.get(&inst).unwrap(),
+                        get_inst_value(inst.get_unary_operand(), local_map, global_map),
+                    )
+                    .as_str();
+                    name_index += 1;
+                }
+                UnOp::Neg => {
+                    local_map.insert(inst, format!("%{}", name_index));
+                    text += format!(
+                        "  {} = sub i32 0, {}\n",
+                        local_map.get(&inst).unwrap(),
+                        get_inst_value(inst.get_unary_operand(), local_map, global_map),
+                    )
+                    .as_str();
+                    name_index += 1;
+                }
+                UnOp::Not => {
+                    local_map.insert(inst, format!("%{}", name_index));
+                    text += format!(
+                        "  {} = xor i1 {}, 1\n",
+                        local_map.get(&inst).unwrap(),
+                        get_inst_value(inst.get_unary_operand(), local_map, global_map),
+                    )
+                    .as_str();
+                    name_index += 1;
+                }
+            }
         }
         InstKind::Branch => {
             if inst.is_jmp() {
@@ -632,7 +704,9 @@ fn dump_inst(
                 )
                 .as_str();
             }
-            param.truncate(param.len() - 2);
+            if param.len() >= 2 {
+                param.truncate(param.len() - 2);
+            }
             local_map.insert(inst, format!("%{}", name_index));
             text += format!(
                 "  {} = call {} @{}({})\n",
@@ -705,7 +779,9 @@ fn dump_inst(
                 )
                 .as_str();
             }
-            text.truncate(text.len() - 2);
+            if inst.get_operands().len() > 0 {
+                text.truncate(text.len() - 2);
+            }
             text += "\n";
         }
         InstKind::Head(_) => unreachable!("No Head in dump_inst"),
