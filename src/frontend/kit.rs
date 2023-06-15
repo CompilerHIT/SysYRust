@@ -124,10 +124,10 @@ impl Kit<'_> {
 
     pub fn phi_padding_allfunctions(&mut self) {
         //填充所有函数中的phi
-        // println!("填phi开始");
+        // // println!("填phi开始");
         let mut vec_funcs = self.get_functions().unwrap().clone();
         for func in vec_funcs {
-            // println!(
+            // // println!(
             //     "填phi,函数头basicblock名:{:?}",
             //     func.as_ref().get_head().get_name()
             // );
@@ -158,59 +158,59 @@ impl Kit<'_> {
 
     pub fn phi_padding_bb(&mut self, bb: ObjPtr<BasicBlock>) {
         //填充该bb中的phi
-        println!("bbnow:name:{:?}", bb.get_name());
+        // println!("bbnow:name:{:?}", bb.get_name());
         let bbname = bb.get_name();
         let option_phi = self.context_mut.phi_list.get(bbname);
         let mut vec_phi = vec![];
         // let mut is_padded = true;
         if let Some((vec_phi_temp, is_padded_temp)) = option_phi {
-            println!("有phi");
+            // println!("有phi");
             vec_phi = vec_phi_temp.clone();
             // is_padded = *is_padded_temp;
         } else {
-            println!("没phi");
+            // println!("没phi");
         }
         // if !is_padded {
-            //没被填过
-            println!("phi_list长度:{:?}", vec_phi.len());
-            for (name_changed, inst_phi, phi_is_padded) in vec_phi.clone() {
-                println!("填phi{:?}:{:?}", name_changed, inst_phi.get_kind());
-                self.phi_padding_inst(&name_changed, inst_phi, bb);
-            }
+        //没被填过
+        // println!("phi_list长度:{:?}", vec_phi.len());
+        for (name_changed, inst_phi, phi_is_padded) in vec_phi.clone() {
+            // println!("填phi{:?}:{:?}", name_changed, inst_phi.get_kind());
+            self.phi_padding_inst(&name_changed, inst_phi, bb);
+        }
         // } else {
-            // println!("phi填过了,跳过");
+        // // println!("phi填过了,跳过");
         // }
         // if !is_padded {
-            self.context_mut
-                .phi_list
-                .insert(bbname.to_string(), (vec![], true));
+        self.context_mut
+            .phi_list
+            .insert(bbname.to_string(), (vec![], true));
         // }
         //判断是否是最后一个bb
         let bb_success = bb.get_next_bb();
-        if bb_success.is_empty(){
-            println!("bb{:?}后面没块了",bbname);
+        if bb_success.is_empty() {
+            // println!("bb{:?}后面没块了",bbname);
         }
         for bb_next in bb_success {
-            println!("bb{:?}下一个块{:?}",bbname,bb_next.get_name());
+            // println!("bb{:?}下一个块{:?}",bbname,bb_next.get_name());
             // if bb_next.get_name() == bb.get_name() {
-            //     // println!("自己插过phi了");
+            //     // // println!("自己插过phi了");
             //     continue;
             // }
             if let Some((vec_phi_temp, is_padded_temp)) =
                 self.context_mut.phi_list.get(bb_next.get_name())
             {
-                println!("bb_next{:?}有phi",bb_next.get_name());
+                // println!("bb_next{:?}有phi",bb_next.get_name());
                 vec_phi = vec_phi_temp.clone();
                 // is_padded = *is_padded_temp;
                 if *is_padded_temp {
-                    println!("填过,跳过");
+                    // println!("填过,跳过");
                     continue;
                 }
-                println!("没填过");
-            } 
+                // println!("没填过");
+            }
             // else {
-            //     println!("bb_next:{:?}没phi_list",bb_next.get_name());
-            // //     // println!("没phi");
+            //     // println!("bb_next:{:?}没phi_list",bb_next.get_name());
+            // //     // // println!("没phi");
             //     continue;
             // }
             self.phi_padding_bb(*bb_next);
@@ -224,12 +224,12 @@ impl Kit<'_> {
         bb: ObjPtr<BasicBlock>,
     ) {
         //填充bb中的变量为name_changed的inst_phi
-        // println!("填phi:{:?},所在bb:{:?}", name_changed, bb.get_name());
+        // // println!("填phi:{:?},所在bb:{:?}", name_changed, bb.get_name());
         let vec_pre = bb.get_up_bb();
         for pre in vec_pre {
             let inst_find = self.find_var(*pre, &name_changed).unwrap();
             inst_phi.as_mut().add_operand(inst_find); //向上找,填充
-            // println!("其参数为:{:?}", inst_find.get_kind());
+                                                      // // println!("其参数为:{:?}", inst_find.get_kind());
         }
     }
 
@@ -238,7 +238,7 @@ impl Kit<'_> {
         bb: ObjPtr<BasicBlock>,
         var_name_changed: &str,
     ) -> Result<ObjPtr<Inst>, Error> {
-        // println!("在bb:{:?}中找", bb.get_name());
+        // // println!("在bb:{:?}中找", bb.get_name());
         let bbname = bb.get_name();
         let inst_opt = self
             .context_mut
@@ -246,13 +246,12 @@ impl Kit<'_> {
             .get(bbname)
             .and_then(|var_inst_map| var_inst_map.get(var_name_changed));
         if let Some(inst_var) = inst_opt {
-            // println!("找到了,返回{:?}", inst_var.get_kind());
+            // // println!("找到了,返回{:?}", inst_var.get_kind());
             Ok(*inst_var)
         } else {
-            // println!("没找到,插phi");
+            // // println!("没找到,插phi");
             let sym_opt = self.context_mut.symbol_table.get(var_name_changed);
             if let Some(sym) = sym_opt {
-
                 match sym.tp {
                     Type::ConstFloat | Type::Float => {
                         let inst_phi = self.pool_inst_mut.make_float_phi();
@@ -266,7 +265,6 @@ impl Kit<'_> {
                             self.context_mut.bb_map.insert(bbname.to_string(), map);
                         }
                         self.phi_padding_inst(var_name_changed, inst_phi, bb);
-
 
                         Ok(inst_phi)
                     }
@@ -283,16 +281,15 @@ impl Kit<'_> {
                         }
                         self.phi_padding_inst(var_name_changed, inst_phi, bb);
 
-
                         Ok(inst_phi)
                     }
-                    _=>{
+                    _ => {
                         todo!()
                     }
                 }
             } else {
-                // println!("没找到符号{:?}", var_name_changed);
-                // println!("符号表长度:{:?}", self.context_mut.symbol_table.len());
+                // // println!("没找到符号{:?}", var_name_changed);
+                // // println!("符号表长度:{:?}", self.context_mut.symbol_table.len());
                 Err(Error::FindVarError)
             }
         }
@@ -352,9 +349,9 @@ impl Kit<'_> {
     ) -> Result<ObjPtr<Inst>, Error> {
         match tp {
             Type::ConstFloat | Type::Float => {
-                // println!()
+                // // println!()
                 let inst_phi = self.pool_inst_mut.make_float_phi();
-                // println!("指令{:?}插入bb{:?}中", inst_phi.get_kind(), bb.get_name());
+                // // println!("指令{:?}插入bb{:?}中", inst_phi.get_kind(), bb.get_name());
                 bb.as_mut().push_front(inst_phi);
                 // self.context_mut
                 //     .update_var_scope(name.as_str(), inst_phi, bb.get_name());
@@ -370,14 +367,14 @@ impl Kit<'_> {
                 }
                 if let Some((phi_list, _)) = self.context_mut.phi_list.get_mut(bb.get_name()) {
                     //如果有philist
-                    // println!(
+                    // // println!(
                     //     "有philist,插入phi{:?}进入philist{:?}",
                     //     inst_phi.get_kind(),
                     //     name
                     // );
                     phi_list.push((name, inst_phi, false));
                 } else {
-                    // println!(
+                    // // println!(
                     //     "没有philist,插入phi{:?}进入philist{:?}",
                     //     inst_phi.get_kind(),
                     //     name
@@ -393,7 +390,7 @@ impl Kit<'_> {
             }
             Type::ConstInt | Type::Int => {
                 let inst_phi = self.pool_inst_mut.make_int_phi();
-                // println!("指令{:?}插入bb{:?}中", inst_phi.get_kind(), bb.get_name());
+                // // println!("指令{:?}插入bb{:?}中", inst_phi.get_kind(), bb.get_name());
                 bb.as_mut().push_front(inst_phi);
                 // self.context_mut
                 //     .update_var_scope(name.as_str(), inst_phi, bb.get_name());
@@ -410,14 +407,14 @@ impl Kit<'_> {
                     self.context_mut.phi_list.get_mut(bb.get_name())
                 {
                     //如果有philist
-                    // println!(
+                    // // println!(
                     //     "有philist,插入phi{:?}进入philist{:?}",
                     //     inst_phi.get_kind(),
                     //     bb.get_name()
                     // );
                     phi_list.push((name, inst_phi, false));
                 } else {
-                    // println!(
+                    // // println!(
                     //     "没有philist,插入phi{:?}进入philist{:?}",
                     //     inst_phi.get_kind(),
                     //     bb.get_name()
@@ -431,7 +428,9 @@ impl Kit<'_> {
                 }
                 Ok(inst_phi)
             }
-            _=>{todo!()}
+            _ => {
+                todo!()
+            }
         }
     }
 
@@ -489,7 +488,7 @@ impl Kit<'_> {
                     .and_then(|var_inst_map| var_inst_map.get(&name_changed));
 
                 if let Some(sym) = sym_opt {
-                    // println!("找到变量{:?}",s);
+                    // // println!("找到变量{:?}",s);
                     return Ok((inst, sym));
                 }
                 // InfuncChoice::NInFunc() => {
@@ -497,7 +496,7 @@ impl Kit<'_> {
                 // }
             }
         }
-        // println!("没找到变量:{:?}",s);
+        // // println!("没找到变量:{:?}",s);
         return Err(Error::VariableNotFound);
     }
 
@@ -534,7 +533,7 @@ impl Kit<'_> {
         //     // bbname = "params";
         //     if let Some(is_used) = self.context_mut.param_usage_table.get(&name_changed) {
         //         if !is_used {
-        //             // println!("进来了");
+        //             // // println!("进来了");
         //             bbname = "params";
         //         }
 
@@ -548,14 +547,14 @@ impl Kit<'_> {
             .and_then(|var_inst_map| var_inst_map.get(&name_changed));
 
         if let Some(sym) = sym_opt {
-            // println!("进来了");
-            // println!("找到变量{:?}",s);
+            // // println!("进来了");
+            // // println!("找到变量{:?}",s);
 
             //应该先判断是不是数组，以防bbmap中找不到报错
             if let Some(inst_array) = sym.array_inst {
-                // println!("是数组{:?}",inst_array.get_ir_type());
-                // println!("找到数组变量{:?},不插phi", s);
-                // println!("bbname:{:?}", bbname);
+                // // println!("是数组{:?}",inst_array.get_ir_type());
+                // // println!("找到数组变量{:?},不插phi", s);
+                // // println!("bbname:{:?}", bbname);
                 //如果是数组
                 let mut inst_ret = self.pool_inst_mut.make_int_const(-1129);
                 match sym.tp {
@@ -582,13 +581,13 @@ impl Kit<'_> {
                                     let ptr_array =
                                         self.pool_inst_mut.make_global_float_array_load(inst_array); //获得数组第一个元素(全局变量元素都是指针)
                                     let ptr = self.pool_inst_mut.make_gep(ptr_array, offset); //获得特定指针
-                                    // println!("var_name:{:?},ptr类型:{:?}",s,ptr.get_ir_type());
-                                    // match self.context_mut.bb_now_mut {
-                                    //     InfuncChoice::InFunc(bb) =>{
-                                    //         println!("所在bb{:?}",bb.get_name());
-                                    //     }
-                                    //     _=>{}
-                                    // }
+                                                                                              // // println!("var_name:{:?},ptr类型:{:?}",s,ptr.get_ir_type());
+                                                                                              // match self.context_mut.bb_now_mut {
+                                                                                              //     InfuncChoice::InFunc(bb) =>{
+                                                                                              //         // println!("所在bb{:?}",bb.get_name());
+                                                                                              //     }
+                                                                                              //     _=>{}
+                                                                                              // }
                                     inst_ret = self.pool_inst_mut.make_float_load(ptr); //获得元素值
                                                                                         // inst_ret = self.pool_inst_mut.make_gep(ptr_array, offset);
                                                                                         // self.context_mut.push_inst_bb(offset); //这里需要向bb插入offset吗
@@ -631,20 +630,20 @@ impl Kit<'_> {
                                     inst_ret = self.pool_inst_mut.make_gep(inst_array, offset); //获得特定指针
                                     self.context_mut.push_inst_bb(inst_ret);
                                 } else {
-                                    // println!("var_name:{:?},arrayinst类型:{:?}",s,inst_array.get_ir_type());
+                                    // // println!("var_name:{:?},arrayinst类型:{:?}",s,inst_array.get_ir_type());
                                     match self.context_mut.bb_now_mut {
-                                        InfuncChoice::InFunc(bb) =>{
-                                            // println!("所在bb{:?}",bb.get_name());
+                                        InfuncChoice::InFunc(bb) => {
+                                            // // println!("所在bb{:?}",bb.get_name());
                                         }
-                                        _=>{}
+                                        _ => {}
                                     }
                                     let ptr = self.pool_inst_mut.make_gep(inst_array, offset);
-                                    // println!("var_name:{:?},ptr类型:{:?}",s,ptr.get_ir_type());
+                                    // // println!("var_name:{:?},ptr类型:{:?}",s,ptr.get_ir_type());
                                     match self.context_mut.bb_now_mut {
-                                        InfuncChoice::InFunc(bb) =>{
-                                            // println!("所在bb{:?}",bb.get_name());
+                                        InfuncChoice::InFunc(bb) => {
+                                            // // println!("所在bb{:?}",bb.get_name());
                                         }
-                                        _=>{}
+                                        _ => {}
                                     }
                                     inst_ret = self.pool_inst_mut.make_float_load(ptr);
                                     // inst_ret = self.pool_inst_mut.make_gep(inst_array, offset);
@@ -759,14 +758,16 @@ impl Kit<'_> {
                             }
                         }
                     }
-                    _=>{todo!()}
+                    _ => {
+                        todo!()
+                    }
                 }
                 return Some((inst_ret, sym));
             } else {
                 //不是数组的情况
                 if layer_var < 0 {
-                    // println!("找到全局变量{:?},不插phi", s);
-                    // println!("bbname:{:?}", bbname);
+                    // // println!("找到全局变量{:?},不插phi", s);
+                    // // println!("bbname:{:?}", bbname);
                     //全局也肯定能找到
                     //如果是全局变量
                     // let mut inst_ret = self.pool_inst_mut.make_int_const(-1129);
@@ -792,12 +793,14 @@ impl Kit<'_> {
                             }
                             // return Some((inst_load, sym));
                         }
-                        _=>{todo!()}
+                        _ => {
+                            todo!()
+                        }
                     }
                 } else {
                     if let Some(inst) = inst_opt {
-                        // println!("找到变量{:?},不插phi", s);
-                        // println!("bbname:{:?}", bbname);
+                        // // println!("找到变量{:?},不插phi", s);
+                        // // println!("bbname:{:?}", bbname);
                         //找到变量
                         let mut inst_ret = *inst;
                         if layer_var < 0 {
@@ -815,14 +818,16 @@ impl Kit<'_> {
                                     self.context_mut.push_inst_bb(inst_ret);
                                     // return Some((inst_load, sym));
                                 }
-                                _=>{todo!()}
+                                _ => {
+                                    todo!()
+                                }
                             }
                         }
 
                         return Some((inst_ret, sym));
                     } else {
-                        // println!("没找到变量{:?},插phi", s);
-                        // println!("bbname:{:?}", bbname);
+                        // // println!("没找到变量{:?},插phi", s);
+                        // // println!("bbname:{:?}", bbname);
 
                         //没找到
                         // bb.as_ref().
@@ -859,7 +864,9 @@ impl Kit<'_> {
                                 // }
                                 return Some((phi_inst, sym));
                             }
-                            _=>{todo!()}
+                            _ => {
+                                todo!()
+                            }
                         }
 
                         // let phiinst_mut = phiinst.as_mut();

@@ -33,7 +33,7 @@ pub fn init_padding_int(vec: &mut Vec<i32>, dimension_now: Vec<i32>) {
         total = total * dm;
     }
 
-    // println!("total:{:?},now{:?}",total,now);
+    // // println!("total:{:?},now{:?}",total,now);
     let need = total as usize - now;
     for i in 0..need {
         vec.push(0);

@@ -369,9 +369,9 @@ impl Regalloc for Allocator {
 
         // 第四次遍历，堆滑动窗口更新获取FuncAllocStat
         let (spillings, dstr) = self.allocRegister();
-        println!("_______________________________________________");
-        println!("{}",func.label);
-        println!("{:?}",spillings);
+        // println!("_______________________________________________");
+        // println!("{}",func.label);
+        // println!("{:?}",spillings);
         let (stack_size, bb_stack_sizes) = Allocator::countStackSize(func, &spillings);
         // let stack_size=spillings.len(); //TO REMOVE
         let mut out=FuncAllocStat {

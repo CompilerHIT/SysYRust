@@ -74,7 +74,7 @@ impl BB {
         map_info: &mut Mapping,
         pool: &mut BackendPool,
     ) {
-        println!(">>>>{}", block.get_name());
+        // println!(">>>>{}", block.get_name());
         if block.is_empty() {
             self.showed = false;
             return;
@@ -82,7 +82,7 @@ impl BB {
         let mut ir_block_inst = block.as_ref().get_head_inst();
         loop {
             let inst_ref = ir_block_inst.as_ref();
-            println!("inst_ref: {:?}", inst_ref.get_kind());
+            // println!("inst_ref: {:?}", inst_ref.get_kind());
             // translate ir to lir, use match
             match inst_ref.get_kind() {
                 InstKind::Binary(op) => {
@@ -142,8 +142,8 @@ impl BB {
                                         self.resolve_operand(func, rhs, false, map_info, pool);
                                 }
                             }
-                            println!("lhs_reg: {:?}", lhs_reg);
-                            println!("rhs_reg: {:?}", rhs_reg);
+                            // println!("lhs_reg: {:?}", lhs_reg);
+                            // println!("rhs_reg: {:?}", rhs_reg);
                             self.insts.push(pool.put_inst(LIRInst::new(
                                 inst_kind,
                                 vec![dst_reg, lhs_reg, rhs_reg],
@@ -440,8 +440,8 @@ impl BB {
                 InstKind::Store => {
                     let addr = inst_ref.get_dest();
                     let value = inst_ref.get_value();
-                    println!("{:?}", addr.as_ref().get_kind());
-                    println!("{:?}", value.as_ref().get_kind());
+                    // println!("{:?}", addr.as_ref().get_kind());
+                    // println!("{:?}", value.as_ref().get_kind());
                     let value_reg = self.resolve_operand(func, value, true, map_info, pool);
                     match addr.as_ref().get_kind() {
                         InstKind::Gep => {
@@ -619,9 +619,9 @@ impl BB {
                                 BinOp::Lt => InstrsType::Branch(CmpOp::Lt),
                                 // BinOp::And =>
                                 _ => {
-                                    println!("{:?}", cond);
-                                    println!("left{:?}", cond_ref.get_lhs().get_kind());
-                                    println!("right{:?}", cond_ref.get_rhs().get_kind());
+                                    // println!("{:?}", cond);
+                                    // println!("left{:?}", cond_ref.get_lhs().get_kind());
+                                    // println!("right{:?}", cond_ref.get_rhs().get_kind());
                                     unreachable!("no condition match")
                                 }
                             };
@@ -653,7 +653,7 @@ impl BB {
                                 .append(vec![*true_succ_block, *false_succ_block].as_mut());
                         }
                         _ => {
-                            println!("{:?}", cond_ref.get_kind());
+                            // println!("{:?}", cond_ref.get_kind());
                             let lhs_reg =
                                 self.resolve_operand(func, cond_ref, true, map_info, pool);
                             let inst_kind = InstrsType::Branch(CmpOp::Eqz);
@@ -731,7 +731,7 @@ impl BB {
                                         _ => self.resolve_operand(func, *arg, true, map_info, pool),
                                     };
                                     if let Operand::Reg(reg) = src_reg {
-                                        println!("arg kind {:?}, reg {:?}", arg.get_kind(), reg);
+                                        // println!("arg kind {:?}, reg {:?}", arg.get_kind(), reg);
                                     }
                                     let dst_reg =
                                         Operand::Reg(Reg::new(icnt + 10, ScalarType::Int));
@@ -885,7 +885,7 @@ impl BB {
                         _ => unreachable!("mv must be int or float"),
                     };
 
-                    println!("phi reg: {:?}, tmp: {:?}", phi_reg.clone(), temp.clone());
+                    // println!("phi reg: {:?}, tmp: {:?}", phi_reg.clone(), temp.clone());
                     self.phis
                         .push(pool.put_inst(LIRInst::new(inst_kind, vec![phi_reg, temp.clone()])));
 
@@ -894,7 +894,7 @@ impl BB {
                         if !op_list.insert(*op) {
                             continue;
                         }
-                        println!("op: {:?}", op.get_kind());
+                        // println!("op: {:?}", op.get_kind());
                         let src_reg = self.resolve_operand(func, *op, false, map_info, pool);
                         inst_kind = match src_reg {
                             Operand::Reg(reg) => match reg.get_type() {
@@ -906,7 +906,7 @@ impl BB {
                             _ => unreachable!("phi operand must be reg or iimm"),
                         };
                         let inst = LIRInst::new(inst_kind, vec![temp.clone(), src_reg]);
-                        println!("save to insert phi inst: {:?}", inst);
+                        // println!("save to insert phi inst: {:?}", inst);
                         let obj_inst = pool.put_inst(inst);
                         let incoming_block = map_info
                             .ir_block_map
@@ -916,10 +916,10 @@ impl BB {
                             .clone();
 
                         if let Some(insts) = map_info.phis_to_block.get_mut(&incoming_block) {
-                            println!("insert phi inst: {:?}", obj_inst);
+                            // println!("insert phi inst: {:?}", obj_inst);
                             insts.insert(obj_inst);
                         } else {
-                            println!("insert phi inst: {:?}", obj_inst);
+                            // println!("insert phi inst: {:?}", obj_inst);
                             let mut set = HashSet::new();
                             set.insert(obj_inst);
                             map_info.phis_to_block.insert(incoming_block, set);
@@ -1056,11 +1056,11 @@ impl BB {
                     }
                 }
                 for i in 0..len {
-                    // println!("{i}------------------");
-                    // println!("{} inst: {:?}", self.label, self.insts[index-2]);
-                    // println!("{} inst: {:?}", self.label, self.insts[index-1]);
-                    // println!("{} replace inst: {:?}", self.label, inst);
-                    // println!("------------------");
+                    // // println!("{i}------------------");
+                    // // println!("{} inst: {:?}", self.label, self.insts[index-2]);
+                    // // println!("{} inst: {:?}", self.label, self.insts[index-1]);
+                    // // println!("{} replace inst: {:?}", self.label, inst);
+                    // // println!("------------------");
                     inst.as_mut().replace(spills[i as usize], 5 + i)
                 }
 
@@ -1089,9 +1089,9 @@ impl BB {
                 start_pos = offset;
             }
         }
-        println!("---------------------------");
-        println!("{:?}", func.spill_stack_map);
-        println!("---------------------------");
+        // println!("---------------------------");
+        // println!("{:?}", func.spill_stack_map);
+        // println!("---------------------------");
     }
 
     pub fn handle_overflow(&mut self, func: ObjPtr<Func>, pool: &mut BackendPool) {
@@ -1462,7 +1462,7 @@ impl BB {
                         }
                     }
                     _ => {
-                        println!("{:?}", p.get_param_type());
+                        // println!("{:?}", p.get_param_type());
                         unreachable!("cannot reach, param must be int, float or ptr")
                     }
                 }
@@ -1501,7 +1501,7 @@ impl BB {
             self.insts.push(pool.put_inst(inst));
             reg
         } else {
-            println!("find!");
+            // println!("find!");
             return self.global_map.get(&src).unwrap().clone();
         }
     }
@@ -1781,7 +1781,7 @@ impl GenerateAsm for BB {
             builder.show_block(&self.label)?;
         }
         for inst in self.insts.iter() {
-            // println!("generate inst: {:?}", inst);
+            // // println!("generate inst: {:?}", inst);
             inst.as_mut().v_to_phy(context.get_reg_map().clone());
             inst.as_mut().generate(context.clone(), f)?;
         }

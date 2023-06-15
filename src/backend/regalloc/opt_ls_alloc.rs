@@ -8,7 +8,6 @@
 
  */
 
-
 use crate::algorithm::graphalgo;
 use crate::algorithm::graphalgo::Graph;
 use crate::backend::block::BB;
@@ -96,7 +95,7 @@ impl Allocator {
     // 深度分配
     fn dfs_bbs(&mut self, bb: ObjPtr<BB>) {
         let n = self.passed.len();
-        //println!("bb.length:{n}");
+        //// println!("bb.length:{n}");
         if self.passed.contains(&bb) {
             return;
         }
@@ -104,13 +103,13 @@ impl Allocator {
         self.depths.insert(bb, self.base);
         self.passed.insert(bb.clone());
         self.base += 1;
-        // //println!("before");
+        // //// println!("before");
         // 深度优先遍历后面的块
         for next in &bb.as_ref().out_edge {
             self.dfs_bbs(next.clone());
-            //println!("after clone ");
+            //// println!("after clone ");
         }
-        //println!("once end");
+        //// println!("once end");
     }
     // 指令编号
     fn inst_record(&mut self, bb: ObjPtr<BB>) {
@@ -244,7 +243,7 @@ impl Allocator {
                         let iereg: i32 = *dstr.get(&min.id).unwrap();
                         regUsedStat.release_ireg(iereg);
                         iwindow.pop_front();
-                    }else{
+                    } else {
                         break;
                     }
                 }
@@ -256,7 +255,7 @@ impl Allocator {
                         let fereg: i32 = *dstr.get(&min.id).unwrap();
                         regUsedStat.release_freg(fereg);
                         fwindow.pop_front();
-                    }else{
+                    } else {
                         break;
                     }
                 }
@@ -358,7 +357,5 @@ impl Allocator {
 }
 
 impl Regalloc for Allocator {
-    fn alloc(&mut self, func: &Func) -> FuncAllocStat {
-        
-    }
+    fn alloc(&mut self, func: &Func) -> FuncAllocStat {}
 }

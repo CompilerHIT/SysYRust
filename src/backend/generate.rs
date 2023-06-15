@@ -99,7 +99,7 @@ impl GenerateAsm for LIRInst {
                 };
                 let addr = match self.get_lhs() {
                     Operand::Reg(reg) => reg.to_string(),
-                    _ => { println!("load reg: {:?}", self.get_lhs());panic!("src of load must be reg, to improve");},
+                    _ => { panic!("src of load must be reg, to improve");},
                 };
 
                 builder.l(&dst, &addr, offset.get_data(), self.is_float(), self.is_double())?;
@@ -126,8 +126,6 @@ impl GenerateAsm for LIRInst {
             InstrsType::StoreToStack => {
                 let mut builder = AsmBuilder::new(f);
                 if !operand::is_imm_12bs(self.get_stack_offset().get_data()) {
-                    println!("inst: {:?}", self);
-                    println!("offset: {:?}", self.get_stack_offset());
                     panic!("illegal offset");
                 }
                 let src = match self.get_dst() {

@@ -80,7 +80,7 @@ impl Context<'_> {
     pub fn push_inst_bb(&mut self, inst_ptr: ObjPtr<Inst>) {
         match self.bb_now_mut {
             InfuncChoice::InFunc(bbptr) => {
-                // println!(
+                // // println!(
                 //     "指令{:?}插入bb{:?}中",
                 //     inst_ptr.get_kind(),
                 //     bbptr.get_name()
@@ -104,7 +104,7 @@ impl Context<'_> {
     }
 
     pub fn bb_now_set(&mut self, bb: ObjPtr<BasicBlock>) {
-        // println!("现在处于块{:?}中", bb.get_name());
+        // // println!("现在处于块{:?}中", bb.get_name());
         self.bb_now_mut = InfuncChoice::InFunc(bb);
     }
 
@@ -191,7 +191,7 @@ impl Context<'_> {
 
     pub fn update_var_scope(&mut self, s: &str, inst: ObjPtr<Inst>, bbname: &str) -> bool {
         // let mut bbname = " ";
-        // println!("进来了");
+        // // println!("进来了");
         // match bb {
         //     InfuncChoice::InFunc(bbptr) => {
         //         let bbn = bbptr.as_mut();
@@ -208,7 +208,7 @@ impl Context<'_> {
         // }
         if self.var_map.contains_key(s) {
             if let Some(vec) = self.var_map.get_mut(s) {
-                // println!("进来了");
+                // // println!("进来了");
                 // let temps = self.add_prefix(s.to_string()).as_str()
                 if let Some(tempvar) = vec.last() {
                     let temps = tempvar.0.clone();
@@ -219,7 +219,7 @@ impl Context<'_> {
                         map.insert(temps, inst);
                         self.bb_map.insert(bbname.to_string(), map);
                     }
-                    // println!("bbname:{:?}插入:{:?}", bbname, s);
+                    // // println!("bbname:{:?}插入:{:?}", bbname, s);
                     return true;
                 }
             }
@@ -234,7 +234,7 @@ impl Context<'_> {
 
         match &mut self.bb_now_mut {
             InfuncChoice::InFunc(bbptr) => {
-                // println!("指令{:?}插入bb{:?}中", inst.get_kind(), bbptr.get_name());
+                // // println!("指令{:?}插入bb{:?}中", inst.get_kind(), bbptr.get_name());
                 let bb = bbptr.as_mut();
                 bb.push_back(inst);
                 v.push((temps.clone(), 1));
@@ -271,7 +271,7 @@ impl Context<'_> {
         let temps = self.add_prefix(s.clone());
         match &mut self.bb_now_mut {
             InfuncChoice::InFunc(bbptr) => {
-                // println!("指令{:?}插入bb{:?}中", inst.get_kind(), bbptr.get_name());
+                // // println!("指令{:?}插入bb{:?}中", inst.get_kind(), bbptr.get_name());
                 let bb = bbptr.as_mut();
                 bb.push_back(inst); //应该往头节点插，往头节点取
                 v.push((temps.clone(), 1));
@@ -309,14 +309,14 @@ impl Context<'_> {
                     if *layer_now == 1 {
                         for ((bbname, inst_vec)) in &self.bb_map {
                             if let Some(inst) = inst_vec.get(name_changed) {
-                                // println!("找到常量:{:?}",i);
+                                // // println!("找到常量:{:?}",i);
                                 return Option::Some(*inst);
                             }
                         }
                     }
                 }
             }
-            // println!("没找到常量:{:?}",i);
+            // // println!("没找到常量:{:?}",i);
             return Option::None;
         } else {
             let iname = "@".to_string() + i.to_string().as_str();
@@ -379,13 +379,13 @@ impl Context<'_> {
     ) -> bool {
         let s1 = s.clone();
         if (self.has_var_now(s1)) {
-            // println!("当前作用域中已声明过变量{:?}", s);
+            // // println!("当前作用域中已声明过变量{:?}", s);
             return false;
         }
         let temps = self.add_prefix(s.to_string());
         if self.var_map.contains_key(s) {
             if let Some(vec) = self.var_map.get_mut(s) {
-                // println!("插入符号{:?}", temps);
+                // // println!("插入符号{:?}", temps);
                 // let temps = self.add_prefix(s.to_string()).as_str();
                 vec.push((temps.to_string(), self.layer));
                 self.symbol_table.insert(
@@ -402,7 +402,7 @@ impl Context<'_> {
                 );
             }
         } else {
-            // println!("插入符号{:?}", temps);
+            // // println!("插入符号{:?}", temps);
             let mut v = vec![];
             // let temps = self.add_prefix(s.to_string());
             v.push((temps.to_string(), self.layer));

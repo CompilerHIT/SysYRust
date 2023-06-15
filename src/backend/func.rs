@@ -153,7 +153,7 @@ impl Func {
             }
             let block = self.blocks[index];
             if block != self.entry.unwrap() {
-                println!("start build block");
+                // println!("start build block");
                 if i == 0 {
                     block.as_mut().showed = false;
                 }
@@ -200,8 +200,8 @@ impl Func {
             }
             if let Some(mut target) = info.phis_to_block.get_mut(&block.label) {
                 for inst in target.iter() {
-                    println!("label: {}", block.label);
-                    println!("insert phi to last: {:?}", inst);
+                    // println!("label: {}", block.label);
+                    // println!("insert phi to last: {:?}", inst);
                     block.as_mut().insts.insert(index, *inst);
                 }
             }
@@ -211,13 +211,13 @@ impl Func {
             }
             size += block.insts.len();
         }
-        println!("phi insert size: {}", size);
+        // println!("phi insert size: {}", size);
 
         for block in self.blocks.iter() {
-            // println!("-----------------");
-            // println!("block: {:?}", block.label);
+            // // println!("-----------------");
+            // // println!("block: {:?}", block.label);
             for inst in block.insts.iter() {
-                // println!("row inst: {:?}", inst);
+                // // println!("row inst: {:?}", inst);
             }
         }
         self.update(this);
@@ -308,10 +308,10 @@ impl Func {
 
         self.reg_alloc_info = alloc_stat;
         self.context.as_mut().set_reg_map(&self.reg_alloc_info.dstr);
-        println!("dstr map info{:?}", self.reg_alloc_info.dstr);
+        // println!("dstr map info{:?}", self.reg_alloc_info.dstr);
 
         let mut stack_size = self.reg_alloc_info.stack_size as i32;
-        println!("stack_size: {}", stack_size);
+        // println!("stack_size: {}", stack_size);
 
         let (icnt, fcnt) = self.max_params;
         stack_size += (icnt + fcnt) * 8;
@@ -456,7 +456,7 @@ impl GenerateAsm for Func {
             a.generate(self.context, f)?;
         }
         if self.floats.len() > 0 {
-            println!("generate float");
+            // println!("generate float");
             writeln!(f, "   .data")?;
         }
         for (name, data) in self.floats.clone() {
@@ -468,7 +468,7 @@ impl GenerateAsm for Func {
         for block in self.blocks.iter() {
             size += block.insts.len();
         }
-        println!("tatol {}", size);
+        // println!("tatol {}", size);
         for block in self.blocks.iter() {
             block.as_mut().generate(self.context, f)?;
         }
