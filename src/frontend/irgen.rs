@@ -1463,39 +1463,29 @@ impl Process for If {
         let (inst_cond, val_cond) = self.cond.process(Type::Int, kit_mut).unwrap();
         let inst_branch = kit_mut.pool_inst_mut.make_br(inst_cond);
         kit_mut.context_mut.push_inst_bb(inst_branch);
+
         let bb_if_name = kit_mut.context_mut.get_newbb_name();
         let inst_bb_if = kit_mut.pool_bb_mut.new_basic_block(bb_if_name.clone());
-        kit_mut.context_mut.is_branch_map.insert(bb_if_name, false); //初始化
-                                                                     // match kit_mut.context_mut.bb_now_mut {
-                                                                     //     InfuncChoice::InFunc(bb_now) => {
-                                                                     //         kit_mut
-                                                                     //             .context_mut
-                                                                     //             .is_branch_map
-                                                                     //             .insert(bb_now.get_name().to_string(), true); //标志该块出现分支
-                                                                     //     }
-                                                                     //     _ => {
-                                                                     //         unreachable!()
-                                                                     //     }
-                                                                     // }
+        // kit_mut.context_mut.is_branch_map.insert(bb_if_name, false); //初始化
 
         if let Some(stmt_else) = &mut self.else_then {
             //如果有else语句
             let bb_else_name = kit_mut.context_mut.get_newbb_name();
             let inst_bb_else = kit_mut.pool_bb_mut.new_basic_block(bb_else_name.clone());
-            kit_mut
-                .context_mut
-                .is_branch_map
-                .insert(bb_else_name, false); //初始化
+            // kit_mut
+            //     .context_mut
+            //     .is_branch_map
+            //     .insert(bb_else_name, false); //初始化
 
             //生成一块新的bb
             let bb_successor_name = kit_mut.context_mut.get_newbb_name();
             let inst_bb_successor = kit_mut
                 .pool_bb_mut
                 .new_basic_block(bb_successor_name.clone());
-            kit_mut
-                .context_mut
-                .is_branch_map
-                .insert(bb_successor_name, false); //初始化
+            // kit_mut
+            //     .context_mut
+            //     .is_branch_map
+            //     .insert(bb_successor_name, false); //初始化
 
             match kit_mut.context_mut.bb_now_mut {
                 InfuncChoice::InFunc(bb_now) => {
@@ -1553,10 +1543,10 @@ impl Process for If {
             let inst_bb_successor = kit_mut
                 .pool_bb_mut
                 .new_basic_block(bb_successor_name.clone());
-            kit_mut
-                .context_mut
-                .is_branch_map
-                .insert(bb_successor_name, false); //初始化
+            // kit_mut
+            //     .context_mut
+            //     .is_branch_map
+            //     .insert(bb_successor_name, false); //初始化
 
             match kit_mut.context_mut.bb_now_mut {
                 InfuncChoice::InFunc(bb_now) => {
