@@ -898,6 +898,7 @@ impl BB {
         self.insts.append(inst);
     }
 
+
     pub fn handle_spill(
         &mut self,
         func: ObjPtr<Func>,
