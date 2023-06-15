@@ -10,3 +10,5 @@ data/
 log
 out
 __pycache__
+dump.ll
+run_and_compiler.sh
