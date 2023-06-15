@@ -1,7 +1,7 @@
 use std::cmp::min;
 use std::collections::{HashMap, HashSet};
 pub use std::io::Result;
-use std::vec;
+use std::{vec, fmt};
 
 pub use crate::backend::asm_builder::AsmBuilder;
 pub use crate::backend::block::BB;
@@ -111,6 +111,14 @@ pub struct LIRInst {
     // call指令的跳转到函数
     double: bool,
     float: bool,
+}
+
+
+// 实现个fmt display trait
+impl fmt::Display for LIRInst {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f,"type:{:?},def:{:?},use:{:?}",self.get_type(),self.get_reg_def(),self.get_reg_use())
+    }
 }
 
 impl LIRInst {
