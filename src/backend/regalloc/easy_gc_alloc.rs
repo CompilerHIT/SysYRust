@@ -1,8 +1,7 @@
 // a impl of graph color register alloc algo
 
-use std::{collections::{HashSet, HashMap, VecDeque}, future::IntoFuture};
+use std::{collections::{HashSet, HashMap, VecDeque}, future::IntoFuture, fmt};
 
-use lazy_static::__Deref;
 
 use crate::{backend::{instrs::{Func, BB}, operand::Reg}, utility::{ObjPool, ObjPtr, ScalarType}};
 
@@ -23,6 +22,12 @@ pub struct Allocator {
     i_interference_graph:HashMap<i32,HashSet<i32>>,   //浮点寄存器冲突图
     dstr:HashMap<i32,i32>,  //记录每个寄存器分配到的实际寄存器
     spillings:HashSet<i32>, //记录溢出寄存器
+}
+
+impl fmt::Display for crate::backend::LIRInst {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "type:{:?} def:{:?},use:{:?}",self.get_type(), self.get_reg_def(), self.get_reg_use())
+    }
 }
 
 
@@ -50,9 +55,18 @@ impl  Allocator {
         let mut passed_reg:HashSet<Reg>=HashSet::new();
         // 定义处理函数
         let process=|cur_bb: ObjPtr<BB>,interef_graph:&mut HashMap<i32,HashSet<i32>>,kind: ScalarType|{
+            
+            // TODO,调试用
+            if func.label=="main" {
+                println!("target");
+            }
+            
             let mut livenow:HashSet<i32>=HashSet::new();
             // 重构冲突分析
             let mut sets_end:HashMap<i32,HashSet<i32>>=HashMap::new();
+
+            let mut end_poses:HashMap<i32,i32>=HashMap::new();
+
             let mut ends =HashSet::new();
             cur_bb.live_out.iter().for_each(|e|{if e.is_virtual()&&e.get_type()==kind {ends.insert(e.get_id());}});
             for (index,inst) in cur_bb.insts.iter().enumerate().rev() {
@@ -64,17 +78,17 @@ impl  Allocator {
                         sets_end.insert(index as i32, HashSet::new());
                     }
                     sets_end.get_mut(&(index as i32)).unwrap().insert(reg.get_id());
+                    end_poses.insert(reg.get_id(), index as i32);
                 }
             }
-
+            println!("ends:{:?}",end_poses);
+            end_poses.clear();
             cur_bb.live_in.iter().for_each(|e|{if e.is_virtual()&&e.get_type()==kind {livenow.insert(e.get_id());}});
             for (index,inst) in cur_bb.insts.iter().enumerate() {
-                if let Some(finishes)=sets_end.get(&(index as i32)) {
-                    for finish in finishes {
-                        livenow.remove(finish);
-                    }
-                }
-                for reg in inst.get_regs() {
+                // 先与reg use冲突,然后消去终结的,然后与reg def冲突,并加上新的reg def
+                println!("{}",inst.as_ref());
+                
+                for reg in inst.get_reg_use() {
                     if !reg.is_virtual() ||reg.get_type()!=kind {continue;}
                     if livenow.contains(&reg.get_id()) {continue;}
                     for live in livenow.iter() {
@@ -84,9 +98,37 @@ impl  Allocator {
                         interef_graph.get_mut(&reg.get_id()).unwrap().insert(*live);
                     }
                 }
-            }
+                
+                if let Some(finishes)=sets_end.get(&(index as i32)) {
+                    for finish in finishes {
+                        livenow.remove(finish);
+                    }
+                }
 
+                for reg in inst.get_reg_def() {
+                    if !reg.is_virtual() ||reg.get_type()!=kind {continue;}
+                    if end_poses.contains_key(&reg.get_id()) {continue;}
+                    livenow.insert(reg.get_id());
+                    end_poses.insert(reg.get_id(), index as i32);
+                    for live in livenow.iter() {
+                        if *live==reg.get_id() {continue;}
+                        if let None=interef_graph.get(live) { interef_graph.insert(*live, HashSet::new());}
+                        if let None=interef_graph.get(&reg.get_id()) {interef_graph.insert(reg.get_id(), HashSet::new());}
+                        interef_graph.get_mut(live).unwrap().insert(reg.get_id());
+                        interef_graph.get_mut(&reg.get_id()).unwrap().insert(*live);
+                    }
+                }
+                println!("live now:{:?}",livenow);
+                println!("intereference :{:?}",interef_graph);
+            }
+            println!("starts:{:?}",end_poses);
+            for (k,v) in interef_graph {
+                println!("{k} interefer:");
+                println!("{:?}",v);
+            }
         };
+
+
         while(!que.is_empty()){
             let cur_bb=que.pop_front().unwrap();
             if passed.contains(&cur_bb) {
@@ -120,6 +162,11 @@ impl  Allocator {
                 que.push_back(*bb_next);
             }
         }
+        
+        // 查看简历的冲突图
+        println!("interference graph");
+   
+   
     }
     
 
@@ -320,6 +367,10 @@ impl Regalloc for Allocator {
         }
         let (spillings,dstr)=   self.alloc_register();
         let (func_stack_size,bb_sizes)=easy_ls_alloc::Allocator::countStackSize(func, &spillings);
+        
+        println!("dstr:{:?}",self.dstr);
+        println!("spillings:{:?}",self.spillings);
+        
         FuncAllocStat{
             stack_size: func_stack_size,
             bb_stack_sizes: bb_sizes,
