@@ -101,4 +101,10 @@ impl Inst {
         debug_assert!(self.is_br());
         self.get_parent_bb().get_next_bb()[0].clone()
     }
+
+    /// 获得jum指令的bb
+    pub fn get_jump_bb(&self) -> ObjPtr<BasicBlock> {
+        debug_assert!(self.is_jmp());
+        self.get_parent_bb().get_next_bb()[0].clone()
+    }
 }
