@@ -18,6 +18,8 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::io::Result;
 
+use super::block::NUM_SIZE;
+
 /// Assembly builder.
 pub struct AsmBuilder<'f> {
     f: &'f File,
@@ -194,8 +196,11 @@ impl<'f> AsmBuilder<'f> {
     //     writeln!(self.f, "	addi    {reg}, {reg}, %pcrel_lo({block_label})")
     // }
 
-    pub fn print_array(&mut self, array: &Vec<i32>, name: String) -> Result<()> {
+    pub fn print_array(&mut self, array: &Vec<i32>, name: String, size: i32) -> Result<()> {
         writeln!(self.f, "{name}:")?;
+        if array.len() == 0 {
+            writeln!(self.f, "	.zero	{num}", num = size * NUM_SIZE)?;
+        }
         for i in array {
             writeln!(self.f, "	.word	{i}")?;
         }
