@@ -9,7 +9,7 @@ use crate::utility::ObjPtr;
 use super::{
     basicblock::BasicBlock,
     function::Function,
-    instruction::{Inst, InstKind},
+    instruction::{BinOp, Inst, InstKind},
     ir_type::IrType,
     module::Module,
 };
@@ -342,14 +342,349 @@ fn dump_inst(
             }
             _ => unreachable!("No other type in store"),
         },
-        InstKind::Binary(op) => {}
-        InstKind::Unary(op) => {}
-        InstKind::Branch => {}
-        InstKind::Call(callee) => {}
+        InstKind::Binary(op) => match op {
+            BinOp::Add => {
+                if let IrType::Int = inst.get_ir_type() {
+                    local_map.insert(inst, format!("%{}", name_index));
+                    text += format!(
+                        "  {} = add i32 {}, {}\n",
+                        local_map.get(&inst).unwrap(),
+                        get_inst_value(inst.get_lhs(), local_map, global_map),
+                        get_inst_value(inst.get_rhs(), local_map, global_map)
+                    )
+                    .as_str();
+                    name_index += 1;
+                } else {
+                    local_map.insert(inst, format!("%{}", name_index));
+                    text += format!(
+                        "  {} = fadd float {}, {}\n",
+                        local_map.get(&inst).unwrap(),
+                        get_inst_value(inst.get_lhs(), local_map, global_map),
+                        get_inst_value(inst.get_rhs(), local_map, global_map)
+                    )
+                    .as_str();
+                    name_index += 1;
+                }
+            }
+            BinOp::Sub => {
+                if let IrType::Int = inst.get_ir_type() {
+                    local_map.insert(inst, format!("%{}", name_index));
+                    text += format!(
+                        "  {} = sub i32 {}, {}\n",
+                        local_map.get(&inst).unwrap(),
+                        get_inst_value(inst.get_lhs(), local_map, global_map),
+                        get_inst_value(inst.get_rhs(), local_map, global_map)
+                    )
+                    .as_str();
+                    name_index += 1;
+                } else {
+                    local_map.insert(inst, format!("%{}", name_index));
+                    text += format!(
+                        "  {} = fsub float {}, {}\n",
+                        local_map.get(&inst).unwrap(),
+                        get_inst_value(inst.get_lhs(), local_map, global_map),
+                        get_inst_value(inst.get_rhs(), local_map, global_map)
+                    )
+                    .as_str();
+                    name_index += 1;
+                }
+            }
+            BinOp::Mul => {
+                if let IrType::Int = inst.get_ir_type() {
+                    local_map.insert(inst, format!("%{}", name_index));
+                    text += format!(
+                        "  {} = mul i32 {}, {}\n",
+                        local_map.get(&inst).unwrap(),
+                        get_inst_value(inst.get_lhs(), local_map, global_map),
+                        get_inst_value(inst.get_rhs(), local_map, global_map)
+                    )
+                    .as_str();
+                    name_index += 1;
+                } else {
+                    local_map.insert(inst, format!("%{}", name_index));
+                    text += format!(
+                        "  {} = fmul float {}, {}\n",
+                        local_map.get(&inst).unwrap(),
+                        get_inst_value(inst.get_lhs(), local_map, global_map),
+                        get_inst_value(inst.get_rhs(), local_map, global_map)
+                    )
+                    .as_str();
+                    name_index += 1;
+                }
+            }
+            BinOp::Div => {
+                if let IrType::Int = inst.get_ir_type() {
+                    local_map.insert(inst, format!("%{}", name_index));
+                    text += format!(
+                        "  {} = sdiv i32 {}, {}\n",
+                        local_map.get(&inst).unwrap(),
+                        get_inst_value(inst.get_lhs(), local_map, global_map),
+                        get_inst_value(inst.get_rhs(), local_map, global_map)
+                    )
+                    .as_str();
+                    name_index += 1;
+                } else {
+                    local_map.insert(inst, format!("%{}", name_index));
+                    text += format!(
+                        "  {} = fdiv float {}, {}\n",
+                        local_map.get(&inst).unwrap(),
+                        get_inst_value(inst.get_lhs(), local_map, global_map),
+                        get_inst_value(inst.get_rhs(), local_map, global_map)
+                    )
+                    .as_str();
+                    name_index += 1;
+                }
+            }
+            BinOp::Rem => {
+                if let IrType::Int = inst.get_ir_type() {
+                    local_map.insert(inst, format!("%{}", name_index));
+                    text += format!(
+                        "  {} = srem i32 {}, {}\n",
+                        local_map.get(&inst).unwrap(),
+                        get_inst_value(inst.get_lhs(), local_map, global_map),
+                        get_inst_value(inst.get_rhs(), local_map, global_map)
+                    )
+                    .as_str();
+                    name_index += 1;
+                } else {
+                    unreachable!("No float rem in ir");
+                }
+            }
+            BinOp::Gt => {
+                if let IrType::Int = inst.get_ir_type() {
+                    local_map.insert(inst, format!("%{}", name_index));
+                    text += format!(
+                        "  {} = icmp sgt i32 {}, {}\n",
+                        local_map.get(&inst).unwrap(),
+                        get_inst_value(inst.get_lhs(), local_map, global_map),
+                        get_inst_value(inst.get_rhs(), local_map, global_map)
+                    )
+                    .as_str();
+                    name_index += 1;
+                } else {
+                    local_map.insert(inst, format!("%{}", name_index));
+                    text += format!(
+                        "  {} = fcmp ogt float {}, {}\n",
+                        local_map.get(&inst).unwrap(),
+                        get_inst_value(inst.get_lhs(), local_map, global_map),
+                        get_inst_value(inst.get_rhs(), local_map, global_map)
+                    )
+                    .as_str();
+                }
+            }
+            BinOp::Lt => {
+                if let IrType::Int = inst.get_ir_type() {
+                    local_map.insert(inst, format!("%{}", name_index));
+                    text += format!(
+                        "  {} = icmp slt i32 {}, {}\n",
+                        local_map.get(&inst).unwrap(),
+                        get_inst_value(inst.get_lhs(), local_map, global_map),
+                        get_inst_value(inst.get_rhs(), local_map, global_map)
+                    )
+                    .as_str();
+                    name_index += 1;
+                } else {
+                    local_map.insert(inst, format!("%{}", name_index));
+                    text += format!(
+                        "  {} = fcmp olt float {}, {}\n",
+                        local_map.get(&inst).unwrap(),
+                        get_inst_value(inst.get_lhs(), local_map, global_map),
+                        get_inst_value(inst.get_rhs(), local_map, global_map)
+                    )
+                    .as_str();
+                    name_index += 1;
+                }
+            }
+            BinOp::Ge => {
+                if let IrType::Int = inst.get_ir_type() {
+                    local_map.insert(inst, format!("%{}", name_index));
+                    text += format!(
+                        "  {} = icmp sge i32 {}, {}\n",
+                        local_map.get(&inst).unwrap(),
+                        get_inst_value(inst.get_lhs(), local_map, global_map),
+                        get_inst_value(inst.get_rhs(), local_map, global_map)
+                    )
+                    .as_str();
+                    name_index += 1;
+                } else {
+                    local_map.insert(inst, format!("%{}", name_index));
+                    text += format!(
+                        "  {} = fcmp oge float {}, {}\n",
+                        local_map.get(&inst).unwrap(),
+                        get_inst_value(inst.get_lhs(), local_map, global_map),
+                        get_inst_value(inst.get_rhs(), local_map, global_map),
+                    )
+                    .as_str();
+                    name_index += 1;
+                }
+            }
+            BinOp::Le => {
+                if let IrType::Int = inst.get_ir_type() {
+                    local_map.insert(inst, format!("%{}", name_index));
+                    text += format!(
+                        "  {} = icmp sle i32 {}, {}\n",
+                        local_map.get(&inst).unwrap(),
+                        get_inst_value(inst.get_lhs(), local_map, global_map),
+                        get_inst_value(inst.get_rhs(), local_map, global_map),
+                    )
+                    .as_str();
+                    name_index += 1;
+                } else {
+                    local_map.insert(inst, format!("%{}", name_index));
+                    text += format!(
+                        "  {} = fcmp ole float {}, {}\n",
+                        local_map.get(&inst).unwrap(),
+                        get_inst_value(inst.get_lhs(), local_map, global_map),
+                        get_inst_value(inst.get_rhs(), local_map, global_map),
+                    )
+                    .as_str();
+                    name_index += 1;
+                }
+            }
+            BinOp::Eq => {
+                if let IrType::Int = inst.get_ir_type() {
+                    local_map.insert(inst, format!("%{}", name_index));
+                    text += format!(
+                        "  {} = icmp eq i32 {}, {}\n",
+                        local_map.get(&inst).unwrap(),
+                        get_inst_value(inst.get_lhs(), local_map, global_map),
+                        get_inst_value(inst.get_rhs(), local_map, global_map),
+                    )
+                    .as_str();
+                    name_index += 1;
+                } else {
+                    local_map.insert(inst, format!("%{}", name_index));
+                    text += format!(
+                        "  {} = fcmp oeq float {}, {}\n",
+                        local_map.get(&inst).unwrap(),
+                        get_inst_value(inst.get_lhs(), local_map, global_map),
+                        get_inst_value(inst.get_rhs(), local_map, global_map),
+                    )
+                    .as_str();
+                    name_index += 1;
+                }
+            }
+            BinOp::Ne => {
+                if let IrType::Int = inst.get_ir_type() {
+                    local_map.insert(inst, format!("%{}", name_index));
+                    text += format!(
+                        "  {} = icmp ne i32 {}, {}\n",
+                        local_map.get(&inst).unwrap(),
+                        get_inst_value(inst.get_lhs(), local_map, global_map),
+                        get_inst_value(inst.get_rhs(), local_map, global_map),
+                    )
+                    .as_str();
+                    name_index += 1;
+                } else {
+                    local_map.insert(inst, format!("%{}", name_index));
+                    text += format!(
+                        "  {} = fcmp one float {}, {}\n",
+                        local_map.get(&inst).unwrap(),
+                        get_inst_value(inst.get_lhs(), local_map, global_map),
+                        get_inst_value(inst.get_rhs(), local_map, global_map),
+                    )
+                    .as_str();
+                    name_index += 1;
+                }
+            }
+            BinOp::And | BinOp::Or => {}
+        },
+        InstKind::Unary(_op) => {
+            // 不生成指令，等待前端修改，将其转换为对应的二元运算
+            unreachable!("No Unary in dump_inst");
+        }
+        InstKind::Branch => {
+            if inst.is_jmp() {
+                text += format!(
+                    "  br label %{}\n",
+                    inst.get_parent_bb().get_next_bb()[0].get_name()
+                )
+                .as_str();
+            } else {
+                text += format!(
+                    "  br i1 {}, label %{}, label %{}\n",
+                    get_inst_value(inst.get_br_cond(), local_map, global_map),
+                    inst.get_true_bb().get_name(),
+                    inst.get_false_bb().get_name()
+                )
+                .as_str();
+            }
+        }
+        InstKind::Call(callee) => {
+            let func_type = match inst.get_ir_type() {
+                IrType::Int => "i32",
+                IrType::Float => "float",
+                IrType::Void => "void",
+                _ => unreachable!("No Call in dump_inst"),
+            };
+            let mut param = String::new();
+            for arg in inst.get_operands().iter() {
+                let arg_type = match arg.get_ir_type() {
+                    IrType::Int => "i32",
+                    IrType::Float => "float",
+                    IrType::IntPtr | IrType::FloatPtr => "ptr",
+                    _ => unreachable!("No Call in dump_inst"),
+                };
+                param += format!(
+                    "{} noundef {}, ",
+                    arg_type,
+                    get_inst_value(arg.clone(), local_map, global_map)
+                )
+                .as_str();
+            }
+            param.truncate(param.len() - 2);
+            local_map.insert(inst, format!("%{}", name_index));
+            text += format!(
+                "  {} = call {} @{}({})\n",
+                local_map.get(&inst).unwrap(),
+                func_type,
+                callee,
+                param
+            )
+            .as_str();
+            name_index += 1;
+        }
         InstKind::Parameter => unreachable!("No parameter in bb"),
-        InstKind::Return => {}
-        InstKind::FtoI => {}
-        InstKind::ItoF => {}
+        InstKind::Return => match inst.get_ir_type() {
+            IrType::Void => {
+                text += "  ret void\n";
+            }
+            IrType::Int => {
+                text += format!(
+                    "  ret i32 {}\n",
+                    get_inst_value(inst.get_return_value(), local_map, global_map)
+                )
+                .as_str();
+            }
+            IrType::Float => {
+                text += format!(
+                    "  ret float {}\n",
+                    get_inst_value(inst.get_return_value(), local_map, global_map)
+                )
+                .as_str();
+            }
+            _ => unreachable!("No Return in dump_inst"),
+        },
+        InstKind::FtoI => {
+            local_map.insert(inst, format!("%{}", name_index));
+            text += format!(
+                "  {} = fptosi float {} to i32\n",
+                local_map.get(&inst).unwrap(),
+                get_inst_value(inst.get_float_to_int_value(), local_map, global_map),
+            )
+            .as_str();
+            name_index += 1;
+        }
+        InstKind::ItoF => {
+            local_map.insert(inst, format!("%{}", name_index));
+            text += format!(
+                "  {} = sitofp i32 {} to float\n",
+                local_map.get(&inst).unwrap(),
+                get_inst_value(inst.get_int_to_float_value(), local_map, global_map),
+            )
+            .as_str();
+            name_index += 1;
+        }
         InstKind::ConstInt(_) | InstKind::ConstFloat(_) => {
             // 常量不处理
         }
@@ -359,7 +694,20 @@ fn dump_inst(
         | InstKind::GlobalFloat(_) => {
             unreachable!("No Global in bb")
         }
-        InstKind::Phi => {}
+        InstKind::Phi => {
+            local_map.insert(inst, format!("%{}", name_index));
+            text += format!("  {} = phi ", local_map.get(&inst).unwrap()).as_str();
+            for op in inst.get_operands().iter() {
+                text += format!(
+                    "[ {}, %{} ], ",
+                    get_inst_value(op.clone(), local_map, global_map),
+                    inst.get_parent_bb().get_up_bb()[0].get_name()
+                )
+                .as_str();
+            }
+            text.truncate(text.len() - 2);
+            text += "\n";
+        }
         InstKind::Head(_) => unreachable!("No Head in dump_inst"),
     }
     (name_index, text)
