@@ -119,7 +119,79 @@ pub struct LIRInst {
 // 实现个fmt display trait
 impl fmt::Display for LIRInst {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f,"type:{:?},def:{:?},use:{:?}",self.get_type(),self.get_reg_def(),self.get_reg_use())
+        let mut kind="";
+        match self.get_type() {
+            InstrsType::Binary(op) => {
+                kind = match op {
+                    BinaryOp::Add => "add",
+                    BinaryOp::Sub => "sub",
+                    BinaryOp::Mul => "mul",
+                    BinaryOp::Div => "div",
+                    BinaryOp::Rem => "rem",
+                    BinaryOp::And => "and",
+                    BinaryOp::Or => "or",
+                    BinaryOp::Xor => "xor",
+                    BinaryOp::Shl => "sll",
+                    BinaryOp::Shr => "srl",
+                    BinaryOp::Sar => "sra",
+                    BinaryOp::Mulhs => "mulhs",
+                };
+            }
+            InstrsType::OpReg(op) => {
+                kind = match op {
+                    SingleOp::Li => "li",
+                    SingleOp::Lui => "lui",
+                    SingleOp::IMv => "mv",
+                    SingleOp::FMv => "fmv",
+                    SingleOp::INot => "not",
+                    SingleOp::INeg => "neg",
+                    SingleOp::FNot => "fnot",
+                    SingleOp::FNeg => "fneg",
+                    SingleOp::I2F => "fcvt.s.w",
+                    SingleOp::F2I => "fcvt.w.s",
+                    SingleOp::LoadAddr => "la",
+                };
+            }
+            // InstrsType::ChangeSp => {
+            //     let mut builder = AsmBuilder::new(f);
+            //     let imm = self.get_change_sp_offset();
+            //     builder.addi("sp", "sp", imm)?;
+            //     Ok(())
+            // },
+            InstrsType::Load|InstrsType::LoadParamFromStack|InstrsType::LoadFromStack => {
+                kind="load";
+            }
+            InstrsType::Store|InstrsType::StoreToStack|InstrsType::StoreParamToStack => {
+                kind="store";
+            }
+            // 判断！是否需要多插入一条j，间接跳转到
+            InstrsType::Branch(cond) => {
+                kind = match cond {
+                    CmpOp::Eq => "eq",
+                    CmpOp::Ne => "ne",
+                    CmpOp::Lt => "lt",
+                    CmpOp::Le => "le",
+                    CmpOp::Gt => "gt",
+                    CmpOp::Ge => "ge",
+                    CmpOp::Eqz => "eqz",
+                };
+                
+            }
+            InstrsType::Jump => {
+                kind="jump";
+            }
+            InstrsType::Call => {
+              kind="call";
+            }
+            InstrsType::Ret(..) => {
+              kind="ret";
+            }
+        }
+        let mut def=HashSet::new();
+        let mut use_reg_id =HashSet::new();
+        self.get_reg_def().iter().for_each(|e|{def.insert(e.get_id());});
+        self.get_reg_use().iter().for_each(|e|{use_reg_id.insert(e.get_id());});
+        write!(f,"type:{:?},def:{:?},use:{:?}",kind,def,use_reg_id)
     }
 }
 

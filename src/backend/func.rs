@@ -322,8 +322,7 @@ impl Func {
                         block.as_mut().live_use.insert(reg);
                     }
                 }
-                // println!("use:{:?}",it.get_reg_use());
-                // println!("def:{:?}",it.get_reg_def());
+                
             }       
             
             // 
