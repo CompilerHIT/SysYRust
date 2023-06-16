@@ -301,6 +301,9 @@ impl LIRInst {
                 let mut regs = self.operands.clone();
                 let mut res = Vec::new();
                 while let Some(operand) = regs.pop() {
+                    if operand == *self.get_dst() {
+                        continue;
+                    }
                     match operand {
                         Operand::Reg(reg) => res.push(reg),
                         _ => {}
