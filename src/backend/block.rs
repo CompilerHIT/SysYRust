@@ -471,12 +471,24 @@ impl BB {
                                     pool,
                                 );
                             }
+                            match addr.get_gep_ptr().get_kind() {
+                                // 使用全局数组，addr_reg获得的是地址，而非寄存器，因此需要加载
+                                InstKind::Alloca(..) => {
+                                    let addr = addr_reg.clone();
+                                    addr_reg = Operand::Reg(Reg::init(ScalarType::Int));
+                                    self.insts.push(pool.put_inst(LIRInst::new(
+                                        InstrsType::OpReg(SingleOp::LoadAddr),
+                                        vec![addr_reg.clone(), addr]
+                                    )));
+                                },
+                                _ => {}
+                            }
                             match addr.get_gep_offset().get_kind() {
                                 InstKind::ConstInt(offset) | InstKind::GlobalConstInt(offset) => {
                                     self.insts.push(pool.put_inst(LIRInst::new(
                                         InstrsType::Store,
                                         vec![
-                                            addr_reg,
+                                            addr_reg.clone(),
                                             value_reg,
                                             Operand::IImm(IImm::new(offset * 4)),
                                         ],
@@ -598,6 +610,7 @@ impl BB {
                         None => unreachable!("false block not found"),
                     };
 
+                    let mut bz = false;
                     match cond_ref.get_kind() {
                         InstKind::Binary(cond) => {
                             let lhs_reg = self.resolve_operand(
@@ -623,20 +636,30 @@ impl BB {
                                 BinOp::Lt => InstrsType::Branch(CmpOp::Lt),
                                 // BinOp::And =>
                                 _ => {
-                                    // log!("{:?}", cond);
-                                    // log!("left{:?}", cond_ref.get_lhs().get_kind());
-                                    // log!("right{:?}", cond_ref.get_rhs().get_kind());
-                                    unreachable!("no condition match")
+                                    // 无法匹配，认为是if(a)情况，与0进行比较
+                                    bz = true;
+                                    InstrsType::Branch(CmpOp::Eqz)
                                 }
                             };
-                            self.insts.push(pool.put_inst(LIRInst::new(
-                                inst_kind,
-                                vec![
-                                    Operand::Addr(false_succ_block.label.to_string()),
-                                    lhs_reg,
-                                    rhs_reg,
-                                ],
-                            )));
+                            if bz {
+                                let src_reg = self.resolve_operand(func, cond_ref, true, map_info, pool);
+                                self.insts.push(pool.put_inst(LIRInst::new(
+                                    inst_kind,
+                                    vec![
+                                        Operand::Addr(false_succ_block.label.to_string()),
+                                        src_reg
+                                    ]
+                                )))
+                            } else {
+                                self.insts.push(pool.put_inst(LIRInst::new(
+                                    inst_kind,
+                                    vec![
+                                        Operand::Addr(false_succ_block.label.to_string()),
+                                        lhs_reg,
+                                        rhs_reg,
+                                    ],
+                                )));
+                            }
                             self.push_back(pool.put_inst(LIRInst::new(
                                 InstrsType::Jump,
                                 vec![Operand::Addr(true_succ_block.label.to_string())],
@@ -658,12 +681,13 @@ impl BB {
                         }
                         _ => {
                             // log!("{:?}", cond_ref.get_kind());
-                            let lhs_reg =
+                            let src_reg =
                                 self.resolve_operand(func, cond_ref, true, map_info, pool);
+                            log!("branch src reg: {:?}", src_reg);
                             let inst_kind = InstrsType::Branch(CmpOp::Eqz);
                             self.insts.push(pool.put_inst(LIRInst::new(
                                 inst_kind,
-                                vec![Operand::Addr(false_succ_block.label.to_string()), lhs_reg],
+                                vec![Operand::Addr(false_succ_block.label.to_string()), src_reg],
                             )));
                             self.push_back(pool.put_inst(LIRInst::new(
                                 InstrsType::Jump,
@@ -1327,7 +1351,7 @@ impl BB {
                     }
                 };
                 // log!("inst kind: {:?}", src.get_kind());
-                // log!("new reg: {:?}", op);
+                log!("new reg: {:?}", op);
                 map.val_map.insert(src, op.clone());
                 op
             }
@@ -1488,8 +1512,8 @@ impl BB {
     ) -> Operand {
         if !self.global_map.contains_key(&src) {
             let reg = match src.as_ref().get_ir_type() {
-                IrType::Int => Operand::Reg(Reg::init(ScalarType::Int)),
-                IrType::Float => Operand::Reg(Reg::init(ScalarType::Float)),
+                IrType::Int | IrType::IntPtr | IrType::FloatPtr => Operand::Reg(Reg::init(ScalarType::Int)),
+                IrType::Float  => Operand::Reg(Reg::init(ScalarType::Float)),
                 _ => unreachable!("cannot reach, global var is either int or float"),
             };
             self.global_map.insert(src, reg.clone());
@@ -1508,7 +1532,7 @@ impl BB {
             self.insts.push(pool.put_inst(inst));
             reg
         } else {
-            // log!("find!");
+            log!("find! {:?}", src);
             return self.global_map.get(&src).unwrap().clone();
         }
     }

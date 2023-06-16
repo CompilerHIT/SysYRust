@@ -130,7 +130,7 @@ impl GenerateAsm for LIRInst {
                 };
                 let addr = match self.get_dst() {
                     Operand::Reg(reg) => reg.to_string(),
-                    _ => panic!("dst of store must be reg, to improve"),
+                    _ => panic!("dst of store must be reg, but is {:?} as Inst:{:?}", self.get_dst(), self),
                 };
                 builder.s(
                     &src,
