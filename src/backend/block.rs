@@ -471,18 +471,18 @@ impl BB {
                                     pool,
                                 );
                             }
-                            match addr.get_gep_ptr().get_kind() {
-                                // 使用全局数组，addr_reg获得的是地址，而非寄存器，因此需要加载
-                                InstKind::Alloca(..) => {
-                                    let addr = addr_reg.clone();
-                                    addr_reg = Operand::Reg(Reg::init(ScalarType::Int));
-                                    self.insts.push(pool.put_inst(LIRInst::new(
-                                        InstrsType::OpReg(SingleOp::LoadAddr),
-                                        vec![addr_reg.clone(), addr]
-                                    )));
-                                },
-                                _ => {}
-                            }
+                            // match addr_reg {
+                            //     // 使用全局数组，addr_reg获得的是地址，而非寄存器，因此需要加载
+                            //     Operand::Addr(..) => {
+                            //         let addr = addr_reg.clone();
+                            //         addr_reg = Operand::Reg(Reg::init(ScalarType::Int));
+                            //         self.insts.push(pool.put_inst(LIRInst::new(
+                            //             InstrsType::OpReg(SingleOp::LoadAddr),
+                            //             vec![addr_reg.clone(), addr]
+                            //         )));
+                            //     },
+                            //     _ => {}
+                            // }
                             match addr.get_gep_offset().get_kind() {
                                 InstKind::ConstInt(offset) | InstKind::GlobalConstInt(offset) => {
                                     self.insts.push(pool.put_inst(LIRInst::new(
@@ -1512,7 +1512,7 @@ impl BB {
     ) -> Operand {
         if !self.global_map.contains_key(&src) {
             let reg = match src.as_ref().get_ir_type() {
-                IrType::Int | IrType::IntPtr | IrType::FloatPtr => Operand::Reg(Reg::init(ScalarType::Int)),
+                IrType::Int => Operand::Reg(Reg::init(ScalarType::Int)),
                 IrType::Float  => Operand::Reg(Reg::init(ScalarType::Float)),
                 _ => unreachable!("cannot reach, global var is either int or float"),
             };
