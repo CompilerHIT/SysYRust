@@ -23,6 +23,7 @@ use crate::ir::basicblock::BasicBlock;
 use crate::ir::function::Function;
 use crate::ir::instruction::Inst;
 use crate::ir::ir_type::IrType;
+use crate::log_file;
 use crate::utility::{ObjPtr, ScalarType};
 
 #[derive(Clone)]
@@ -262,24 +263,25 @@ impl Func {
     }
 
     pub fn calc_live(&mut self) {
+        let calc_live_file="callive.txt";
         // 打印函数里面的寄存器活跃情况
         let printinterval = || {
             let mut que: VecDeque<ObjPtr<BB>> = VecDeque::new();
             let mut passed_bb = HashSet::new();
             que.push_front(self.entry.unwrap());
             passed_bb.insert(self.entry.unwrap());
-            log!("func:{}", self.label);
+            log_file!(calc_live_file,"func:{}", self.label);
             while !que.is_empty() {
                 let cur_bb = que.pop_front().unwrap();
-                // log!("block {}:",cur_bb.label);
-                // log!("live in:");
-                // log!("{:?}",cur_bb.live_in);
-                // log!("live out:");
-                // log!("{:?}",cur_bb.live_out);
-                // log!("live use:");
-                // log!("{:?}",cur_bb.live_use);
-                // log!("live def:");
-                // log!("{:?}",cur_bb.live_def);
+                log_file!(calc_live_file,"block {}:",cur_bb.label);
+                log_file!(calc_live_file,"live in:");
+                log_file!(calc_live_file,"{:?}",cur_bb.live_in);
+                log_file!(calc_live_file,"live out:");
+                log_file!(calc_live_file,"{:?}",cur_bb.live_out);
+                log_file!(calc_live_file,"live use:");
+                log_file!(calc_live_file,"{:?}",cur_bb.live_use);
+                log_file!(calc_live_file,"live def:");
+                log_file!(calc_live_file,"{:?}",cur_bb.live_def);
                 for next in cur_bb.out_edge.iter() {
                     if passed_bb.contains(next) {
                         continue;
@@ -290,7 +292,7 @@ impl Func {
             }
         };
 
-        // log!("-----------------------------------before count live def,live use----------------------------");
+        log_file!(calc_live_file,"-----------------------------------before count live def,live use----------------------------");
         printinterval();
 
         // 计算公式，live in 来自于所有前继的live out的集合 + 自身的live use
@@ -307,7 +309,7 @@ impl Func {
             block.as_mut().live_use.clear();
             block.as_mut().live_def.clear();
             for it in block.as_ref().insts.iter().rev() {
-                // log!("{:?}",it);
+                log_file!(calc_live_file,"{:?}",it);
                 for reg in it.as_ref().get_reg_def().into_iter() {
                     if reg.is_virtual() || reg.is_allocable() {
                         block.as_mut().live_use.remove(&reg);
@@ -320,8 +322,6 @@ impl Func {
                         block.as_mut().live_use.insert(reg);
                     }
                 }
-                log!("use:{:?}", it.get_reg_use());
-                log!("def:{:?}", it.get_reg_def());
             }
 
             //
@@ -332,7 +332,7 @@ impl Func {
             block.as_mut().live_out.clear();
         }
 
-        log!("-----------------------------------before count live in,live out----------------------------");
+        log_file!(calc_live_file,"-----------------------------------before count live in,live out----------------------------");
         printinterval();
 
         //然后计算live in 和live out
@@ -356,8 +356,9 @@ impl Func {
     pub fn allocate_reg(&mut self, f: &mut File) {
         // 函数返回地址保存在ra中
         self.calc_live();
-        let mut allocator = Allocator::new();
+        // let mut allocator = Allocator::new();
         // let mut allocator =crate::backend::regalloc::easy_gc_alloc::Allocator::new();
+        let mut allocator=crate::backend::regalloc::base_alloc::Allocator::new();
         let alloc_stat = allocator.alloc(self);
 
         self.reg_alloc_info = alloc_stat;
