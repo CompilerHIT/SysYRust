@@ -152,7 +152,7 @@ impl Inst {
         self.list.get_prev()
     }
 
-    /// 获得当前指令的下一条指令。若为最后一条指令，则返回None
+    /// 获得当前指令的下一条指令。
     pub fn get_next(&self) -> ObjPtr<Inst> {
         self.list.get_next()
     }
