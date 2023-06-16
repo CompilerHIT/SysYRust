@@ -113,7 +113,7 @@ impl<'a> AsmModule<'a> {
 
     fn generate_global_var(&self, f: &mut File) {
         if self.global_var_list.len() > 0 {
-            writeln!(f, "	.data");
+            writeln!(f, "    .data");
         }
         for (inst, iter) in self.global_var_list.iter() {
             match iter {

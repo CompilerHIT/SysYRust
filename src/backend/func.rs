@@ -47,7 +47,6 @@ pub struct Func {
 
     pub const_array: HashSet<IntArray>,
     pub floats: Vec<(String, f32)>,
-    pub max_params: (i32, i32),
     //FIXME: resolve float regs
     pub callee_saved: HashSet<Reg>,
     pub caller_saved: HashMap<i32, i32>,
@@ -75,7 +74,6 @@ impl Func {
             spill_stack_map: HashMap::new(),
             const_array: HashSet::new(),
             floats: Vec::new(),
-            max_params: (0, 0),
             callee_saved: HashSet::new(),
             caller_saved: HashMap::new(),
         }
@@ -370,9 +368,6 @@ impl Func {
         let mut stack_size = self.reg_alloc_info.stack_size as i32;
         // log!("stack_size: {}", stack_size);
 
-        let (icnt, fcnt) = self.max_params;
-        stack_size += (icnt + fcnt) * 8;
-
         self.context.as_mut().set_offset(stack_size);
     }
 
@@ -443,7 +438,6 @@ impl Func {
         self.stack_addr = func_ref.stack_addr.clone();
         self.spill_stack_map = func_ref.spill_stack_map.clone();
         self.const_array = func_ref.const_array.clone();
-        self.max_params = func_ref.max_params;
         self.callee_saved = func_ref.callee_saved.clone();
         self.caller_saved = func_ref.caller_saved.clone();
     }
@@ -477,6 +471,8 @@ impl Func {
         if let Some(addition_stack_info) = self.stack_addr.front() {
             stack_size += addition_stack_info.get_pos() + addition_stack_info.get_size();
         }
+
+        stack_size += self.caller_saved.len() as i32 * ADDR_SIZE;
 
         //栈对齐 - 调用func时sp需按16字节对齐
         stack_size = stack_size / 16 * 16 + 16;

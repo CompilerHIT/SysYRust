@@ -703,8 +703,6 @@ impl BB {
                             unreachable!("call arg type not match, either be int or float")
                         }
                     }
-                    let (x, y) = func.max_params;
-                    func.as_mut().max_params = (max(x, icnt), max(y, fcnt));
                     for arg in arg_list.iter().rev() {
                         match arg.as_ref().get_param_type() {
                             IrType::Int | IrType::IntPtr => {
