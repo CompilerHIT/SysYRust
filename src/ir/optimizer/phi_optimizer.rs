@@ -1,10 +1,7 @@
 use std::collections::HashSet;
 
 use crate::{
-    ir::{
-        basicblock::BasicBlock,
-        instruction::{Inst, InstKind},
-    },
+    ir::{basicblock::BasicBlock, instruction::InstKind},
     utility::ObjPtr,
 };
 
@@ -43,7 +40,7 @@ fn phi_optimize(bb: ObjPtr<BasicBlock>) -> bool {
     if bb.is_empty() {
         return changed;
     }
-    let inst = bb.get_head_inst();
+    let mut inst = bb.get_head_inst();
     while let InstKind::Phi = inst.get_kind() {
         if inst
             .get_operands()
@@ -55,6 +52,8 @@ fn phi_optimize(bb: ObjPtr<BasicBlock>) -> bool {
             for user in inst.get_use_list() {
                 user.as_mut().replace_operand(inst, inst.get_operands()[0]);
             }
+            inst = inst.get_next();
+            inst.get_prev().remove_self();
         }
     }
 

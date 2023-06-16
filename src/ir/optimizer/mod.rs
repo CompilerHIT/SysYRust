@@ -1,11 +1,8 @@
+use super::{basicblock::BasicBlock, module::Module};
+use crate::utility::ObjPtr;
 use std::collections::HashSet;
 
-use crate::utility::ObjPtr;
-
-use self::phi_optimizer::phi_run;
-
-use super::{basicblock::BasicBlock, module::Module};
-
+mod dead_code_eliminate;
 mod phi_optimizer;
 
 pub fn optimizer_run(module: &mut Module, optimize_flag: bool) {
@@ -26,10 +23,11 @@ fn functional_optimizer(module: &mut Module) {
 
         let end_bb = bfs_find_end_bb(func.get_head());
 
-        // TODO: 一遍简单的冗余代码删除
+        // 一遍死代码删除
+        dead_code_eliminate::dead_code_eliminate(end_bb);
 
         // phi优化
-        phi_run(end_bb);
+        phi_optimizer::phi_run(end_bb);
     }
 }
 

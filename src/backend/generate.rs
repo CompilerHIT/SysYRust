@@ -4,6 +4,7 @@ use std::fs::File;
 impl GenerateAsm for LIRInst {
     fn generate(&mut self, context: ObjPtr<Context>, f: &mut File) -> Result<()> {
         let mut builder = AsmBuilder::new(f);
+        // println!("generate: {:?}", self);
         match self.get_type() {
             InstrsType::Binary(op) => {
                 let op = match op {
@@ -78,7 +79,7 @@ impl GenerateAsm for LIRInst {
                     Operand::Addr(addr) => addr.to_string(),
                     _ => unreachable!("src of single op must be reg or imm, to improve"),
                 };
-                if dst == src {
+                if dst == src && op == "mv" {
                     return Ok(());
                 }
                 builder.op1(op, &dst, &src)?;
@@ -259,7 +260,6 @@ impl GenerateAsm for LIRInst {
             // }
         }
         //InstrsType::GenerateArray => {
-        //TODO: generate array
         // .LC + {array_num}    .word {array_num} ...
         //   Ok(())
         //}

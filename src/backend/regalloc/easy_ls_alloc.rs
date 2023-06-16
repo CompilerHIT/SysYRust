@@ -1,4 +1,3 @@
-use crate::algorithm::graphalgo;
 use crate::algorithm::graphalgo::Graph;
 use crate::backend::block::BB;
 use crate::backend::func::Func;
@@ -81,7 +80,7 @@ impl Allocator {
     // 深度分配
     fn dfs_bbs(&mut self, bb: ObjPtr<BB>) {
         let n = self.passed.len();
-        //println!("bb.length:{n}");
+        ////println!("bb.length:{n}");
         if self.passed.contains(&bb) {
             return;
         }
@@ -89,13 +88,13 @@ impl Allocator {
         self.depths.insert(bb, self.base);
         self.passed.insert(bb.clone());
         self.base += 1;
-        // //println!("before");
+        // ////println!("before");
         // 深度优先遍历后面的块
         for next in &bb.as_ref().out_edge {
             self.dfs_bbs(next.clone());
-            //println!("after clone ");
+            ////println!("after clone ");
         }
-        //println!("once end");
+        ////println!("once end");
     }
     // 指令编号
     fn inst_record(&mut self, bb: ObjPtr<BB>) {
@@ -149,7 +148,7 @@ impl Allocator {
                 if !reg.is_virtual() {
                     continue;
                 }
-                self.intervals.insert(reg.get_id(),i );
+                self.intervals.insert(reg.get_id(), i);
             }
         }
     }
@@ -180,13 +179,13 @@ impl Allocator {
         while !walk.is_empty() {
             let cur = walk.pop_front().unwrap();
             let mut bbspillings: HashSet<i32> = HashSet::new();
-            println!("{}",cur.label);
+            //println!("{}",cur.label);
             for reg in &cur.as_ref().live_in {
                 if spillings.contains(&reg.get_id()) {
                     bbspillings.insert(reg.get_id());
                 }
             }
-            let start=bbspillings.len()*8;
+            let start = bbspillings.len() * 8;
             bb_stack_sizes.insert(cur, start);
             bbspillings.clear();
             // 统计spilling数量
@@ -202,8 +201,8 @@ impl Allocator {
                     }
                 }
             }
-            if bbspillings.len()*8+start > stackSize {
-                stackSize = bbspillings.len()*8+start;
+            if bbspillings.len() * 8 + start > stackSize {
+                stackSize = bbspillings.len() * 8 + start;
             }
             // 扩展未扩展的节点
             for bb in &cur.as_ref().out_edge {
@@ -236,7 +235,7 @@ impl Allocator {
                         let iereg: i32 = *dstr.get(&min.id).unwrap();
                         reg_used_stat.release_ireg(iereg);
                         iwindow.pop_front();
-                    }else{
+                    } else {
                         break;
                     }
                 }
@@ -248,20 +247,17 @@ impl Allocator {
                         let fereg: i32 = *dstr.get(&min.id).unwrap();
                         reg_used_stat.release_freg(fereg);
                         fwindow.pop_front();
-                    }else{
+                    } else {
                         break;
                     }
                 }
             }
 
             for reg in it.as_ref().get_reg_def() {
-
                 if !reg.is_virtual() {
                     continue;
                 }
-                
-                
-                
+
                 let id = reg.get_id();
                 // 如果已经在dstr的key中，也就是已经分配，则忽略处理
                 if dstr.contains_key(&id) {
@@ -328,8 +324,6 @@ impl Allocator {
                     }
                 }
             }
-        
-            
         }
         (spillings, dstr)
     }
@@ -369,18 +363,18 @@ impl Regalloc for Allocator {
 
         // 第四次遍历，堆滑动窗口更新获取FuncAllocStat
         let (spillings, dstr) = self.allocRegister();
-        // println!("_______________________________________________");
-        // println!("{}",func.label);
-        // println!("{:?}",spillings);
+        // //println!("_______________________________________________");
+        // //println!("{}",func.label);
+        // //println!("{:?}",spillings);
         let (stack_size, bb_stack_sizes) = Allocator::countStackSize(func, &spillings);
         // let stack_size=spillings.len(); //TO REMOVE
-        let mut out=FuncAllocStat {
+        let mut out = FuncAllocStat {
             stack_size,
             bb_stack_sizes,
             spillings,
             dstr,
         };
-        // println!("{:?}",out.spillings);
+        // //println!("{:?}",out.spillings);
         out
     }
 }

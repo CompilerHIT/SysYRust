@@ -944,6 +944,7 @@ impl BB {
         self.insts.append(inst);
     }
 
+
     pub fn handle_spill(
         &mut self,
         func: ObjPtr<Func>,
@@ -1060,8 +1061,23 @@ impl BB {
                     // // println!("------------------");
                     inst.as_mut().replace(spills[i as usize], 5 + i)
                 }
-
-                index += 1;
+                match inst.get_dst() {
+                    Operand::Reg(_) => {
+                        match inst.get_type() {
+                            InstrsType::Store | InstrsType::StoreParamToStack | InstrsType::StoreToStack => {
+                                index += 1;
+                                continue;
+                            },
+                            _ => {
+                                index += 1;
+                            }
+                        }
+                    },
+                    _ => {
+                        index += 1;
+                        continue;
+                    }
+                }
 
                 for i in 0..len {
                     let reg = Operand::Reg(Reg::new(5 + i, ScalarType::Int));
@@ -1768,7 +1784,7 @@ impl GenerateAsm for BB {
             builder.show_block(&self.label)?;
         }
         for inst in self.insts.iter() {
-            // println!("generate inst: {:?}", inst);
+            // println!("{:?}, generate", self.label);
             inst.as_mut().v_to_phy(context.get_reg_map().clone());
             inst.as_mut().generate(context.clone(), f)?;
         }
