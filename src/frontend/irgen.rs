@@ -1592,11 +1592,12 @@ impl Process for While {
         // kit_mut.context_mut.push_inst_bb(inst_branch); //当前basicblock中放入branch指令
         kit_mut.context_mut.bb_now_set(block_while_head); //设置当前basicblock
                                                           // // println!("while_body process starts");
+        // let (inst_cond, val_cond) = self.cond.process((Type::Int,Some(block_while_head), Some(block_false)), kit_mut).unwrap(); //当前块中放入cond
         self.body
             .process((Some(block_while_head), Some(block_false)), kit_mut)
             .unwrap(); //在块内生成指令
                        // // println!("while_body process finished");
-        let (inst_cond, val_cond) = self.cond.process((Type::Int,Some(block_while_head), Some(block_false)), kit_mut).unwrap(); //当前块中放入cond
+        
                                                                                     // // println!("cond process finished");
         // let inst_branch = kit_mut.pool_inst_mut.make_br(inst_cond);
         // kit_mut.context_mut.push_inst_bb(inst_branch); //当前basicblock中放入branch指令
