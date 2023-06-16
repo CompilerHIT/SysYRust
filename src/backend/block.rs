@@ -610,7 +610,6 @@ impl BB {
                         None => unreachable!("false block not found"),
                     };
 
-                    let mut bz = false;
                     match cond_ref.get_kind() {
                         InstKind::Binary(cond) => {
                             let lhs_reg = self.resolve_operand(
@@ -627,6 +626,7 @@ impl BB {
                                 map_info,
                                 pool,
                             );
+                            let mut bz = false;
                             let inst_kind = match cond {
                                 BinOp::Eq => InstrsType::Branch(CmpOp::Eq),
                                 BinOp::Ne => InstrsType::Branch(CmpOp::Ne),
@@ -681,13 +681,12 @@ impl BB {
                         }
                         _ => {
                             // log!("{:?}", cond_ref.get_kind());
-                            let src_reg =
+                            let lhs_reg =
                                 self.resolve_operand(func, cond_ref, true, map_info, pool);
-                            log!("branch src reg: {:?}", src_reg);
                             let inst_kind = InstrsType::Branch(CmpOp::Eqz);
                             self.insts.push(pool.put_inst(LIRInst::new(
                                 inst_kind,
-                                vec![Operand::Addr(false_succ_block.label.to_string()), src_reg],
+                                vec![Operand::Addr(false_succ_block.label.to_string()), lhs_reg],
                             )));
                             self.push_back(pool.put_inst(LIRInst::new(
                                 InstrsType::Jump,
@@ -1351,7 +1350,7 @@ impl BB {
                     }
                 };
                 // log!("inst kind: {:?}", src.get_kind());
-                log!("new reg: {:?}", op);
+                // log!("new reg: {:?}", op);
                 map.val_map.insert(src, op.clone());
                 op
             }
@@ -1513,7 +1512,7 @@ impl BB {
         if !self.global_map.contains_key(&src) {
             let reg = match src.as_ref().get_ir_type() {
                 IrType::Int => Operand::Reg(Reg::init(ScalarType::Int)),
-                IrType::Float  => Operand::Reg(Reg::init(ScalarType::Float)),
+                IrType::Float => Operand::Reg(Reg::init(ScalarType::Float)),
                 _ => unreachable!("cannot reach, global var is either int or float"),
             };
             self.global_map.insert(src, reg.clone());
@@ -1532,7 +1531,7 @@ impl BB {
             self.insts.push(pool.put_inst(inst));
             reg
         } else {
-            log!("find! {:?}", src);
+            // log!("find!");
             return self.global_map.get(&src).unwrap().clone();
         }
     }
