@@ -126,6 +126,15 @@ impl RegUsedStat {
     }
 
 
+    pub fn release_reg(&mut self,reg:i32){
+        if reg>=0&&reg<32 {self.release_ireg(reg);}
+        else if reg>=32&&reg<63 {self.release_freg(reg);}
+    }
+    pub fn use_reg(&mut self,reg:i32){
+        if reg>=0&&reg<32 {self.use_ireg(reg);}
+        else if reg>=32&&reg<63 {self.use_freg(reg);}
+    }
+    
 
 
     // 释放一个通用寄存器
