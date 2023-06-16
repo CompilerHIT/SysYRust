@@ -37,17 +37,7 @@ pub struct Allocator {
     spillings: HashSet<i32>,                          //记录溢出寄存器
 }
 
-impl fmt::Display for crate::backend::LIRInst {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "type:{:?} def:{:?},use:{:?}",
-            self.get_type(),
-            self.get_reg_def(),
-            self.get_reg_use()
-        )
-    }
-}
+
 
 impl Allocator {
     pub fn new() -> Allocator {

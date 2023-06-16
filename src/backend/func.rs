@@ -1,6 +1,7 @@
 use std::cmp::max;
 use std::collections::LinkedList;
 pub use std::collections::{HashSet, VecDeque};
+use std::fmt;
 pub use std::fs::File;
 pub use std::hash::{Hash, Hasher};
 pub use std::io::Result;
@@ -51,6 +52,8 @@ pub struct Func {
     //FIXME: resolve float regs
     pub callee_saved: HashSet<Reg>,
 }
+
+
 
 /// reg_num, stack_addr, caller_stack_addr考虑借助回填实现
 /// 是否需要caller_stack_addr？caller函数sp保存在s0中
@@ -272,15 +275,15 @@ impl Func {
             println!("func:{}",self.label);
             while !que.is_empty() {
                 let cur_bb=que.pop_front().unwrap();
-                // println!("block {}:",cur_bb.label);
-                // println!("live in:");
-                // println!("{:?}",cur_bb.live_in);
-                // println!("live out:");
-                // println!("{:?}",cur_bb.live_out);
-                // println!("live use:");
-                // println!("{:?}",cur_bb.live_use);
-                // println!("live def:");
-                // println!("{:?}",cur_bb.live_def);
+                println!("block {}:",cur_bb.label);
+                println!("live in:");
+                println!("{:?}",cur_bb.live_in);
+                println!("live out:");
+                println!("{:?}",cur_bb.live_out);
+                println!("live use:");
+                println!("{:?}",cur_bb.live_use);
+                println!("live def:");
+                println!("{:?}",cur_bb.live_def);
                 for next in cur_bb.out_edge.iter() {
                     if passed_bb.contains(next) {continue;}
                     passed_bb.insert(*next);
@@ -289,7 +292,7 @@ impl Func {
             }
         };
 
-        // println!("-----------------------------------before count live def,live use----------------------------");
+        println!("-----------------------------------before count live def,live use----------------------------");
         printinterval();
 
         // 计算公式，live in 来自于所有前继的live out的集合 + 自身的live use
@@ -306,7 +309,7 @@ impl Func {
             block.as_mut().live_use.clear();
             block.as_mut().live_def.clear();
             for it in block.as_ref().insts.iter().rev() {
-                // println!("{:?}",it);
+                println!("{}",it.as_ref());
                 for reg in it.as_ref().get_reg_def().into_iter() {
                     if reg.is_virtual() || reg.is_allocable() {
                         block.as_mut().live_use.remove(&reg);
@@ -319,8 +322,8 @@ impl Func {
                         block.as_mut().live_use.insert(reg);
                     }
                 }
-                println!("use:{:?}",it.get_reg_use());
-                println!("def:{:?}",it.get_reg_def());
+                // println!("use:{:?}",it.get_reg_use());
+                // println!("def:{:?}",it.get_reg_def());
             }       
             
             // 
