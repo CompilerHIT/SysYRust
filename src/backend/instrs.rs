@@ -323,11 +323,10 @@ impl LIRInst {
             InstrsType::Binary(..)
             | InstrsType::OpReg(..)
             | InstrsType::Load
-            | InstrsType::Store
             | InstrsType::LoadFromStack
             | InstrsType::LoadParamFromStack => match self.operands[0] {
                 Operand::Reg(dst_reg) => vec![dst_reg],
-                _ => panic!("dst must be reg"),
+                _ => panic!("dst must be reg, but actually is {:?}, at LIRInst:{:?}", self.operands[0], self),
             },
             InstrsType::Call => {
                 let mut set = Vec::new();
@@ -349,7 +348,8 @@ impl LIRInst {
             InstrsType::StoreToStack
             | InstrsType::StoreParamToStack
             | InstrsType::Jump
-            | InstrsType::Branch(..) => vec![],
+            | InstrsType::Branch(..)
+            | InstrsType::Store => vec![],
 
             InstrsType::Ret(re_type) => match re_type {
                 ScalarType::Int => vec![Reg::new(10, ScalarType::Int)],

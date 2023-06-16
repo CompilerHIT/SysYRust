@@ -471,12 +471,24 @@ impl BB {
                                     pool,
                                 );
                             }
+                            // match addr_reg {
+                            //     // 使用全局数组，addr_reg获得的是地址，而非寄存器，因此需要加载
+                            //     Operand::Addr(..) => {
+                            //         let addr = addr_reg.clone();
+                            //         addr_reg = Operand::Reg(Reg::init(ScalarType::Int));
+                            //         self.insts.push(pool.put_inst(LIRInst::new(
+                            //             InstrsType::OpReg(SingleOp::LoadAddr),
+                            //             vec![addr_reg.clone(), addr]
+                            //         )));
+                            //     },
+                            //     _ => {}
+                            // }
                             match addr.get_gep_offset().get_kind() {
                                 InstKind::ConstInt(offset) | InstKind::GlobalConstInt(offset) => {
                                     self.insts.push(pool.put_inst(LIRInst::new(
                                         InstrsType::Store,
                                         vec![
-                                            addr_reg,
+                                            addr_reg.clone(),
                                             value_reg,
                                             Operand::IImm(IImm::new(offset * 4)),
                                         ],
@@ -614,6 +626,7 @@ impl BB {
                                 map_info,
                                 pool,
                             );
+                            let mut bz = false;
                             let inst_kind = match cond {
                                 BinOp::Eq => InstrsType::Branch(CmpOp::Eq),
                                 BinOp::Ne => InstrsType::Branch(CmpOp::Ne),
@@ -623,20 +636,30 @@ impl BB {
                                 BinOp::Lt => InstrsType::Branch(CmpOp::Lt),
                                 // BinOp::And =>
                                 _ => {
-                                    // log!("{:?}", cond);
-                                    // log!("left{:?}", cond_ref.get_lhs().get_kind());
-                                    // log!("right{:?}", cond_ref.get_rhs().get_kind());
-                                    unreachable!("no condition match")
+                                    // 无法匹配，认为是if(a)情况，与0进行比较
+                                    bz = true;
+                                    InstrsType::Branch(CmpOp::Eqz)
                                 }
                             };
-                            self.insts.push(pool.put_inst(LIRInst::new(
-                                inst_kind,
-                                vec![
-                                    Operand::Addr(false_succ_block.label.to_string()),
-                                    lhs_reg,
-                                    rhs_reg,
-                                ],
-                            )));
+                            if bz {
+                                let src_reg = self.resolve_operand(func, cond_ref, true, map_info, pool);
+                                self.insts.push(pool.put_inst(LIRInst::new(
+                                    inst_kind,
+                                    vec![
+                                        Operand::Addr(false_succ_block.label.to_string()),
+                                        src_reg
+                                    ]
+                                )))
+                            } else {
+                                self.insts.push(pool.put_inst(LIRInst::new(
+                                    inst_kind,
+                                    vec![
+                                        Operand::Addr(false_succ_block.label.to_string()),
+                                        lhs_reg,
+                                        rhs_reg,
+                                    ],
+                                )));
+                            }
                             self.push_back(pool.put_inst(LIRInst::new(
                                 InstrsType::Jump,
                                 vec![Operand::Addr(true_succ_block.label.to_string())],

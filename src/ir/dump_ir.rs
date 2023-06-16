@@ -329,7 +329,7 @@ fn dump_inst(
                 name = global_map.get(&ptr).unwrap().clone();
             } else {
                 ptr = inst.get_ptr();
-                name = local_map.get(&ptr).unwrap().clone();
+                name = get_inst_value(inst, local_map, global_map)
             };
             if let InstKind::Parameter = ptr.get_kind() {
                 if let IrType::IntPtr = ptr.get_ir_type() {

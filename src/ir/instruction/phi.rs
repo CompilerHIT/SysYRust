@@ -34,7 +34,10 @@ impl Inst {
     /// * 'index' - 操作数的索引
     pub fn set_operand(&mut self, mut operand: ObjPtr<Inst>, index: usize) {
         // 正确性检查
-        debug_assert_eq!(self.get_ir_type(), operand.get_ir_type());
+        debug_assert_eq!(
+            self.get_operands()[index].get_ir_type(),
+            operand.get_ir_type()
+        );
 
         // 修改use list
         self.user.get_operand(index).remove_user(self);
