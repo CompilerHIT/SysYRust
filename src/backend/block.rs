@@ -1771,7 +1771,7 @@ impl GenerateAsm for BB {
             builder.show_block(&self.label)?;
         }
         for inst in self.insts.iter() {
-            println!("generate inst: {:?}", inst);
+            // println!("generate inst: {:?}", inst);
             inst.as_mut().v_to_phy(context.get_reg_map().clone());
             inst.as_mut().generate(context.clone(), f)?;
         }

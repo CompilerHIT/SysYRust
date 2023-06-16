@@ -216,10 +216,10 @@ impl Func {
         // println!("phi insert size: {}", size);
 
         for block in self.blocks.iter() {
-            // // println!("-----------------");
-            // // println!("block: {:?}", block.label);
+            println!("-----------------");
+            println!("block: {:?}", block.label);
             for inst in block.insts.iter() {
-                // // println!("row inst: {:?}", inst);
+                println!("row inst: {:?}", inst);
             }
         }
         self.update(this);
