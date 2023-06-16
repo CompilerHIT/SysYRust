@@ -48,6 +48,7 @@ pub struct Func {
     pub max_params: (i32, i32),
     //FIXME: resolve float regs
     pub callee_saved: HashSet<Reg>,
+    pub caller_saved: HashMap<i32, i32>
 }
 
 /// reg_num, stack_addr, caller_stack_addr考虑借助回填实现
@@ -74,6 +75,7 @@ impl Func {
             floats: Vec::new(),
             max_params: (0, 0),
             callee_saved: HashSet::new(),
+            caller_saved: HashMap::new(),
         }
     }
 
@@ -388,6 +390,7 @@ impl Func {
         self.const_array = func_ref.const_array.clone();
         self.max_params = func_ref.max_params;
         self.callee_saved = func_ref.callee_saved.clone();
+        self.caller_saved = func_ref.caller_saved.clone();
     }
 
     fn save_callee(&mut self, pool: &mut BackendPool, f: &mut File) {

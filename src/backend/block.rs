@@ -953,7 +953,6 @@ impl BB {
     ) {
         let mut start_pos = pos;
         let mut index = 0;
-        let mut reg_mapping: HashMap<i32, i32> = HashMap::new();
         loop {
             if index >= self.insts.len() {
                 break;
@@ -965,7 +964,7 @@ impl BB {
                     Operand::Reg(reg) => {
                         //FIXME: solve float regs
                         if let Some(phy_id) = func.reg_alloc_info.dstr.get(&reg.get_id()) {
-                            reg_mapping.insert(*phy_id, reg.get_id());
+                            func.as_mut().caller_saved.insert(*phy_id, reg.get_id());
                             let save_reg = Reg::new(*phy_id, reg.get_type());
                             if save_reg.is_callee_save() {
                                 func.as_mut().callee_saved.insert(save_reg);
@@ -976,14 +975,13 @@ impl BB {
                     _ => {}
                 }
             }
-            let mut i = 0;
             let mut caller_regs: HashSet<i32> = HashSet::new();
             let (icnt, fcnt) = inst.get_param_cnts();
             //FIXME: solve float regs
             match inst.get_type() {
                 InstrsType::Call => {
                     for op in inst.get_reg_def().iter() {
-                        if let Some(reg) = reg_mapping.get(&op.get_id()) {
+                        if let Some(reg) = func.as_mut().caller_saved.get(&op.get_id()) {
                             if op.get_id() - 10 < icnt && op.get_id() >= 10 {
                                 continue;
                             }
