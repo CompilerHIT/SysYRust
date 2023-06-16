@@ -11,7 +11,7 @@
 use std::collections::HashSet;
 
 use crate::{
-    ir::{basicblock::BasicBlock, instruction::InstKind},
+    ir::{basicblock::BasicBlock, instruction::InstKind, module::Module},
     utility::ObjPtr,
 };
 
@@ -32,6 +32,20 @@ pub fn dead_code_eliminate(end_bb: ObjPtr<BasicBlock>) {
                 queue.insert(0, pred.clone());
             }
         }
+    }
+}
+
+pub fn global_elininate(module: &mut Module) {
+    let mut delete_list = Vec::new();
+
+    for (name, value) in module.get_all_var().iter() {
+        if value.get_use_list().len() == 0 {
+            delete_list.push(name.to_owned().to_owned());
+        }
+    }
+
+    for name in delete_list {
+        module.remove_var(name.as_str());
     }
 }
 
