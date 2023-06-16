@@ -1460,44 +1460,40 @@ impl Process for If {
     type Ret = i32;
     type Message = (Option<ObjPtr<BasicBlock>>, Option<ObjPtr<BasicBlock>>);
     fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
-        let (inst_cond, val_cond) = self.cond.process(Type::Int, kit_mut).unwrap();
-        let inst_branch = kit_mut.pool_inst_mut.make_br(inst_cond);
-        kit_mut.context_mut.push_inst_bb(inst_branch);
+        // let (inst_cond, val_cond) = self.cond.process(Type::Int, kit_mut).unwrap();
+        // let inst_branch = kit_mut.pool_inst_mut.make_br(inst_cond);
+        // kit_mut.context_mut.push_inst_bb(inst_branch);
 
         let bb_if_name = kit_mut.context_mut.get_newbb_name();
         let inst_bb_if = kit_mut.pool_bb_mut.new_basic_block(bb_if_name.clone());
-        // kit_mut.context_mut.is_branch_map.insert(bb_if_name, false); //初始化
+
 
         if let Some(stmt_else) = &mut self.else_then {
             //如果有else语句
             let bb_else_name = kit_mut.context_mut.get_newbb_name();
             let inst_bb_else = kit_mut.pool_bb_mut.new_basic_block(bb_else_name.clone());
-            // kit_mut
-            //     .context_mut
-            //     .is_branch_map
-            //     .insert(bb_else_name, false); //初始化
 
+            let (inst_cond, val_cond) = self.cond.process((Type::Int,Some(inst_bb_if),Some(inst_bb_else)), kit_mut).unwrap();
+            // let inst_branch = kit_mut.pool_inst_mut.make_br(inst_cond);
+
+            
             //生成一块新的bb
             let bb_successor_name = kit_mut.context_mut.get_newbb_name();
             let inst_bb_successor = kit_mut
                 .pool_bb_mut
                 .new_basic_block(bb_successor_name.clone());
-            // kit_mut
-            //     .context_mut
-            //     .is_branch_map
-            //     .insert(bb_successor_name, false); //初始化
 
-            match kit_mut.context_mut.bb_now_mut {
-                InfuncChoice::InFunc(bb_now) => {
-                    // // println!("下一块:{:?}", inst_bb_else.get_name());
-                    // // println!("下一块:{:?}", inst_bb_if.get_name());
-                    bb_now.as_mut().add_next_bb(inst_bb_else); //先放判断为假的else语句
-                    bb_now.as_mut().add_next_bb(inst_bb_if);
-                }
-                _ => {
-                    unreachable!()
-                }
-            }
+
+            // match kit_mut.context_mut.bb_now_mut {
+            //     InfuncChoice::InFunc(bb_now) => {
+
+            //         bb_now.as_mut().add_next_bb(inst_bb_else); //先放判断为假的else语句
+            //         bb_now.as_mut().add_next_bb(inst_bb_if);
+            //     }
+            //     _ => {
+            //         unreachable!()
+            //     }
+            // }
             kit_mut.context_mut.bb_now_set(inst_bb_else); //设置现在所在的bb块，准备归约
             stmt_else.process(input, kit_mut).unwrap(); //向该分支块内生成指令
                                                         //加一条直接跳转语句
@@ -1514,11 +1510,7 @@ impl Process for If {
                 }
             }
 
-            // let branch_flag_else = kit_mut
-            //     .context_mut
-            //     .is_branch_map
-            //     .get(inst_bb_else.get_name())
-            //     .unwrap();
+
             kit_mut.context_mut.bb_now_set(inst_bb_if);
             self.then.process(input, kit_mut).unwrap();
             kit_mut
@@ -1526,7 +1518,7 @@ impl Process for If {
                 .push_inst_bb(kit_mut.pool_inst_mut.make_jmp()); //bb_now_mut是if语句块的叶子交汇点
             match kit_mut.context_mut.bb_now_mut {
                 InfuncChoice::InFunc(bb_now) => {
-                    // // println!("下一块:{:?}", inst_bb_successor.get_name());
+
                     bb_now.as_mut().add_next_bb(inst_bb_successor); //向if分支的叶子交汇点bb_now_mut插入下一个节点
                 }
                 _ => {
@@ -1543,22 +1535,18 @@ impl Process for If {
             let inst_bb_successor = kit_mut
                 .pool_bb_mut
                 .new_basic_block(bb_successor_name.clone());
-            // kit_mut
-            //     .context_mut
-            //     .is_branch_map
-            //     .insert(bb_successor_name, false); //初始化
 
-            match kit_mut.context_mut.bb_now_mut {
-                InfuncChoice::InFunc(bb_now) => {
-                    // // println!("下一块:{:?}", inst_bb_successor.get_name());
-                    // // println!("下一块:{:?}", inst_bb_if.get_name());
-                    bb_now.as_mut().add_next_bb(inst_bb_successor); //先放判断为假的else语句
-                    bb_now.as_mut().add_next_bb(inst_bb_if);
-                }
-                _ => {
-                    unreachable!()
-                }
-            }
+                let (inst_cond, val_cond) = self.cond.process((Type::Int,Some(inst_bb_if),Some(inst_bb_successor)), kit_mut).unwrap();
+
+            // match kit_mut.context_mut.bb_now_mut {
+            //     InfuncChoice::InFunc(bb_now) => {
+            //         bb_now.as_mut().add_next_bb(inst_bb_successor); //先放判断为假的else语句
+            //         bb_now.as_mut().add_next_bb(inst_bb_if);
+            //     }
+            //     _ => {
+            //         unreachable!()
+            //     }
+            // }
             kit_mut.context_mut.bb_now_set(inst_bb_if);
             self.then.process(input, kit_mut).unwrap();
             kit_mut
@@ -1567,7 +1555,6 @@ impl Process for If {
 
             match kit_mut.context_mut.bb_now_mut {
                 InfuncChoice::InFunc(bb_now) => {
-                    // // println!("下一块:{:?}", inst_bb_successor.get_name());
                     bb_now.as_mut().add_next_bb(inst_bb_successor); //向if分支的叶子交汇点bb_now_mut插入下一个节点
                 }
                 _ => {
@@ -1583,32 +1570,36 @@ impl Process for While {
     type Ret = i32;
     type Message = (Option<ObjPtr<BasicBlock>>, Option<ObjPtr<BasicBlock>>);
     fn process(&mut self, _input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
-        let (inst_cond, val_cond) = self.cond.process(Type::Int, kit_mut).unwrap();
-        let inst_branch = kit_mut.pool_inst_mut.make_br(inst_cond);
-        kit_mut.context_mut.push_inst_bb(inst_branch); //当前basicblock中放入branch指令
+        // let (inst_cond, val_cond) = self.cond.process(Type::Int, kit_mut).unwrap();
+        // let inst_branch = kit_mut.pool_inst_mut.make_br(inst_cond);
+        // kit_mut.context_mut.push_inst_bb(inst_branch); //当前basicblock中放入branch指令
+
         let block_while_head_name = kit_mut.context_mut.get_newbb_name();
         let block_while_head = kit_mut.pool_bb_mut.new_basic_block(block_while_head_name); //生成新的块(false)
         let block_false_name = kit_mut.context_mut.get_newbb_name();
         let block_false = kit_mut.pool_bb_mut.new_basic_block(block_false_name); //生成新的块(false)
-        match kit_mut.context_mut.bb_now_mut {
-            InfuncChoice::InFunc(bb_now) => {
-                bb_now.as_mut().add_next_bb(block_false);
-                bb_now.as_mut().add_next_bb(block_while_head);
-            }
-            _ => {
-                unreachable!()
-            }
-        }
+        // match kit_mut.context_mut.bb_now_mut {
+        //     InfuncChoice::InFunc(bb_now) => {
+        //         bb_now.as_mut().add_next_bb(block_false);
+        //         bb_now.as_mut().add_next_bb(block_while_head);
+        //     }
+        //     _ => {
+        //         unreachable!()
+        //     }
+        // }
+        let (inst_cond, val_cond) = self.cond.process((Type::Int,Some(block_while_head), Some(block_false)), kit_mut).unwrap();
+        // let inst_branch = kit_mut.pool_inst_mut.make_br(inst_cond);
+        // kit_mut.context_mut.push_inst_bb(inst_branch); //当前basicblock中放入branch指令
         kit_mut.context_mut.bb_now_set(block_while_head); //设置当前basicblock
                                                           // // println!("while_body process starts");
         self.body
             .process((Some(block_while_head), Some(block_false)), kit_mut)
             .unwrap(); //在块内生成指令
                        // // println!("while_body process finished");
-        let (inst_cond, val_cond) = self.cond.process(Type::Int, kit_mut).unwrap(); //当前块中放入cond
+        let (inst_cond, val_cond) = self.cond.process((Type::Int,Some(block_while_head), Some(block_false)), kit_mut).unwrap(); //当前块中放入cond
                                                                                     // // println!("cond process finished");
-        let inst_branch = kit_mut.pool_inst_mut.make_br(inst_cond);
-        kit_mut.context_mut.push_inst_bb(inst_branch); //当前basicblock中放入branch指令
+        // let inst_branch = kit_mut.pool_inst_mut.make_br(inst_cond);
+        // kit_mut.context_mut.push_inst_bb(inst_branch); //当前basicblock中放入branch指令
         match kit_mut.context_mut.bb_now_mut {
             //当前块是while_body所有叶子节点的交汇点
             InfuncChoice::InFunc(bb_now) => {
@@ -1725,7 +1716,7 @@ impl Process for Exp {
 
 impl Process for Cond {
     type Ret = (ObjPtr<Inst>, ExpValue);
-    type Message = (Type);
+    type Message = (Type,Option<ObjPtr<BasicBlock>>, Option<ObjPtr<BasicBlock>>);//第一个为true,第二个为false
     fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
         self.l_or_exp.process(input, kit_mut)
     }
@@ -2589,7 +2580,7 @@ impl Process for RelExp {
 }
 impl Process for EqExp {
     type Ret = (ObjPtr<Inst>, ExpValue);
-    type Message = (Type); //if中默认给Type::Int
+    type Message = (Type);//第一个为true,第二个为false //if中默认给Type::Int
     fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
         let tp = self.type_process(1, kit_mut).unwrap(); //获得表达式中各比较元素应该给的类型
         match self {
@@ -2663,15 +2654,49 @@ impl Process for EqExp {
 
 impl Process for LAndExp {
     type Ret = (ObjPtr<Inst>, ExpValue);
-    type Message = (Type);
+    type Message = (Type,Option<ObjPtr<BasicBlock>>, Option<ObjPtr<BasicBlock>>);//第一个为true,第二个为false
     fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
         match self {
-            LAndExp::EqExp(eqexp) => eqexp.process(input, kit_mut),
+            LAndExp::EqExp(eqexp) => {
+                let (inst_ret,val_ret) = eqexp.process(input.0, kit_mut).unwrap();
+                match kit_mut.context_mut.bb_now_mut {
+                    InfuncChoice::InFunc(bb_now) =>{
+                        if let Some(bb_false) = input.2{
+                            bb_now.as_mut().add_next_bb(bb_false);
+                        }
+                        if let Some(bb_true) = input.1{
+                            bb_now.as_mut().add_next_bb(bb_true);
+                        }
+                        let inst_branch = kit_mut.pool_inst_mut.make_br(inst_ret);
+                        kit_mut.context_mut.push_inst_bb(inst_branch);
+                    }
+                    _=>{unreachable!()}
+                }
+                Ok((inst_ret, val_ret))
+            }
             LAndExp::AndExp((landexp, eqexp)) => {
-                let (mut inst_left, val_left) = landexp.process(input, kit_mut).unwrap();
-                let (mut inst_right, val_right) = eqexp.process(input, kit_mut).unwrap();
-                let mut inst_and = kit_mut.pool_inst_mut.make_and(inst_left, inst_right);
-                let mut val_and = ExpValue::None;
+                let name_bb_cond_right = kit_mut.context_mut.get_newbb_name();
+                let inst_bb_cond_right = kit_mut.pool_bb_mut.new_basic_block(name_bb_cond_right);//创建一个新的bb
+                let (mut inst_left, val_left) = landexp.process((input.0,Some(inst_bb_cond_right),input.2), kit_mut).unwrap();
+                kit_mut.context_mut.bb_now_set(inst_bb_cond_right);
+                let (mut inst_right, val_right) = eqexp.process(input.0, kit_mut).unwrap();
+                kit_mut.context_mut.bb_now_set(inst_bb_cond_right);
+                match kit_mut.context_mut.bb_now_mut {
+                    InfuncChoice::InFunc(bb_now) =>{
+                        if let Some(bb_false) = input.2{
+                            bb_now.as_mut().add_next_bb(bb_false);
+                        }
+                        if let Some(bb_true) = input.1{
+                            bb_now.as_mut().add_next_bb(bb_true);
+                        }
+                    }
+                    _=>{unreachable!()}
+                }
+                let inst_branch = kit_mut.pool_inst_mut.make_br(inst_right);
+                kit_mut.context_mut.push_inst_bb(inst_branch);
+                // let mut inst_and = kit_mut.pool_inst_mut.make_and(inst_left, inst_right);
+                // let mut val_and = ExpValue::None;
+
                 // match val_left {//优化得再改改
                 //     ExpValue::False =>{
                 //         inst_and = kit_mut.pool_inst_mut.make_int_const(0);
@@ -2716,8 +2741,10 @@ impl Process for LAndExp {
                 //         unreachable!()
                 //     }
                 // }
-                kit_mut.context_mut.push_inst_bb(inst_and);
-                Ok((inst_and, val_and))
+
+                // kit_mut.context_mut.push_inst_bb(inst_and);
+                // Ok((inst_and, val_and))
+                Ok((inst_right, ExpValue::None))//随便传一个回去
             }
         }
     }
@@ -2732,14 +2759,17 @@ impl Process for ConstExp {
 
 impl Process for LOrExp {
     type Ret = (ObjPtr<Inst>, ExpValue);
-    type Message = (Type);
+    type Message = (Type,Option<ObjPtr<BasicBlock>>, Option<ObjPtr<BasicBlock>>);//第一个为true,第二个为false
     fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
         match self {
             LOrExp::LAndExp(landexp) => landexp.process(input, kit_mut),
             LOrExp::OrExp((lorexp, landexp)) => {
-                let (inst_left, val_left) = lorexp.process(input, kit_mut).unwrap();
+                let name_bb_cond_right = kit_mut.context_mut.get_newbb_name();
+                let inst_bb_cond_right = kit_mut.pool_bb_mut.new_basic_block(name_bb_cond_right);//新建一个bb
+                let (inst_left, val_left) = lorexp.process((input.0,input.1,Some(inst_bb_cond_right)), kit_mut).unwrap();
+                kit_mut.context_mut.bb_now_set(inst_bb_cond_right);
                 let (inst_right, val_right) = landexp.process(input, kit_mut).unwrap();
-                let mut inst_or = kit_mut.pool_inst_mut.make_or(inst_left, inst_right);
+                // let mut inst_or = kit_mut.pool_inst_mut.make_or(inst_left, inst_right);
                 let mut val_or = ExpValue::None;
                 // match val_left {
                 //     ExpValue::Int(i) =>{
@@ -2788,8 +2818,8 @@ impl Process for LOrExp {
                 //         unreachable!()
                 //     }
                 // }
-                kit_mut.context_mut.push_inst_bb(inst_or);
-                Ok((inst_or, val_or)) //这里或许可以优化
+                // kit_mut.context_mut.push_inst_bb(inst_or);
+                Ok((inst_left, val_or)) //这里或许可以优化//这里随便填的
             }
         }
     }
