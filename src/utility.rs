@@ -13,16 +13,25 @@ use std::{
 #[macro_export]
 macro_rules! log {
     ($($arg:tt)*) => {
-        let mut file = std::fs::OpenOptions::new()
-            .append(true)
-            .create(true)
-            .open("log")
-            .unwrap();
+        crate::log_file!("log", $($arg)*);
+         };
+}
 
-        let out_put = format!($($arg)*);
+#[macro_export]
+macro_rules! log_file {
+    ($file:expr, $($arg:tt)*) => {
+        {
+            use std::fs::OpenOptions;
+            use std::io::Write;
 
-        file.write_all(out_put.as_bytes()).unwrap();
-        file.write_all("\n".as_bytes()).unwrap();
+            let mut file = OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open($file)
+                .expect("Failed to open log file");
+
+            writeln!(file, $($arg)*).expect("Failed to write to log file");
+        }
     };
 }
 
