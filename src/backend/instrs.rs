@@ -10,8 +10,6 @@ use crate::backend::operand::*;
 pub use crate::backend::structs::{Context, GenerateAsm};
 pub use crate::utility::{ObjPtr, ScalarType};
 
-use super::operand;
-
 #[derive(Clone, PartialEq, Debug)]
 pub enum Operand {
     IImm(IImm),
@@ -271,8 +269,13 @@ impl LIRInst {
             InstrsType::StoreToStack
             | InstrsType::StoreParamToStack
             | InstrsType::Jump
-            | InstrsType::Branch(..)
-            | InstrsType::Ret(..) => vec![],
+            | InstrsType::Branch(..) => vec![],
+
+            InstrsType::Ret(re_type) => match re_type {
+                ScalarType::Int => vec![Reg::new(10, ScalarType::Int)],
+                ScalarType::Float => vec![Reg::new(10, ScalarType::Float)],
+                ScalarType::Void => vec![],
+            },
         }
     }
     pub fn get_reg_use(&self) -> Vec<Reg> {
@@ -282,23 +285,11 @@ impl LIRInst {
             | InstrsType::Load
             | InstrsType::Store
             | InstrsType::LoadFromStack
+            | InstrsType::StoreToStack
             | InstrsType::Branch(..)
             | InstrsType::Jump
-            | InstrsType::LoadParamFromStack => {
-                let mut regs = self.operands.clone();
-                let mut res = Vec::new();
-                while let Some(operand) = regs.pop() {
-                    if operand == *self.get_dst() {
-                        continue;
-                    }
-                    match operand {
-                        Operand::Reg(reg) => res.push(reg),
-                        _ => {}
-                    }
-                }
-                res
-            }
-            InstrsType::StoreParamToStack | InstrsType::StoreToStack => {
+            | InstrsType::LoadParamFromStack
+            | InstrsType::StoreParamToStack => {
                 let mut regs = self.operands.clone();
                 let mut res = Vec::new();
                 while let Some(operand) = regs.pop() {
