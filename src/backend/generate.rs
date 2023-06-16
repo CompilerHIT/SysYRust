@@ -259,7 +259,6 @@ impl GenerateAsm for LIRInst {
             // }
         }
         //InstrsType::GenerateArray => {
-        //TODO: generate array
         // .LC + {array_num}    .word {array_num} ...
         //   Ok(())
         //}
