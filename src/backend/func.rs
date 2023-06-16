@@ -7,6 +7,8 @@ pub use std::io::Result;
 use std::io::Write;
 use std::vec::Vec;
 
+use lazy_static::__Deref;
+
 use super::instrs::InstrsType;
 use super::{structs::*, BackendPool};
 use crate::backend::asm_builder::AsmBuilder;
@@ -216,10 +218,10 @@ impl Func {
         // println!("phi insert size: {}", size);
 
         for block in self.blocks.iter() {
-            // // println!("-----------------");
-            // // println!("block: {:?}", block.label);
+            println!("-----------------");
+            println!("block: {:?}", block.label);
             for inst in block.insts.iter() {
-                // // println!("row inst: {:?}", inst);
+                println!("row inst: {:?}", inst);
             }
         }
         self.update(this);
@@ -262,11 +264,51 @@ impl Func {
     }
 
     pub fn calc_live(&mut self) {
+
+        // 打印函数里面的寄存器活跃情况
+        let printinterval=||{
+            let mut que:VecDeque<ObjPtr<BB>> =VecDeque::new();
+            let mut passed_bb=HashSet::new();
+            que.push_front(self.entry.unwrap());
+            passed_bb.insert(self.entry.unwrap());
+            println!("func:{}",self.label);
+            while !que.is_empty() {
+                let cur_bb=que.pop_front().unwrap();
+                // println!("block {}:",cur_bb.label);
+                // println!("live in:");
+                // println!("{:?}",cur_bb.live_in);
+                // println!("live out:");
+                // println!("{:?}",cur_bb.live_out);
+                // println!("live use:");
+                // println!("{:?}",cur_bb.live_use);
+                // println!("live def:");
+                // println!("{:?}",cur_bb.live_def);
+                for next in cur_bb.out_edge.iter() {
+                    if passed_bb.contains(next) {continue;}
+                    passed_bb.insert(*next);
+                    que.push_back(*next);
+                }
+            }
+        };
+
+        // println!("-----------------------------------before count live def,live use----------------------------");
+        printinterval();
+
+        // 计算公式，live in 来自于所有前继的live out的集合 + 自身的live use
+        // live out等于所有后继块的live in的集合与 (自身的livein 和live def的并集) 的交集
+        // 以块为遍历单位进行更新
+        // TODO 重写
+        // 首先计算出live def和live use
+        if self.label=="main" {
+            println!("to");
+        }
+
         let mut queue: VecDeque<(ObjPtr<BB>, Reg)> = VecDeque::new();
         for block in self.blocks.iter() {
             block.as_mut().live_use.clear();
             block.as_mut().live_def.clear();
             for it in block.as_ref().insts.iter().rev() {
+                // println!("{:?}",it);
                 for reg in it.as_ref().get_reg_def().into_iter() {
                     if reg.is_virtual() || reg.is_allocable() {
                         block.as_mut().live_use.remove(&reg);
@@ -279,13 +321,22 @@ impl Func {
                         block.as_mut().live_use.insert(reg);
                     }
                 }
-            }
+                println!("use:{:?}",it.get_reg_use());
+                println!("def:{:?}",it.get_reg_def());
+            }       
+            
+            // 
             for reg in block.as_ref().live_use.iter() {
                 queue.push_back((block.clone(), reg.clone()));
             }
             block.as_mut().live_in = block.as_ref().live_use.clone();
             block.as_mut().live_out.clear();
         }
+       
+        println!("-----------------------------------before count live in,live out----------------------------");
+        printinterval();
+       
+        //然后计算live in 和live out
         while let Some(value) = queue.pop_front() {
             let (block, reg) = value;
             for pred in block.as_ref().in_edge.iter() {
@@ -298,19 +349,23 @@ impl Func {
                 }
             }
         }
+   
+        println!("-----------------------------------after count live in,live out----------------------------");
+        printinterval();
+    
     }
 
     pub fn allocate_reg(&mut self, f: &mut File) {
         // 函数返回地址保存在ra中
         self.calc_live();
         let mut allocator = Allocator::new();
+        // let mut allocator =crate::backend::regalloc::easy_gc_alloc::Allocator::new();
         let alloc_stat = allocator.alloc(self);
-        // // 替换为图着色寄存器分配器
-        // let alloc_stat=crate::backend::regalloc::easy_gc_alloc::Allocator::new().alloc(&self);
 
         self.reg_alloc_info = alloc_stat;
         self.context.as_mut().set_reg_map(&self.reg_alloc_info.dstr);
-        // println!("dstr map info{:?}", self.reg_alloc_info.dstr);
+        println!("dstr map info{:?}", self.reg_alloc_info.dstr);
+        println!("spills:{:?}", self.reg_alloc_info.spillings);
 
         let mut stack_size = self.reg_alloc_info.stack_size as i32;
         // println!("stack_size: {}", stack_size);
