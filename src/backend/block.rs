@@ -471,18 +471,18 @@ impl BB {
                                     pool,
                                 );
                             }
-                            // match addr_reg {
-                            //     // 使用全局数组，addr_reg获得的是地址，而非寄存器，因此需要加载
-                            //     Operand::Addr(..) => {
-                            //         let addr = addr_reg.clone();
-                            //         addr_reg = Operand::Reg(Reg::init(ScalarType::Int));
-                            //         self.insts.push(pool.put_inst(LIRInst::new(
-                            //             InstrsType::OpReg(SingleOp::LoadAddr),
-                            //             vec![addr_reg.clone(), addr]
-                            //         )));
-                            //     },
-                            //     _ => {}
-                            // }
+                            match addr_reg {
+                                // 使用全局数组，addr_reg获得的是地址，而非寄存器，因此需要加载
+                                Operand::Addr(..) => {
+                                    let addr = addr_reg.clone();
+                                    addr_reg = Operand::Reg(Reg::init(ScalarType::Int));
+                                    self.insts.push(pool.put_inst(LIRInst::new(
+                                        InstrsType::OpReg(SingleOp::LoadAddr),
+                                        vec![addr_reg.clone(), addr]
+                                    )));
+                                },
+                                _ => {}
+                            }
                             match addr.get_gep_offset().get_kind() {
                                 InstKind::ConstInt(offset) | InstKind::GlobalConstInt(offset) => {
                                     self.insts.push(pool.put_inst(LIRInst::new(
