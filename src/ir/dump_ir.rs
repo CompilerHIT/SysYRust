@@ -285,8 +285,7 @@ fn dump_inst(
     match inst.get_kind() {
         InstKind::Alloca(len) => {
             if let IrType::IntPtr = inst.get_ir_type() {
-                local_map.insert(inst, format!("%{}", name_index));
-                name_index += 1;
+                name_index = put_name(local_map, inst.clone(), name_index);
                 text = format!(
                     "  {} = alloca [{} x i32], align 4\n",
                     local_map.get(&inst).unwrap(),
@@ -297,8 +296,9 @@ fn dump_inst(
                 text += format!("  ; init array begin!!!!\n").as_str();
                 let init = inst.get_int_init();
                 for (i, v) in init.iter().enumerate() {
-                    text += format!("  %{} = getelementptr inbounds [{} x i32], [{} x i32]* {}, i32 0, i32 {}\n", name_index, len, len, local_map.get(&inst).unwrap(), i).as_str();
-                    text += format!("  store i32 {}, i32* %{}, align 4\n", v, name_index).as_str();
+                    text += format!("  %var_{} = getelementptr inbounds [{} x i32], [{} x i32]* {}, i32 0, i32 {}\n", name_index, len, len, local_map.get(&inst).unwrap(), i).as_str();
+                    text +=
+                        format!("  store i32 {}, i32* %var_{}, align 4\n", v, name_index).as_str();
                     name_index += 1;
                 }
                 text += format!("  ; init array end!!!!\n").as_str();
@@ -826,7 +826,7 @@ fn put_name(
     if local_map.contains_key(&inst) {
         name_index
     } else {
-        local_map.insert(inst, format!("%{}", name_index));
+        local_map.insert(inst, format!("%var_{}", name_index));
         name_index + 1
     }
 }
