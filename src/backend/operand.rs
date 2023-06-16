@@ -1,5 +1,5 @@
 use crate::utility::ScalarType;
-
+use crate::log;
 pub const REG_COUNT: i32 = 32;
 pub const ARG_REG_COUNT: i32 = 8;
 pub const REG_SP: i32 = 2;
@@ -109,7 +109,7 @@ impl Reg {
                 18..=27 => format!("s{}", self.id - 16),
                 28..=31 => format!("t{}", self.id - 25),
                 _ => {
-                    println!("id: {}", self.id);
+                    log!("id: {}", self.id);
                     panic!("Invalid Physic Integer Register Id")
                 }
             }

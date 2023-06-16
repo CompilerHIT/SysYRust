@@ -50,7 +50,7 @@ pub struct Func {
     pub max_params: (i32, i32),
     //FIXME: resolve float regs
     pub callee_saved: HashSet<Reg>,
-    pub caller_saved: HashMap<i32, i32>
+    pub caller_saved: HashMap<i32, i32>,
 }
 
 /// reg_num, stack_addr, caller_stack_addr考虑借助回填实现
@@ -157,7 +157,7 @@ impl Func {
             }
             let block = self.blocks[index];
             if block != self.entry.unwrap() {
-                // println!("start build block");
+                // log!("start build block");
                 if i == 0 {
                     block.as_mut().showed = false;
                 }
@@ -204,8 +204,8 @@ impl Func {
             }
             if let Some(mut target) = info.phis_to_block.get_mut(&block.label) {
                 for inst in target.iter() {
-                    // println!("label: {}", block.label);
-                    // println!("insert phi to last: {:?}", inst);
+                    // log!("label: {}", block.label);
+                    // log!("insert phi to last: {:?}", inst);
                     block.as_mut().insts.insert(index, *inst);
                 }
             }
@@ -215,13 +215,13 @@ impl Func {
             }
             size += block.insts.len();
         }
-        // println!("phi insert size: {}", size);
+        // log!("phi insert size: {}", size);
 
         for block in self.blocks.iter() {
-            println!("-----------------");
-            println!("block: {:?}", block.label);
+            log!("-----------------");
+            log!("block: {:?}", block.label);
             for inst in block.insts.iter() {
-                println!("row inst: {:?}", inst);
+                log!("row inst: {:?}", inst);
             }
         }
         self.update(this);
@@ -264,34 +264,35 @@ impl Func {
     }
 
     pub fn calc_live(&mut self) {
-
         // 打印函数里面的寄存器活跃情况
-        let printinterval=||{
-            let mut que:VecDeque<ObjPtr<BB>> =VecDeque::new();
-            let mut passed_bb=HashSet::new();
+        let printinterval = || {
+            let mut que: VecDeque<ObjPtr<BB>> = VecDeque::new();
+            let mut passed_bb = HashSet::new();
             que.push_front(self.entry.unwrap());
             passed_bb.insert(self.entry.unwrap());
-            println!("func:{}",self.label);
+            log!("func:{}", self.label);
             while !que.is_empty() {
-                let cur_bb=que.pop_front().unwrap();
-                // println!("block {}:",cur_bb.label);
-                // println!("live in:");
-                // println!("{:?}",cur_bb.live_in);
-                // println!("live out:");
-                // println!("{:?}",cur_bb.live_out);
-                // println!("live use:");
-                // println!("{:?}",cur_bb.live_use);
-                // println!("live def:");
-                // println!("{:?}",cur_bb.live_def);
+                let cur_bb = que.pop_front().unwrap();
+                // log!("block {}:",cur_bb.label);
+                // log!("live in:");
+                // log!("{:?}",cur_bb.live_in);
+                // log!("live out:");
+                // log!("{:?}",cur_bb.live_out);
+                // log!("live use:");
+                // log!("{:?}",cur_bb.live_use);
+                // log!("live def:");
+                // log!("{:?}",cur_bb.live_def);
                 for next in cur_bb.out_edge.iter() {
-                    if passed_bb.contains(next) {continue;}
+                    if passed_bb.contains(next) {
+                        continue;
+                    }
                     passed_bb.insert(*next);
                     que.push_back(*next);
                 }
             }
         };
 
-        // println!("-----------------------------------before count live def,live use----------------------------");
+        // log!("-----------------------------------before count live def,live use----------------------------");
         printinterval();
 
         // 计算公式，live in 来自于所有前继的live out的集合 + 自身的live use
@@ -299,8 +300,8 @@ impl Func {
         // 以块为遍历单位进行更新
         // TODO 重写
         // 首先计算出live def和live use
-        if self.label=="main" {
-            println!("to");
+        if self.label == "main" {
+            log!("to");
         }
 
         let mut queue: VecDeque<(ObjPtr<BB>, Reg)> = VecDeque::new();
@@ -308,7 +309,7 @@ impl Func {
             block.as_mut().live_use.clear();
             block.as_mut().live_def.clear();
             for it in block.as_ref().insts.iter().rev() {
-                // println!("{:?}",it);
+                // log!("{:?}",it);
                 for reg in it.as_ref().get_reg_def().into_iter() {
                     if reg.is_virtual() || reg.is_allocable() {
                         block.as_mut().live_use.remove(&reg);
@@ -321,21 +322,21 @@ impl Func {
                         block.as_mut().live_use.insert(reg);
                     }
                 }
-                println!("use:{:?}",it.get_reg_use());
-                println!("def:{:?}",it.get_reg_def());
-            }       
-            
-            // 
+                log!("use:{:?}", it.get_reg_use());
+                log!("def:{:?}", it.get_reg_def());
+            }
+
+            //
             for reg in block.as_ref().live_use.iter() {
                 queue.push_back((block.clone(), reg.clone()));
             }
             block.as_mut().live_in = block.as_ref().live_use.clone();
             block.as_mut().live_out.clear();
         }
-       
-        println!("-----------------------------------before count live in,live out----------------------------");
+
+        log!("-----------------------------------before count live in,live out----------------------------");
         printinterval();
-       
+
         //然后计算live in 和live out
         while let Some(value) = queue.pop_front() {
             let (block, reg) = value;
@@ -349,10 +350,9 @@ impl Func {
                 }
             }
         }
-   
-        println!("-----------------------------------after count live in,live out----------------------------");
+
+        log!("-----------------------------------after count live in,live out----------------------------");
         printinterval();
-    
     }
 
     pub fn allocate_reg(&mut self, f: &mut File) {
@@ -364,11 +364,11 @@ impl Func {
 
         self.reg_alloc_info = alloc_stat;
         self.context.as_mut().set_reg_map(&self.reg_alloc_info.dstr);
-        println!("dstr map info{:?}", self.reg_alloc_info.dstr);
-        println!("spills:{:?}", self.reg_alloc_info.spillings);
+        log!("dstr map info{:?}", self.reg_alloc_info.dstr);
+        log!("spills:{:?}", self.reg_alloc_info.spillings);
 
         let mut stack_size = self.reg_alloc_info.stack_size as i32;
-        // println!("stack_size: {}", stack_size);
+        // log!("stack_size: {}", stack_size);
 
         let (icnt, fcnt) = self.max_params;
         stack_size += (icnt + fcnt) * 8;
@@ -518,7 +518,7 @@ impl GenerateAsm for Func {
             a.generate(self.context, f)?;
         }
         if self.floats.len() > 0 {
-            // println!("generate float");
+            // log!("generate float");
             writeln!(f, "   .data")?;
         }
         for (name, data) in self.floats.clone() {
@@ -530,7 +530,7 @@ impl GenerateAsm for Func {
         for block in self.blocks.iter() {
             size += block.insts.len();
         }
-        // println!("tatol {}", size);
+        // log!("tatol {}", size);
         for block in self.blocks.iter() {
             block.as_mut().generate(self.context, f)?;
         }

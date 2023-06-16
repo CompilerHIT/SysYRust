@@ -1,10 +1,11 @@
 use super::{instrs::*, operand};
 use crate::backend::operand::ToString;
+use crate::log;
 use std::fs::File;
 impl GenerateAsm for LIRInst {
     fn generate(&mut self, context: ObjPtr<Context>, f: &mut File) -> Result<()> {
         let mut builder = AsmBuilder::new(f);
-        // println!("generate: {:?}", self);
+        log!("generate: {:?}", self);
         match self.get_type() {
             InstrsType::Binary(op) => {
                 let op = match op {
@@ -46,7 +47,7 @@ impl GenerateAsm for LIRInst {
                     match op {
                         "add" | "sub" | "and" | "or" | "xor" | "sll" | "srl" | "sra" => {
                             is_imm = true;
-                        },
+                        }
                         _ => {
                             is_imm = false;
                         }
@@ -103,10 +104,18 @@ impl GenerateAsm for LIRInst {
                 };
                 let addr = match self.get_lhs() {
                     Operand::Reg(reg) => reg.to_string(),
-                    _ => { panic!("src of load must be reg, to improve");},
+                    _ => {
+                        panic!("src of load must be reg, to improve");
+                    }
                 };
 
-                builder.l(&dst, &addr, offset.get_data(), self.is_float(), self.is_double())?;
+                builder.l(
+                    &dst,
+                    &addr,
+                    offset.get_data(),
+                    self.is_float(),
+                    self.is_double(),
+                )?;
                 Ok(())
             }
             InstrsType::Store => {
@@ -123,7 +132,13 @@ impl GenerateAsm for LIRInst {
                     Operand::Reg(reg) => reg.to_string(),
                     _ => panic!("dst of store must be reg, to improve"),
                 };
-                builder.s(&src, &addr, offset.get_data(), self.is_float(), self.is_double())?;
+                builder.s(
+                    &src,
+                    &addr,
+                    offset.get_data(),
+                    self.is_float(),
+                    self.is_double(),
+                )?;
                 Ok(())
             }
 
@@ -139,7 +154,13 @@ impl GenerateAsm for LIRInst {
                 let offset = self.get_stack_offset().get_data();
                 //FIXME: 判断寄存器中存的是否是地址，如果只是简单的数值，则可以使用sw替代
                 //FIXME: *4 or *8
-                builder.s(&src.to_string(), "sp", offset, self.is_float(), self.is_double())?;
+                builder.s(
+                    &src.to_string(),
+                    "sp",
+                    offset,
+                    self.is_float(),
+                    self.is_double(),
+                )?;
                 Ok(())
             }
             InstrsType::LoadFromStack => {
@@ -154,7 +175,13 @@ impl GenerateAsm for LIRInst {
                 // let inst_off = self.get_offset().
                 //FIXME: *4 or *8
                 let offset = self.get_stack_offset().get_data();
-                builder.l(&dst.to_string(), "sp", offset, self.is_float(), self.is_double())?;
+                builder.l(
+                    &dst.to_string(),
+                    "sp",
+                    offset,
+                    self.is_float(),
+                    self.is_double(),
+                )?;
                 Ok(())
             }
             InstrsType::LoadParamFromStack => {
@@ -170,7 +197,13 @@ impl GenerateAsm for LIRInst {
                     _ => panic!("dst of load must be reg, to improve"),
                 };
 
-                builder.l(&dst.to_string(), "sp", true_offset, self.is_float(), self.is_double())?;
+                builder.l(
+                    &dst.to_string(),
+                    "sp",
+                    true_offset,
+                    self.is_float(),
+                    self.is_double(),
+                )?;
                 Ok(())
             }
 
@@ -186,7 +219,13 @@ impl GenerateAsm for LIRInst {
                     _ => panic!("dst of load must be reg, to improve"),
                 };
 
-                builder.s(&dst.to_string(), "sp", true_offset, self.is_float(), self.is_double())?;
+                builder.s(
+                    &dst.to_string(),
+                    "sp",
+                    true_offset,
+                    self.is_float(),
+                    self.is_double(),
+                )?;
                 Ok(())
             }
             // 判断！是否需要多插入一条j，间接跳转到
@@ -244,20 +283,19 @@ impl GenerateAsm for LIRInst {
                 let mut builder = AsmBuilder::new(f);
                 builder.ret()?;
                 Ok(())
-            }
-            // InstrsType::LoadGlobal => {
-            //     let mut builder = AsmBuilder::new(f);
-            //     let dst = match self.get_dst() {
-            //         Operand::Reg(reg) => reg,
-            //         _ => panic!("dst of load must be reg, to improve"),
-            //     };
-            //     builder.load_global(
-            //         &dst.to_string(),
-            //         &self.get_global_var_str(true),
-            //         &self.get_global_var_str(false),
-            //     )?;
-            //     Ok(())
-            // }
+            } // InstrsType::LoadGlobal => {
+              //     let mut builder = AsmBuilder::new(f);
+              //     let dst = match self.get_dst() {
+              //         Operand::Reg(reg) => reg,
+              //         _ => panic!("dst of load must be reg, to improve"),
+              //     };
+              //     builder.load_global(
+              //         &dst.to_string(),
+              //         &self.get_global_var_str(true),
+              //         &self.get_global_var_str(false),
+              //     )?;
+              //     Ok(())
+              // }
         }
         //InstrsType::GenerateArray => {
         // .LC + {array_num}    .word {array_num} ...

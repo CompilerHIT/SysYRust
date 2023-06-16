@@ -52,7 +52,7 @@ impl<'a> AsmModule<'a> {
         // 检查地址溢出，插入间接寻址
         self.handle_overflow(pool);
         self.generate_global_var(f);
-        // println!("start generate");
+        // log!("start generate");
         self.generate_asm(f, pool);
     }
 
@@ -66,7 +66,7 @@ impl<'a> AsmModule<'a> {
 
     fn allocate_reg(&mut self, f: &mut File) {
         self.func_map.iter_mut().for_each(|(_, func)| {
-            // println!("allocate reg fun: {}", func.as_ref().label);
+            // log!("allocate reg fun: {}", func.as_ref().label);
             if !func.is_extern {
                 func.as_mut().allocate_reg(f);
             }
@@ -86,7 +86,7 @@ impl<'a> AsmModule<'a> {
         let mut list = Vec::with_capacity(map.len());
         for (name, iter) in map {
             //TODO: update ir translation，to use ObjPtr match
-            // println!("{:?}", iter.as_ref().get_kind());
+            // log!("{:?}", iter.as_ref().get_kind());
             match iter.as_ref().get_kind() {
                 InstKind::GlobalConstInt(value) | InstKind::GlobalInt(value) => list.push((
                     *iter,
