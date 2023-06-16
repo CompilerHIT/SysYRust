@@ -30,7 +30,6 @@ fn functional_optimizer(module: &mut Module) {
 
         // phi优化
         phi_run(end_bb);
-        phi_run(end_bb);
     }
 }
 
