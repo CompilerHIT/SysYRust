@@ -6,6 +6,26 @@ use std::{
     {pin::Pin, ptr::NonNull},
 };
 
+/// 进行一个简单的log,而不是printfln!
+/// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+/// 史诗级更新
+/// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+#[macro_export]
+macro_rules! log {
+    ($($arg:tt)*) => {
+        let mut file = std::fs::OpenOptions::new()
+            .append(true)
+            .create(true)
+            .open("log")
+            .unwrap();
+
+        let out_put = format!($($arg)*);
+
+        file.write_all(out_put.as_bytes()).unwrap();
+        file.write_all("\n".as_bytes()).unwrap();
+    };
+}
+
 #[derive(Clone, Copy, PartialEq, Hash, Eq, Debug)]
 pub enum ScalarType {
     Void,
@@ -93,5 +113,3 @@ impl<T> ObjPool<T> {
         self.data.clear()
     }
 }
-
-
