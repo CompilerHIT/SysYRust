@@ -1,6 +1,7 @@
 use std::cmp::max;
 use std::collections::LinkedList;
 pub use std::collections::{HashSet, VecDeque};
+use std::fmt;
 pub use std::fs::File;
 pub use std::hash::{Hash, Hasher};
 pub use std::io::Result;
@@ -52,6 +53,8 @@ pub struct Func {
     pub callee_saved: HashSet<Reg>,
     pub caller_saved: HashMap<i32, i32>,
 }
+
+
 
 /// reg_num, stack_addr, caller_stack_addr考虑借助回填实现
 /// 是否需要caller_stack_addr？caller函数sp保存在s0中
@@ -272,6 +275,7 @@ impl Func {
             passed_bb.insert(self.entry.unwrap());
             log_file!(calc_live_file,"func:{}", self.label);
             while !que.is_empty() {
+<<<<<<< HEAD
                 let cur_bb = que.pop_front().unwrap();
                 log_file!(calc_live_file,"block {}:",cur_bb.label);
                 log_file!(calc_live_file,"live in:");
@@ -282,6 +286,18 @@ impl Func {
                 log_file!(calc_live_file,"{:?}",cur_bb.live_use);
                 log_file!(calc_live_file,"live def:");
                 log_file!(calc_live_file,"{:?}",cur_bb.live_def);
+=======
+                let cur_bb=que.pop_front().unwrap();
+                println!("block {}:",cur_bb.label);
+                println!("live in:");
+                println!("{:?}",cur_bb.live_in);
+                println!("live out:");
+                println!("{:?}",cur_bb.live_out);
+                println!("live use:");
+                println!("{:?}",cur_bb.live_use);
+                println!("live def:");
+                println!("{:?}",cur_bb.live_def);
+>>>>>>> backend
                 for next in cur_bb.out_edge.iter() {
                     if passed_bb.contains(next) {
                         continue;
@@ -292,7 +308,11 @@ impl Func {
             }
         };
 
+<<<<<<< HEAD
         log_file!(calc_live_file,"-----------------------------------before count live def,live use----------------------------");
+=======
+        println!("-----------------------------------before count live def,live use----------------------------");
+>>>>>>> backend
         printinterval();
 
         // 计算公式，live in 来自于所有前继的live out的集合 + 自身的live use
@@ -309,7 +329,11 @@ impl Func {
             block.as_mut().live_use.clear();
             block.as_mut().live_def.clear();
             for it in block.as_ref().insts.iter().rev() {
+<<<<<<< HEAD
                 log_file!(calc_live_file,"{:?}",it);
+=======
+                println!("{}",it.as_ref());
+>>>>>>> backend
                 for reg in it.as_ref().get_reg_def().into_iter() {
                     if reg.is_virtual() || reg.is_allocable() {
                         block.as_mut().live_use.remove(&reg);
@@ -322,9 +346,16 @@ impl Func {
                         block.as_mut().live_use.insert(reg);
                     }
                 }
+<<<<<<< HEAD
             }
 
             //
+=======
+                
+            }       
+            
+            // 
+>>>>>>> backend
             for reg in block.as_ref().live_use.iter() {
                 queue.push_back((block.clone(), reg.clone()));
             }
