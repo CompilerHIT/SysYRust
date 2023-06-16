@@ -2,7 +2,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use crate::{backend::{regalloc::{regalloc::Regalloc, self, structs::RegUsedStat}, instrs::BB, operand::Reg}, utility::{ObjPtr, ScalarType}, frontend::ast::Continue};
+use crate::{backend::{regalloc::{regalloc::Regalloc, self, structs::RegUsedStat}, instrs::BB, operand::Reg}, utility::{ObjPtr, ScalarType}, frontend::ast::Continue, log_file};
 
 use super::structs::FuncAllocStat;
 
@@ -93,11 +93,18 @@ impl Regalloc for Allocator {
         }  
         let  (func_stack,bbstacks)=regalloc::easy_ls_alloc::Allocator::countStackSize(func,&spillings);
         
+        let mut calout="callive.txt";
+        log_file!(calout,"\n\nfinal:\n");
+        log_file!(calout,"dstr:{:?}\nspillings:{:?}",dstr,spillings);
+
+
         FuncAllocStat{
             stack_size: func_stack,
             bb_stack_sizes: bbstacks,
             spillings,
             dstr,
         }
+        
+        
     }
 }
