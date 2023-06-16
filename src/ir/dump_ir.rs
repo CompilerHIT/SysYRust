@@ -301,7 +301,6 @@ fn dump_inst(
                     text += format!("  store i32 {}, i32* %{}, align 4\n", v, name_index).as_str();
                     name_index += 1;
                 }
-
                 text += format!("  ; init array end!!!!\n").as_str();
             } else {
                 name_index = put_name(local_map, inst.clone(), name_index);
