@@ -16,7 +16,7 @@ use crate::{
 
 use super::{
     easy_ls_alloc,
-    regalloc::Regalloc,
+    regalloc::{Regalloc, self},
     structs::{FuncAllocStat, RegUsedStat},
 };
 
@@ -485,7 +485,8 @@ impl Regalloc for Allocator {
         }
         let (spillings, dstr) = self.alloc_register();
         let (func_stack_size, bb_sizes) =
-            easy_ls_alloc::Allocator::countStackSize(func, &spillings);
+            crate::backend::regalloc::easy_ls_alloc::Allocator
+            ::countStackSize(func, &spillings);
 
         //println!("dstr:{:?}",self.dstr);
         //println!("spillings:{:?}",self.spillings);
