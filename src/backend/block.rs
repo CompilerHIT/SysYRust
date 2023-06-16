@@ -217,17 +217,17 @@ impl BB {
                                         )));
                                     }
                                     _ => {
-                                        self.resolve_opt_rem(
-                                            func, map_info, dst_reg, lhs, imm, pool,
-                                        );
-                                        // lhs_reg =
-                                        //     self.resolve_operand(func, lhs, true, map_info, pool);
-                                        // rhs_reg =
-                                        //     self.resolve_operand(func, rhs, false, map_info, pool);
-                                        // self.insts.push(pool.put_inst(LIRInst::new(
-                                        //     InstrsType::Binary(BinaryOp::Rem),
-                                        //     vec![dst_reg, lhs_reg, rhs_reg],
-                                        // )));
+                                        // self.resolve_opt_rem(
+                                        //     func, map_info, dst_reg, lhs, imm, pool,
+                                        // );
+                                        lhs_reg =
+                                            self.resolve_operand(func, lhs, true, map_info, pool);
+                                        rhs_reg =
+                                            self.resolve_operand(func, rhs, true, map_info, pool);
+                                        self.insts.push(pool.put_inst(LIRInst::new(
+                                            InstrsType::Binary(BinaryOp::Rem),
+                                            vec![dst_reg, lhs_reg, rhs_reg],
+                                        )));
                                     }
                                 },
                                 _ => {
