@@ -56,6 +56,7 @@ pub struct Context {
     reg_info: HashMap<i32, i32>,
     epilogue: Option<Box<dyn FnMut()>>,
     prologue: Option<Box<dyn FnMut()>>,
+    pub is_row: bool
 }
 
 #[derive(Clone)]
@@ -72,6 +73,7 @@ impl Context {
             reg_info: HashMap::new(),
             epilogue: None,
             prologue: None,
+            is_row: false
         }
     }
 

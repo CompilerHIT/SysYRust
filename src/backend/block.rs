@@ -2007,6 +2007,17 @@ impl BB {
     //     self.live_in.clear();
     //     self.live_out.clear();
     // }
+    pub fn generate_row(&mut self, context: ObjPtr<Context>, f: &mut File) -> Result<()> {
+        if self.showed {
+            let mut builder = AsmBuilder::new(f);
+            builder.show_block(&self.label)?;
+        }
+        context.as_mut().is_row = true;
+        for inst in self.insts.iter() {
+            inst.as_mut().generate(context.clone(), f)?;
+        }
+        Ok(())
+    }
 }
 impl GenerateAsm for BB {
     fn generate(&mut self, context: ObjPtr<Context>, f: &mut File) -> Result<()> {
@@ -2014,6 +2025,7 @@ impl GenerateAsm for BB {
             let mut builder = AsmBuilder::new(f);
             builder.show_block(&self.label)?;
         }
+        context.as_mut().is_row = false;
         for inst in self.insts.iter() {
             log!("{:?}, generate", self.label);
             inst.as_mut().v_to_phy(context.get_reg_map().clone());

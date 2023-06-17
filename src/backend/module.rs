@@ -45,7 +45,7 @@ impl<'a> AsmModule<'a> {
         }
     }
 
-    pub fn generator(&mut self, f: &mut File, pool: &mut BackendPool) {
+    pub fn generator(&mut self, f: &mut File, f2: &mut File, pool: &mut BackendPool) {
         self.build_lir(pool);
         self.allocate_reg(f);
         self.handle_spill(pool, f);
@@ -53,6 +53,7 @@ impl<'a> AsmModule<'a> {
         self.handle_overflow(pool);
         self.generate_global_var(f);
         // log!("start generate");
+        self.generate_row_asm(f2, pool);
         self.generate_asm(f, pool);
     }
 
@@ -144,11 +145,19 @@ impl<'a> AsmModule<'a> {
             }
         }
     }
-
+    
     fn generate_asm(&mut self, f: &mut File, pool: &mut BackendPool) {
         self.func_map.iter_mut().for_each(|(_, func)| {
             if !func.is_extern {
                 func.as_mut().generate(pool.put_context(Context::new()), f);
+            }
+        });
+    }
+
+    fn generate_row_asm(&mut self, f: &mut File, pool: &mut BackendPool) {
+        self.func_map.iter_mut().for_each(|(_, func)| {
+            if !func.is_extern {
+                func.as_mut().generate_row(pool.put_context(Context::new()), f);
             }
         });
     }

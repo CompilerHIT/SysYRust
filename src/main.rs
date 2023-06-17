@@ -1,12 +1,9 @@
-use std::collections::HashMap;
 use std::env;
 
 use lalrpop_util::lalrpop_mod;
 use sysylib::backend::module::AsmModule;
 use sysylib::frontend::irgen::irgen;
-use sysylib::ir::basicblock::BasicBlock;
-use sysylib::ir::instruction::{Inst, InstKind};
-use sysylib::utility::ObjPtr;
+use sysylib::ir::instruction::Inst;
 use sysylib::{self, backend::generate_asm, ir::module::Module, utility::ObjPool};
 lalrpop_mod! {
   #[allow(clippy::all)]
@@ -73,6 +70,9 @@ fn run_main() {
     // ir优化
     sysylib::ir::optimizer_run(&mut module, o1_option);
 
+    let output2 = matches.value_of("o").unwrap_or("row_asm.s");
     // 后端解析
-    generate_asm(filename, output, &mut AsmModule::new(&module));
+    generate_asm(filename, output, output2, &mut AsmModule::new(&module));
+
+    
 }

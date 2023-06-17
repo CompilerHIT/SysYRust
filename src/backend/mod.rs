@@ -58,7 +58,7 @@ impl BackendPool {
     }
 }
 
-pub fn generate_asm(in_path: &str, path: &str, module: &mut AsmModule) {
+pub fn generate_asm(in_path: &str, path: &str, row_path: &str, module: &mut AsmModule) {
     let mut file = match File::create(path) {
         Ok(f) => f,
         Err(e) => panic!("Create output path error: {}", e),
@@ -67,7 +67,12 @@ pub fn generate_asm(in_path: &str, path: &str, module: &mut AsmModule) {
     writeln!(file, "	.option pic");
     writeln!(file, "    .text");
     let mut pool = BackendPool::new();
-    module.generator(&mut file, &mut pool);
+    let mut file2 = match File::create(row_path) {
+        Ok(f) => f,
+        Err(e) => panic!("Create output path error: {}", e),
+    };
+    module.generator(&mut file, &mut file2, &mut pool);
+
     pool.free_all();
 
     // writeln!(file, "    .ident	\"GCC: (Ubuntu 9.4.0-1ubuntu1~20.04) 9.4.0\"");

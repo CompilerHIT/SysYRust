@@ -126,6 +126,10 @@ impl Reg {
         }
     }
 
+    pub fn to_row(&self) -> String {
+        format!("r{}", self.id)
+    }
+
     // ra, t0, t1-2, a0-1, a2-7, t3-6
     // f0-7, f10-17, f28-31
     pub fn is_caller_save(&self) -> bool {
