@@ -363,7 +363,7 @@ impl Kit<'_> {
                                 endpoint_bb.as_mut().push_back(self.pool_inst_mut.make_jmp());//添加jump
                                 inst_phi.as_mut().add_operand(ret_val);//向phi指令添加参数
                             }
-                            _=>{unreachable!()}
+                            _=>{unreachable!("func:{:?}最后一条指令是{:?}类型",func_name,inst_ret.get_kind())}
                         }
                     }
                     let inst_ret = self.pool_inst_mut.make_return(inst_phi);

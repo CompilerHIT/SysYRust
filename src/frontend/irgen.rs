@@ -120,6 +120,7 @@ impl Process for GlobalItems {
                             unreachable!("函数ir生成完毕,本应处于最后一个bb中")
                         }
                     }
+                    kit_mut.context_mut.bb_now_mut = InfuncChoice::NInFunc();
                     Ok(1)
                 }
             }
