@@ -45,6 +45,7 @@ impl Process for CompUnit {
     type Message = (i32);
     fn process(&mut self, _input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
         for item in &mut self.global_items {
+            kit_mut.context_mut.set_stop_genir(false);
             item.process(1, kit_mut);
         }
         // // println!(
@@ -65,16 +66,21 @@ impl Process for GlobalItems {
     type Ret = i32;
     type Message = (i32);
     fn process(&mut self, _input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
-        match self {
-            Self::Decl(decl) => {
-                decl.process(1, kit_mut).unwrap();
-                Ok(1)
-            }
-            Self::FuncDef(funcdef) => {
-                funcdef.process(true, kit_mut);
-                Ok(1)
+        if kit_mut.context_mut.stop_genir{
+            Ok(1)
+        }else{
+            match self {
+                Self::Decl(decl) => {
+                    decl.process(1, kit_mut).unwrap();
+                    Ok(1)
+                }
+                Self::FuncDef(funcdef) => {
+                    funcdef.process(true, kit_mut);
+                    Ok(1)
+                }
             }
         }
+        
         // todo!();
     }
 }
@@ -84,17 +90,20 @@ impl Process for Decl {
     type Message = (i32);
 
     fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
-        match self {
-            Self::ConstDecl(constdecl) => {
-                constdecl.process(input, kit_mut).unwrap();
-                return Ok(1);
-            }
-            Self::VarDecl(vardef) => {
-                vardef.process(input, kit_mut).unwrap();
-                return Ok(1);
+        if kit_mut.context_mut.stop_genir{
+            Ok(1)
+        }else{
+            match self {
+                Self::ConstDecl(constdecl) => {
+                    constdecl.process(input, kit_mut).unwrap();
+                    return Ok(1);
+                }
+                Self::VarDecl(vardef) => {
+                    vardef.process(input, kit_mut).unwrap();
+                    return Ok(1);
+                }
             }
         }
-        todo!();
     }
 }
 
@@ -1282,12 +1291,16 @@ impl Process for Block {
     type Ret = i32;
     type Message = (Option<ObjPtr<BasicBlock>>, Option<ObjPtr<BasicBlock>>);
     fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
-        kit_mut.context_mut.add_layer();
-        for item in &mut self.block_vec {
-            item.process(input, kit_mut);
+        if kit_mut.context_mut.stop_genir{
+            Ok(1)
+        }else{
+            kit_mut.context_mut.add_layer();
+            for item in &mut self.block_vec {
+                item.process(input, kit_mut);
+            }
+            kit_mut.context_mut.delete_layer();
+            Ok(1)
         }
-        kit_mut.context_mut.delete_layer();
-        Ok(1)
     }
 }
 
@@ -1295,57 +1308,65 @@ impl Process for BlockItem {
     type Ret = i32;
     type Message = (Option<ObjPtr<BasicBlock>>, Option<ObjPtr<BasicBlock>>);
     fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
-        match self {
-            BlockItem::Decl(decl) => {
-                decl.process(1, kit_mut);
-                return Ok(1);
-            }
-            BlockItem::Stmt(stmt) => {
-                stmt.process(input, kit_mut);
-                return Ok(1);
+        if kit_mut.context_mut.stop_genir{
+            Ok(1)
+        }else{
+            match self {
+                BlockItem::Decl(decl) => {
+                    decl.process(1, kit_mut);
+                    return Ok(1);
+                }
+                BlockItem::Stmt(stmt) => {
+                    stmt.process(input, kit_mut);
+                    return Ok(1);
+                }
             }
         }
-        todo!();
     }
 }
 impl Process for Stmt {
     type Ret = i32;
     type Message = (Option<ObjPtr<BasicBlock>>, Option<ObjPtr<BasicBlock>>);
     fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
-        match self {
-            Stmt::Assign(assign) => {
-                assign.process(input, kit_mut);
-                Ok(1)
-            }
-            Stmt::ExpStmt(exp_stmt) => {
-                exp_stmt.process((Type::Int, input.0, input.1), kit_mut); //这里可能有问题
-                Ok(1)
-            }
-            Stmt::Block(blk) => {
-                blk.process(input, kit_mut);
-                Ok(1)
-            }
-            Stmt::If(if_stmt) => {
-                if_stmt.process(input, kit_mut);
-                Ok(1)
-            }
-            Stmt::While(while_stmt) => {
-                while_stmt.process(input, kit_mut);
-                Ok(1)
-            }
-            Stmt::Break(break_stmt) => {
-                break_stmt.process(input, kit_mut);
-                Ok(1)
-            }
-            Stmt::Continue(continue_stmt) => {
-                continue_stmt.process(input, kit_mut);
-                Ok(1)
-            }
-            Stmt::Return(ret_stmt) => {
-                ret_stmt.process(input, kit_mut);
-                Ok(1)
+        if kit_mut.context_mut.stop_genir{
+            Ok(1)
+        }else{
+            match self {
+                Stmt::Assign(assign) => {
+                    assign.process(input, kit_mut);
+                    Ok(1)
+                }
+                Stmt::ExpStmt(exp_stmt) => {
+                    exp_stmt.process((Type::Int, input.0, input.1), kit_mut); //这里可能有问题
+                    Ok(1)
+                }
+                Stmt::Block(blk) => {
+                    blk.process(input, kit_mut);
+                    Ok(1)
+                }
+                Stmt::If(if_stmt) => {
+                    if_stmt.process(input, kit_mut);
+                    Ok(1)
+                }
+                Stmt::While(while_stmt) => {
+                    while_stmt.process(input, kit_mut);
+                    Ok(1)
+                }
+                Stmt::Break(break_stmt) => {
+                    break_stmt.process(input, kit_mut);
+                    Ok(1)
+                }
+                Stmt::Continue(continue_stmt) => {
+                    continue_stmt.process(input, kit_mut);
+                    Ok(1)
+                }
+                Stmt::Return(ret_stmt) => {
+                    ret_stmt.process(input, kit_mut);
+                    Ok(1)
+                }
             }
         }
+        
         // todo!();
     }
 }
@@ -1497,34 +1518,40 @@ impl Process for If {
             kit_mut.context_mut.bb_now_set(inst_bb_else); //设置现在所在的bb块，准备归约
             stmt_else.process(input, kit_mut).unwrap(); //向该分支块内生成指令
                                                         //加一条直接跳转语句
-            kit_mut
-                .context_mut
-                .push_inst_bb(kit_mut.pool_inst_mut.make_jmp()); //bb_mut_now是else分支的叶子交汇点
+            
             match kit_mut.context_mut.bb_now_mut {
                 InfuncChoice::InFunc(bb_now) => {
                     // // println!("下一块:{:?}", inst_bb_successor.get_name());
-                    bb_now.as_mut().add_next_bb(inst_bb_successor); //向if分支的叶子交汇点bb_now_mut插入下一个节点
+                    if !kit_mut.context_mut.stop_genir{
+                        kit_mut
+                .context_mut
+                .push_inst_bb(kit_mut.pool_inst_mut.make_jmp()); //bb_mut_now是else分支的叶子交汇点
+                        bb_now.as_mut().add_next_bb(inst_bb_successor); //向if分支的叶子交汇点bb_now_mut插入下一个节点
+                    }
+                    
                 }
                 _ => {
                     unreachable!()
                 }
             }
 
-
+            kit_mut.context_mut.set_stop_genir(false);
             kit_mut.context_mut.bb_now_set(inst_bb_if);
             self.then.process(input, kit_mut).unwrap();
-            kit_mut
-                .context_mut
-                .push_inst_bb(kit_mut.pool_inst_mut.make_jmp()); //bb_now_mut是if语句块的叶子交汇点
             match kit_mut.context_mut.bb_now_mut {
                 InfuncChoice::InFunc(bb_now) => {
-
+                    if !kit_mut.context_mut.stop_genir{
+                    kit_mut
+                        .context_mut
+                        .push_inst_bb(kit_mut.pool_inst_mut.make_jmp()); //bb_now_mut是if语句块的叶子交汇点
                     bb_now.as_mut().add_next_bb(inst_bb_successor); //向if分支的叶子交汇点bb_now_mut插入下一个节点
+                    }
                 }
                 _ => {
                     unreachable!()
                 }
             }
+            kit_mut.context_mut.set_stop_genir(false);
             kit_mut.context_mut.bb_now_set(inst_bb_successor); //设置现在所在的bb
         } else {
             // // println!("有if没else");
@@ -1549,18 +1576,22 @@ impl Process for If {
             // }
             kit_mut.context_mut.bb_now_set(inst_bb_if);
             self.then.process(input, kit_mut).unwrap();
-            kit_mut
-                .context_mut
-                .push_inst_bb(kit_mut.pool_inst_mut.make_jmp()); //bb_now_mut是if语句块的叶子交汇点
+            
 
             match kit_mut.context_mut.bb_now_mut {
                 InfuncChoice::InFunc(bb_now) => {
+                    if !kit_mut.context_mut.stop_genir{
+                        kit_mut
+                .context_mut
+                .push_inst_bb(kit_mut.pool_inst_mut.make_jmp()); //bb_now_mut是if语句块的叶子交汇点
                     bb_now.as_mut().add_next_bb(inst_bb_successor); //向if分支的叶子交汇点bb_now_mut插入下一个节点
+                    }
                 }
                 _ => {
                     unreachable!()
                 }
             }
+            kit_mut.context_mut.set_stop_genir(false);
             kit_mut.context_mut.bb_now_set(inst_bb_successor); //设置现在所在的bb
         }
         Ok(1)
@@ -1570,49 +1601,17 @@ impl Process for While {
     type Ret = i32;
     type Message = (Option<ObjPtr<BasicBlock>>, Option<ObjPtr<BasicBlock>>);
     fn process(&mut self, _input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
-        // let (inst_cond, val_cond) = self.cond.process(Type::Int, kit_mut).unwrap();
-        // let inst_branch = kit_mut.pool_inst_mut.make_br(inst_cond);
-        // kit_mut.context_mut.push_inst_bb(inst_branch); //当前basicblock中放入branch指令
-
         let block_while_head_name = kit_mut.context_mut.get_newbb_name();
         let block_while_head = kit_mut.pool_bb_mut.new_basic_block(block_while_head_name); //生成新的块(false)
         let block_false_name = kit_mut.context_mut.get_newbb_name();
         let block_false = kit_mut.pool_bb_mut.new_basic_block(block_false_name); //生成新的块(false)
-        // match kit_mut.context_mut.bb_now_mut {
-        //     InfuncChoice::InFunc(bb_now) => {
-        //         bb_now.as_mut().add_next_bb(block_false);
-        //         bb_now.as_mut().add_next_bb(block_while_head);
-        //     }
-        //     _ => {
-        //         unreachable!()
-        //     }
-        // }
         let (inst_cond, val_cond) = self.cond.process((Type::Int,Some(block_while_head), Some(block_false)), kit_mut).unwrap();
-        // let inst_branch = kit_mut.pool_inst_mut.make_br(inst_cond);
-        // kit_mut.context_mut.push_inst_bb(inst_branch); //当前basicblock中放入branch指令
         kit_mut.context_mut.bb_now_set(block_while_head); //设置当前basicblock
-                                                          // // println!("while_body process starts");
-        // let (inst_cond, val_cond) = self.cond.process((Type::Int,Some(block_while_head), Some(block_false)), kit_mut).unwrap(); //当前块中放入cond
         self.body
             .process((Some(block_while_head), Some(block_false)), kit_mut)
             .unwrap(); //在块内生成指令
-        
-        let (inst_cond, val_cond) = self.cond.process((Type::Int,Some(block_while_head), Some(block_false)), kit_mut).unwrap(); //当前块中放入cond                                                                       // // println!("cond process finished");
-        // let inst_branch = kit_mut.pool_inst_mut.make_br(inst_cond);
-        // kit_mut.context_mut.push_inst_bb(inst_branch); //当前basicblock中放入branch指令
-        // match kit_mut.context_mut.bb_now_mut {
-        //     //当前块是while_body所有叶子节点的交汇点
-        //     InfuncChoice::InFunc(bb_now) => {
-        //         // // println!("下一个节点:{:?}", block_false.get_name());
-        //         // // println!("下一个节点:{:?}", block_while_head.get_name());
-        //         bb_now.as_mut().add_next_bb(block_false);
-        //         bb_now.as_mut().add_next_bb(block_while_head);
-        //     }
-        //     _ => {
-        //         unreachable!()
-        //     }
-        // }
-        // // println!("set");
+        let (inst_cond, val_cond) = self.cond.process((Type::Int,Some(block_while_head), Some(block_false)), kit_mut).unwrap(); //当前块中放入cond
+        kit_mut.context_mut.set_stop_genir(false);
         kit_mut.context_mut.bb_now_set(block_false);
         // todo!()
         Ok(1)
@@ -1634,11 +1633,13 @@ impl Process for Break {
                     }
                     // bb_now.as_mut().add_next_bb(bb_false);
                 }
+                kit_mut.context_mut.is_terminated_map.insert(bb_now.get_name().to_string(), true);
             }
             _ => {
                 unreachable!()
             }
         }
+        kit_mut.context_mut.set_stop_genir(true);
         Ok(1)
     }
 }
@@ -1656,11 +1657,13 @@ impl Process for Continue {
                         bb_now.as_mut().add_next_bb(bb_false);
                     }
                 }
+                kit_mut.context_mut.is_terminated_map.insert(bb_now.get_name().to_string(), true);
             }
             _ => {
                 unreachable!()
             }
         }
+        kit_mut.context_mut.set_stop_genir(true);
         Ok(1)
     }
 }
@@ -1669,6 +1672,15 @@ impl Process for Return {
     type Ret = i32;
     type Message = (Option<ObjPtr<BasicBlock>>, Option<ObjPtr<BasicBlock>>);
     fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
+        kit_mut.context_mut.set_stop_genir(true);
+            match kit_mut.context_mut.bb_now_mut {
+                InfuncChoice::InFunc(bb_now) => {
+                    kit_mut.context_mut.is_terminated_map.insert(bb_now.get_name().to_string(), true);
+                }
+                _ => {
+                    unreachable!()
+                }
+            }
         if let Some(exp) = &mut self.exp {
             let (inst, val) = exp.process(Type::Int, kit_mut).unwrap(); //这里可能有问题
             match val {
@@ -1718,7 +1730,12 @@ impl Process for Cond {
     type Ret = (ObjPtr<Inst>, ExpValue);
     type Message = (Type,Option<ObjPtr<BasicBlock>>, Option<ObjPtr<BasicBlock>>);//第一个为true,第二个为false
     fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
-        self.l_or_exp.process(input, kit_mut)
+        if kit_mut.context_mut.stop_genir{
+            Ok((kit_mut.pool_inst_mut.make_int_const(-1129),ExpValue::None))
+        }else{
+            self.l_or_exp.process(input, kit_mut)
+        }
+
     }
 }
 impl Process for LVal {
@@ -2196,14 +2213,30 @@ impl Process for UnaryExp {
             UnaryExp::OpUnary((unaryop, unaryexp)) => match unaryop {
                 UnaryOp::Add => {
                     let (mut inst_u, mut val) = unaryexp.as_mut().process(input, kit_mut).unwrap();
-                    let inst = kit_mut.pool_inst_mut.make_pos(inst_u);
-                    kit_mut.context_mut.push_inst_bb(inst);
+                    // let inst = kit_mut.pool_inst_mut.make_pos(inst_u);
+                    // kit_mut.context_mut.push_inst_bb(inst);
                     let mut val_ret = val;
-                    Ok((inst, val_ret))
+                    Ok((inst_u, val_ret))
                 }
                 UnaryOp::Minus => {
                     let (mut inst_u, mut val) = unaryexp.as_mut().process(input, kit_mut).unwrap();
-                    let inst = kit_mut.pool_inst_mut.make_neg(inst_u);
+                    let mut inst = inst_u;
+                    match inst_u.get_ir_type(){
+                        IrType::Int |IrType::ConstInt =>{
+                            let inst_zero = kit_mut.pool_inst_mut.make_int_const(0);
+                            kit_mut.context_mut.push_inst_bb(inst_zero);
+                            inst = kit_mut.pool_inst_mut.make_sub(inst_zero, inst_u);
+                        }
+                        IrType::Float |IrType::ConstFloat =>{
+                            let inst_zero = kit_mut.pool_inst_mut.make_float_const(0.0);
+                            kit_mut.context_mut.push_inst_bb(inst_zero);
+                            inst = kit_mut.pool_inst_mut.make_sub(inst_zero, inst_u);
+                        }
+                        _=>{
+                            unreachable!()
+                        }
+                    }
+                    // let inst = kit_mut.pool_inst_mut.make_neg(inst_u);
                     kit_mut.context_mut.push_inst_bb(inst);
                     let mut val_ret = val;
                     match val {
