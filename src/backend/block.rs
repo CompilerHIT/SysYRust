@@ -152,35 +152,41 @@ impl BB {
                             )));
                         }
                         BinOp::Mul => {
-                            let mut imm = 0;
-                            let limm = match lhs.as_ref().get_kind() {
-                                InstKind::ConstInt(limm) => {
-                                    imm = limm;
-                                    true
-                                }
-                                _ => false,
-                            };
-                            let rimm = match rhs.as_ref().get_kind() {
-                                InstKind::ConstInt(rimm) => {
-                                    imm = rimm;
-                                    true
-                                }
-                                _ => false,
-                            };
-                            if rimm {
-                                let src = self.resolve_operand(func, lhs, true, map_info, pool);
-                                self.resolve_opt_mul(dst_reg, src, imm, pool);
-                            } else if limm {
-                                let src = self.resolve_operand(func, rhs, true, map_info, pool);
-                                self.resolve_opt_mul(dst_reg, src, imm, pool);
-                            } else {
-                                lhs_reg = self.resolve_operand(func, lhs, true, map_info, pool);
+                            lhs_reg = self.resolve_operand(func, lhs, true, map_info, pool);
                                 rhs_reg = self.resolve_operand(func, rhs, true, map_info, pool);
                                 self.insts.push(pool.put_inst(LIRInst::new(
                                     InstrsType::Binary(BinaryOp::Mul),
                                     vec![dst_reg, lhs_reg, rhs_reg],
                                 )));
-                            }
+                            // let mut imm = 0;
+                            // let limm = match lhs.as_ref().get_kind() {
+                            //     InstKind::ConstInt(limm) => {
+                            //         imm = limm;
+                            //         true
+                            //     }
+                            //     _ => false,
+                            // };
+                            // let rimm = match rhs.as_ref().get_kind() {
+                            //     InstKind::ConstInt(rimm) => {
+                            //         imm = rimm;
+                            //         true
+                            //     }
+                            //     _ => false,
+                            // };
+                            // if rimm {
+                            //     let src = self.resolve_operand(func, lhs, true, map_info, pool);
+                            //     self.resolve_opt_mul(dst_reg, src, imm, pool);
+                            // } else if limm {
+                            //     let src = self.resolve_operand(func, rhs, true, map_info, pool);
+                            //     self.resolve_opt_mul(dst_reg, src, imm, pool);
+                            // } else {
+                            //     lhs_reg = self.resolve_operand(func, lhs, true, map_info, pool);
+                            //     rhs_reg = self.resolve_operand(func, rhs, true, map_info, pool);
+                            //     self.insts.push(pool.put_inst(LIRInst::new(
+                            //         InstrsType::Binary(BinaryOp::Mul),
+                            //         vec![dst_reg, lhs_reg, rhs_reg],
+                            //     )));
+                            // }
                         }
                         BinOp::Div => {
                             lhs_reg = self.resolve_operand(func, lhs, true, map_info, pool);
@@ -806,12 +812,14 @@ impl BB {
                                         vec![dst_reg.clone(), Operand::IImm(IImm::new(pos))]
                                     );
                                     inst.set_double();
+                                    log!("save param to stack {:?}", inst);
                                     self.insts.push(pool.put_inst(inst));
                                     let mut inst = LIRInst::new(
                                         InstrsType::StoreParamToStack,
                                         vec![src_reg.clone(), Operand::IImm(IImm::new(tmp_pos))],
                                     );
                                     inst.set_double();
+                                    log!("save param to stack 2： {:?}", inst);
                                     self.insts.push(pool.put_inst(inst));
                                 }
                             }
@@ -865,7 +873,7 @@ impl BB {
                         let mut inst = LIRInst::new(
                             InstrsType::LoadParamFromStack,
                             vec![
-                                Operand::Reg(Reg::new(icnt + 10, ScalarType::Int)),
+                                Operand::Reg(Reg::new(reg_cnt - icnt + 9, ScalarType::Int)),
                                 Operand::IImm(IImm::new(slot.get_pos())),
                             ],
                         );
@@ -1192,17 +1200,21 @@ impl BB {
 
     pub fn handle_overflow(&mut self, func: ObjPtr<Func>, pool: &mut BackendPool) {
         let mut pos = 0;
+        log!("{}, len: {}", self.label, self.insts.len());
         loop {
             if pos >= self.insts.len() {
                 break;
             }
+            log!("inst: {:?}", self.insts[pos]);
             let inst_ref = self.insts[pos].as_ref();
             match inst_ref.get_type() {
                 InstrsType::Load | InstrsType::Store => {
                     let temp = Operand::Reg(Reg::new(3, ScalarType::Int));
                     let offset = inst_ref.get_offset().get_data();
+                    log!("offset {}", offset);
                     if operand::is_imm_12bs(offset) {
-                        break;
+                        pos += 1;
+                        continue;
                     }
                     self.resolve_overflow_sl(temp.clone(), &mut pos, offset, pool);
                     self.insts.insert(
@@ -1223,7 +1235,8 @@ impl BB {
                     let temp = Operand::Reg(Reg::new(3, ScalarType::Int));
                     let offset = inst_ref.get_stack_offset().get_data();
                     if operand::is_imm_12bs(offset) {
-                        break;
+                        pos += 1;
+                        continue;
                     }
                     self.resolve_overflow_sl(temp.clone(), &mut pos, offset, pool);
                     self.insts.insert(
@@ -1249,7 +1262,8 @@ impl BB {
                     let offset = func.as_ref().reg_alloc_info.stack_size as i32
                         - inst_ref.get_stack_offset().get_data();
                     if operand::is_imm_12bs(offset) {
-                        break;
+                        pos += 1;
+                        continue;
                     }
                     self.resolve_overflow_sl(temp.clone(), &mut pos, offset, pool);
                     self.insts.insert(
@@ -1293,6 +1307,7 @@ impl BB {
                             flag = true;
                         }
                         if &block_ref.as_ref().label == target {
+                            //FIXME: this is a bug
                             break;
                         }
                         if flag {
@@ -1343,8 +1358,12 @@ impl BB {
         offset: i32,
         pool: &mut BackendPool,
     ) {
-        let op1 = Operand::IImm(IImm::new(offset >> 12));
-        let op2 = Operand::IImm(IImm::new(offset & 0xfff));
+        let lower = (offset << 20) >> 20;
+            let upper = (offset - lower) >> 12;
+            //取得高20位
+            let op1 = Operand::IImm(IImm::new(upper));
+            //取得低12位
+            let op2 = Operand::IImm(IImm::new(lower));
         self.insts.insert(
             *pos,
             pool.put_inst(LIRInst::new(
@@ -1455,12 +1474,17 @@ impl BB {
                 vec![reg.clone(), iimm],
             )));
         } else {
-            let op1 = Operand::IImm(IImm::new(imm >> 11));
-            let op2 = Operand::IImm(IImm::new(imm & 0x7ff));
+            let lower = (imm << 20) >> 20;
+            let upper = (imm - lower) >> 12;
+            //取得高20位
+            let op1 = Operand::IImm(IImm::new(upper));
+            //取得低12位
+            let op2 = Operand::IImm(IImm::new(lower));
             self.insts.push(pool.put_inst(LIRInst::new(
                 InstrsType::OpReg(SingleOp::Lui),
                 vec![reg.clone(), op1],
             )));
+            log!("op2: {:?}", op2);
             self.insts.push(pool.put_inst(LIRInst::new(
                 InstrsType::Binary(BinaryOp::Add),
                 vec![reg.clone(), reg.clone(), op2],

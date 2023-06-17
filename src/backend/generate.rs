@@ -125,7 +125,7 @@ impl GenerateAsm for LIRInst {
                 let mut builder = AsmBuilder::new(f);
                 let offset = self.get_offset();
                 if !operand::is_imm_12bs(offset.get_data()) {
-                    panic!("illegal offset");
+                    panic!("illegal offset, {:?}", self);
                 }
                 let src = match self.get_lhs() {
                     Operand::Reg(reg) => reg.to_string(),

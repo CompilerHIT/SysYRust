@@ -368,8 +368,8 @@ impl Func {
         log!("spills:{:?}", self.reg_alloc_info.spillings);
 
         let mut stack_size = self.reg_alloc_info.stack_size as i32;
-        // log!("stack_size: {}", stack_size);
-        stack_size += self.max_params * ADDR_SIZE * 2;
+        stack_size += self.max_params * ADDR_SIZE;
+        log!("set stack size:{}", stack_size);
         self.context.as_mut().set_offset(stack_size);
     }
 
@@ -471,10 +471,11 @@ impl Func {
             Err(e) => panic!("Error: {}", e),
         };
         let mut stack_size = self.context.get_offset();
+        log!("stack size:{}", stack_size);
+
         if let Some(addition_stack_info) = self.stack_addr.front() {
             stack_size += addition_stack_info.get_pos() + addition_stack_info.get_size();
         }
-
         stack_size += self.caller_saved.len() as i32 * ADDR_SIZE;
 
         //栈对齐 - 调用func时sp需按16字节对齐
@@ -483,6 +484,9 @@ impl Func {
 
         let ra = Reg::new(1, ScalarType::Int);
         let map_clone = map.clone();
+        log!("label: {}", self.label);
+        log!("stack size:{}", stack_size);
+
         self.context.as_mut().set_prologue_event(move || {
             let mut builder = AsmBuilder::new(&mut f1);
             // addi sp -stack_size
