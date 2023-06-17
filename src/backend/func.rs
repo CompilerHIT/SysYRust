@@ -496,8 +496,6 @@ impl Func {
                 for (reg, slot) in map.iter() {
                     if !row {
                         builder.s(&reg.to_string(), "sp", slot.get_pos(), false, true);
-                    } else {
-                        builder.s(&reg.to_row(), "sp", slot.get_pos(), true, true);
                     }
                 }
             }
@@ -509,8 +507,6 @@ impl Func {
                 for (reg, slot) in map_clone.iter() {
                     if !row {
                         builder.l(&reg.to_string(), "sp", slot.get_pos(), false, true);
-                    } else {
-                        builder.l(&reg.to_row(), "sp", slot.get_pos(), true, true);
                     }
                 }
             }

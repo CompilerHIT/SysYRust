@@ -70,7 +70,7 @@ fn run_main() {
     // ir优化
     sysylib::ir::optimizer_run(&mut module, o1_option);
 
-    let output2 = matches.value_of("o").unwrap_or("row_asm.s");
+    let output2 = matches.value_of("o").unwrap_or("row_asm.log");
     // 后端解析
     generate_asm(filename, output, output2, &mut AsmModule::new(&module));
 
