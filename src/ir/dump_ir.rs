@@ -660,26 +660,34 @@ fn dump_inst(
             match op {
                 UnOp::Pos => {
                     name_index = put_name(local_map, inst, name_index);
-                    text += format!(
-                        "  {} = add i32 0, {}\n",
-                        local_map.get(&inst).unwrap().clone(),
-                        get_inst_value(inst.get_unary_operand(), local_map, global_map),
-                    )
-                    .as_str();
-                }
-                UnOp::Neg => {
-                    if let InstKind::Unary(UnOp::Not) = inst.get_unary_operand().get_kind() {
-                        name_index = put_name(local_map, inst, name_index);
+                    if let IrType::Int = inst.get_ir_type() {
                         text += format!(
-                            "  {} = sub i1 0, {}\n",
+                            "  {} = add i32 0, {}\n",
                             local_map.get(&inst).unwrap().clone(),
                             get_inst_value(inst.get_unary_operand(), local_map, global_map),
                         )
                         .as_str();
                     } else {
-                        name_index = put_name(local_map, inst, name_index);
+                        text += format!(
+                            "  {} = fadd float 0.0, {}\n",
+                            local_map.get(&inst).unwrap().clone(),
+                            get_inst_value(inst.get_unary_operand(), local_map, global_map),
+                        )
+                        .as_str();
+                    }
+                }
+                UnOp::Neg => {
+                    name_index = put_name(local_map, inst, name_index);
+                    if let IrType::Int = inst.get_ir_type() {
                         text += format!(
                             "  {} = sub i32 0, {}\n",
+                            local_map.get(&inst).unwrap().clone(),
+                            get_inst_value(inst.get_unary_operand(), local_map, global_map),
+                        )
+                        .as_str();
+                    } else {
+                        text += format!(
+                            "  {} = fsub float 0.0, {}\n",
                             local_map.get(&inst).unwrap().clone(),
                             get_inst_value(inst.get_unary_operand(), local_map, global_map),
                         )
@@ -688,12 +696,21 @@ fn dump_inst(
                 }
                 UnOp::Not => {
                     name_index = put_name(local_map, inst, name_index);
-                    text += format!(
-                        "  {} = xor i1 {}, 1\n",
-                        local_map.get(&inst).unwrap().clone(),
-                        get_inst_value(inst.get_unary_operand(), local_map, global_map),
-                    )
-                    .as_str();
+                    if let IrType::Int = inst.get_ir_type() {
+                        text += format!(
+                            "  {} = icmp ne i32 {}, 0\n",
+                            local_map.get(&inst).unwrap().clone(),
+                            get_inst_value(inst.get_unary_operand(), local_map, global_map),
+                        )
+                        .as_str();
+                    } else {
+                        text += format!(
+                            "  {} = fcmp one float {}, 0.0\n",
+                            local_map.get(&inst).unwrap().clone(),
+                            get_inst_value(inst.get_unary_operand(), local_map, global_map),
+                        )
+                        .as_str();
+                    }
                 }
             }
         }
