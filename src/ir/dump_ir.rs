@@ -668,13 +668,23 @@ fn dump_inst(
                     .as_str();
                 }
                 UnOp::Neg => {
-                    name_index = put_name(local_map, inst, name_index);
-                    text += format!(
-                        "  {} = sub i32 0, {}\n",
-                        local_map.get(&inst).unwrap().clone(),
-                        get_inst_value(inst.get_unary_operand(), local_map, global_map),
-                    )
-                    .as_str();
+                    if let InstKind::Unary(UnOp::Not) = inst.get_unary_operand().get_kind() {
+                        name_index = put_name(local_map, inst, name_index);
+                        text += format!(
+                            "  {} = sub i1 0, {}\n",
+                            local_map.get(&inst).unwrap().clone(),
+                            get_inst_value(inst.get_unary_operand(), local_map, global_map),
+                        )
+                        .as_str();
+                    } else {
+                        name_index = put_name(local_map, inst, name_index);
+                        text += format!(
+                            "  {} = sub i32 0, {}\n",
+                            local_map.get(&inst).unwrap().clone(),
+                            get_inst_value(inst.get_unary_operand(), local_map, global_map),
+                        )
+                        .as_str();
+                    }
                 }
                 UnOp::Not => {
                     name_index = put_name(local_map, inst, name_index);
