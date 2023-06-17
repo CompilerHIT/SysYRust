@@ -47,13 +47,13 @@ impl<'a> AsmModule<'a> {
 
     pub fn generator(&mut self, f: &mut File, f2: &mut File, pool: &mut BackendPool) {
         self.build_lir(pool);
+        self.generate_row_asm(f2, pool);
         self.allocate_reg(f);
         self.handle_spill(pool, f);
         // 检查地址溢出，插入间接寻址
         self.handle_overflow(pool);
         self.generate_global_var(f);
         // log!("start generate");
-        self.generate_row_asm(f2, pool);
         self.generate_asm(f, pool);
     }
 

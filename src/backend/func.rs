@@ -491,12 +491,10 @@ impl Func {
             let mut builder = AsmBuilder::new(&mut f1);
             // addi sp -stack_size
             builder.addi("sp", "sp", -stack_size);
-            builder.s(&ra.to_string(), "sp", stack_size - 8, false, true);
+            builder.s(&ra.to_string(false), "sp", stack_size - 8, false, true);
             if !is_main {
                 for (reg, slot) in map.iter() {
-                    if !row {
-                        builder.s(&reg.to_string(), "sp", slot.get_pos(), false, true);
-                    }
+                    builder.s(&reg.to_string(false), "sp", slot.get_pos(), false, true);
                 }
             }
         });
@@ -505,19 +503,17 @@ impl Func {
             let mut builder = AsmBuilder::new(&mut f2);
             if !is_main {
                 for (reg, slot) in map_clone.iter() {
-                    if !row {
-                        builder.l(&reg.to_string(), "sp", slot.get_pos(), false, true);
-                    }
+                    builder.l(&reg.to_string(false), "sp", slot.get_pos(), false, true);
                 }
             }
-            builder.l(&ra.to_string(), "sp", stack_size - 8, false, true);
+            builder.l(&ra.to_string(false), "sp", stack_size - 8, false, true);
             builder.addi("sp", "sp", stack_size);
         });
     }
 
     pub fn generate_row(&mut self, _:ObjPtr<Context>, f: &mut File) -> Result<()> {
         AsmBuilder::new(f).show_func(&self.label)?;
-        self.context.as_mut().call_prologue_event();
+        // self.context.as_mut().call_prologue_event();
         let mut size = 0;
         for block in self.blocks.iter() {
             size += block.insts.len();

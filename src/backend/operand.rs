@@ -95,7 +95,10 @@ impl Reg {
             _ => panic!("Wrong Type"),
         }
     }
-    pub fn to_string(&self) -> String {
+    pub fn to_string(&self, is_row: bool) -> String {
+        if is_row {
+            return format!("x{}", self.id);
+        }
         if self.r_type == ScalarType::Int {
             match self.id {
                 0 => String::from("zero"),
