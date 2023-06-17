@@ -8,6 +8,7 @@ pub use crate::backend::block::BB;
 pub use crate::backend::func::Func;
 use crate::backend::operand::*;
 pub use crate::backend::structs::{Context, GenerateAsm};
+use crate::ir::instruction::Inst;
 pub use crate::utility::{ObjPtr, ScalarType};
 
 #[derive(Clone, PartialEq, Debug)]
@@ -101,6 +102,9 @@ pub enum InstrsType {
     // LoadGlobal,
 }
 
+
+
+
 #[derive(Debug)]
 pub struct LIRInst {
     inst_type: InstrsType,
@@ -189,7 +193,7 @@ impl fmt::Display for LIRInst {
         let mut use_reg_id =HashSet::new();
         self.get_reg_def().iter().for_each(|e|{def.insert(e.get_id());});
         self.get_reg_use().iter().for_each(|e|{use_reg_id.insert(e.get_id());});
-        write!(f,"type:{:?},def:{:?},use:{:?}",kind,def,use_reg_id)
+        write!(f,"{:?} def:{:?} use:{:?}",kind,def,use_reg_id)
     }
 }
 

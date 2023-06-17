@@ -17,6 +17,7 @@ use crate::backend::block::*;
 use crate::backend::instrs::{LIRInst, Operand};
 use crate::backend::module::AsmModule;
 use crate::backend::operand::{IImm, Reg, ARG_REG_COUNT};
+use crate::backend::regalloc::simulate_assign;
 use crate::backend::regalloc::{
     easy_ls_alloc::Allocator, regalloc::Regalloc, structs::FuncAllocStat,
 };
@@ -267,24 +268,20 @@ impl Func {
 
     pub fn calc_live(&mut self) {
         let calc_live_file="callive.txt";
+        log_file!(calc_live_file,"-----------------------------------cal live func:{}---------------------------", self.label);
         // 打印函数里面的寄存器活跃情况
         let printinterval = || {
             let mut que: VecDeque<ObjPtr<BB>> = VecDeque::new();
             let mut passed_bb = HashSet::new();
             que.push_front(self.entry.unwrap());
             passed_bb.insert(self.entry.unwrap());
-            log_file!(calc_live_file,"func:{}", self.label);
             while !que.is_empty() {
                 let cur_bb = que.pop_front().unwrap();
                 log_file!(calc_live_file,"block {}:",cur_bb.label);
-                log_file!(calc_live_file,"live in:");
-                log_file!(calc_live_file,"{:?}",cur_bb.live_in);
-                log_file!(calc_live_file,"live out:");
-                log_file!(calc_live_file,"{:?}",cur_bb.live_out);
-                log_file!(calc_live_file,"live use:");
-                log_file!(calc_live_file,"{:?}",cur_bb.live_use);
-                log_file!(calc_live_file,"live def:");
-                log_file!(calc_live_file,"{:?}",cur_bb.live_def);
+                log_file!(calc_live_file,"live in:{:?}",cur_bb.live_in.iter().map(|e|e.get_id()).collect::<Vec<i32>>());
+                log_file!(calc_live_file,"live out:{:?}",cur_bb.live_out.iter().map(|e|e.get_id()).collect::<Vec<i32>>());
+                log_file!(calc_live_file,"live use:{:?}",cur_bb.live_use.iter().map(|e|e.get_id()).collect::<Vec<i32>>());
+                log_file!(calc_live_file,"live def{:?}:",cur_bb.live_def.iter().map(|e|e.get_id()).collect::<Vec<i32>>());
                 for next in cur_bb.out_edge.iter() {
                     if passed_bb.contains(next) {
                         continue;
@@ -296,7 +293,7 @@ impl Func {
         };
 
         log_file!(calc_live_file,"-----------------------------------before count live def,live use----------------------------");
-        printinterval();
+        // printinterval();
 
         // 计算公式，live in 来自于所有前继的live out的集合 + 自身的live use
         // live out等于所有后继块的live in的集合与 (自身的livein 和live def的并集) 的交集
@@ -338,11 +335,12 @@ impl Func {
 
 
         log_file!(calc_live_file,"-----------------------------------before count live in,live out----------------------------");
-        printinterval();
+        // printinterval();
 
         //然后计算live in 和live out
         while let Some(value) = queue.pop_front() {
             let (block, reg) = value;
+            log_file!(calc_live_file,"block {} 's ins:{:?}",block.label,block.in_edge.iter().map(|b|&b.label).collect::<HashSet<&String>>());
             for pred in block.as_ref().in_edge.iter() {
                 if pred.as_mut().live_out.insert(reg) {
                     if !pred.as_mut().live_def.contains(&reg)
@@ -365,6 +363,9 @@ impl Func {
         // let mut allocator =crate::backend::regalloc::easy_gc_alloc::Allocator::new();
         let mut allocator=crate::backend::regalloc::base_alloc::Allocator::new();
         let alloc_stat = allocator.alloc(self);
+
+        // TODO
+        simulate_assign::Simulator::simulate(&self, &alloc_stat);
 
         self.reg_alloc_info = alloc_stat;
         self.context.as_mut().set_reg_map(&self.reg_alloc_info.dstr);
