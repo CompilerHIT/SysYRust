@@ -71,7 +71,7 @@ pub enum CmpOp {
     Lt,
     Ge,
     Le,
-    Eqz,
+    Nez,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -154,7 +154,7 @@ impl LIRInst {
     // rhs不一定存在
     pub fn get_rhs(&self) -> &Operand {
         if !self.is_rhs_exist() {
-            panic!("Error call for instr's rhs");
+            panic!("Error call for instr's rhs, instr is {:?}", self);
         } else {
             &self.operands[2]
         }
