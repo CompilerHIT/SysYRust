@@ -30,6 +30,7 @@ pub enum BinaryOp {
     And,
     Or,
     Xor,
+    Slt,
     /// Shift left logical.
     Shl,
     /// Shift right logical.
@@ -57,6 +58,8 @@ pub enum SingleOp {
     LoadAddr,
     // F2D,
     // D2F,
+    Seqz,
+    Snez,
 }
 
 /// 比较运算符
