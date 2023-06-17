@@ -18,9 +18,10 @@ pub struct Context<'a> {
     pub param_usage_table: HashMap<String, bool>,
     pub bb_map: HashMap<String, HashMap<String, ObjPtr<Inst>>>,
     pub phi_list: HashMap<String, (Vec<(String, ObjPtr<Inst>, bool)>, bool)>,
-    pub is_branch_map: HashMap<String, bool>,
+    pub is_terminated_map: HashMap<String, bool>,
     pub bb_now_mut: InfuncChoice,
     pub module_mut: &'a mut Module,
+    pub stop_genir:bool,
     // pub is_branch: bool,
     // pub is_else: bool,
     num_bb: i64,
@@ -58,8 +59,9 @@ impl Context<'_> {
             bb_map: HashMap::new(),
             param_usage_table: HashMap::new(),
             phi_list: HashMap::new(),
-            is_branch_map: HashMap::new(),
+            is_terminated_map: HashMap::new(),
             bb_now_mut: InfuncChoice::NInFunc(),
+            stop_genir:false,
             module_mut,
             // is_branch: false,
             num_bb: 0,
@@ -474,6 +476,10 @@ impl Context<'_> {
         self.index.to_string() + s.as_str()
     }
 
+
+    pub fn set_stop_genir(&mut self,flag:bool){
+        self.stop_genir = flag;
+    }
     /* -------------------------------------------------------------------------- */
     /*                               for phi_list                                 */
     /* -------------------------------------------------------------------------- */
