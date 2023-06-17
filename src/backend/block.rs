@@ -281,7 +281,10 @@ impl BB {
                         UnOp::Not => match src.as_ref().get_kind() {
                             InstKind::ConstInt(imm) => {
                                 let imm = src.as_ref().get_int_bond();
-                                let iimm = self.resolve_iimm(!imm, pool);
+                                let iimm = match imm {
+                                    0 => self.resolve_iimm(1, pool),
+                                    _ => self.resolve_iimm(0, pool)
+                                };
                                 self.insts.push(pool.put_inst(LIRInst::new(
                                     InstrsType::OpReg(SingleOp::Li),
                                     vec![dst_reg, iimm],
@@ -293,7 +296,7 @@ impl BB {
                             _ => match src.as_ref().get_ir_type() {
                                 IrType::Int => {
                                     self.insts.push(pool.put_inst(LIRInst::new(
-                                        InstrsType::OpReg(SingleOp::INot),
+                                        InstrsType::OpReg(SingleOp::Seqz),
                                         vec![dst_reg, src_reg],
                                     )));
                                 }
