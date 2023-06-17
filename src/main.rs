@@ -74,5 +74,5 @@ fn run_main() {
     sysylib::ir::optimizer_run(&mut module, o1_option);
 
     // 后端解析
-    generate_asm(filename, output, &mut AsmModule::new(&module));
+    // generate_asm(filename, output, &mut AsmModule::new(&module));
 }

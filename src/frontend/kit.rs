@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::collections::HashSet;
 
 use super::context::Type;
 use super::InfuncChoice;
@@ -303,11 +304,12 @@ impl Kit<'_> {
             if func.is_empty_bb() {
                 continue;
             }
-            self.merge_function(func_name.to_string(), func.get_return_type());
+            self.merge_function(func_name.to_string(), *func);
         }
     }
 
-    pub fn merge_function(&mut self,func_name:String,ret_type:IrType){
+    pub fn merge_function(&mut self,func_name:String,inst_func:ObjPtr<Function>){
+        let ret_type = inst_func.get_return_type();
         let vec_endpoint = self.context_mut.terminated_map.get(&func_name).unwrap().clone();
         if vec_endpoint.len()>1{
             match ret_type {
@@ -373,7 +375,45 @@ impl Kit<'_> {
             }
             
         }
+        // else if vec_endpoint.len()==0{
+        //     match ret_type {
+        //         IrType::Void =>{
+        //             let end_bb = Self::bfs_find_end_bb(inst_func.get_head());
+        //             end_bb.as_mut().push_back(self.pool_inst_mut.make_return_void());
+        //         }
+        //         _=>{
+        //             unreachable!("无返回值,且函数返回类型应该为{:?}",ret_type)
+        //         }
+        //     }
+        // }
 
+    }
+
+    fn bfs_find_end_bb(head: ObjPtr<BasicBlock>) -> ObjPtr<BasicBlock> {
+        // 如果只有一个块，那么这个块就是end_bb
+        if !head.has_next_bb() {
+            return head;
+        }
+    
+        let mut visited = HashSet::new();
+        let mut queue = Vec::new();
+        visited.insert(head);
+    
+        queue.insert(0, head.get_next_bb());
+        while let Some(vec_bb) = queue.pop() {
+            for bb in vec_bb.iter() {
+                if !bb.has_next_bb() {
+                    return bb.clone();
+                }
+    
+                if !visited.contains(bb) {
+                    visited.insert(*bb);
+                    queue.insert(0, bb.get_next_bb());
+                }
+            }
+        }
+    
+        unreachable!("can't find end bb")
     }
 
     pub fn add_var(

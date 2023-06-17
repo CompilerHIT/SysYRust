@@ -76,7 +76,50 @@ impl Process for GlobalItems {
                     Ok(1)
                 }
                 Self::FuncDef(funcdef) => {
-                    funcdef.process(true, kit_mut);
+                    let inst_func = funcdef.process(true, kit_mut).unwrap();
+                    match kit_mut.context_mut.bb_now_mut {
+                        InfuncChoice::InFunc(bb_now) =>{
+                            if bb_now.is_empty(){
+                                match inst_func.get_return_type() {
+                                    IrType::Void =>{
+                                        bb_now.as_mut().push_back(kit_mut.pool_inst_mut.make_return_void());
+                                        let func_name = &kit_mut.context_mut.func_now;
+                                        if let Some(vec) = kit_mut.context_mut.terminated_map.get_mut(func_name){
+                                            vec.push((bb_now,kit_mut.pool_inst_mut.make_int_const(-1129)));
+                                        }
+                                    }
+                                    _=>{
+                                        unreachable!("返回值非空,但最后一个块却是空的")
+                                    }
+                                }
+                            }
+                            else{
+                                match bb_now.get_tail_inst().get_kind() {
+                                    InstKind::Return =>{
+
+                                    }
+                                    _=>{
+                                        match inst_func.get_return_type() {
+                                            IrType::Void =>{
+                                                bb_now.as_mut().push_back(kit_mut.pool_inst_mut.make_return_void());
+                                                let func_name = &kit_mut.context_mut.func_now;
+                                                if let Some(vec) = kit_mut.context_mut.terminated_map.get_mut(func_name){
+                                                    vec.push((bb_now,kit_mut.pool_inst_mut.make_int_const(-1129)));
+                                                }
+                                            }
+                                            _=>{
+                                                unreachable!("返回值非空,但最后一个块的最后一条指令却不是ret")
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            
+                        }
+                        _=>{
+                            unreachable!("函数ir生成完毕,本应处于最后一个bb中")
+                        }
+                    }
                     Ok(1)
                 }
             }
@@ -1099,7 +1142,7 @@ impl Process for InitVal {
     }
 }
 impl Process for FuncDef {
-    type Ret = i32;
+    type Ret = ObjPtr<Function>;
     type Message = bool;
     fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
         match self {
@@ -1124,7 +1167,7 @@ impl Process for FuncDef {
                     .push_func_module(id.to_string(), func_ptr);
                 blk.process((None, None), kit_mut);
                 kit_mut.context_mut.delete_layer();
-                return Ok(1);
+                return Ok(func_ptr);
             }
             Self::ParameterFuncDef((tp, id, params, blk)) => {
                 kit_mut.context_mut.set_funcnow(id.to_string());
@@ -1157,11 +1200,10 @@ impl Process for FuncDef {
 
                 blk.process((None, None), kit_mut);
                 kit_mut.context_mut.delete_layer();
-                return Ok(1);
+                return Ok(func_ptr);
             }
         }
-        // module.push_function(name, function);
-        todo!();
+    
     }
 }
 
