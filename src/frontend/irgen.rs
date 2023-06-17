@@ -45,6 +45,7 @@ impl Process for CompUnit {
     type Message = (i32);
     fn process(&mut self, _input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
         for item in &mut self.global_items {
+            kit_mut.context_mut.set_stop_genir(false);
             item.process(1, kit_mut);
         }
         // // println!(
