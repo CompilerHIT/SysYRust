@@ -662,7 +662,7 @@ impl BB {
                                 _ => {
                                     // 无法匹配，认为是if(a)情况，与0进行比较
                                     bz = true;
-                                    InstrsType::Branch(CmpOp::Eqz)
+                                    InstrsType::Branch(CmpOp::Nez)
                                 }
                             };
                             if bz {
@@ -708,7 +708,7 @@ impl BB {
                             // log!("{:?}", cond_ref.get_kind());
                             let lhs_reg =
                                 self.resolve_operand(func, cond_ref, true, map_info, pool);
-                            let inst_kind = InstrsType::Branch(CmpOp::Eqz);
+                            let inst_kind = InstrsType::Branch(CmpOp::Nez);
                             self.insts.push(pool.put_inst(LIRInst::new(
                                 inst_kind,
                                 vec![Operand::Addr(false_succ_block.label.to_string()), lhs_reg],
