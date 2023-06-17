@@ -788,7 +788,12 @@ impl BB {
                                         _ => self.resolve_operand(func, *arg, true, map_info, pool),
                                     };
                                     let stack_addr = &func.as_ref().stack_addr;
-                                    let pos = stack_addr.front().unwrap().get_pos() + ADDR_SIZE;
+                                    let mut pos = 0;
+                                    if let Some(slot) = stack_addr.front() {
+                                        pos = slot.get_pos() + ADDR_SIZE;
+                                    } else {
+                                        pos = ADDR_SIZE;
+                                    }
                                     let tmp_pos = pos + reg_cnt * ADDR_SIZE;
                                     let slot = StackSlot::new(pos, ADDR_SIZE);
                                     let tmp_slot = StackSlot::new(pos + reg_cnt * ADDR_SIZE, ADDR_SIZE);

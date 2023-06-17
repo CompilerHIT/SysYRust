@@ -369,7 +369,7 @@ impl Func {
 
         let mut stack_size = self.reg_alloc_info.stack_size as i32;
         // log!("stack_size: {}", stack_size);
-        stack_size += self.max_params * ADDR_SIZE;
+        stack_size += self.max_params * ADDR_SIZE * 2;
         self.context.as_mut().set_offset(stack_size);
     }
 
