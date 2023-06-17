@@ -23,12 +23,16 @@ fn functional_optimizer(module: &mut Module) {
 
         let end_bb = bfs_find_end_bb(func.get_head());
 
+        drop(func);
         // 一遍死代码删除
         dead_code_eliminate::dead_code_eliminate(end_bb);
 
         // phi优化
         phi_optimizer::phi_run(end_bb);
     }
+
+    // 全局死代码删除
+    dead_code_eliminate::global_elininate(module);
 }
 
 fn bfs_find_end_bb(head: ObjPtr<BasicBlock>) -> ObjPtr<BasicBlock> {

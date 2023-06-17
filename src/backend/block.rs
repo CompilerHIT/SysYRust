@@ -281,7 +281,10 @@ impl BB {
                         UnOp::Not => match src.as_ref().get_kind() {
                             InstKind::ConstInt(imm) => {
                                 let imm = src.as_ref().get_int_bond();
-                                let iimm = self.resolve_iimm(!imm, pool);
+                                let iimm = match imm {
+                                    0 => self.resolve_iimm(1, pool),
+                                    _ => self.resolve_iimm(0, pool)
+                                };
                                 self.insts.push(pool.put_inst(LIRInst::new(
                                     InstrsType::OpReg(SingleOp::Li),
                                     vec![dst_reg, iimm],
@@ -293,7 +296,7 @@ impl BB {
                             _ => match src.as_ref().get_ir_type() {
                                 IrType::Int => {
                                     self.insts.push(pool.put_inst(LIRInst::new(
-                                        InstrsType::OpReg(SingleOp::INot),
+                                        InstrsType::OpReg(SingleOp::Seqz),
                                         vec![dst_reg, src_reg],
                                     )));
                                 }
@@ -471,18 +474,18 @@ impl BB {
                                     pool,
                                 );
                             }
-                            // match addr_reg {
-                            //     // 使用全局数组，addr_reg获得的是地址，而非寄存器，因此需要加载
-                            //     Operand::Addr(..) => {
-                            //         let addr = addr_reg.clone();
-                            //         addr_reg = Operand::Reg(Reg::init(ScalarType::Int));
-                            //         self.insts.push(pool.put_inst(LIRInst::new(
-                            //             InstrsType::OpReg(SingleOp::LoadAddr),
-                            //             vec![addr_reg.clone(), addr]
-                            //         )));
-                            //     },
-                            //     _ => {}
-                            // }
+                            match addr_reg {
+                                // 使用全局数组，addr_reg获得的是地址，而非寄存器，因此需要加载
+                                Operand::Addr(..) => {
+                                    let addr = addr_reg.clone();
+                                    addr_reg = Operand::Reg(Reg::init(ScalarType::Int));
+                                    self.insts.push(pool.put_inst(LIRInst::new(
+                                        InstrsType::OpReg(SingleOp::LoadAddr),
+                                        vec![addr_reg.clone(), addr],
+                                    )));
+                                }
+                                _ => {}
+                            }
                             match addr.get_gep_offset().get_kind() {
                                 InstKind::ConstInt(offset) | InstKind::GlobalConstInt(offset) => {
                                     self.insts.push(pool.put_inst(LIRInst::new(
@@ -612,20 +615,44 @@ impl BB {
 
                     match cond_ref.get_kind() {
                         InstKind::Binary(cond) => {
-                            let lhs_reg = self.resolve_operand(
-                                func,
-                                cond_ref.get_lhs(),
-                                true,
-                                map_info,
-                                pool,
-                            );
-                            let rhs_reg = self.resolve_operand(
-                                func,
-                                cond_ref.get_rhs(),
-                                true,
-                                map_info,
-                                pool,
-                            );
+                            let mut lhs_reg = Operand::IImm(IImm::new(0));
+                            let mut rhs_reg = Operand::IImm(IImm::new(0));
+                            if let Some(lhs_cond) =  is_cond_op(cond_ref.get_lhs()) {
+                                lhs_reg = self.resolve_bool(
+                                    func,
+                                    lhs_cond,
+                                    cond_ref.get_lhs(),
+                                    map_info,
+                                    pool,
+                                );
+                            } else {
+                                lhs_reg = self.resolve_operand(
+                                    func,
+                                    cond_ref.get_lhs(),
+                                    true,
+                                    map_info,
+                                    pool,
+                                );
+                            }
+
+                            if let Some(rhs_cond) = is_cond_op(cond_ref.get_rhs()) {
+                                rhs_reg = self.resolve_bool(
+                                    func,
+                                    rhs_cond,
+                                    cond_ref.get_rhs(),
+                                    map_info,
+                                    pool,
+                                );
+                            } else {
+                                rhs_reg = self.resolve_operand(
+                                    func,
+                                    cond_ref.get_rhs(),
+                                    true,
+                                    map_info,
+                                    pool,
+                                );
+                            }
+
                             let mut bz = false;
                             let inst_kind = match cond {
                                 BinOp::Eq => InstrsType::Branch(CmpOp::Eq),
@@ -638,17 +665,18 @@ impl BB {
                                 _ => {
                                     // 无法匹配，认为是if(a)情况，与0进行比较
                                     bz = true;
-                                    InstrsType::Branch(CmpOp::Eqz)
+                                    InstrsType::Branch(CmpOp::Nez)
                                 }
                             };
                             if bz {
-                                let src_reg = self.resolve_operand(func, cond_ref, true, map_info, pool);
+                                let src_reg =
+                                    self.resolve_operand(func, cond_ref, true, map_info, pool);
                                 self.insts.push(pool.put_inst(LIRInst::new(
                                     inst_kind,
                                     vec![
                                         Operand::Addr(false_succ_block.label.to_string()),
-                                        src_reg
-                                    ]
+                                        src_reg,
+                                    ],
                                 )))
                             } else {
                                 self.insts.push(pool.put_inst(LIRInst::new(
@@ -683,7 +711,7 @@ impl BB {
                             // log!("{:?}", cond_ref.get_kind());
                             let lhs_reg =
                                 self.resolve_operand(func, cond_ref, true, map_info, pool);
-                            let inst_kind = InstrsType::Branch(CmpOp::Eqz);
+                            let inst_kind = InstrsType::Branch(CmpOp::Nez);
                             self.insts.push(pool.put_inst(LIRInst::new(
                                 inst_kind,
                                 vec![Operand::Addr(false_succ_block.label.to_string()), lhs_reg],
@@ -1536,6 +1564,125 @@ impl BB {
         }
     }
 
+    fn resolve_bool(
+        &mut self,
+        func: ObjPtr<Func>,
+        cond: BinOp,
+        src: ObjPtr<Inst>,
+        map: &mut Mapping,
+        pool: &mut BackendPool,
+    ) -> Operand {
+        let dst_reg = self.resolve_operand(func, src, true, map, pool);
+        let mut lhs_reg = Operand::IImm(IImm::new(0));
+        let mut rhs_reg = Operand::IImm(IImm::new(0));
+        let lhs = src.get_lhs();
+        let rhs = src.get_rhs();
+        if let Some(lhs_cond) = is_cond_op(lhs) {
+            lhs_reg = self.resolve_bool(func, lhs_cond, lhs, map, pool);
+        } else {
+            lhs_reg = self.resolve_operand(func, lhs, false, map, pool);
+        };
+        if let Some(rhs_cond) = is_cond_op(rhs) {
+            rhs_reg = self.resolve_bool(func, rhs_cond, rhs, map, pool);
+        } else {
+            rhs_reg = self.resolve_operand(func, rhs, false, map, pool);
+        }
+        let is_limm = match lhs_reg {
+            Operand::IImm(..) | Operand::FImm(..) => true,
+            Operand::Reg(..) => false,
+            Operand::Addr(..) => unreachable!("reg cannot be addr")
+        };
+        let is_rimm = match rhs_reg {
+            Operand::IImm(..) | Operand::FImm(..) => true,
+            Operand::Reg(..) => false,
+            Operand::Addr(..) => unreachable!("reg cannot be addr")
+        };
+        match cond {
+            BinOp::Eq | BinOp::Ne => {
+                // 允许交换
+                if is_limm {
+                    if !is_rimm {
+                        let tmp = rhs_reg.clone();
+                        rhs_reg = lhs_reg.clone();
+                        lhs_reg = tmp;
+                    } else {
+                        lhs_reg = self.resolve_operand(func, lhs, true, map, pool)
+                    }
+                }
+                self.insts.push(pool.put_inst(LIRInst::new(
+                    InstrsType::Binary(BinaryOp::Xor),
+                    vec![dst_reg.clone(), lhs_reg, rhs_reg]
+                )));
+                match cond {
+                    BinOp::Eq => {
+                        self.insts.push(pool.put_inst(LIRInst::new(
+                            InstrsType::OpReg(SingleOp::Seqz),
+                            vec![dst_reg.clone(), dst_reg.clone()]
+                        )))
+                    },
+                    BinOp::Ne => {
+                        self.insts.push(pool.put_inst(LIRInst::new(
+                            InstrsType::OpReg(SingleOp::Snez),
+                            vec![dst_reg.clone(), dst_reg.clone()]
+                        )))
+                    },
+                    _ => unreachable!("no more cond")
+                }
+            },
+            // 不允许交换
+            BinOp::Lt => {
+                if is_limm {
+                    lhs_reg = self.resolve_operand(func, lhs, true, map, pool);
+                }
+                self.insts.push(pool.put_inst(LIRInst::new(
+                    InstrsType::Binary(BinaryOp::Slt),
+                    vec![dst_reg.clone(), lhs_reg, rhs_reg]
+                )))
+            },
+            BinOp::Gt => {
+                // a > b 变为 b < a
+                if is_rimm {
+                    rhs_reg = self.resolve_operand(func, rhs, true, map, pool);
+                }
+                self.insts.push(pool.put_inst(LIRInst::new(
+                    InstrsType::Binary(BinaryOp::Slt),
+                    vec![dst_reg.clone(), rhs_reg, lhs_reg]
+                )))
+            },
+            BinOp::Le => {
+                // a <= b 变为 !(b < a)
+                if is_rimm {
+                    rhs_reg = self.resolve_operand(func, rhs, true, map, pool);
+                }
+                self.insts.push(pool.put_inst(LIRInst::new(
+                    InstrsType::Binary(BinaryOp::Slt),
+                    vec![dst_reg.clone(), rhs_reg, lhs_reg]
+                )));
+                self.insts.push(pool.put_inst(LIRInst::new(
+                    InstrsType::Binary(BinaryOp::Xor),
+                    vec![dst_reg.clone(), dst_reg.clone(), Operand::IImm(IImm::new(1))]
+                )));
+            },
+            BinOp::Ge => {
+                // a >= b 变为 !(a < b)
+                if is_limm {
+                    lhs_reg = self.resolve_operand(func, lhs, true, map, pool);
+                }
+                self.insts.push(pool.put_inst(LIRInst::new(
+                    InstrsType::Binary(BinaryOp::Slt),
+                    vec![dst_reg.clone(), lhs_reg, rhs_reg]
+                )));
+                self.insts.push(pool.put_inst(LIRInst::new(
+                    InstrsType::Binary(BinaryOp::Xor),
+                    vec![dst_reg.clone(), dst_reg.clone(), Operand::IImm(IImm::new(1))]
+                )));
+            },
+            _ => unreachable!("cond not illegal")
+        }
+        dst_reg
+    }
+    
+
     fn resolve_opt_mul(&mut self, dst: Operand, src: Operand, imm: i32, pool: &mut BackendPool) {
         let abs = imm.abs();
         let is_neg = imm < 0;
@@ -1864,5 +2011,15 @@ fn get_tmp_bb() -> i32 {
     unsafe {
         TMP_BB += 1;
         TMP_BB
+    }
+}
+
+fn is_cond_op(cond: ObjPtr<Inst>) -> Option<BinOp> {
+    match cond.get_kind() {
+        InstKind::Binary(cmp) => match cmp {
+            BinOp::Eq | BinOp::Ne | BinOp::Ge | BinOp::Le | BinOp::Gt | BinOp::Lt => Some(cmp),
+            _ => None,
+        },
+        _ => None,
     }
 }
