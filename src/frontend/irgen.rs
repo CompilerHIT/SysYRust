@@ -32,6 +32,7 @@ pub fn irgen(
     kit_mut.init_external_funcs();
     compunit.process(1, &mut kit_mut);
     kit_mut.phi_padding_allfunctions();
+    kit_mut.merge_allfunctions();
 }
 
 pub trait Process {
@@ -1103,6 +1104,10 @@ impl Process for FuncDef {
     fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
         match self {
             Self::NonParameterFuncDef((tp, id, blk)) => {
+                kit_mut.context_mut.set_funcnow(id.to_string());
+                let vec_ttt = vec![];
+                kit_mut.context_mut.terminated_map.insert(id.to_string(), vec_ttt);
+
                 kit_mut.context_mut.add_layer();
                 let func_ptr = kit_mut.pool_func_mut.new_function();
                 let func_mut = func_ptr.as_mut();
@@ -1122,6 +1127,10 @@ impl Process for FuncDef {
                 return Ok(1);
             }
             Self::ParameterFuncDef((tp, id, params, blk)) => {
+                kit_mut.context_mut.set_funcnow(id.to_string());
+                let vec_ttt = vec![];
+                kit_mut.context_mut.terminated_map.insert(id.to_string(), vec_ttt);
+                
                 kit_mut.context_mut.add_layer();
                 let func_ptr = kit_mut.pool_func_mut.new_function();
                 let func_mut = func_ptr.as_mut();
@@ -1689,16 +1698,49 @@ impl Process for Return {
                     let ret_inst = kit_mut.pool_inst_mut.make_return(inst_float);
                     kit_mut.context_mut.push_inst_bb(inst_float);
                     kit_mut.context_mut.push_inst_bb(ret_inst);
+                    match kit_mut.context_mut.bb_now_mut {
+                        InfuncChoice::InFunc(bb_now) => {
+                            let func_now = &kit_mut.context_mut.func_now;
+                            if let Some(vec) = kit_mut.context_mut.terminated_map.get_mut(func_now) {
+                            vec.push((bb_now, inst_float));
+                            }
+                        }
+                        _ => {
+                            unreachable!()
+                        }
+                    }
                 }
                 ExpValue::Int(i) => {
                     let inst_int = kit_mut.pool_inst_mut.make_int_const(i);
                     let ret_inst = kit_mut.pool_inst_mut.make_return(inst_int);
                     kit_mut.context_mut.push_inst_bb(inst_int);
                     kit_mut.context_mut.push_inst_bb(ret_inst);
+                    match kit_mut.context_mut.bb_now_mut {
+                        InfuncChoice::InFunc(bb_now) => {
+                            let func_now = &kit_mut.context_mut.func_now;
+                            if let Some(vec) = kit_mut.context_mut.terminated_map.get_mut(func_now) {
+                            vec.push((bb_now, inst_int));
+                            }
+                        }
+                        _ => {
+                            unreachable!()
+                        }
+                    }
                 }
                 ExpValue::None => {
                     let ret_inst = kit_mut.pool_inst_mut.make_return(inst);
                     kit_mut.context_mut.push_inst_bb(ret_inst);
+                    match kit_mut.context_mut.bb_now_mut {
+                        InfuncChoice::InFunc(bb_now) => {
+                            let func_now = &kit_mut.context_mut.func_now;
+                            if let Some(vec) = kit_mut.context_mut.terminated_map.get_mut(func_now) {
+                            vec.push((bb_now, inst));
+                            }
+                        }
+                        _ => {
+                            unreachable!()
+                        }
+                    }
                 }
                 _ => {
                     unreachable!()
@@ -1713,6 +1755,17 @@ impl Process for Return {
             // Ok(1)
             let ret_inst = kit_mut.pool_inst_mut.make_return_void();
             kit_mut.context_mut.push_inst_bb(ret_inst);
+            match kit_mut.context_mut.bb_now_mut {
+                InfuncChoice::InFunc(bb_now) => {
+                    let func_now = &kit_mut.context_mut.func_now;
+                    if let Some(vec) = kit_mut.context_mut.terminated_map.get_mut(func_now) {
+                    vec.push((bb_now, kit_mut.pool_inst_mut.make_int_const(-1129)));
+                    }
+                }
+                _ => {
+                    unreachable!()
+                }
+            }
             // todo!()
             Ok(1)
         }

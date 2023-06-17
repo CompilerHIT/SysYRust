@@ -8,6 +8,7 @@ use crate::frontend::error::Error;
 use crate::ir::basicblock::BasicBlock;
 use crate::ir::function::Function;
 use crate::ir::instruction::Inst;
+use crate::ir::instruction::InstKind;
 use crate::ir::ir_type::IrType;
 use crate::utility::ObjPool;
 use crate::utility::ObjPtr;
@@ -293,6 +294,86 @@ impl Kit<'_> {
                 Err(Error::FindVarError)
             }
         }
+    }
+
+    pub fn merge_allfunctions(&mut self) {
+        //填充所有函数中的phi
+        // let mut vec_funcs = self.get_functions().unwrap().clone();
+        for (func_name,func) in self.context_mut.module_mut.function.clone().iter() {
+            if func.is_empty_bb() {
+                continue;
+            }
+            self.merge_function(func_name.to_string(), func.get_return_type());
+        }
+    }
+
+    pub fn merge_function(&mut self,func_name:String,ret_type:IrType){
+        let vec_endpoint = self.context_mut.terminated_map.get(&func_name).unwrap().clone();
+        if vec_endpoint.len()>1{
+            match ret_type {
+                IrType::Void =>{
+                    let bb_merge_name = self.context_mut.get_newbb_name();
+                    let bb_merge = self.pool_bb_mut.new_basic_block(bb_merge_name);//新建汇合点
+                    for (endpoint_bb,_) in vec_endpoint{//对于每个终结点
+                        let inst_ret = endpoint_bb.get_tail_inst();//获得ret指令
+                        match inst_ret.get_kind() {
+                            InstKind::Return =>{
+                                endpoint_bb.as_mut().add_next_bb(bb_merge);//设置后继节点为汇合点
+                                inst_ret.as_mut().remove_self();//删除ret
+                                endpoint_bb.as_mut().push_back(self.pool_inst_mut.make_jmp());//添加jump
+                            }
+                            _=>{unreachable!()}
+                        }
+                    }
+                    bb_merge.as_mut().push_back(self.pool_inst_mut.make_return_void());
+                }
+                IrType::Float=>{
+                    let bb_merge_name = self.context_mut.get_newbb_name();
+                    let bb_merge = self.pool_bb_mut.new_basic_block(bb_merge_name);//新建汇合点
+                    let inst_phi = self.pool_inst_mut.make_float_phi();
+                    bb_merge.as_mut().push_back(inst_phi);
+                    for (endpoint_bb,ret_val) in vec_endpoint{//对于每个终结点
+                        let inst_ret = endpoint_bb.get_tail_inst();//获得ret指令
+                        match inst_ret.get_kind() {
+                            InstKind::Return =>{
+                                endpoint_bb.as_mut().add_next_bb(bb_merge);//设置后继节点为汇合点
+                                inst_ret.as_mut().remove_self();//删除ret
+                                endpoint_bb.as_mut().push_back(self.pool_inst_mut.make_jmp());//添加jump
+                                inst_phi.as_mut().add_operand(ret_val);//向phi指令添加参数
+                            }
+                            _=>{unreachable!()}
+                        }
+                    }
+                    let inst_ret = self.pool_inst_mut.make_return(inst_phi);
+                    bb_merge.as_mut().push_back(inst_ret);
+                }
+                IrType::Int=>{
+                    let bb_merge_name = self.context_mut.get_newbb_name();
+                    let bb_merge = self.pool_bb_mut.new_basic_block(bb_merge_name);//新建汇合点
+                    let inst_phi = self.pool_inst_mut.make_int_phi();
+                    bb_merge.as_mut().push_back(inst_phi);
+                    for (endpoint_bb,ret_val) in vec_endpoint{//对于每个终结点
+                        let inst_ret = endpoint_bb.get_tail_inst();//获得ret指令
+                        match inst_ret.get_kind() {
+                            InstKind::Return =>{
+                                endpoint_bb.as_mut().add_next_bb(bb_merge);//设置后继节点为汇合点
+                                inst_ret.as_mut().remove_self();//删除ret
+                                endpoint_bb.as_mut().push_back(self.pool_inst_mut.make_jmp());//添加jump
+                                inst_phi.as_mut().add_operand(ret_val);//向phi指令添加参数
+                            }
+                            _=>{unreachable!()}
+                        }
+                    }
+                    let inst_ret = self.pool_inst_mut.make_return(inst_phi);
+                    bb_merge.as_mut().push_back(inst_ret);
+                }
+                _=>{
+                    println!("funcname:{:?},rettype{:?}",func_name,ret_type);
+                    unreachable!()}
+            }
+            
+        }
+
     }
 
     pub fn add_var(
