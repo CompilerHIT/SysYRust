@@ -67,4 +67,9 @@ impl Module {
             .map(|(name, func)| (name, func.clone()))
             .collect()
     }
+
+    /// 用于删除全局变量
+    pub fn remove_var(&mut self, name: &str) {
+        self.global_variable.remove(name);
+    }
 }

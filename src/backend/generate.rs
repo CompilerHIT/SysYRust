@@ -17,6 +17,7 @@ impl GenerateAsm for LIRInst {
                     BinaryOp::And => "and",
                     BinaryOp::Or => "or",
                     BinaryOp::Xor => "xor",
+                    BinaryOp::Slt => "slt",
                     BinaryOp::Shl => "sll",
                     BinaryOp::Shr => "srl",
                     BinaryOp::Sar => "sra",
@@ -45,7 +46,7 @@ impl GenerateAsm for LIRInst {
                 };
                 if is_imm {
                     match op {
-                        "add" | "sub" | "and" | "or" | "xor" | "sll" | "srl" | "sra" => {
+                        "add" | "sub" | "and" | "or" | "xor" | "sll" | "srl" | "sra" | "slt" => {
                             is_imm = true;
                         }
                         _ => {
@@ -69,6 +70,8 @@ impl GenerateAsm for LIRInst {
                     SingleOp::I2F => "fcvt.s.w",
                     SingleOp::F2I => "fcvt.w.s",
                     SingleOp::LoadAddr => "la",
+                    SingleOp::Seqz => "seqz",
+                    SingleOp::Snez => "snez"
                 };
                 let dst = match self.get_dst() {
                     Operand::Reg(reg) => reg.to_string(),
@@ -242,20 +245,20 @@ impl GenerateAsm for LIRInst {
                     CmpOp::Le => "le",
                     CmpOp::Gt => "gt",
                     CmpOp::Ge => "ge",
-                    CmpOp::Eqz => "eqz",
+                    CmpOp::Nez => "nez"
                 };
                 let lhs = match self.get_lhs() {
                     Operand::Reg(reg) => reg.to_string(),
                     _ => unreachable!("branch block's lhs must be reg"),
                 };
-                if cond != "eqz" {
+                if cond != "nez" {
                     let rhs = match self.get_rhs() {
                         Operand::Reg(reg) => reg.to_string(),
                         _ => unreachable!("branch block's rhs must be reg"),
                     };
                     builder.b(cond, &lhs, &rhs, &label)?;
                 } else {
-                    builder.beqz(&lhs, &label)?;
+                    builder.bnez(&lhs, &label)?;
                 }
                 Ok(())
             }
