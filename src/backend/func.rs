@@ -53,6 +53,7 @@ pub struct Func {
     //FIXME: resolve float regs
     pub callee_saved: HashSet<Reg>,
     pub caller_saved: HashMap<i32, i32>,
+    pub max_params: i32,
 }
 
 
@@ -81,6 +82,7 @@ impl Func {
             floats: Vec::new(),
             callee_saved: HashSet::new(),
             caller_saved: HashMap::new(),
+            max_params: 0
         }
     }
 
@@ -374,7 +376,7 @@ impl Func {
 
         let mut stack_size = self.reg_alloc_info.stack_size as i32;
         // log!("stack_size: {}", stack_size);
-
+        stack_size += self.max_params * ADDR_SIZE * 2;
         self.context.as_mut().set_offset(stack_size);
     }
 
@@ -447,6 +449,7 @@ impl Func {
         self.const_array = func_ref.const_array.clone();
         self.callee_saved = func_ref.callee_saved.clone();
         self.caller_saved = func_ref.caller_saved.clone();
+        self.max_params = func_ref.max_params;
     }
 
     fn save_callee(&mut self, pool: &mut BackendPool, f: &mut File) {

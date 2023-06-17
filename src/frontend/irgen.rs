@@ -2266,30 +2266,14 @@ impl Process for UnaryExp {
             UnaryExp::OpUnary((unaryop, unaryexp)) => match unaryop {
                 UnaryOp::Add => {
                     let (mut inst_u, mut val) = unaryexp.as_mut().process(input, kit_mut).unwrap();
-                    // let inst = kit_mut.pool_inst_mut.make_pos(inst_u);
-                    // kit_mut.context_mut.push_inst_bb(inst);
+                    let inst = kit_mut.pool_inst_mut.make_pos(inst_u);
+                    kit_mut.context_mut.push_inst_bb(inst);
                     let mut val_ret = val;
-                    Ok((inst_u, val_ret))
+                    Ok((inst, val_ret))
                 }
                 UnaryOp::Minus => {
                     let (mut inst_u, mut val) = unaryexp.as_mut().process(input, kit_mut).unwrap();
-                    let mut inst = inst_u;
-                    match inst_u.get_ir_type(){
-                        IrType::Int |IrType::ConstInt =>{
-                            let inst_zero = kit_mut.pool_inst_mut.make_int_const(0);
-                            kit_mut.context_mut.push_inst_bb(inst_zero);
-                            inst = kit_mut.pool_inst_mut.make_sub(inst_zero, inst_u);
-                        }
-                        IrType::Float |IrType::ConstFloat =>{
-                            let inst_zero = kit_mut.pool_inst_mut.make_float_const(0.0);
-                            kit_mut.context_mut.push_inst_bb(inst_zero);
-                            inst = kit_mut.pool_inst_mut.make_sub(inst_zero, inst_u);
-                        }
-                        _=>{
-                            unreachable!()
-                        }
-                    }
-                    // let inst = kit_mut.pool_inst_mut.make_neg(inst_u);
+                    let inst = kit_mut.pool_inst_mut.make_neg(inst_u);
                     kit_mut.context_mut.push_inst_bb(inst);
                     let mut val_ret = val;
                     match val {
