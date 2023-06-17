@@ -140,6 +140,7 @@ impl fmt::Display for LIRInst {
                     BinaryOp::Shr => "srl",
                     BinaryOp::Sar => "sra",
                     BinaryOp::Mulhs => "mulhs",
+                    BinaryOp::Slt => "slt",
                 };
             }
             InstrsType::OpReg(op) => {
@@ -155,6 +156,8 @@ impl fmt::Display for LIRInst {
                     SingleOp::I2F => "fcvt.s.w",
                     SingleOp::F2I => "fcvt.w.s",
                     SingleOp::LoadAddr => "la",
+                    SingleOp::Seqz => "seqz",
+                    SingleOp::Snez => "snez",
                 };
             }
             // InstrsType::ChangeSp => {
@@ -178,7 +181,7 @@ impl fmt::Display for LIRInst {
                     CmpOp::Le => "le",
                     CmpOp::Gt => "gt",
                     CmpOp::Ge => "ge",
-                    CmpOp::Eqz => "eqz",
+                    CmpOp::Nez => "nez",
                 };
                 
             }
