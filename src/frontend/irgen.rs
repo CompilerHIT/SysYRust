@@ -89,7 +89,8 @@ impl Process for GlobalItems {
                                         }
                                     }
                                     _=>{
-                                        unreachable!("返回值非空,但最后一个块却是空的")
+                                        // println!("{:?}",&kit_mut.context_mut.func_now);
+                                        // unreachable!("返回值非空,但最后一个块却是空的")
                                     }
                                 }
                             }
