@@ -1,8 +1,12 @@
 use std::collections::HashSet;
 
 use crate::{
-    ir::{basicblock::BasicBlock, instruction::InstKind, module::Module},
-    utility::ObjPtr,
+    ir::{
+        basicblock::BasicBlock,
+        instruction::{Inst, InstKind},
+        module::Module,
+    },
+    utility::{ObjPool, ObjPtr},
 };
 
 ///! 对于block的优化
@@ -10,19 +14,82 @@ use crate::{
 ///! 2. 合并只有一个后继和这个后继只有一个前继的block
 ///! 3. 删除无法到达的分支
 
-pub fn simplify_cfg_run(module: &mut Module) {
+pub fn simplify_cfg_run(
+    module: &mut Module,
+    pools: &mut (&mut ObjPool<BasicBlock>, &mut ObjPool<Inst>),
+) {
     for (_, func) in module.get_all_func().iter() {
         if func.is_empty_bb() || !func.get_head().has_next_bb() {
             continue;
         }
 
-        remove_unreachable_bb(func.get_head());
+        remove_unreachable_bb(func.get_head(), pools);
+        merge_one_line_bb(func.get_head());
     }
 }
 
-fn merge_one_line_bb(head: ObjPtr<BasicBlock>) {}
+fn merge_one_line_bb(head: ObjPtr<BasicBlock>) {
+    let bb_list = get_bb_list(head);
 
-fn remove_unreachable_bb(head: ObjPtr<BasicBlock>) {
+    loop {
+        let mut changed = false;
+        for bb in bb_list.iter() {
+            // 不考虑尾
+            if bb_is_end(bb.clone()) {
+                continue;
+            }
+
+            if bb_has_jump(bb.clone()) && bb.get_next_bb()[0].get_up_bb().len() == 1 {
+                changed = true;
+                merge_bb(bb.clone());
+            }
+        }
+
+        if !changed {
+            break;
+        }
+    }
+}
+
+fn merge_bb(mut bb: ObjPtr<BasicBlock>) {
+    let next_bb = bb.get_next_bb()[0].clone();
+    if bb_is_end(next_bb) {
+        bb.clear_next_bb();
+    } else {
+        bb.as_mut()
+            .replace_next_bb(next_bb, next_bb.get_next_bb()[0].clone());
+
+        if !bb_has_jump(next_bb) {
+            next_bb.get_next_bb()[1]
+                .as_mut()
+                .replace_up_bb(next_bb, bb.clone());
+            bb.add_next_bb(next_bb.get_next_bb()[1].clone());
+        }
+    }
+
+    let mut inst = next_bb.get_head_inst();
+
+    // 先移动phi指令
+    while let InstKind::Phi = inst.get_kind() {
+        let next = inst.get_next();
+        bb.push_front(inst);
+        inst = next;
+    }
+
+    // 再移动剩下的指令
+    let mut tail = bb.get_tail_inst();
+    while !inst.is_tail() {
+        let next = inst.get_next();
+        tail.insert_before(inst);
+        inst = next;
+    }
+    tail.insert_before(inst);
+    tail.remove_self();
+}
+fn remove_unreachable_bb(
+    head: ObjPtr<BasicBlock>,
+    pools: &mut (&mut ObjPool<BasicBlock>, &mut ObjPool<Inst>),
+) {
     let mut deleted = HashSet::new();
 
     let bb_list = get_bb_list(head);
@@ -37,8 +104,10 @@ fn remove_unreachable_bb(head: ObjPtr<BasicBlock>) {
 
             // 如果没有前继或者前继都在deleted集里，那么当前bb是无法到达的
             if bb.get_up_bb().is_empty() || bb.get_up_bb().iter().all(|bb| deleted.contains(bb)) {
-                deleted.insert(bb);
-                changed = true;
+                if !deleted.contains(bb) {
+                    deleted.insert(bb);
+                    changed = true;
+                }
             }
 
             // jump指令不检查
@@ -47,7 +116,7 @@ fn remove_unreachable_bb(head: ObjPtr<BasicBlock>) {
             }
 
             // 检查是否分支不可达，并删除掉不可达的路径
-            changed |= check_bb(bb.clone());
+            changed |= check_bb(bb.clone(), pools);
         }
 
         if !changed {
@@ -89,7 +158,10 @@ fn remove_bb_self(bb: ObjPtr<BasicBlock>) {
 
 /// 检查分支是否无法到达
 /// 如果无法到达，那么删除到达这个分支的路径
-fn check_bb(bb: ObjPtr<BasicBlock>) -> bool {
+fn check_bb(
+    bb: ObjPtr<BasicBlock>,
+    pools: &mut (&mut ObjPool<BasicBlock>, &mut ObjPool<Inst>),
+) -> bool {
     let mut changed = false;
     let cond = bb.get_tail_inst().get_br_cond();
 
@@ -100,6 +172,8 @@ fn check_bb(bb: ObjPtr<BasicBlock>) -> bool {
             } else {
                 bb.as_mut().remove_next_bb(bb.get_next_bb()[0].clone());
             }
+            bb.get_tail_inst().remove_self();
+            bb.as_mut().push_back(pools.1.make_jmp());
             changed = true;
         }
         InstKind::ConstFloat(value) => {
@@ -108,6 +182,8 @@ fn check_bb(bb: ObjPtr<BasicBlock>) -> bool {
             } else {
                 bb.as_mut().remove_next_bb(bb.get_next_bb()[0].clone());
             }
+            bb.get_tail_inst().remove_self();
+            bb.as_mut().push_back(pools.1.make_jmp());
             changed = true;
         }
 

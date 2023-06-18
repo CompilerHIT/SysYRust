@@ -1,18 +1,22 @@
-use super::{basicblock::BasicBlock, module::Module};
-use crate::utility::ObjPtr;
+use super::{basicblock::BasicBlock, instruction::Inst, module::Module};
+use crate::utility::{ObjPool, ObjPtr};
 use std::collections::HashSet;
 
 mod dead_code_eliminate;
 mod phi_optimizer;
 mod simplify_cfg;
 
-pub fn optimizer_run(module: &mut Module, optimize_flag: bool) {
+pub fn optimizer_run(
+    module: &mut Module,
+    mut pools: (&mut ObjPool<BasicBlock>, &mut ObjPool<Inst>),
+    optimize_flag: bool,
+) {
     // 在功能点上对phi指令进行优化
     functional_optimizer(module);
 
     if optimize_flag {
         // 简化cfg
-        simplify_cfg::simplify_cfg_run(module);
+        simplify_cfg::simplify_cfg_run(module, &mut pools);
         // TODO: 性能优化
     }
 }

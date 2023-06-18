@@ -102,6 +102,10 @@ impl BasicBlock {
     /// # Arguments
     /// * `bb` - 上一个BB
     pub fn add_up_bb(&mut self, bb: &BasicBlock) {
+        if self.up_bb.contains(&ObjPtr::new(bb)) {
+            return;
+        }
+
         let bb = ObjPtr::new(bb);
         self.up_bb.push(bb);
     }
@@ -120,7 +124,7 @@ impl BasicBlock {
     /// # Arguments
     /// * `old_bb` - 被替换的BB
     /// * `new_bb` - 新的BB
-    fn replace_up_bb(&mut self, old_bb: ObjPtr<BasicBlock>, new_bb: ObjPtr<BasicBlock>) {
+    pub fn replace_up_bb(&mut self, old_bb: ObjPtr<BasicBlock>, new_bb: ObjPtr<BasicBlock>) {
         let index = self.get_up_bb().iter().position(|x| *x == old_bb).unwrap();
         self.up_bb[index] = new_bb;
     }
@@ -161,5 +165,13 @@ impl BasicBlock {
         let index = self.get_next_bb().iter().position(|x| *x == bb).unwrap();
         bb.as_mut().remove_up_bb(ObjPtr::new(self));
         self.next_bb.remove(index);
+    }
+
+    /// 清除自身记录的后继BB
+    pub fn clear_next_bb(&mut self) {
+        for bb in self.get_next_bb().iter() {
+            bb.as_mut().remove_up_bb(ObjPtr::new(self));
+        }
+        self.next_bb.clear();
     }
 }
