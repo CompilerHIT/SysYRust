@@ -11,7 +11,7 @@ data/
 log
 out
 __pycache__
-dump.ll
+dump*.ll
 row_asm.log
 *.log
 *.c

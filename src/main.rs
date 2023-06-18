@@ -63,11 +63,14 @@ fn run_main() {
     );
     drop(compunit);
 
+    // ir打印
+    sysylib::ir::dump_now(&module, "dump.ll");
+
     // ir优化
     sysylib::ir::optimizer_run(&mut module, o1_option);
 
     // ir打印
-    sysylib::ir::dump_now(&module);
+    sysylib::ir::dump_now(&module, "dump_opt.ll");
 
     let output2 = matches.value_of("o").unwrap_or("row_asm.log");
     // 后端解析
