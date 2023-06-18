@@ -75,18 +75,20 @@ impl RegUsedStat {
         }
         // 参数寄存器x10也就是a0保留
 
+        // 先分配其他寄存器再使用a0-a7
+        for i in 18..=31 {
+            if self.iregs_used & (1 << i) == 0 {
+                return Some(i);
+            }
+        }
+        
         // 但是a1-a7自由使用
         for i in 11..=17 {
             if self.iregs_used & (1 << i) == 0 {
                 return Some(i);
             }
         }
-
-        for i in 18..=31 {
-            if self.iregs_used & (1 << i) == 0 {
-                return Some(i);
-            }
-        }
+       
         None
     }
 
