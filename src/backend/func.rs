@@ -1,6 +1,7 @@
 use std::cmp::max;
 use std::collections::LinkedList;
 pub use std::collections::{HashSet, VecDeque};
+use std::fmt;
 pub use std::fs::File;
 pub use std::hash::{Hash, Hasher};
 pub use std::io::Result;
@@ -78,7 +79,7 @@ impl Func {
             floats: Vec::new(),
             callee_saved: HashSet::new(),
             caller_saved: HashMap::new(),
-            max_params: 0
+            max_params: 0,
         }
     }
 
@@ -265,25 +266,25 @@ impl Func {
     }
 
     pub fn calc_live(&mut self) {
-        let calc_live_file="callive.txt";
+        let calc_live_file = "callive.txt";
         // 打印函数里面的寄存器活跃情况
         let printinterval = || {
             let mut que: VecDeque<ObjPtr<BB>> = VecDeque::new();
             let mut passed_bb = HashSet::new();
             que.push_front(self.entry.unwrap());
             passed_bb.insert(self.entry.unwrap());
-            log_file!(calc_live_file,"func:{}", self.label);
+            log_file!(calc_live_file, "func:{}", self.label);
             while !que.is_empty() {
                 let cur_bb = que.pop_front().unwrap();
-                log_file!(calc_live_file,"block {}:",cur_bb.label);
-                log_file!(calc_live_file,"live in:");
-                log_file!(calc_live_file,"{:?}",cur_bb.live_in);
-                log_file!(calc_live_file,"live out:");
-                log_file!(calc_live_file,"{:?}",cur_bb.live_out);
-                log_file!(calc_live_file,"live use:");
-                log_file!(calc_live_file,"{:?}",cur_bb.live_use);
-                log_file!(calc_live_file,"live def:");
-                log_file!(calc_live_file,"{:?}",cur_bb.live_def);
+                log_file!(calc_live_file, "block {}:", cur_bb.label);
+                log_file!(calc_live_file, "live in:");
+                log_file!(calc_live_file, "{:?}", cur_bb.live_in);
+                log_file!(calc_live_file, "live out:");
+                log_file!(calc_live_file, "{:?}", cur_bb.live_out);
+                log_file!(calc_live_file, "live use:");
+                log_file!(calc_live_file, "{:?}", cur_bb.live_use);
+                log_file!(calc_live_file, "live def:");
+                log_file!(calc_live_file, "{:?}", cur_bb.live_def);
                 for next in cur_bb.out_edge.iter() {
                     if passed_bb.contains(next) {
                         continue;
@@ -311,7 +312,7 @@ impl Func {
             block.as_mut().live_use.clear();
             block.as_mut().live_def.clear();
             for it in block.as_ref().insts.iter().rev() {
-                log_file!(calc_live_file,"{:?}",it);
+                log_file!(calc_live_file, "{:?}", it);
                 for reg in it.as_ref().get_reg_def().into_iter() {
                     if reg.is_virtual() || reg.is_allocable() {
                         block.as_mut().live_use.remove(&reg);
@@ -360,7 +361,7 @@ impl Func {
         self.calc_live();
         // let mut allocator = Allocator::new();
         // let mut allocator =crate::backend::regalloc::easy_gc_alloc::Allocator::new();
-        let mut allocator=crate::backend::regalloc::base_alloc::Allocator::new();
+        let mut allocator = crate::backend::regalloc::base_alloc::Allocator::new();
         let alloc_stat = allocator.alloc(self);
 
         self.reg_alloc_info = alloc_stat;
@@ -512,7 +513,7 @@ impl Func {
         });
     }
 
-    pub fn generate_row(&mut self, _:ObjPtr<Context>, f: &mut File) -> Result<()> {
+    pub fn generate_row(&mut self, _: ObjPtr<Context>, f: &mut File) -> Result<()> {
         AsmBuilder::new(f).show_func(&self.label)?;
         // self.context.as_mut().call_prologue_event();
         let mut size = 0;
