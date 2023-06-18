@@ -15,9 +15,10 @@ use crate::{
     utility::ObjPtr,
 };
 
-pub fn dead_code_eliminate(end_bb: ObjPtr<BasicBlock>) {
+pub fn dead_code_eliminate(end_bb: ObjPtr<BasicBlock>, more_than_once: bool) {
     let mut changed = true;
-    while changed {
+    let mut next = true;
+    while changed && next {
         changed = false;
         let mut visited = HashSet::new();
         let mut queue = Vec::new();
@@ -32,10 +33,11 @@ pub fn dead_code_eliminate(end_bb: ObjPtr<BasicBlock>) {
                 queue.insert(0, pred.clone());
             }
         }
+        next = more_than_once;
     }
 }
 
-pub fn global_elininate(module: &mut Module) {
+pub fn global_eliminate(module: &mut Module) {
     let mut delete_list = Vec::new();
 
     for (name, value) in module.get_all_var().iter() {
