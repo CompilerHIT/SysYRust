@@ -361,9 +361,9 @@ impl Func {
     pub fn allocate_reg(&mut self, f: &mut File) {
         // 函数返回地址保存在ra中
         self.calc_live();
-        // let mut allocator = crate::backend::regalloc::easy_ls_alloc::Allocator::new();
+        let mut allocator = crate::backend::regalloc::easy_ls_alloc::Allocator::new();
         // let mut allocator =crate::backend::regalloc::easy_gc_alloc::Allocator::new();
-        let mut allocator=crate::backend::regalloc::base_alloc::Allocator::new();
+        // let mut allocator=crate::backend::regalloc::base_alloc::Allocator::new();
         let alloc_stat = allocator.alloc(self);
 
         // TODO
@@ -487,7 +487,7 @@ impl Func {
 
         //栈对齐 - 调用func时sp需按16字节对齐
         stack_size = stack_size / 16 * 16 + 16;
-        self.context.as_mut().set_offset(stack_size - 8);
+        self.context.as_mut().set_offset(stack_size - ADDR_SIZE);
 
         let ra = Reg::new(1, ScalarType::Int);
         let map_clone = map.clone();
@@ -498,10 +498,11 @@ impl Func {
             let mut builder = AsmBuilder::new(&mut f1);
             // addi sp -stack_size
             builder.addi("sp", "sp", -stack_size);
-            builder.s(&ra.to_string(false), "sp", stack_size - 8, false, true);
+            builder.s(&ra.to_string(false), "sp", stack_size - ADDR_SIZE, false, true);
             if !is_main {
                 for (reg, slot) in map.iter() {
-                    builder.s(&reg.to_string(false), "sp", slot.get_pos(), false, true);
+                    let of = stack_size - ADDR_SIZE - slot.get_pos();
+                    builder.s(&reg.to_string(false), "sp", of, false, true);
                 }
             }
         });
@@ -510,10 +511,11 @@ impl Func {
             let mut builder = AsmBuilder::new(&mut f2);
             if !is_main {
                 for (reg, slot) in map_clone.iter() {
-                    builder.l(&reg.to_string(false), "sp", slot.get_pos(), false, true);
+                    let of = stack_size - ADDR_SIZE - slot.get_pos();
+                    builder.l(&reg.to_string(false), "sp", of, false, true);
                 }
             }
-            builder.l(&ra.to_string(false), "sp", stack_size - 8, false, true);
+            builder.l(&ra.to_string(false), "sp", stack_size - ADDR_SIZE, false, true);
             builder.addi("sp", "sp", stack_size);
         });
     }

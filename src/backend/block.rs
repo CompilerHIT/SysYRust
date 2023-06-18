@@ -1026,6 +1026,7 @@ impl BB {
         pos: i32,
         pool: &mut BackendPool,
     ) {
+        log!("{}, start at {}", self.label, pos);
         let mut start_pos = pos;
         let mut index = 0;
         loop {

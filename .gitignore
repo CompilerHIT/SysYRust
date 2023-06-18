@@ -13,3 +13,5 @@ out
 __pycache__
 dump.ll
 row_asm.log
+*.log
+*.c
