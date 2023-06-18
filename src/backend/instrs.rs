@@ -1,7 +1,7 @@
 use std::cmp::min;
 use std::collections::{HashMap, HashSet};
 pub use std::io::Result;
-use std::{vec, fmt};
+use std::{fmt, vec};
 
 pub use crate::backend::asm_builder::AsmBuilder;
 pub use crate::backend::block::BB;
@@ -116,11 +116,16 @@ pub struct LIRInst {
     float: bool,
 }
 
-
 // 实现个fmt display trait
 impl fmt::Display for LIRInst {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f,"type:{:?},def:{:?},use:{:?}",self.get_type(),self.get_reg_def(),self.get_reg_use())
+        write!(
+            f,
+            "type:{:?},def:{:?},use:{:?}",
+            self.get_type(),
+            self.get_reg_def(),
+            self.get_reg_use()
+        )
     }
 }
 
@@ -241,10 +246,14 @@ impl LIRInst {
         self.operands[0] = Operand::Addr(label);
     }
 
-    pub fn get_regs(&self)->Vec<Reg> {
-        let mut out =Vec::new();
-        self.get_reg_def().iter().for_each(|e|{out.push(*e);});
-        self.get_reg_use().iter().for_each(|e|{out.push(*e);});
+    pub fn get_regs(&self) -> Vec<Reg> {
+        let mut out = Vec::new();
+        self.get_reg_def().iter().for_each(|e| {
+            out.push(*e);
+        });
+        self.get_reg_use().iter().for_each(|e| {
+            out.push(*e);
+        });
         out
     }
 
@@ -257,7 +266,10 @@ impl LIRInst {
             | InstrsType::LoadFromStack
             | InstrsType::LoadParamFromStack => match self.operands[0] {
                 Operand::Reg(dst_reg) => vec![dst_reg],
-                _ => panic!("dst must be reg, but actually is {:?}, at LIRInst:{:?}", self.operands[0], self),
+                _ => panic!(
+                    "dst must be reg, but actually is {:?}, at LIRInst:{:?}",
+                    self.operands[0], self
+                ),
             },
             InstrsType::Call => {
                 let mut set = Vec::new();
@@ -304,7 +316,9 @@ impl LIRInst {
                 let mut regs = self.operands.clone();
                 let mut res = Vec::new();
                 while let Some(operand) = regs.pop() {
-                    if operand==*self.get_dst(){continue;}
+                    if operand == *self.get_dst() {
+                        continue;
+                    }
                     match operand {
                         Operand::Reg(reg) => res.push(reg),
                         _ => {}
