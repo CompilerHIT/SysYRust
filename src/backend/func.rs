@@ -375,14 +375,14 @@ impl Func {
 
     fn handle_parameters(&mut self, ir_func: &Function) {
         let mut iparam: Vec<_> = ir_func
-            .get_params()
+            .get_parameter_list()
             .iter()
-            .filter(|(_, param)| {
+            .filter(|(param)| {
                 param.as_ref().get_param_type() == IrType::Int
                     || param.get_param_type() == IrType::IntPtr
                     || param.get_param_type() == IrType::FloatPtr
             })
-            .map(|(_, param)| param.clone())
+            .map(|(param)| param.clone())
             .collect();
         let mut fparam: Vec<_> = ir_func
             .get_params()
