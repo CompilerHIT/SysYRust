@@ -20,15 +20,15 @@ impl RegUsedStat {
     }
     pub fn is_available_ireg(&self, ireg: i32) -> bool {
         if (1 << ireg & self.iregs_used) != 0 {
-            return true;
+            return false;
         }
-        return false;
+        return true
     }
     pub fn is_available_freg(&self, freg: i32) -> bool {
         if (1 << freg & self.fregs_used) != 0 {
-            return true;
+            return false;
         }
-        return false;
+        return true;
     }
 
     // pub fn num_available_iregs(&self)->i32 {
@@ -199,3 +199,4 @@ impl BlockAllocStat {
         }
     }
 }
+

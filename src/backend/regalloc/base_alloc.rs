@@ -98,10 +98,21 @@ impl Regalloc for Allocator {
 
             }
         };
+
+        let mut remove_spillings=|bb:ObjPtr<BB>| {
+            // let mut livenow=HashSet::new();
+            // let mut used=HashSet::new();
+            // for inst in bb.insts.iter() {
+
+            // }
+        };
+
+
         for bb in func.blocks.iter() {
             count(*bb);
         }  
-        let  (func_stack,bbstacks)=regalloc::easy_ls_alloc::Allocator::countStackSize(func,&spillings);
+
+        let  (func_stack,bbstacks)=regalloc::regalloc::countStackSize(func,&spillings);
         
         log_file!(calout,"\n\n{} final:\n",func.label);
         log_file!(calout,"dstr:{:?}\nspillings:{:?}",dstr ,spillings);
