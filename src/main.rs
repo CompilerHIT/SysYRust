@@ -67,7 +67,7 @@ fn run_main() {
     sysylib::ir::dump_now(&module, "dump.ll");
 
     // ir优化
-    sysylib::ir::optimizer_run(&mut module, o1_option);
+    sysylib::ir::optimizer_run(&mut module, (&mut pool_bb, &mut pool_inst), true); //o1_option);
 
     // ir打印
     sysylib::ir::dump_now(&module, "dump_opt.ll");
