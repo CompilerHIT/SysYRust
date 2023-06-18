@@ -10,7 +10,7 @@ impl ObjPool<Inst> {
     pub fn make_add(&mut self, mut lhs: ObjPtr<Inst>, mut rhs: ObjPtr<Inst>) -> ObjPtr<Inst> {
         // 正确性检查
         // 操作数类型要相互对应
-        check_arith(lhs, rhs, true);
+        check_arith(lhs, rhs);
 
         let inst = self.put(Inst::new(
             lhs.get_ir_type(),
@@ -30,7 +30,7 @@ impl ObjPool<Inst> {
     /// * `rhs` - 右操作数
     pub fn make_sub(&mut self, mut lhs: ObjPtr<Inst>, mut rhs: ObjPtr<Inst>) -> ObjPtr<Inst> {
         // 正确性检查
-        check_arith(lhs, rhs, true);
+        check_arith(lhs, rhs);
 
         let inst = self.put(Inst::new(
             lhs.get_ir_type(),
@@ -49,7 +49,7 @@ impl ObjPool<Inst> {
     /// * `rhs` - 右操作数
     pub fn make_mul(&mut self, mut lhs: ObjPtr<Inst>, mut rhs: ObjPtr<Inst>) -> ObjPtr<Inst> {
         // 正确性检查
-        check_arith(lhs, rhs, true);
+        check_arith(lhs, rhs);
 
         let inst = self.put(Inst::new(
             lhs.get_ir_type(),
@@ -69,7 +69,7 @@ impl ObjPool<Inst> {
     /// * `rhs` - 右操作数
     pub fn make_div(&mut self, mut lhs: ObjPtr<Inst>, mut rhs: ObjPtr<Inst>) -> ObjPtr<Inst> {
         // 正确性检查
-        check_arith(lhs, rhs, true);
+        check_arith(lhs, rhs);
 
         let inst = self.put(Inst::new(
             lhs.get_ir_type(),
@@ -89,51 +89,11 @@ impl ObjPool<Inst> {
     /// * `rhs` - 右操作数
     pub fn make_rem(&mut self, mut lhs: ObjPtr<Inst>, mut rhs: ObjPtr<Inst>) -> ObjPtr<Inst> {
         // 正确性检查
-        check_arith(lhs, rhs, true);
+        check_arith(lhs, rhs);
 
         let inst = self.put(Inst::new(
             lhs.get_ir_type(),
             InstKind::Binary(BinOp::Rem),
-            vec![lhs, rhs],
-        ));
-
-        // 设置use list
-        lhs.add_user(inst.as_ref());
-        rhs.add_user(inst.as_ref());
-        inst
-    }
-
-    /// 创建逻辑与指令
-    /// # Arguments
-    /// * `lhs` - 左操作数
-    /// * `rhs` - 右操作数
-    pub fn make_and(&mut self, mut lhs: ObjPtr<Inst>, mut rhs: ObjPtr<Inst>) -> ObjPtr<Inst> {
-        // 正确性检查
-        check_arith(lhs, rhs, false);
-
-        let inst = self.put(Inst::new(
-            lhs.get_ir_type(),
-            InstKind::Binary(BinOp::And),
-            vec![lhs, rhs],
-        ));
-
-        // 设置use list
-        lhs.add_user(inst.as_ref());
-        rhs.add_user(inst.as_ref());
-        inst
-    }
-
-    /// 创建逻辑或指令
-    /// # Arguments
-    /// * `lhs` - 左操作数
-    /// * `rhs` - 右操作数
-    pub fn make_or(&mut self, mut lhs: ObjPtr<Inst>, mut rhs: ObjPtr<Inst>) -> ObjPtr<Inst> {
-        // 正确性检查
-        check_arith(lhs, rhs, false);
-
-        let inst = self.put(Inst::new(
-            lhs.get_ir_type(),
-            InstKind::Binary(BinOp::Or),
             vec![lhs, rhs],
         ));
 
@@ -149,7 +109,7 @@ impl ObjPool<Inst> {
     /// * `rhs` - 右操作数
     pub fn make_le(&mut self, mut lhs: ObjPtr<Inst>, mut rhs: ObjPtr<Inst>) -> ObjPtr<Inst> {
         // 正确性检查
-        check_arith(lhs, rhs, true);
+        check_arith(lhs, rhs);
 
         let inst = self.put(Inst::new(
             lhs.get_ir_type(),
@@ -169,7 +129,7 @@ impl ObjPool<Inst> {
     /// * `rhs` - 右操作数
     pub fn make_lt(&mut self, mut lhs: ObjPtr<Inst>, mut rhs: ObjPtr<Inst>) -> ObjPtr<Inst> {
         // 正确性检查
-        check_arith(lhs, rhs, true);
+        check_arith(lhs, rhs);
 
         let inst = self.put(Inst::new(
             lhs.get_ir_type(),
@@ -189,7 +149,7 @@ impl ObjPool<Inst> {
     /// * `rhs` - 右操作数
     pub fn make_ge(&mut self, mut lhs: ObjPtr<Inst>, mut rhs: ObjPtr<Inst>) -> ObjPtr<Inst> {
         // 正确性检查
-        check_arith(lhs, rhs, true);
+        check_arith(lhs, rhs);
 
         let inst = self.put(Inst::new(
             lhs.get_ir_type(),
@@ -209,7 +169,7 @@ impl ObjPool<Inst> {
     /// * `rhs` - 右操作数
     pub fn make_gt(&mut self, mut lhs: ObjPtr<Inst>, mut rhs: ObjPtr<Inst>) -> ObjPtr<Inst> {
         // 正确性检查
-        check_arith(lhs, rhs, true);
+        check_arith(lhs, rhs);
 
         let inst = self.put(Inst::new(
             lhs.get_ir_type(),
@@ -228,7 +188,7 @@ impl ObjPool<Inst> {
     /// * `rhs` - 右操作数
     pub fn make_eq(&mut self, mut lhs: ObjPtr<Inst>, mut rhs: ObjPtr<Inst>) -> ObjPtr<Inst> {
         // 正确性检查
-        check_arith(lhs, rhs, true);
+        check_arith(lhs, rhs);
 
         let inst = self.put(Inst::new(
             lhs.get_ir_type(),
@@ -248,7 +208,7 @@ impl ObjPool<Inst> {
     /// * `rhs` - 右操作数
     pub fn make_ne(&mut self, mut lhs: ObjPtr<Inst>, mut rhs: ObjPtr<Inst>) -> ObjPtr<Inst> {
         // 正确性检查
-        check_arith(lhs, rhs, true);
+        check_arith(lhs, rhs);
 
         let inst = self.put(Inst::new(
             lhs.get_ir_type(),
@@ -290,7 +250,7 @@ impl Inst {
     pub fn set_lhs(&mut self, mut lhs: ObjPtr<Inst>) {
         // 正确性检查
         if let InstKind::Binary(_) = self.kind {
-            check_arith(lhs, self.get_rhs(), is_arith(self));
+            check_arith(lhs, self.get_rhs());
         } else {
             unreachable!("Inst::set_lhs")
         }
@@ -307,7 +267,7 @@ impl Inst {
     pub fn set_rhs(&mut self, mut rhs: ObjPtr<Inst>) {
         // 正确性检查
         if let InstKind::Binary(_) = self.kind {
-            check_arith(self.get_lhs(), rhs, is_arith(self));
+            check_arith(self.get_rhs(), rhs);
         } else {
             unreachable!("Inst::set_rhs")
         }
@@ -329,30 +289,14 @@ impl Inst {
 /// 操作数类型要相互对应
 /// (Const)Int op (Const)Int
 /// (Const)Float op (Const)Float
-fn check_arith(lhs: ObjPtr<Inst>, rhs: ObjPtr<Inst>, check_float: bool) {
-    match lhs.get_ir_type() {
+fn check_arith(old: ObjPtr<Inst>, new: ObjPtr<Inst>) {
+    match old.get_ir_type() {
         IrType::Int | IrType::ConstInt => {
-            debug_assert!(rhs.get_ir_type() == IrType::Int || rhs.get_ir_type() == IrType::ConstInt)
+            debug_assert!(new.get_ir_type() == IrType::Int || new.get_ir_type() == IrType::ConstInt)
         }
-        IrType::Float | IrType::ConstFloat if check_float => debug_assert!(
-            rhs.get_ir_type() == IrType::Float || rhs.get_ir_type() == IrType::ConstFloat
+        IrType::Float | IrType::ConstFloat => debug_assert!(
+            new.get_ir_type() == IrType::Float || new.get_ir_type() == IrType::ConstFloat
         ),
         _ => unreachable!("check_arith"),
-    }
-}
-
-/// 检测是否为算术指令
-/// # Arguments
-/// * `inst` - 待检测指令
-/// # Return
-/// * `true` - 是算术指令
-fn is_arith(inst: &Inst) -> bool {
-    if let InstKind::Binary(op) = inst.get_kind() {
-        match op {
-            BinOp::And | BinOp::Or => false,
-            _ => true,
-        }
-    } else {
-        unreachable!("is_arith")
     }
 }
