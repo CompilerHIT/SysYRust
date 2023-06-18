@@ -377,18 +377,18 @@ impl Func {
         let mut iparam: Vec<_> = ir_func
             .get_parameter_list()
             .iter()
-            .filter(|(param)| {
+            .filter(|param| {
                 param.as_ref().get_param_type() == IrType::Int
                     || param.get_param_type() == IrType::IntPtr
                     || param.get_param_type() == IrType::FloatPtr
             })
-            .map(|(param)| param.clone())
+            .map(|param| param.clone())
             .collect();
         let mut fparam: Vec<_> = ir_func
-            .get_params()
+            .get_parameter_list()
             .iter()
-            .filter(|(_, param)| param.as_ref().get_param_type() == IrType::Float)
-            .map(|(_, param)| param.clone())
+            .filter(|param| param.as_ref().get_param_type() == IrType::Float)
+            .map(|param| param.clone())
             .collect();
         self.param_cnt = (iparam.len() as i32, fparam.len() as i32);
         self.params.append(&mut iparam);
