@@ -2363,8 +2363,23 @@ impl Process for UnaryExp {
                 UnaryOp::Minus => {
                     let (mut inst_u, mut val) = unaryexp.as_mut().process(input, kit_mut).unwrap();
                     let mut inst = inst_u;
-                    match val {
-                        ExpValue::Bool(_) => {}
+                    // match val {
+                    //     ExpValue::Bool(_) => {}
+                    //     _ => {
+                    //         inst = kit_mut.pool_inst_mut.make_neg(inst_u);
+                    //         kit_mut.context_mut.push_inst_bb(inst);
+                    //     }
+                    // }
+                    match inst_u.get_kind() {
+                        InstKind::Unary(op) => match op {
+                            UnOp::Neg => {
+                                inst = inst_u.get_unary_operand();
+                            }
+                            _ => {
+                                inst = kit_mut.pool_inst_mut.make_neg(inst_u);
+                                kit_mut.context_mut.push_inst_bb(inst);
+                            }
+                        },
                         _ => {
                             inst = kit_mut.pool_inst_mut.make_neg(inst_u);
                             kit_mut.context_mut.push_inst_bb(inst);
@@ -2378,8 +2393,8 @@ impl Process for UnaryExp {
                         ExpValue::Int(i) => {
                             val_ret = ExpValue::Int(-i);
                         }
-                        ExpValue::Bool(_) => {
-                            // val_ret = val;
+                        ExpValue::Bool(i) => {
+                            val_ret = ExpValue::Bool(-i);
                         }
                         _ => {
                             val_ret = ExpValue::None;
@@ -2393,18 +2408,18 @@ impl Process for UnaryExp {
                         InstKind::Unary(op) => match op {
                             UnOp::Not => {
                                 let inst = inst_u.get_unary_operand();
-                                Ok((inst, ExpValue::Bool(true)))
+                                Ok((inst, ExpValue::Bool(1)))
                             }
                             _ => {
                                 let inst = kit_mut.pool_inst_mut.make_not(inst_u);
                                 kit_mut.context_mut.push_inst_bb(inst);
-                                Ok((inst, ExpValue::Bool(true)))
+                                Ok((inst, ExpValue::Bool(1)))
                             }
                         },
                         _ => {
                             let inst = kit_mut.pool_inst_mut.make_not(inst_u);
                             kit_mut.context_mut.push_inst_bb(inst);
-                            Ok((inst, ExpValue::Bool(true)))
+                            Ok((inst, ExpValue::Bool(1)))
                         }
                     }
                 }
@@ -2769,7 +2784,7 @@ impl Process for EqExp {
         match self {
             EqExp::RelExp(relexp) => {
                 let (inst, _) = relexp.process(input, kit_mut).unwrap();
-                Ok((inst, ExpValue::Bool(true))) //这里可以优化
+                Ok((inst, ExpValue::Bool(1))) //这里可以优化
             }
             EqExp::EqualExp((eqexp, relexp)) => {
                 let mut tp_in = Type::Int;
@@ -2803,7 +2818,7 @@ impl Process for EqExp {
                 let inst_eq = kit_mut.pool_inst_mut.make_eq(inst_left, inst_right);
                 // // println!("push_inst_eq into bb{:?}",inst_eq.as_ref().get_kind());
                 kit_mut.context_mut.push_inst_bb(inst_eq);
-                Ok((inst_eq, ExpValue::Bool(true)))
+                Ok((inst_eq, ExpValue::Bool(1)))
             }
             EqExp::NotEqualExp((eqexp, relexp)) => {
                 let (mut inst_left, val_left) = eqexp.process(input, kit_mut).unwrap();
@@ -2832,7 +2847,7 @@ impl Process for EqExp {
                 } //这里可以进一步优化,计算cond是否恒为真或假
                 let inst_ne = kit_mut.pool_inst_mut.make_ne(inst_left, inst_right);
                 kit_mut.context_mut.push_inst_bb(inst_ne);
-                Ok((inst_ne, ExpValue::Bool(true)))
+                Ok((inst_ne, ExpValue::Bool(1)))
             }
         }
     }
