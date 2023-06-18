@@ -474,9 +474,7 @@ impl Regalloc for Allocator {
             self.spill();
         }
         let (spillings, dstr) = self.alloc_register();
-        let (func_stack_size, bb_sizes) =
-            crate::backend::regalloc::easy_ls_alloc::Allocator
-            ::countStackSize(func, &spillings);
+        let (func_stack_size, bb_sizes) =regalloc::countStackSize(func, &spillings);
 
         //println!("dstr:{:?}",self.dstr);
         //println!("spillings:{:?}",self.spillings);

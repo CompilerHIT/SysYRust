@@ -393,7 +393,7 @@ impl Func {
         let alloc_stat = allocator.alloc(self);
 
         // TODO
-        simulate_assign::Simulator::simulate(&self, &alloc_stat);
+        // simulate_assign::Simulator::simulate(&self, &alloc_stat);
 
         self.reg_alloc_info = alloc_stat;
         self.context.as_mut().set_reg_map(&self.reg_alloc_info.dstr);

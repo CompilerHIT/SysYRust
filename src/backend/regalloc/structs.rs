@@ -20,15 +20,15 @@ impl RegUsedStat {
     }
     pub fn is_available_ireg(&self, ireg: i32) -> bool {
         if (1 << ireg & self.iregs_used) != 0 {
-            return true;
+            return false;
         }
-        return false;
+        return true
     }
     pub fn is_available_freg(&self, freg: i32) -> bool {
         if (1 << freg & self.fregs_used) != 0 {
-            return true;
+            return false;
         }
-        return false;
+        return true;
     }
 
     // pub fn num_available_iregs(&self)->i32 {
@@ -83,11 +83,11 @@ impl RegUsedStat {
         }
         
         // 但是a1-a7自由使用
-        for i in 11..=17 {
-            if self.iregs_used & (1 << i) == 0 {
-                return Some(i);
-            }
-        }
+        // for i in 11..=17 {
+        //     if self.iregs_used & (1 << i) == 0 {
+        //         return Some(i);
+        //     }
+        // }
        
         None
     }
@@ -199,3 +199,4 @@ impl BlockAllocStat {
         }
     }
 }
+
