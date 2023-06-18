@@ -226,7 +226,7 @@ fn dump_parameter(
     mut name_index: i32,
 ) -> (i32, String) {
     let mut text = String::new();
-    for (_, var) in param.get_params().iter() {
+    for var in param.get_parameter_list().iter() {
         name_index = put_name(local_map, var.clone(), name_index);
         text += format!(
             "{} {}, ",
@@ -235,7 +235,7 @@ fn dump_parameter(
         )
         .as_str();
     }
-    if param.get_params().len() > 0 {
+    if param.get_parameter_list().len() > 0 {
         text.truncate(text.len() - 2);
     }
     (name_index, text)

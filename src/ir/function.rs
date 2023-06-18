@@ -85,10 +85,6 @@ impl Function {
         }
     }
 
-    pub fn get_params(&self) -> &HashMap<String, ObjPtr<Inst>> {
-        &self.parameters
-    }
-
     pub fn get_ir_type(&self) -> IrType {
         self.value.get_ir_type()
     }
