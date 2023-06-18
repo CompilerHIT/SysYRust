@@ -653,7 +653,6 @@ fn dump_inst(
                     .as_str();
                 }
             }
-            BinOp::And | BinOp::Or => {}
         },
         InstKind::Unary(op) => {
             // 指令替换
