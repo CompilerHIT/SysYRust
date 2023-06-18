@@ -4,12 +4,15 @@ use std::collections::HashSet;
 
 mod dead_code_eliminate;
 mod phi_optimizer;
+mod simplify_cfg;
 
 pub fn optimizer_run(module: &mut Module, optimize_flag: bool) {
     // 在功能点上对phi指令进行优化
     functional_optimizer(module);
 
     if optimize_flag {
+        // 简化cfg
+        simplify_cfg::simplify_cfg(module);
         // TODO: 性能优化
     }
 }

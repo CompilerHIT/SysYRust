@@ -111,4 +111,26 @@ impl BasicBlock {
     pub fn get_up_bb(&self) -> &Vec<ObjPtr<BasicBlock>> {
         &self.up_bb
     }
+
+    /// 替换前继BB
+    /// # Arguments
+    /// * `old_bb` - 被替换的BB
+    /// * `new_bb` - 新的BB
+    pub fn replace_up_bb(&mut self, old_bb: ObjPtr<BasicBlock>, new_bb: ObjPtr<BasicBlock>) {
+        let index = self.get_up_bb().iter().position(|x| *x == old_bb).unwrap();
+        self.up_bb[index] = new_bb;
+    }
+
+    /// 替换后继BB
+    /// # Arguments
+    /// * `old_bb` - 被替换的BB
+    /// * `new_bb` - 新的BB
+    pub fn replace_next_bb(&mut self, old_bb: ObjPtr<BasicBlock>, new_bb: ObjPtr<BasicBlock>) {
+        let index = self
+            .get_next_bb()
+            .iter()
+            .position(|x| *x == old_bb)
+            .unwrap();
+        self.next_bb[index] = new_bb;
+    }
 }
