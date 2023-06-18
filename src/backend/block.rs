@@ -1023,11 +1023,8 @@ impl BB {
         &mut self,
         func: ObjPtr<Func>,
         spill: &HashSet<i32>,
-        pos: i32,
         pool: &mut BackendPool,
     ) {
-        log!("{}, start at {}", self.label, pos);
-        let mut start_pos = pos;
         let mut index = 0;
         loop {
             if index >= self.insts.len() {
@@ -1035,6 +1032,7 @@ impl BB {
             }
             let inst = self.insts[index];
             let spills = inst.is_spill(spill);
+            log!("spills: {:?}", spills);
             for op in inst.operands.iter() {
                 match op {
                     Operand::Reg(reg) => {
@@ -1066,8 +1064,10 @@ impl BB {
                             caller_regs.insert(*reg);
                         }
                     }
+                    let mut pos = func.stack_addr.back().unwrap().get_pos();
+                    pos += func.stack_addr.back().unwrap().get_size();
                     for (i, id) in caller_regs.iter().enumerate() {
-                        let offset = start_pos + i as i32 * ADDR_SIZE;
+                        let offset = pos + i as i32 * ADDR_SIZE;
                         let mut ins = LIRInst::new(
                             InstrsType::StoreToStack,
                             vec![
@@ -1081,7 +1081,7 @@ impl BB {
                     }
                     index += 1;
                     for (i, id) in caller_regs.iter().enumerate() {
-                        let offset = start_pos + i as i32 * ADDR_SIZE;
+                        let offset = pos + i as i32 * ADDR_SIZE;
                         let mut ins = LIRInst::new(
                             InstrsType::LoadFromStack,
                             vec![
@@ -1100,23 +1100,9 @@ impl BB {
                 index += 1;
                 continue;
             } else {
-                let len = spills.len() as i32;
-                let (mut store_num, mut slot) = (0, vec![]);
-                for id in spills.iter() {
-                    if let Some(offset) = func.spill_stack_map.get(&id) {
-                        slot.push(*offset);
-                    } else {
-                        let stack_slot =
-                            StackSlot::new(start_pos + store_num * ADDR_SIZE, ADDR_SIZE);
-                        slot.push(stack_slot);
-                        store_num += 1;
-                    };
-                }
-                let offset = start_pos + store_num * ADDR_SIZE;
-                for i in 0..len {
-                    let reg = Operand::Reg(Reg::new(5 + i, ScalarType::Int));
-                    let stack_slot = slot[i as usize];
-                    if func.spill_stack_map.contains_key(&spills[i as usize]) {
+                for (i, id) in spills.iter().enumerate() {
+                    let reg = Operand::Reg(Reg::new(5 + (i as i32), ScalarType::Int));
+                    if let Some(stack_slot) = func.spill_stack_map.get(&id) {
                         let mut ins = LIRInst::new(
                             InstrsType::LoadFromStack,
                             vec![reg, Operand::IImm(IImm::new(stack_slot.get_pos()))],
@@ -1125,18 +1111,17 @@ impl BB {
                         self.insts.insert(index, pool.put_inst(ins));
                         index += 1;
                     } else {
+                        let last_slot = func.stack_addr.back().unwrap();
+                        let mut pos = last_slot.get_pos() + last_slot.get_size();
+                        let stack_slot = StackSlot::new(pos, ADDR_SIZE);
+                        func.as_mut().stack_addr.push_back(stack_slot);
                         func.as_mut()
                             .spill_stack_map
-                            .insert(spills[i as usize], stack_slot);
+                            .insert(*id, stack_slot);
                     }
                 }
-                for i in 0..len {
-                    // // log!("{i}------------------");
-                    // // log!("{} inst: {:?}", self.label, self.insts[index-2]);
-                    // // log!("{} inst: {:?}", self.label, self.insts[index-1]);
-                    // // log!("{} replace inst: {:?}", self.label, inst);
-                    // // log!("------------------");
-                    inst.as_mut().replace(spills[i as usize], 5 + i)
+                for (i, id) in spills.iter().enumerate() {
+                    inst.as_mut().replace(*id, 5 + (i as i32))
                 }
                 match inst.get_dst() {
                     Operand::Reg(_) => match inst.get_type() {
@@ -1156,12 +1141,12 @@ impl BB {
                     }
                 }
 
-                for i in 0..len {
-                    let reg = Operand::Reg(Reg::new(5 + i, ScalarType::Int));
-                    let stack_slot = slot[i as usize];
+                for (i, id) in spills.iter().enumerate() {
+                    let reg = Operand::Reg(Reg::new(5 + (i as i32), ScalarType::Int));
+                    let stack_slot = func.spill_stack_map.get(id).unwrap();
                     match self.insts[index - 1].get_dst() {
                         Operand::Reg(ireg) => {
-                            if ireg.get_id() != 5 + i {
+                            if ireg.get_id() != 5 + (i as i32) {
                                 continue;
                             }
                         }
@@ -1175,8 +1160,6 @@ impl BB {
                     self.insts.insert(index, pool.put_inst(ins));
                     index += 1;
                 }
-
-                start_pos = offset;
             }
         }
         // log!("---------------------------");

@@ -274,13 +274,13 @@ impl LIRInst {
         }
     }
 
-    pub fn is_spill(&self, id: &HashSet<i32>) -> Vec<i32> {
-        let mut res = Vec::new();
+    pub fn is_spill(&self, id: &HashSet<i32>) -> HashSet<i32> {
+        let mut res = HashSet::new();
         for op in &self.operands {
             match op {
                 Operand::Reg(reg) => {
                     if id.contains(&reg.get_id()) {
-                        res.push(reg.get_id());
+                        res.insert(reg.get_id());
                     }
                 }
                 _ => {}

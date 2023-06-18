@@ -447,13 +447,9 @@ impl Func {
     pub fn handle_spill(&mut self, pool: &mut BackendPool, f: &mut File) {
         let this = pool.put_func(self.clone());
         for block in self.blocks.iter() {
-            let pos = match self.reg_alloc_info.bb_stack_sizes.get(&block) {
-                Some(pos) => *pos as i32,
-                None => continue,
-            };
             block
                 .as_mut()
-                .handle_spill(this, &self.reg_alloc_info.spillings, pos, pool);
+                .handle_spill(this, &self.reg_alloc_info.spillings, pool);
         }
         self.update(this);
         self.save_callee(pool, f);
