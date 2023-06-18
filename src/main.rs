@@ -61,14 +61,13 @@ fn run_main() {
         &mut pool_bb,
         &mut pool_func,
     );
-
-    // ir打印
-    sysylib::ir::dump_now(&module);
-
     drop(compunit);
 
     // ir优化
     sysylib::ir::optimizer_run(&mut module, o1_option);
+
+    // ir打印
+    sysylib::ir::dump_now(&module);
 
     let output2 = matches.value_of("o").unwrap_or("row_asm.log");
     // 后端解析
