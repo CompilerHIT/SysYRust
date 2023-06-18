@@ -135,7 +135,11 @@ impl RegUsedStat {
         else if reg>=32&&reg<63 {self.use_freg(reg);}
     }
     
-
+    pub fn is_available_reg(&self,reg:i32)->bool {
+        if reg>=0&&reg<32 {self.is_available_ireg(reg)}
+        else if reg>=32&&reg<63 {self.is_available_freg(reg)}
+        else {  panic!("not legal reg") }
+    }
 
     // 释放一个通用寄存器
     pub fn release_ireg(&mut self, reg: i32) {
