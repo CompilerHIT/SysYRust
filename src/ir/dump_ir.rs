@@ -14,7 +14,7 @@ use super::{
     module::Module,
 };
 
-pub fn dump_now(module: &Module) {
+pub fn dump_now(module: &Module, path: &str) {
     let mut global_map = HashMap::new();
     let mut text = String::new();
 
@@ -39,7 +39,7 @@ pub fn dump_now(module: &Module) {
     text += format!("{}\n", dump_external_func()).as_str();
 
     // write to file
-    let mut file = File::create("dump.ll").unwrap();
+    let mut file = File::create(path).unwrap();
     file.write_all(text.as_bytes()).unwrap();
 }
 

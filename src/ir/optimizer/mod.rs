@@ -12,7 +12,7 @@ pub fn optimizer_run(module: &mut Module, optimize_flag: bool) {
 
     if optimize_flag {
         // 简化cfg
-        simplify_cfg::simplify_cfg(module);
+        simplify_cfg::simplify_cfg_run(module);
         // TODO: 性能优化
     }
 }

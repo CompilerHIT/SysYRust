@@ -1,4 +1,8 @@
-use super::{instruction::Inst, ir_type::IrType, value::Value};
+use super::{
+    instruction::{Inst, InstKind},
+    ir_type::IrType,
+    value::Value,
+};
 use crate::utility::{ObjPool, ObjPtr};
 
 #[derive(Debug)]
@@ -116,7 +120,7 @@ impl BasicBlock {
     /// # Arguments
     /// * `old_bb` - 被替换的BB
     /// * `new_bb` - 新的BB
-    pub fn replace_up_bb(&mut self, old_bb: ObjPtr<BasicBlock>, new_bb: ObjPtr<BasicBlock>) {
+    fn replace_up_bb(&mut self, old_bb: ObjPtr<BasicBlock>, new_bb: ObjPtr<BasicBlock>) {
         let index = self.get_up_bb().iter().position(|x| *x == old_bb).unwrap();
         self.up_bb[index] = new_bb;
     }
@@ -131,6 +135,31 @@ impl BasicBlock {
             .iter()
             .position(|x| *x == old_bb)
             .unwrap();
+        new_bb.as_mut().replace_up_bb(old_bb, ObjPtr::new(self));
         self.next_bb[index] = new_bb;
+    }
+
+    /// 删除前继BB
+    /// # Arguments
+    /// * `bb` - 被删除的BB
+    fn remove_up_bb(&mut self, bb: ObjPtr<BasicBlock>) {
+        let index = self.get_up_bb().iter().position(|x| *x == bb).unwrap();
+        self.up_bb.remove(index);
+
+        // 修改phi的参数
+        let mut inst = self.get_head_inst();
+        while let InstKind::Phi = inst.as_ref().get_kind() {
+            inst.remove_operand_by_index(index);
+            inst = inst.get_next();
+        }
+    }
+
+    /// 删除后继BB
+    /// # Arguments
+    /// * `bb` - 被删除的BB
+    pub fn remove_next_bb(&mut self, bb: ObjPtr<BasicBlock>) {
+        let index = self.get_next_bb().iter().position(|x| *x == bb).unwrap();
+        bb.as_mut().remove_up_bb(ObjPtr::new(self));
+        self.next_bb.remove(index);
     }
 }
