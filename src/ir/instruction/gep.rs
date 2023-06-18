@@ -14,7 +14,7 @@ impl ObjPool<Inst> {
         // 正确性检查
         match ptr.get_ir_type() {
             IrType::IntPtr | IrType::FloatPtr => match offset.get_ir_type() {
-                IrType::Int | IrType::ConstInt => {}
+                IrType::Int => {}
                 _ => unreachable!("ObjPool::make_gep: offset must be a int"),
             },
             _ => unreachable!("ObjPool::make_gep: ptr must be a pointer"),
@@ -81,7 +81,7 @@ impl Inst {
         // 正确性检查
         if let InstKind::Gep = self.get_kind() {
             match offset.get_ir_type() {
-                IrType::Int | IrType::ConstInt => {}
+                IrType::Int => {}
                 _ => unreachable!("Inst::set_gep_offset: offset must be a int"),
             };
         } else {

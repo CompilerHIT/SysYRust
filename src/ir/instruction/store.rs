@@ -20,7 +20,7 @@ impl ObjPool<Inst> {
         ));
         // 正确性检查
         let check = || match value.get_ir_type() {
-            IrType::Int | IrType::ConstInt => {}
+            IrType::Int => {}
             _ => unreachable!("ObjPool::make_int_store: value must be a int"),
         };
         match dest.get_ir_type() {
@@ -57,7 +57,7 @@ impl ObjPool<Inst> {
         ));
         // 正确性检查
         let check = || match value.get_ir_type() {
-            IrType::Float | IrType::ConstFloat => {}
+            IrType::Float => {}
             _ => unreachable!("ObjPool::make_float_store: value must be a float"),
         };
         match dest.get_ir_type() {

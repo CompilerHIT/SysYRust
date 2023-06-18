@@ -102,8 +102,8 @@ impl TypeProcess for UnaryExp {
             UnaryExp::FuncCall((id, _)) => {
                 let inst_func = kit_mut.context_mut.module_mut.get_function(&id);
                 match inst_func.as_ref().get_return_type() {
-                    IrType::ConstFloat | IrType::Float => Ok(3),
-                    IrType::ConstInt | IrType::Int => Ok(1),
+                    IrType::Float => Ok(3),
+                    IrType::Int => Ok(1),
                     _ => {
                         unreachable!()
                     }
@@ -130,7 +130,9 @@ impl TypeProcess for PrimaryExp {
                 match sym.tp {
                     Type::ConstFloat | Type::Float => Ok(3),
                     Type::ConstInt | Type::Int => Ok(1),
-                    _=>{todo!()}
+                    _ => {
+                        todo!()
+                    }
                 }
             }
             PrimaryExp::Number(imm) => {

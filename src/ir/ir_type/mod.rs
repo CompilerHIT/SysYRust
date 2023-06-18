@@ -4,11 +4,9 @@
 pub enum IrType {
     Void,
     Int,
-    ConstInt,
     IntPtr,
     Float,
     FloatPtr,
-    ConstFloat,
     Function,
     BBlock,
     Parameter,

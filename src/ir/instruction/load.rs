@@ -34,7 +34,7 @@ impl ObjPool<Inst> {
         // 正确性检查
         match ptr.as_ref().get_ir_type() {
             // 全局变量作为指针，但是其值的类型仍为Int
-            IrType::Int | IrType::ConstInt => {}
+            IrType::Int => {}
             _ => {
                 unreachable!("ObjPool::make_global_int_load: ptr must be a global int")
             }
@@ -108,7 +108,7 @@ impl ObjPool<Inst> {
     pub fn make_global_float_load(&mut self, mut ptr: ObjPtr<Inst>) -> ObjPtr<Inst> {
         // 正确性检查
         match ptr.get_ir_type() {
-            IrType::Float | IrType::ConstFloat => {}
+            IrType::Float => {}
             _ => unreachable!("ObjPool::make_global_float_load: ptr must be a global float"),
         }
 

@@ -75,10 +75,7 @@ impl Inst {
         // 正确性检查
         if let InstKind::Branch = self.kind {
             debug_assert!(self.is_br());
-            debug_assert!(
-                cond.as_ref().get_ir_type() == IrType::Int
-                    || cond.as_ref().get_ir_type() == IrType::ConstInt
-            );
+            debug_assert!(cond.as_ref().get_ir_type() == IrType::Int);
         } else {
             unreachable!("Inst::set_br_cond")
         };
