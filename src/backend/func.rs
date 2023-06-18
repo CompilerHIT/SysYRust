@@ -1,6 +1,7 @@
 use std::cmp::max;
 use std::collections::LinkedList;
 pub use std::collections::{HashSet, VecDeque};
+use std::fmt;
 pub use std::fs::File;
 pub use std::hash::{Hash, Hasher};
 pub use std::io::Result;
@@ -16,6 +17,7 @@ use crate::backend::block::*;
 use crate::backend::instrs::{LIRInst, Operand};
 use crate::backend::module::AsmModule;
 use crate::backend::operand::{IImm, Reg, ARG_REG_COUNT};
+use crate::backend::regalloc::simulate_assign;
 use crate::backend::regalloc::{
     easy_ls_alloc::Allocator, regalloc::Regalloc, structs::FuncAllocStat,
 };
@@ -23,6 +25,7 @@ use crate::ir::basicblock::BasicBlock;
 use crate::ir::function::Function;
 use crate::ir::instruction::Inst;
 use crate::ir::ir_type::IrType;
+use crate::log_file;
 use crate::utility::{ObjPtr, ScalarType};
 
 #[derive(Clone)]
@@ -52,6 +55,8 @@ pub struct Func {
     pub caller_saved: HashMap<i32, i32>,
     pub max_params: i32,
 }
+
+
 
 /// reg_num, stack_addr, caller_stack_addr考虑借助回填实现
 /// 是否需要caller_stack_addr？caller函数sp保存在s0中
@@ -264,24 +269,21 @@ impl Func {
     }
 
     pub fn calc_live(&mut self) {
+        let calc_live_file="callive.txt";
+        log_file!(calc_live_file,"-----------------------------------cal live func:{}---------------------------", self.label);
         // 打印函数里面的寄存器活跃情况
         let printinterval = || {
             let mut que: VecDeque<ObjPtr<BB>> = VecDeque::new();
             let mut passed_bb = HashSet::new();
             que.push_front(self.entry.unwrap());
             passed_bb.insert(self.entry.unwrap());
-            log!("func:{}", self.label);
             while !que.is_empty() {
                 let cur_bb = que.pop_front().unwrap();
-                // log!("block {}:",cur_bb.label);
-                // log!("live in:");
-                // log!("{:?}",cur_bb.live_in);
-                // log!("live out:");
-                // log!("{:?}",cur_bb.live_out);
-                // log!("live use:");
-                // log!("{:?}",cur_bb.live_use);
-                // log!("live def:");
-                // log!("{:?}",cur_bb.live_def);
+                log_file!(calc_live_file,"block {}:",cur_bb.label);
+                log_file!(calc_live_file,"live in:{:?}",cur_bb.live_in.iter().map(|e|e.get_id()).collect::<Vec<i32>>());
+                log_file!(calc_live_file,"live out:{:?}",cur_bb.live_out.iter().map(|e|e.get_id()).collect::<Vec<i32>>());
+                log_file!(calc_live_file,"live use:{:?}",cur_bb.live_use.iter().map(|e|e.get_id()).collect::<Vec<i32>>());
+                log_file!(calc_live_file,"live def{:?}:",cur_bb.live_def.iter().map(|e|e.get_id()).collect::<Vec<i32>>());
                 for next in cur_bb.out_edge.iter() {
                     if passed_bb.contains(next) {
                         continue;
@@ -292,8 +294,8 @@ impl Func {
             }
         };
 
-        // log!("-----------------------------------before count live def,live use----------------------------");
-        printinterval();
+        log_file!(calc_live_file,"-----------------------------------before count live def,live use----------------------------");
+        // printinterval();
 
         // 计算公式，live in 来自于所有前继的live out的集合 + 自身的live use
         // live out等于所有后继块的live in的集合与 (自身的livein 和live def的并集) 的交集
@@ -306,10 +308,11 @@ impl Func {
 
         let mut queue: VecDeque<(ObjPtr<BB>, Reg)> = VecDeque::new();
         for block in self.blocks.iter() {
+            log_file!(calc_live_file,"block:{}",block.label);
             block.as_mut().live_use.clear();
             block.as_mut().live_def.clear();
             for it in block.as_ref().insts.iter().rev() {
-                // log!("{:?}",it);
+                log_file!(calc_live_file,"{}",it.as_ref());
                 for reg in it.as_ref().get_reg_def().into_iter() {
                     if reg.is_virtual() || reg.is_allocable() {
                         block.as_mut().live_use.remove(&reg);
@@ -322,10 +325,8 @@ impl Func {
                         block.as_mut().live_use.insert(reg);
                     }
                 }
-                log!("use:{:?}", it.get_reg_use());
-                log!("def:{:?}", it.get_reg_def());
             }
-
+            log_file!(calc_live_file,"live def:{:?},live use:{:?}",block.live_def.iter().map(|e|e.get_id()).collect::<Vec<i32>>(),block.live_use.iter().map(|e|e.get_id()).collect::<Vec<i32>>());
             //
             for reg in block.as_ref().live_use.iter() {
                 queue.push_back((block.clone(), reg.clone()));
@@ -334,15 +335,17 @@ impl Func {
             block.as_mut().live_out.clear();
         }
 
-        log!("-----------------------------------before count live in,live out----------------------------");
-        printinterval();
+
+        log_file!(calc_live_file,"-----------------------------------before count live in,live out----------------------------");
+        // printinterval();
 
         //然后计算live in 和live out
         while let Some(value) = queue.pop_front() {
             let (block, reg) = value;
+            log_file!(calc_live_file,"block {} 's ins:{:?}",block.label,block.in_edge.iter().map(|b|&b.label).collect::<HashSet<&String>>());
             for pred in block.as_ref().in_edge.iter() {
                 if pred.as_mut().live_out.insert(reg) {
-                    if pred.as_mut().live_def.take(&reg) == None
+                    if !pred.as_mut().live_def.contains(&reg)
                         && pred.as_mut().live_in.insert(reg)
                     {
                         queue.push_back((pred.clone(), reg));
@@ -351,16 +354,20 @@ impl Func {
             }
         }
 
-        log!("-----------------------------------after count live in,live out----------------------------");
+        log_file!(calc_live_file,"-----------------------------------after count live in,live out----------------------------");
         printinterval();
     }
 
     pub fn allocate_reg(&mut self, f: &mut File) {
         // 函数返回地址保存在ra中
         self.calc_live();
-        let mut allocator = Allocator::new();
+        // let mut allocator = crate::backend::regalloc::easy_ls_alloc::Allocator::new();
         // let mut allocator =crate::backend::regalloc::easy_gc_alloc::Allocator::new();
+        let mut allocator=crate::backend::regalloc::base_alloc::Allocator::new();
         let alloc_stat = allocator.alloc(self);
+
+        // TODO
+        simulate_assign::Simulator::simulate(&self, &alloc_stat);
 
         self.reg_alloc_info = alloc_stat;
         self.context.as_mut().set_reg_map(&self.reg_alloc_info.dstr);

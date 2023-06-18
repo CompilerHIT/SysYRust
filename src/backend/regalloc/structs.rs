@@ -75,18 +75,20 @@ impl RegUsedStat {
         }
         // 参数寄存器x10也就是a0保留
 
+        // 先分配其他寄存器再使用a0-a7
+        for i in 18..=31 {
+            if self.iregs_used & (1 << i) == 0 {
+                return Some(i);
+            }
+        }
+        
         // 但是a1-a7自由使用
         for i in 11..=17 {
             if self.iregs_used & (1 << i) == 0 {
                 return Some(i);
             }
         }
-
-        for i in 18..=31 {
-            if self.iregs_used & (1 << i) == 0 {
-                return Some(i);
-            }
-        }
+       
         None
     }
 
@@ -126,7 +128,20 @@ impl RegUsedStat {
     }
 
 
-
+    pub fn release_reg(&mut self,reg:i32){
+        if reg>=0&&reg<32 {self.release_ireg(reg);}
+        else if reg>=32&&reg<63 {self.release_freg(reg);}
+    }
+    pub fn use_reg(&mut self,reg:i32){
+        if reg>=0&&reg<32 {self.use_ireg(reg);}
+        else if reg>=32&&reg<63 {self.use_freg(reg);}
+    }
+    
+    pub fn is_available_reg(&self,reg:i32)->bool {
+        if reg>=0&&reg<32 {self.is_available_ireg(reg)}
+        else if reg>=32&&reg<63 {self.is_available_freg(reg)}
+        else {  panic!("not legal reg") }
+    }
 
     // 释放一个通用寄存器
     pub fn release_ireg(&mut self, reg: i32) {

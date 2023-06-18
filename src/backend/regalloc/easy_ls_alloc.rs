@@ -138,13 +138,7 @@ impl Allocator {
     // 指令窗口分析
     fn interval_anaylise(&mut self) {
         for (i, inst) in self.lines.iter().enumerate() {
-            for reg in inst.as_ref().get_reg_use() {
-                if !reg.is_virtual() {
-                    continue;
-                }
-                self.intervals.insert(reg.get_id(), i);
-            }
-            for reg in inst.get_reg_def() {
+            for reg in inst.as_ref().get_regs() { 
                 if !reg.is_virtual() {
                     continue;
                 }
@@ -253,6 +247,7 @@ impl Allocator {
                 }
             }
 
+            // 处理冲突
             for reg in it.as_ref().get_reg_def() {
                 if !reg.is_virtual() {
                     continue;
@@ -324,6 +319,7 @@ impl Allocator {
                     }
                 }
             }
+       
         }
         (spillings, dstr)
     }

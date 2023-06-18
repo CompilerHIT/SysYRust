@@ -16,7 +16,7 @@ use crate::{
 
 use super::{
     easy_ls_alloc,
-    regalloc::Regalloc,
+    regalloc::{Regalloc, self},
     structs::{FuncAllocStat, RegUsedStat},
 };
 
@@ -37,17 +37,7 @@ pub struct Allocator {
     spillings: HashSet<i32>,                          //记录溢出寄存器
 }
 
-impl fmt::Display for crate::backend::LIRInst {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "type:{:?} def:{:?},use:{:?}",
-            self.get_type(),
-            self.get_reg_def(),
-            self.get_reg_use()
-        )
-    }
-}
+
 
 impl Allocator {
     pub fn new() -> Allocator {
@@ -485,7 +475,8 @@ impl Regalloc for Allocator {
         }
         let (spillings, dstr) = self.alloc_register();
         let (func_stack_size, bb_sizes) =
-            easy_ls_alloc::Allocator::countStackSize(func, &spillings);
+            crate::backend::regalloc::easy_ls_alloc::Allocator
+            ::countStackSize(func, &spillings);
 
         //println!("dstr:{:?}",self.dstr);
         //println!("spillings:{:?}",self.spillings);
