@@ -56,8 +56,6 @@ pub struct Func {
     pub max_params: i32,
 }
 
-
-
 /// reg_num, stack_addr, caller_stack_addr考虑借助回填实现
 /// 是否需要caller_stack_addr？caller函数sp保存在s0中
 impl Func {
@@ -82,7 +80,7 @@ impl Func {
             floats: Vec::new(),
             callee_saved: HashSet::new(),
             caller_saved: HashMap::new(),
-            max_params: 0
+            max_params: 0,
         }
     }
 
@@ -269,21 +267,30 @@ impl Func {
     }
 
     pub fn calc_live(&mut self) {
-        let calc_live_file="callive.txt";
-        log_file!(calc_live_file,"-----------------------------------cal live func:{}---------------------------", self.label);
+        let calc_live_file = "callive.txt";
+        log_file!(
+            calc_live_file,
+            "-----------------------------------cal live func:{}---------------------------",
+            self.label
+        );
         // 打印函数里面的寄存器活跃情况
         let printinterval = || {
             let mut que: VecDeque<ObjPtr<BB>> = VecDeque::new();
             let mut passed_bb = HashSet::new();
             que.push_front(self.entry.unwrap());
             passed_bb.insert(self.entry.unwrap());
+            log_file!(calc_live_file, "func:{}", self.label);
             while !que.is_empty() {
                 let cur_bb = que.pop_front().unwrap();
-                log_file!(calc_live_file,"block {}:",cur_bb.label);
-                log_file!(calc_live_file,"live in:{:?}",cur_bb.live_in.iter().map(|e|e.get_id()).collect::<Vec<i32>>());
-                log_file!(calc_live_file,"live out:{:?}",cur_bb.live_out.iter().map(|e|e.get_id()).collect::<Vec<i32>>());
-                log_file!(calc_live_file,"live use:{:?}",cur_bb.live_use.iter().map(|e|e.get_id()).collect::<Vec<i32>>());
-                log_file!(calc_live_file,"live def{:?}:",cur_bb.live_def.iter().map(|e|e.get_id()).collect::<Vec<i32>>());
+                log_file!(calc_live_file, "block {}:", cur_bb.label);
+                log_file!(calc_live_file, "live in:");
+                log_file!(calc_live_file, "{:?}", cur_bb.live_in);
+                log_file!(calc_live_file, "live out:");
+                log_file!(calc_live_file, "{:?}", cur_bb.live_out);
+                log_file!(calc_live_file, "live use:");
+                log_file!(calc_live_file, "{:?}", cur_bb.live_use);
+                log_file!(calc_live_file, "live def:");
+                log_file!(calc_live_file, "{:?}", cur_bb.live_def);
                 for next in cur_bb.out_edge.iter() {
                     if passed_bb.contains(next) {
                         continue;
@@ -295,7 +302,7 @@ impl Func {
         };
 
         log_file!(calc_live_file,"-----------------------------------before count live def,live use----------------------------");
-        // printinterval();
+        printinterval();
 
         // 计算公式，live in 来自于所有前继的live out的集合 + 自身的live use
         // live out等于所有后继块的live in的集合与 (自身的livein 和live def的并集) 的交集
@@ -308,11 +315,11 @@ impl Func {
 
         let mut queue: VecDeque<(ObjPtr<BB>, Reg)> = VecDeque::new();
         for block in self.blocks.iter() {
-            log_file!(calc_live_file,"block:{}",block.label);
+            log_file!(calc_live_file, "block:{}", block.label);
             block.as_mut().live_use.clear();
             block.as_mut().live_def.clear();
             for it in block.as_ref().insts.iter().rev() {
-                log_file!(calc_live_file,"{}",it.as_ref());
+                log_file!(calc_live_file, "{}", it.as_ref());
                 for reg in it.as_ref().get_reg_def().into_iter() {
                     if reg.is_virtual() || reg.is_allocable() {
                         block.as_mut().live_use.remove(&reg);
@@ -326,7 +333,20 @@ impl Func {
                     }
                 }
             }
-            log_file!(calc_live_file,"live def:{:?},live use:{:?}",block.live_def.iter().map(|e|e.get_id()).collect::<Vec<i32>>(),block.live_use.iter().map(|e|e.get_id()).collect::<Vec<i32>>());
+            log_file!(
+                calc_live_file,
+                "live def:{:?},live use:{:?}",
+                block
+                    .live_def
+                    .iter()
+                    .map(|e| e.get_id())
+                    .collect::<Vec<i32>>(),
+                block
+                    .live_use
+                    .iter()
+                    .map(|e| e.get_id())
+                    .collect::<Vec<i32>>()
+            );
             //
             for reg in block.as_ref().live_use.iter() {
                 queue.push_back((block.clone(), reg.clone()));
@@ -335,19 +355,25 @@ impl Func {
             block.as_mut().live_out.clear();
         }
 
-
         log_file!(calc_live_file,"-----------------------------------before count live in,live out----------------------------");
-        // printinterval();
+        printinterval();
 
         //然后计算live in 和live out
         while let Some(value) = queue.pop_front() {
             let (block, reg) = value;
-            log_file!(calc_live_file,"block {} 's ins:{:?}",block.label,block.in_edge.iter().map(|b|&b.label).collect::<HashSet<&String>>());
+            log_file!(
+                calc_live_file,
+                "block {} 's ins:{:?}",
+                block.label,
+                block
+                    .in_edge
+                    .iter()
+                    .map(|b| &b.label)
+                    .collect::<HashSet<&String>>()
+            );
             for pred in block.as_ref().in_edge.iter() {
                 if pred.as_mut().live_out.insert(reg) {
-                    if !pred.as_mut().live_def.contains(&reg)
-                        && pred.as_mut().live_in.insert(reg)
-                    {
+                    if !pred.as_mut().live_def.contains(&reg) && pred.as_mut().live_in.insert(reg) {
                         queue.push_back((pred.clone(), reg));
                     }
                 }
@@ -498,7 +524,13 @@ impl Func {
             let mut builder = AsmBuilder::new(&mut f1);
             // addi sp -stack_size
             builder.addi("sp", "sp", -stack_size);
-            builder.s(&ra.to_string(false), "sp", stack_size - ADDR_SIZE, false, true);
+            builder.s(
+                &ra.to_string(false),
+                "sp",
+                stack_size - ADDR_SIZE,
+                false,
+                true,
+            );
             if !is_main {
                 for (reg, slot) in map.iter() {
                     let of = stack_size - ADDR_SIZE - slot.get_pos();
@@ -515,12 +547,18 @@ impl Func {
                     builder.l(&reg.to_string(false), "sp", of, false, true);
                 }
             }
-            builder.l(&ra.to_string(false), "sp", stack_size - ADDR_SIZE, false, true);
+            builder.l(
+                &ra.to_string(false),
+                "sp",
+                stack_size - ADDR_SIZE,
+                false,
+                true,
+            );
             builder.addi("sp", "sp", stack_size);
         });
     }
 
-    pub fn generate_row(&mut self, _:ObjPtr<Context>, f: &mut File) -> Result<()> {
+    pub fn generate_row(&mut self, _: ObjPtr<Context>, f: &mut File) -> Result<()> {
         AsmBuilder::new(f).show_func(&self.label)?;
         // self.context.as_mut().call_prologue_event();
         let mut size = 0;

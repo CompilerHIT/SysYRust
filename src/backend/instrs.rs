@@ -1,7 +1,7 @@
 use std::cmp::min;
 use std::collections::{HashMap, HashSet};
 pub use std::io::Result;
-use std::{vec, fmt};
+use std::{fmt, vec};
 
 pub use crate::backend::asm_builder::AsmBuilder;
 pub use crate::backend::block::BB;
@@ -105,9 +105,6 @@ pub enum InstrsType {
     // LoadGlobal,
 }
 
-
-
-
 #[derive(Debug)]
 pub struct LIRInst {
     inst_type: InstrsType,
@@ -120,11 +117,10 @@ pub struct LIRInst {
     float: bool,
 }
 
-
 // 实现个fmt display trait
 impl fmt::Display for LIRInst {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut kind="";
+        let mut kind = "";
         match self.get_type() {
             InstrsType::Binary(op) => {
                 kind = match op {
@@ -166,11 +162,11 @@ impl fmt::Display for LIRInst {
             //     builder.addi("sp", "sp", imm)?;
             //     Ok(())
             // },
-            InstrsType::Load|InstrsType::LoadParamFromStack|InstrsType::LoadFromStack => {
-                kind="load";
+            InstrsType::Load | InstrsType::LoadParamFromStack | InstrsType::LoadFromStack => {
+                kind = "load";
             }
-            InstrsType::Store|InstrsType::StoreToStack|InstrsType::StoreParamToStack => {
-                kind="store";
+            InstrsType::Store | InstrsType::StoreToStack | InstrsType::StoreParamToStack => {
+                kind = "store";
             }
             // 判断！是否需要多插入一条j，间接跳转到
             InstrsType::Branch(cond) => {
@@ -183,23 +179,26 @@ impl fmt::Display for LIRInst {
                     CmpOp::Ge => "ge",
                     CmpOp::Nez => "nez",
                 };
-                
             }
             InstrsType::Jump => {
-                kind="jump";
+                kind = "jump";
             }
             InstrsType::Call => {
-              kind="call";
+                kind = "call";
             }
             InstrsType::Ret(..) => {
-              kind="ret";
+                kind = "ret";
             }
         }
-        let mut def=HashSet::new();
-        let mut use_reg_id =HashSet::new();
-        self.get_reg_def().iter().for_each(|e|{def.insert(e.get_id());});
-        self.get_reg_use().iter().for_each(|e|{use_reg_id.insert(e.get_id());});
-        write!(f,"{:?} def:{:?} use:{:?}",kind,def,use_reg_id)
+        let mut def = HashSet::new();
+        let mut use_reg_id = HashSet::new();
+        self.get_reg_def().iter().for_each(|e| {
+            def.insert(e.get_id());
+        });
+        self.get_reg_use().iter().for_each(|e| {
+            use_reg_id.insert(e.get_id());
+        });
+        write!(f, "{:?} def:{:?} use:{:?}", kind, def, use_reg_id)
     }
 }
 
@@ -320,10 +319,14 @@ impl LIRInst {
         self.operands[0] = Operand::Addr(label);
     }
 
-    pub fn get_regs(&self)->Vec<Reg> {
-        let mut out =Vec::new();
-        self.get_reg_def().iter().for_each(|e|{out.push(*e);});
-        self.get_reg_use().iter().for_each(|e|{out.push(*e);});
+    pub fn get_regs(&self) -> Vec<Reg> {
+        let mut out = Vec::new();
+        self.get_reg_def().iter().for_each(|e| {
+            out.push(*e);
+        });
+        self.get_reg_use().iter().for_each(|e| {
+            out.push(*e);
+        });
         out
     }
 
@@ -336,7 +339,10 @@ impl LIRInst {
             | InstrsType::LoadFromStack
             | InstrsType::LoadParamFromStack => match self.operands[0] {
                 Operand::Reg(dst_reg) => vec![dst_reg],
-                _ => panic!("dst must be reg, but actually is {:?}, at LIRInst:{:?}", self.operands[0], self),
+                _ => panic!(
+                    "dst must be reg, but actually is {:?}, at LIRInst:{:?}",
+                    self.operands[0], self
+                ),
             },
             InstrsType::Call => {
                 let mut set = Vec::new();

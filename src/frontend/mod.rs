@@ -16,6 +16,7 @@ pub enum InfuncChoice {
 pub enum ExpValue {
     Float(f32),
     Int(i32),
+    Bool(i32),
     // True,
     // False,
     None,
