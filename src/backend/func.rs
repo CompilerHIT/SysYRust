@@ -268,7 +268,7 @@ impl Func {
 
     pub fn calc_live(&mut self) {
         let calc_live_file = "callive.txt";
-        fs::remove_file(calc_live_file);
+        // fs::remove_file(calc_live_file);
         log_file!(
             calc_live_file,
             "-----------------------------------cal live func:{}---------------------------",
@@ -302,8 +302,8 @@ impl Func {
             }
         };
 
-        log_file!(calc_live_file,"-----------------------------------before count live def,live use----------------------------");
-        printinterval();
+        // log_file!(calc_live_file,"-----------------------------------before count live def,live use----------------------------");
+        // printinterval();
 
         // 计算公式，live in 来自于所有前继的live out的集合 + 自身的live use
         // live out等于所有后继块的live in的集合与 (自身的livein 和live def的并集) 的交集
@@ -356,8 +356,8 @@ impl Func {
             block.as_mut().live_out.clear();
         }
 
-        log_file!(calc_live_file,"-----------------------------------before count live in,live out----------------------------");
-        printinterval();
+        // log_file!(calc_live_file,"-----------------------------------before count live in,live out----------------------------");
+        // printinterval();
 
         //然后计算live in 和live out
         while let Some(value) = queue.pop_front() {
@@ -373,11 +373,28 @@ impl Func {
                     .collect::<HashSet<&String>>()
             );
             for pred in block.as_ref().in_edge.iter() {
+                println!("{}",pred.label);
+                if pred.label==".LBB0_2"||pred.label==".LBB1_2" {
+                    
+                }
+                if reg.get_id()==62||reg.get_id()==78 {
+                    let tmp=2;
+                }
                 if pred.as_mut().live_out.insert(reg) {
-                    if !pred.as_mut().live_def.contains(&reg) && pred.as_mut().live_in.insert(reg) {
+                    if pred.as_mut().live_def.contains(&reg) {
+                        continue;
+                    }
+                    if pred.as_mut().live_in.insert(reg) {
                         queue.push_back((pred.clone(), reg));
                     }
                 }
+                log_file!("19_2.txt",
+                    "live in:{:?}\nlive out:{:?}\nlive def:{:?}\nlive use:{:?}",
+                    pred.live_in.iter().map(|r|r.get_id()).collect::<HashSet<i32>>(),
+                    pred.live_out.iter().map(|r|r.get_id()).collect::<HashSet<i32>>(),
+                    pred.live_def.iter().map(|r|r.get_id()).collect::<HashSet<i32>>(),
+                    pred.live_use.iter().map(|r|r.get_id()).collect::<HashSet<i32>>(),
+                );
             }
         }
 

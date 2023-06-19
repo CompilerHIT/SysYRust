@@ -1,4 +1,2 @@
-rm row_asm.log
-rm calout.txt
-rm callive.txt
+./mcl.sh
 cargo run a.sy -S -o a.s
