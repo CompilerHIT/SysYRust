@@ -47,7 +47,7 @@ impl<'a> AsmModule<'a> {
 
     pub fn generator(&mut self, f: &mut File, f2: &mut File, pool: &mut BackendPool) {
         self.build_lir(pool);
-        // self.generate_row_asm(f2, pool); //注释
+        self.generate_row_asm(f2, pool); //注释
         self.allocate_reg(f);
         self.handle_spill(pool, f);
         // 检查地址溢出，插入间接寻址

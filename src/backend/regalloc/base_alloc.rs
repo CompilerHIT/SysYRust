@@ -2,7 +2,7 @@
 
 use std::{collections::{HashMap, HashSet}, fs};
 
-use crate::{backend::{regalloc::{regalloc::Regalloc, self, structs::RegUsedStat}, instrs::BB, operand::Reg}, utility::{ObjPtr, ScalarType}, frontend::ast::Continue, log_file};
+use crate::{backend::{regalloc::{regalloc::Regalloc, self, structs::RegUsedStat}, instrs::BB, operand::Reg, block}, utility::{ObjPtr, ScalarType}, frontend::ast::Continue, log_file};
 
 use super::structs::FuncAllocStat;
 
@@ -18,7 +18,7 @@ impl Allocator {
 impl Regalloc for Allocator {
     fn alloc(&mut self, func: &crate::backend::instrs::Func) -> super::structs::FuncAllocStat {
         let  calout="calout.txt";
-        fs::remove_file(calout);
+        // fs::remove_file(calout);
         let mut dstr:HashMap<i32,i32>=HashMap::new();
         let mut spillings:HashSet<i32>=HashSet::new();
 
@@ -60,6 +60,9 @@ impl Regalloc for Allocator {
         };
 
         let mut count =|bb:ObjPtr<BB>|{
+            if bb.label==".LBB0_3"{
+                log_file!(calout,"g?");
+            }
             log_file!(calout,"block {} start",bb.label);
             log_file!(calout,"live in:{:?}\nlive out:{:?}",bb.live_in.iter().map(|e|e.get_id()).collect::<HashSet<i32>>(),bb.live_in.iter().map(|e|e.get_id()).collect::<HashSet<i32>>());
             let mut livenow:HashSet<i32>=HashSet::new();
@@ -80,6 +83,7 @@ impl Regalloc for Allocator {
                     last_use.get_mut(&(index as i32)).unwrap().insert(reg.get_id());
                 }
             }
+            log_file!(calout,"ends:{:?}",last_use);
             
             bb.live_in.iter()
                 .for_each(|reg|{
