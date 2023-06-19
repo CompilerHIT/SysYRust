@@ -16,8 +16,8 @@ use crate::backend::asm_builder::AsmBuilder;
 use crate::backend::block::*;
 use crate::backend::instrs::{LIRInst, Operand};
 use crate::backend::module::AsmModule;
-use crate::backend::operand::{IImm, Reg, ARG_REG_COUNT};
-use crate::backend::regalloc::simulate_assign;
+use crate::backend::operand::{Reg, ARG_REG_COUNT};
+// use crate::backend::regalloc::simulate_assign;
 use crate::backend::regalloc::{
     easy_ls_alloc::Allocator, regalloc::Regalloc, structs::FuncAllocStat,
 };

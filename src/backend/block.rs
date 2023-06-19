@@ -1019,20 +1019,13 @@ impl BB {
         self.insts.append(inst);
     }
 
-    pub fn handle_spill(
-        &mut self,
-        func: ObjPtr<Func>,
-        spill: &HashSet<i32>,
-        pool: &mut BackendPool,
-    ) {
-        let mut index = 0;
+    pub fn save_reg(&mut self, func: ObjPtr<Func>, pool: &mut BackendPool) {
+        let mut index = 0; 
         loop {
             if index >= self.insts.len() {
                 break;
             }
             let inst = self.insts[index];
-            let spills = inst.is_spill(spill);
-            log!("spills: {:?}", spills);
             for op in inst.operands.iter() {
                 match op {
                     Operand::Reg(reg) => {
@@ -1094,8 +1087,28 @@ impl BB {
                         index += 1;
                     }
                 }
-                _ => {}
+                _ => {
+                    index += 1;
+                }
             }
+        }
+    }
+
+    pub fn handle_spill(
+        &mut self,
+        func: ObjPtr<Func>,
+        spill: &HashSet<i32>,
+        pool: &mut BackendPool,
+    ) {
+        self.save_reg(func, pool);
+        let mut index = 0;
+        loop {
+            if index >= self.insts.len() {
+                break;
+            }
+            let inst = self.insts[index];
+            let spills = inst.is_spill(spill);
+            log!("spills: {:?}", spills);
             if spills.is_empty() {
                 index += 1;
                 continue;

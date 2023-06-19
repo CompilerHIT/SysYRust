@@ -241,6 +241,7 @@ impl Allocator {
                         tmpwindow.pop_back();
                         dstr.insert(id, *dstr.get(&maxID).unwrap()); //给新寄存器分配旧寄存器所有的寄存器
                         dstr.remove(&maxID); //解除旧末虚拟寄存器与实际寄存器的契约
+                        spillings.insert(maxID);
                         tmpwindow.push(RegInterval::new(id, end)); //把心的分配结果加入窗口
                     }
                 };
