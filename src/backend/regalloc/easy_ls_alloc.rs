@@ -8,6 +8,7 @@ use crate::container::bitmap::Bitmap;
 use crate::container::prioritydeque::PriorityDeque;
 use crate::utility::ObjPtr;
 use crate::utility::ScalarType;
+use std::arch::x86_64::_MM_EXCEPT_UNDERFLOW;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::collections::HashSet;
@@ -140,7 +141,7 @@ impl Allocator {
     // 指令窗口分析
     fn interval_anaylise(&mut self) {
         for (i, inst) in self.lines.iter().enumerate() {
-            for reg in inst.as_ref().get_regs() { 
+            for reg in inst.as_ref().get_reg_use() { 
                 if !reg.is_virtual() {
                     continue;
                 }
@@ -218,7 +219,9 @@ impl Allocator {
                     continue;
                 }
                 // 在周期表中搜索该寄存器的终结周期
-                let end = *self.intervals.get(&id).unwrap();
+                let end = self.intervals.get(&id);
+                if let None=end {spillings.insert(id);}
+                let end=*end.unwrap();
                 // 定义寄存器溢出处理流程
                 let mut spill_reg_for = |tmpwindow: &mut PriorityDeque<RegInterval>| {
                     // let mut tmpwindow=&mut fwindow;

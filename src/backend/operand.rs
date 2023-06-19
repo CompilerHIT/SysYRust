@@ -1,3 +1,5 @@
+use std::fmt::format;
+
 use crate::utility::ScalarType;
 use crate::log;
 pub const REG_COUNT: i32 = 32;
@@ -112,8 +114,10 @@ impl Reg {
                 18..=27 => format!("s{}", self.id - 16),
                 28..=31 => format!("t{}", self.id - 25),
                 _ => {
-                    log!("id: {}", self.id);
-                    panic!("Invalid Physic Integer Register Id")
+                    // 使用虚拟寄存器
+                    format!("v{}",self.id)
+                    // log!("id: {}", self.id);
+                    // panic!("Invalid Physic Integer Register Id")
                 }
             }
         } else {

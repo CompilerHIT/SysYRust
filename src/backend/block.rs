@@ -1,4 +1,5 @@
 pub use crate::log;
+use crate::log_file;
 use std::cmp::max;
 use std::cmp::min;
 pub use std::collections::{HashSet, VecDeque};
@@ -1047,8 +1048,11 @@ impl BB {
             let mut caller_regs: HashSet<i32> = HashSet::new();
             let (icnt, fcnt) = inst.get_param_cnts();
             //FIXME: solve float regs
+            let mut ifp=false;
+
             match inst.get_type() {
                 InstrsType::Call => {
+                    ifp=true;
                     for op in inst.get_reg_def().iter() {
                         if let Some(reg) = func.as_mut().caller_saved.get(&op.get_id()) {
                             if op.get_id() - 10 < icnt && op.get_id() >= 10 {
@@ -1073,6 +1077,7 @@ impl BB {
                         index += 1;
                     }
                     index += 1;
+                    println!("{:?}",self.insts[index].get_type());
                     for (i, id) in caller_regs.iter().enumerate() {
                         let offset = pos + i as i32 * ADDR_SIZE;
                         let mut ins = LIRInst::new(
@@ -1115,6 +1120,7 @@ impl BB {
             } else {
                 for (i, id) in spills.iter().enumerate() {
                     let reg = Operand::Reg(Reg::new(5 + (i as i32), ScalarType::Int));
+                    
                     if let Some(stack_slot) = func.spill_stack_map.get(&id) {
                         let mut ins = LIRInst::new(
                             InstrsType::LoadFromStack,

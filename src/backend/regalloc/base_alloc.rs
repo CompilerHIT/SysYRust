@@ -23,6 +23,9 @@ impl Regalloc for Allocator {
 
         log_file!(calout,"\n\n{} start:\n",func.label);
         let alloc_one=|reg:&Reg,reg_used_stat:&mut RegUsedStat,dstr:&mut HashMap<i32,i32>,spillings:&mut HashSet<i32>,livenow:&mut HashSet<i32>|{
+            if reg.get_id()==32{
+                println!("gg");
+            }
             if !reg.is_virtual() {return;}
             if spillings.contains(&reg.get_id()) {return;}
             if livenow.contains(&reg.get_id()) { return;}
@@ -63,7 +66,7 @@ impl Regalloc for Allocator {
             // 根据live now给某个虚拟寄存器分配寄存器
             // 获取寄存器终结时间
             for (index,inst) in bb.insts.iter().enumerate().rev() {
-                for reg in inst.get_reg_use(){
+                for reg in inst.get_regs() {
                     if !reg.is_virtual() {continue;}
                     if bb.live_out.contains(&reg) {continue;}   //live out中的寄存器器 不可能有终结时间
                     if passed_regs.contains(&reg.get_id()) {continue;}

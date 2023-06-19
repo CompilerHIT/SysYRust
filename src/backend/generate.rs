@@ -3,6 +3,8 @@ use crate::backend::operand::ToString;
 use crate::log;
 use std::fs::File;
 impl GenerateAsm for LIRInst {
+    
+    
     fn generate(&mut self, context: ObjPtr<Context>, f: &mut File) -> Result<()> {
         let mut builder = AsmBuilder::new(f);
         log!("generate: {:?}", self);
@@ -307,3 +309,4 @@ impl GenerateAsm for LIRInst {
         //}
     }
 }
+

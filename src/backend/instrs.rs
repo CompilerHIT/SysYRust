@@ -9,6 +9,7 @@ pub use crate::backend::func::Func;
 use crate::backend::operand::*;
 pub use crate::backend::structs::{Context, GenerateAsm};
 use crate::ir::instruction::Inst;
+use crate::log_file;
 pub use crate::utility::{ObjPtr, ScalarType};
 
 #[derive(Clone, PartialEq, Debug)]
@@ -264,6 +265,13 @@ impl LIRInst {
                 Operand::Reg(ref mut reg) => {
                     if !reg.is_physic() {
                         if let Some(new) = map.get(&reg.get_id()) {
+                            if reg.get_id()==34 {
+                                // TODO debug
+                                log_file!("618","reg id=34");
+                            }
+                            if *new==34{
+                                log_file!("618","to phy=34");
+                            }
                             self.operands[index] = Operand::Reg(Reg::new(*new, reg.get_type()));
                         }
                     }

@@ -388,7 +388,9 @@ impl Func {
         // 函数返回地址保存在ra中
         self.calc_live();
         // let mut allocator = crate::backend::regalloc::easy_ls_alloc::Allocator::new();
+        // let mut allocator = crate::backend::regalloc::easy_ls_alloc::Allocator::new();
         // let mut allocator =crate::backend::regalloc::easy_gc_alloc::Allocator::new();
+        // let mut allocator=crate::backend::regalloc::base_alloc::Allocator::new();
         let mut allocator=crate::backend::regalloc::base_alloc::Allocator::new();
         let alloc_stat = allocator.alloc(self);
 
@@ -529,6 +531,10 @@ impl Func {
             );
             if !is_main {
                 for (reg, slot) in map.iter() {
+                    log_file!("618","prologue{}",reg.get_id());
+                    if reg.get_id()==34 {
+                        log_file!("618","in prologue");
+                    }
                     let of = stack_size - ADDR_SIZE - slot.get_pos();
                     builder.s(&reg.to_string(false), "sp", of, false, true);
                 }
@@ -539,6 +545,10 @@ impl Func {
             let mut builder = AsmBuilder::new(&mut f2);
             if !is_main {
                 for (reg, slot) in map_clone.iter() {
+                    log_file!("618","epilogue{}",reg.get_id());
+                    if reg.get_id()==34 {
+                        log_file!("618","in epilogue");
+                    }
                     let of = stack_size - ADDR_SIZE - slot.get_pos();
                     builder.l(&reg.to_string(false), "sp", of, false, true);
                 }
