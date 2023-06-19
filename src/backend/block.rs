@@ -1077,7 +1077,6 @@ impl BB {
                         index += 1;
                     }
                     index += 1;
-                    println!("{:?}",self.insts[index].get_type());
                     for (i, id) in caller_regs.iter().enumerate() {
                         let offset = pos + i as i32 * ADDR_SIZE;
                         let mut ins = LIRInst::new(

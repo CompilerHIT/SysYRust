@@ -532,10 +532,6 @@ impl Func {
             );
             if !is_main {
                 for (reg, slot) in map.iter() {
-                    log_file!("618","prologue{}",reg.get_id());
-                    if reg.get_id()==34 {
-                        log_file!("618","in prologue");
-                    }
                     let of = stack_size - ADDR_SIZE - slot.get_pos();
                     builder.s(&reg.to_string(false), "sp", of, false, true);
                 }
@@ -546,10 +542,6 @@ impl Func {
             let mut builder = AsmBuilder::new(&mut f2);
             if !is_main {
                 for (reg, slot) in map_clone.iter() {
-                    log_file!("618","epilogue{}",reg.get_id());
-                    if reg.get_id()==34 {
-                        log_file!("618","in epilogue");
-                    }
                     let of = stack_size - ADDR_SIZE - slot.get_pos();
                     builder.l(&reg.to_string(false), "sp", of, false, true);
                 }

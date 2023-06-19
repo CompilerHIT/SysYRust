@@ -265,13 +265,6 @@ impl LIRInst {
                 Operand::Reg(ref mut reg) => {
                     if !reg.is_physic() {
                         if let Some(new) = map.get(&reg.get_id()) {
-                            if reg.get_id()==34 {
-                                // TODO debug
-                                log_file!("618","reg id=34");
-                            }
-                            if *new==34{
-                                log_file!("618","to phy=34");
-                            }
                             self.operands[index] = Operand::Reg(Reg::new(*new, reg.get_type()));
                         }
                     }
@@ -393,13 +386,13 @@ impl LIRInst {
             | InstrsType::LoadParamFromStack => {
                 let mut regs = self.operands.clone();
                 let mut res = Vec::new();
-                while let Some(operand) = regs.pop() {
-                    if operand == *self.get_dst() {
+                for (i, operand) in regs.iter().enumerate() {
+                    if *operand == *self.get_dst() && i == 0 {
                         continue;
                     }
                     match operand {
                         Operand::Reg(reg) => {
-                            res.push(reg)
+                            res.push(*reg)
                         },
                         _ => {}
                     }
@@ -410,7 +403,6 @@ impl LIRInst {
                 let mut regs = self.operands.clone();
                 let mut res = Vec::new();
                 while let Some(operand) = regs.pop() {
-                    if operand==*self.get_dst(){continue;}
                     match operand {
                         Operand::Reg(reg) => {
                             res.push(reg)
