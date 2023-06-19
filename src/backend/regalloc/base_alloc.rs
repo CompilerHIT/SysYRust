@@ -1,6 +1,6 @@
 // 或者可以认为是没有启发的线性扫描寄存器分配
 
-use std::collections::{HashMap, HashSet};
+use std::{collections::{HashMap, HashSet}, fs};
 
 use crate::{backend::{regalloc::{regalloc::Regalloc, self, structs::RegUsedStat}, instrs::BB, operand::Reg}, utility::{ObjPtr, ScalarType}, frontend::ast::Continue, log_file};
 
@@ -17,7 +17,8 @@ impl Allocator {
 }
 impl Regalloc for Allocator {
     fn alloc(&mut self, func: &crate::backend::instrs::Func) -> super::structs::FuncAllocStat {
-        let  calout="callive.txt";
+        let  calout="calout.txt";
+        fs::remove_file(calout);
         let mut dstr:HashMap<i32,i32>=HashMap::new();
         let mut spillings:HashSet<i32>=HashSet::new();
 
@@ -59,6 +60,8 @@ impl Regalloc for Allocator {
         };
 
         let mut count =|bb:ObjPtr<BB>|{
+            log_file!(calout,"block {} start",bb.label);
+            log_file!(calout,"live in:{:?}\nlive out:{:?}",bb.live_in.iter().map(|e|e.get_id()).collect::<HashSet<i32>>(),bb.live_in.iter().map(|e|e.get_id()).collect::<HashSet<i32>>());
             let mut livenow:HashSet<i32>=HashSet::new();
             let mut reg_used_stat=RegUsedStat::new();
             let mut last_use:HashMap<i32,HashSet<i32>> =HashMap::new();  //记录最后一次use
@@ -66,7 +69,7 @@ impl Regalloc for Allocator {
             // 根据live now给某个虚拟寄存器分配寄存器
             // 获取寄存器终结时间
             for (index,inst) in bb.insts.iter().enumerate().rev() {
-                for reg in inst.get_regs() {
+                for reg in inst.get_reg_use() {
                     if !reg.is_virtual() {continue;}
                     if bb.live_out.contains(&reg) {continue;}   //live out中的寄存器器 不可能有终结时间
                     if passed_regs.contains(&reg.get_id()) {continue;}
@@ -101,6 +104,9 @@ impl Regalloc for Allocator {
                     alloc_one(&reg,&mut reg_used_stat,&mut dstr,&mut spillings,&mut livenow);
                 }
             }
+        
+            
+        
         };
 
 

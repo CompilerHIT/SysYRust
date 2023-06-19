@@ -1,7 +1,7 @@
 use std::cmp::max;
 use std::collections::LinkedList;
 pub use std::collections::{HashSet, VecDeque};
-use std::fmt;
+use std::{fmt, fs};
 pub use std::fs::File;
 pub use std::hash::{Hash, Hasher};
 pub use std::io::Result;
@@ -268,6 +268,7 @@ impl Func {
 
     pub fn calc_live(&mut self) {
         let calc_live_file = "callive.txt";
+        fs::remove_file(calc_live_file);
         log_file!(
             calc_live_file,
             "-----------------------------------cal live func:{}---------------------------",
