@@ -455,11 +455,11 @@ impl Func {
         let overflow_param =
             max(0, self.param_cnt.0 - ARG_REG_COUNT) + max(0, self.param_cnt.1 - ARG_REG_COUNT);
         if overflow_param % 2 == 1 {
-            offset = (overflow_param + 1) * 4;
+            offset = (overflow_param + 1) * ADDR_SIZE;
         } else {
-            offset = overflow_param * 4;
+            offset = overflow_param * ADDR_SIZE;
         }
-        let slot = StackSlot::new(0, offset);
+        let slot = StackSlot::new(offset, offset);
         assert!(self.stack_addr.is_empty());
         self.stack_addr.push_front(slot);
     }
@@ -538,8 +538,8 @@ impl Func {
 
         let ra = Reg::new(1, ScalarType::Int);
         let map_clone = map.clone();
-        log!("label: {}", self.label);
-        log!("stack size:{}", stack_size);
+        let (icnt, fcnt) = self.param_cnt;
+        let start_pos = stack_size - ADDR_SIZE - ADDR_SIZE * (max(0, icnt - ARG_REG_COUNT) + max(0, fcnt - ARG_REG_COUNT));
 
         self.context.as_mut().set_prologue_event(move || {
             let mut builder = AsmBuilder::new(&mut f1);
@@ -550,13 +550,13 @@ impl Func {
                 builder.s(
                     &ra.to_string(false),
                     "sp",
-                    stack_size - ADDR_SIZE,
+                    start_pos,
                     false,
                     true,
                 );
                 if !is_main {
                     for (reg, slot) in map.iter() {
-                        let of = stack_size - ADDR_SIZE - slot.get_pos();
+                        let of = stack_size - ADDR_SIZE * 2 - slot.get_pos();
                         builder.s(&reg.to_string(false), "sp", of, false, true);
                     }
                 }
@@ -586,18 +586,17 @@ impl Func {
         self.context.as_mut().set_epilogue_event(move || {
             let mut builder = AsmBuilder::new(&mut f2);
 
-            let of = stack_size - ADDR_SIZE;
-            if operand::is_imm_12bs(of) {
+            if operand::is_imm_12bs(start_pos) {
                 if !is_main {
                     for (reg, slot) in map_clone.iter() {
-                        let of = stack_size - ADDR_SIZE - slot.get_pos();
+                        let of = stack_size - ADDR_SIZE * 2 - slot.get_pos();
                         builder.l(&reg.to_string(false), "sp", of, false, true);
                     }
                 }
                 builder.l(
                     &ra.to_string(false),
                     "sp",
-                    stack_size - ADDR_SIZE,
+                    start_pos,
                     false,
                     true,
                 );

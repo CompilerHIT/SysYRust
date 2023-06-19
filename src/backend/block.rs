@@ -769,12 +769,15 @@ impl BB {
                                     let offset = Operand::IImm(IImm::new(
                                         -(max(0, icnt - ARG_REG_COUNT)
                                             + max(0, fcnt - ARG_REG_COUNT))
-                                            * 4,
+                                            * ADDR_SIZE
+                                            - ADDR_SIZE,
                                     ));
-                                    self.insts.push(pool.put_inst(LIRInst::new(
+                                    let mut inst = LIRInst::new(
                                         InstrsType::StoreToStack,
                                         vec![src_reg, offset],
-                                    )));
+                                    );
+                                    inst.set_double();
+                                    self.insts.push(pool.put_inst(inst));
                                 } else {
                                     // 保存在寄存器中的参数，从前往后
                                     let dst_reg =
@@ -1276,10 +1279,7 @@ impl BB {
                         ],
                     );
                     inst.set_double();
-                    self.insts.insert(
-                        pos,
-                        pool.put_inst(inst),
-                    );
+                    self.insts.insert(pos, pool.put_inst(inst));
                     pos += 1;
                     match inst_ref.get_type() {
                         InstrsType::LoadParamFromStack => {
@@ -1525,11 +1525,11 @@ impl BB {
             map.val_map.insert(src, reg.clone());
             let (mut inum, mut fnum) = (0, 0);
             // 由于寄存器分配策略，读取参数时需要先在函数开头把所有参数保存，再从寄存器中读取
+            // 目前将a0-a7用作保留寄存器，不参与寄存器分配
             for p in params {
                 match p.as_ref().get_param_type() {
                     IrType::Int | IrType::IntPtr | IrType::FloatPtr => {
                         if src == *p {
-                            let tmp = Operand::Reg(Reg::init(ScalarType::Int));
                             if inum < ARG_REG_COUNT {
                                 let inst = LIRInst::new(
                                     InstrsType::OpReg(SingleOp::IMv),
@@ -1544,15 +1544,17 @@ impl BB {
                                     .insts
                                     .insert(0, pool.put_inst(inst));
                             } else {
-                                let inst = LIRInst::new(
+                                let mut inst = LIRInst::new(
                                     InstrsType::LoadParamFromStack,
                                     vec![
                                         reg.clone(),
                                         Operand::IImm(IImm::new(
-                                            inum - ARG_REG_COUNT + max(fnum - ARG_REG_COUNT, 0) * 4,
+                                            (inum - ARG_REG_COUNT + max(fnum - ARG_REG_COUNT, 0))
+                                                * ADDR_SIZE,
                                         )),
                                     ],
                                 );
+                                inst.set_double();
                                 self.insts.push(pool.put_inst(inst));
                             }
                         }
