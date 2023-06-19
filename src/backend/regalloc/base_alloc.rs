@@ -62,7 +62,7 @@ impl Regalloc for Allocator {
             let mut livenow:HashSet<i32>=HashSet::new();
             let mut reg_used_stat=RegUsedStat::new();
             let mut last_use:HashMap<i32,HashSet<i32>> =HashMap::new();  //记录最后一次use
-            let mut passed_regs=HashSet::new();
+            let mut passed_regs=HashSet::new(); //记录遍历过的寄存器号
             // 根据live now给某个虚拟寄存器分配寄存器
             // 获取寄存器终结时间
             for (index,inst) in bb.insts.iter().enumerate().rev() {
@@ -80,14 +80,13 @@ impl Regalloc for Allocator {
             
             bb.live_in.iter()
                 .for_each(|reg|{
+                    if reg.get_id()==32 {
+                        println!("g");
+                    }
                    alloc_one(&reg,&mut reg_used_stat,&mut dstr,&mut spillings,&mut livenow);
             });
 
             for (index,inst) in bb.insts.iter().enumerate() {
-                // 加入新live now,
-                for reg in inst.get_regs() {
-                    alloc_one(&reg,&mut reg_used_stat,&mut dstr,&mut spillings,&mut livenow);
-                }
                 // 删除旧live now
                 if let Some(ends)=last_use.get(&(index as i32)){
                     for reg in ends.iter() {
@@ -97,49 +96,13 @@ impl Regalloc for Allocator {
                         reg_used_stat.release_reg(*color);
                     }
                 }
-
+                // 加入新live now,
+                for reg in inst.get_reg_def() {
+                    alloc_one(&reg,&mut reg_used_stat,&mut dstr,&mut spillings,&mut livenow);
+                }
             }
         };
 
-        // let mut remove_spillings=|bb:ObjPtr<BB>| {
-        //     let mut livenow:HashSet<i32>=HashSet::new();
-        //     let mut regusestat=RegUsedStat::new();
-        //     // 先取出所有live out
-        //     let mut ends:HashMap<i32,HashSet<i32>>=HashMap::new();
-        //     let mut passedreg=HashSet::new();
-        //     // 记录终点
-        //     for (index,it) in bb.insts.iter().enumerate().rev() {
-        //         for reg in it.get_reg_use() {
-        //             if !reg.is_virtual() {continue;}
-        //             if passedreg.contains(&reg.get_id()) {continue;}
-        //             passedreg.insert(reg.get_id());
-        //             if !ends.contains_key(&(index as i32)) {ends.insert(index as i32, HashSet::new());}
-        //             ends.get_mut(&(index as i32)).unwrap().insert(reg.get_id()); 
-        //         }
-        //     }
-            
-        //     let checkallocone=|reg:&Reg|{
-        //         if (!reg.is_virtual()) {return ;}
-        //         if (spillings.contains(&reg.get_id())) {return;}
-        //         let color =dstr.get(&reg.get_id()).unwrap();
-        //         if regusestat.is_available_reg(*color) {regusestat.use_reg(*color);}
-        //         else {
-        //             dstr.remove(&reg.get_id());
-        //             spillings.insert(reg.get_id());
-        //         }
-        //     }; 
-        //     // 检查分配
-        //     bb.live_in.iter().for_each(checkallocone);
-        //     for (index,it) in bb.insts.iter().enumerate() {
-        //         // 
-        //         if let Some(regs)=ends.get(&(index as i32)) {
-        //             for reg in regs.iter() {
-                        
-        //             }
-        //         }
-        //     }
-
-        // };
 
 
         for bb in func.blocks.iter() {
