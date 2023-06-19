@@ -23,7 +23,8 @@ impl Regalloc for Allocator {
         let mut spillings:HashSet<i32>=HashSet::new();
 
         log_file!(calout,"\n\n{} start:\n",func.label);
-        let alloc_one=|reg:&Reg,reg_used_stat:&mut RegUsedStat,dstr:&mut HashMap<i32,i32>,spillings:&mut HashSet<i32>,livenow:&mut HashSet<i32>|{
+        let alloc_one=|reg:&Reg,reg_used_stat:&mut RegUsedStat,dstr:&mut HashMap<i32,i32>,spillings:&mut HashSet<i32>,livenow:&mut HashSet<i32>,kind:ScalarType|{
+            if reg.get_type()!=kind{ return;}
             if !reg.is_virtual() {return;}
             if spillings.contains(&reg.get_id()) {return;}
             if livenow.contains(&reg.get_id()) { return;}
@@ -56,7 +57,7 @@ impl Regalloc for Allocator {
 
         };
 
-        let mut count =|bb:ObjPtr<BB>|{
+        let mut count =|bb:ObjPtr<BB>,kind:ScalarType|{
             if bb.label==".LBB0_3"{
                 log_file!(calout,"g?");
             }
@@ -70,6 +71,7 @@ impl Regalloc for Allocator {
             // 获取寄存器终结时间
             for (index,inst) in bb.insts.iter().enumerate().rev() {
                 for reg in inst.get_reg_use() {
+                    if reg.get_type()!=kind {continue;}
                     if !reg.is_virtual() {continue;}
                     if bb.live_out.contains(&reg) {continue;}   //live out中的寄存器器 不可能有终结时间
                     if passed_regs.contains(&reg.get_id()) {continue;}
@@ -84,7 +86,7 @@ impl Regalloc for Allocator {
             
             bb.live_in.iter()
                 .for_each(|reg|{
-                   alloc_one(&reg,&mut reg_used_stat,&mut dstr,&mut spillings,&mut livenow);
+                   alloc_one(&reg,&mut reg_used_stat,&mut dstr,&mut spillings,&mut livenow,kind);
             });
 
             for (index,inst) in bb.insts.iter().enumerate() {
@@ -99,7 +101,7 @@ impl Regalloc for Allocator {
                 }
                 // 加入新live now,
                 for reg in inst.get_reg_def() {
-                    alloc_one(&reg,&mut reg_used_stat,&mut dstr,&mut spillings,&mut livenow);
+                    alloc_one(&reg,&mut reg_used_stat,&mut dstr,&mut spillings,&mut livenow,kind);
                 }
             }
         
@@ -110,7 +112,8 @@ impl Regalloc for Allocator {
 
 
         for bb in func.blocks.iter() {
-            count(*bb);
+            count(*bb,ScalarType::Float);
+            count(*bb,ScalarType::Int);
         }  
 
         let  (func_stack,bbstacks)=regalloc::regalloc::countStackSize(func,&spillings);
