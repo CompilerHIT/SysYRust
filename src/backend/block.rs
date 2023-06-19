@@ -706,12 +706,11 @@ impl BB {
                             )]);
                             let obj_inst = pool.put_inst(inst);
                             map_info.block_branch.insert(self.label.clone(), obj_inst);
-                            let this = self.clone();
                             true_succ_block
                                 .as_mut()
                                 .in_edge
-                                .push(pool.put_block(this.clone()));
-                            false_succ_block.as_mut().in_edge.push(pool.put_block(this));
+                                .push(ObjPtr::new(self));
+                            false_succ_block.as_mut().in_edge.push(ObjPtr::new(self));
                             self.out_edge
                                 .append(vec![*true_succ_block, *false_succ_block].as_mut());
                         }
@@ -734,12 +733,11 @@ impl BB {
                             )]);
                             let obj_inst = pool.put_inst(inst);
                             map_info.block_branch.insert(self.label.clone(), obj_inst);
-                            let this = self.clone();
                             true_succ_block
                                 .as_mut()
                                 .in_edge
-                                .push(pool.put_block(this.clone()));
-                            false_succ_block.as_mut().in_edge.push(pool.put_block(this));
+                                .push(ObjPtr::new(self));
+                            false_succ_block.as_mut().in_edge.push(ObjPtr::new(self));
                             self.out_edge
                                 .append(vec![*true_succ_block, *false_succ_block].as_mut());
                         }
