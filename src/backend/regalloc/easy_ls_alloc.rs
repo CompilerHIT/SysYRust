@@ -172,6 +172,7 @@ impl Allocator {
         let mut fwindow: PriorityDeque<RegInterval> = PriorityDeque::new();
         // 遍历指令
         for (i, it) in self.lines.iter().enumerate() {
+            
             // 先通用寄存器窗口中判断有没有可以释放的寄存器
             while iwindow.len() != 0 {
                 if let Some(min) = iwindow.front() {
@@ -204,6 +205,9 @@ impl Allocator {
                     continue;
                 }
 
+                if reg.get_id()==98 {
+                    println!("gg")
+                }
                 let id = reg.get_id();
                 // 如果已经在dstr的key中，也就是已经分配，则忽略处理
                 if dstr.contains_key(&id) {
@@ -242,7 +246,7 @@ impl Allocator {
                         dstr.insert(id, *dstr.get(&maxID).unwrap()); //给新寄存器分配旧寄存器所有的寄存器
                         dstr.remove(&maxID); //解除旧末虚拟寄存器与实际寄存器的契约
                         spillings.insert(maxID);
-                        tmpwindow.push(RegInterval::new(id, end)); //把心的分配结果加入窗口
+                        tmpwindow.push(RegInterval::new(id, end)); //把新的分配结果加入窗口
                     }
                 };
 
@@ -308,7 +312,7 @@ impl Regalloc for Allocator {
         self.inst_record(func.entry.unwrap());
         // 第三次遍历,指令遍历，寄存器interval标记
         self.interval_anaylise();
-
+        self.passed.clear();
         // 第四次遍历，堆滑动窗口更新获取FuncAllocStat
         let (spillings, dstr) = self.allocRegister();
         // //println!("_______________________________________________");

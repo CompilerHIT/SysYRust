@@ -387,9 +387,9 @@ impl Func {
     pub fn allocate_reg(&mut self, f: &mut File) {
         // 函数返回地址保存在ra中
         self.calc_live();
-        let mut allocator = crate::backend::regalloc::easy_ls_alloc::Allocator::new();
+        // let mut allocator = crate::backend::regalloc::easy_ls_alloc::Allocator::new();
         // let mut allocator =crate::backend::regalloc::easy_gc_alloc::Allocator::new();
-        // let mut allocator=crate::backend::regalloc::base_alloc::Allocator::new();
+        let mut allocator=crate::backend::regalloc::base_alloc::Allocator::new();
         let alloc_stat = allocator.alloc(self);
 
         // TODO
