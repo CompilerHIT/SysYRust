@@ -600,8 +600,7 @@ impl BB {
                             self.insts.push(obj_inst);
                             map_info.block_branch.insert(self.label.clone(), obj_inst);
                         }
-                        let this = self.clone();
-                        jump_block.as_mut().in_edge.push(pool.put_block(this));
+                        jump_block.as_mut().in_edge.push(ObjPtr::new(self));
                         self.out_edge.push(*jump_block);
                         break;
                     }

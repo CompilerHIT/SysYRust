@@ -198,13 +198,10 @@ impl<'f> AsmBuilder<'f> {
 
     pub fn print_array(&mut self, array: &Vec<i32>, name: String, size: i32) -> Result<()> {
         writeln!(self.f, "{name}:")?;
-        let mut mul_sum = 0;
-        for num in array.iter() {
-            mul_sum += num * num
-        }
-        if mul_sum == 0 {
-            writeln!(self.f, "	.zero	{num}", num = size * NUM_SIZE)?;
-            return Ok(());
+        if array.len() == 0 {
+            for i in 0..size {
+                writeln!(self.f, "	.word	0")?;
+            }
         }
         for i in array {
             writeln!(self.f, "	.word	{i}")?;
