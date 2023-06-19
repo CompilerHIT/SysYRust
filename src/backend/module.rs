@@ -8,6 +8,7 @@ use crate::backend::BackendPool;
 use crate::ir::function::Function;
 use crate::ir::instruction::{Inst, InstKind};
 use crate::ir::module::Module;
+use crate::log;
 use crate::utility::ObjPtr;
 
 use super::instrs::Context;
@@ -47,10 +48,11 @@ impl<'a> AsmModule<'a> {
 
     pub fn generator(&mut self, f: &mut File, f2: &mut File, pool: &mut BackendPool) {
         self.build_lir(pool);
-        self.generate_row_asm(f2, pool); //注释
+        // self.generate_row_asm(f2, pool); //注释
         self.allocate_reg(f);
         self.handle_spill(pool, f);
         // 检查地址溢出，插入间接寻址
+        log!("start handle overflow");
         self.handle_overflow(pool);
         self.generate_global_var(f);
         // log!("start generate");

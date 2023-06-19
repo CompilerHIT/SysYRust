@@ -1,22 +1,22 @@
 use std::cmp::max;
 use std::collections::LinkedList;
 pub use std::collections::{HashSet, VecDeque};
-use std::{fmt, fs};
 pub use std::fs::File;
 pub use std::hash::{Hash, Hasher};
 pub use std::io::Result;
 use std::io::Write;
 use std::vec::Vec;
+use std::{fmt, fs};
 
 use lazy_static::__Deref;
 
 use super::instrs::InstrsType;
 use super::{structs::*, BackendPool};
 use crate::backend::asm_builder::AsmBuilder;
-use crate::backend::block::*;
 use crate::backend::instrs::{LIRInst, Operand};
 use crate::backend::module::AsmModule;
 use crate::backend::operand::{Reg, ARG_REG_COUNT};
+use crate::backend::{block::*, operand};
 // use crate::backend::regalloc::simulate_assign;
 use crate::backend::regalloc::{
     easy_ls_alloc::Allocator, regalloc::Regalloc, structs::FuncAllocStat,
@@ -381,12 +381,25 @@ impl Func {
                         queue.push_back((pred.clone(), reg));
                     }
                 }
-                log_file!("19_2.txt",
+                log_file!(
+                    "19_2.txt",
                     "live in:{:?}\nlive out:{:?}\nlive def:{:?}\nlive use:{:?}",
-                    pred.live_in.iter().map(|r|r.get_id()).collect::<HashSet<i32>>(),
-                    pred.live_out.iter().map(|r|r.get_id()).collect::<HashSet<i32>>(),
-                    pred.live_def.iter().map(|r|r.get_id()).collect::<HashSet<i32>>(),
-                    pred.live_use.iter().map(|r|r.get_id()).collect::<HashSet<i32>>(),
+                    pred.live_in
+                        .iter()
+                        .map(|r| r.get_id())
+                        .collect::<HashSet<i32>>(),
+                    pred.live_out
+                        .iter()
+                        .map(|r| r.get_id())
+                        .collect::<HashSet<i32>>(),
+                    pred.live_def
+                        .iter()
+                        .map(|r| r.get_id())
+                        .collect::<HashSet<i32>>(),
+                    pred.live_use
+                        .iter()
+                        .map(|r| r.get_id())
+                        .collect::<HashSet<i32>>(),
                 );
             }
         }
@@ -400,7 +413,7 @@ impl Func {
         self.calc_live();
         // let mut allocator = crate::backend::regalloc::easy_ls_alloc::Allocator::new();
         // let mut allocator =crate::backend::regalloc::easy_gc_alloc::Allocator::new();
-        let mut allocator=crate::backend::regalloc::base_alloc::Allocator::new();
+        let mut allocator = crate::backend::regalloc::base_alloc::Allocator::new();
         let alloc_stat = allocator.alloc(self);
 
         // TODO
@@ -469,6 +482,7 @@ impl Func {
     pub fn handle_overflow(&mut self, pool: &mut BackendPool) {
         let this = pool.put_func(self.clone());
         for block in self.blocks.iter() {
+            log!("handle block {}", block.label);
             block.as_mut().handle_overflow(this, pool);
         }
         self.update(this);
@@ -526,42 +540,88 @@ impl Func {
         let map_clone = map.clone();
         log!("label: {}", self.label);
         log!("stack size:{}", stack_size);
-        let row = self.context.is_row;
+
         self.context.as_mut().set_prologue_event(move || {
             let mut builder = AsmBuilder::new(&mut f1);
             // addi sp -stack_size
-            builder.addi("sp", "sp", -stack_size);
-            builder.s(
-                &ra.to_string(false),
-                "sp",
-                stack_size - ADDR_SIZE,
-                false,
-                true,
-            );
-            if !is_main {
-                for (reg, slot) in map.iter() {
-                    let of = stack_size - ADDR_SIZE - slot.get_pos();
-                    builder.s(&reg.to_string(false), "sp", of, false, true);
+            let of = stack_size;
+            if operand::is_imm_12bs(of) {
+                builder.addi("sp", "sp", -stack_size);
+                builder.s(
+                    &ra.to_string(false),
+                    "sp",
+                    stack_size - ADDR_SIZE,
+                    false,
+                    true,
+                );
+                if !is_main {
+                    for (reg, slot) in map.iter() {
+                        let of = stack_size - ADDR_SIZE - slot.get_pos();
+                        builder.s(&reg.to_string(false), "sp", of, false, true);
+                    }
                 }
+            } else {
+                // let lower = (of << 20) >> 20;
+                // let upper = (of - lower) >> 12;
+                // builder.op1("lui", "gp", &upper.to_string());
+                // builder.op2("add", "gp", "gp", &lower.to_string(), true, true);
+                // builder.op2("sub", "sp", "sp", "gp", false, true);
+                // builder.op2("add", "gp", "gp", "sp", false, true);
+                // builder.s(&ra.to_string(false), "gp", -8, false, true);
+
+                // if !is_main {
+                //     for (i, (reg, slot)) in map.iter().enumerate() {
+                //         builder.s(
+                //             &reg.to_string(false),
+                //             "gp",
+                //             -(i as i32 + 2) * ADDR_SIZE,
+                //             false,
+                //             true,
+                //         );
+                //     }
+                // }
             }
         });
 
         self.context.as_mut().set_epilogue_event(move || {
             let mut builder = AsmBuilder::new(&mut f2);
-            if !is_main {
-                for (reg, slot) in map_clone.iter() {
-                    let of = stack_size - ADDR_SIZE - slot.get_pos();
-                    builder.l(&reg.to_string(false), "sp", of, false, true);
+
+            let of = stack_size - ADDR_SIZE;
+            if operand::is_imm_12bs(of) {
+                if !is_main {
+                    for (reg, slot) in map_clone.iter() {
+                        let of = stack_size - ADDR_SIZE - slot.get_pos();
+                        builder.l(&reg.to_string(false), "sp", of, false, true);
+                    }
                 }
+                builder.l(
+                    &ra.to_string(false),
+                    "sp",
+                    stack_size - ADDR_SIZE,
+                    false,
+                    true,
+                );
+                builder.addi("sp", "sp", stack_size);
+            } else {
+                // let lower = (of << 20) >> 20;
+                // let upper = (of - lower) >> 12;
+                // builder.op1("lui", "gp", &upper.to_string());
+                // builder.op2("add", "gp", "gp", &lower.to_string(), true, true);
+                // builder.op2("add", "sp", "sp", "gp", false, true);
+                // builder.op2("add", "gp", "gp", "sp", false, true);
+                // builder.l(&ra.to_string(false), "gp", -8, false, true);
+                // if !is_main {
+                //     for (i, (reg, slot)) in map_clone.iter().enumerate() {
+                //         builder.l(
+                //             &reg.to_string(false),
+                //             "gp",
+                //             -(i as i32 + 2) * ADDR_SIZE,
+                //             false,
+                //             true,
+                //         );
+                //     }
+                // }
             }
-            builder.l(
-                &ra.to_string(false),
-                "sp",
-                stack_size - ADDR_SIZE,
-                false,
-                true,
-            );
-            builder.addi("sp", "sp", stack_size);
         });
     }
 

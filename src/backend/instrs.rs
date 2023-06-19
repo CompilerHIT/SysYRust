@@ -45,7 +45,7 @@ pub enum BinaryOp {
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum SingleOp {
     Li,
-    Lui,
+    // Lui,
     IMv,
     FMv,
     INot,
@@ -141,7 +141,7 @@ impl fmt::Display for LIRInst {
             InstrsType::OpReg(op) => {
                 kind = match op {
                     SingleOp::Li => "li",
-                    SingleOp::Lui => "lui",
+                    // SingleOp::Lui => "lui",
                     SingleOp::IMv => "mv",
                     SingleOp::FMv => "fmv",
                     SingleOp::INot => "not",
@@ -474,7 +474,7 @@ impl LIRInst {
     pub fn get_stack_offset(&self) -> IImm {
         match self.operands[1] {
             Operand::IImm(offset) => offset,
-            _ => unreachable!("only support imm sp offset"),
+            _ => unreachable!("only support imm sp offset, {:?}", self),
         }
     }
 

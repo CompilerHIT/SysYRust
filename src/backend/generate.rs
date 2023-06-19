@@ -62,7 +62,7 @@ impl GenerateAsm for LIRInst {
             InstrsType::OpReg(op) => {
                 let op = match op {
                     SingleOp::Li => "li",
-                    SingleOp::Lui => "lui",
+                    // SingleOp::Lui => "lui",
                     SingleOp::IMv => "mv",
                     SingleOp::FMv => "fmv",
                     SingleOp::INot => "not",

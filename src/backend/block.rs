@@ -961,7 +961,7 @@ impl BB {
                             continue;
                         }
                         log!("op: {:?}", op.get_kind());
-                        let src_reg  = self.resolve_operand(func, *op, false, map_info, pool);
+                        let src_reg = self.resolve_operand(func, *op, false, map_info, pool);
                         inst_kind = match src_reg {
                             Operand::Reg(reg) => match reg.get_type() {
                                 ScalarType::Int => InstrsType::OpReg(SingleOp::IMv),
@@ -982,7 +982,7 @@ impl BB {
 
                         if let Some(insts) = map_info.phis_to_block.get_mut(&incoming_block) {
                             // log!("insert phi inst: {:?}", obj_inst);
-                                insts.insert(obj_inst);
+                            insts.insert(obj_inst);
                         } else {
                             // log!("insert phi inst: {:?}", obj_inst);
                             let mut set = HashSet::new();
@@ -1176,31 +1176,53 @@ impl BB {
             if pos >= self.insts.len() {
                 break;
             }
-            // log!("inst: {:?}", self.insts[pos]);
+            log!("inst: {:?}", self.insts[pos]);
             let inst_ref = self.insts[pos].as_ref();
             match inst_ref.get_type() {
                 InstrsType::Load | InstrsType::Store => {
                     let temp = Operand::Reg(Reg::new(3, ScalarType::Int));
                     let offset = inst_ref.get_offset().get_data();
-                    log!("offset {}", offset);
                     if operand::is_imm_12bs(offset) {
                         pos += 1;
                         continue;
                     }
+                    log!("over offset: {}", offset);
                     self.resolve_overflow_sl(temp.clone(), &mut pos, offset, pool);
-                    self.insts.insert(
-                        pos,
-                        pool.put_inst(LIRInst::new(
-                            InstrsType::Binary(BinaryOp::Add),
-                            vec![temp.clone(), temp.clone(), inst_ref.get_lhs().clone()],
-                        )),
-                    );
-                    pos += 1;
-                    self.insts[pos].as_mut().replace_op(vec![
-                        inst_ref.get_dst().clone(),
-                        temp,
-                        Operand::IImm(IImm::new(0)),
-                    ]);
+                    // load的dst是reg，lhs是src_addr
+                    // store的dst是addr，lhs是val
+                    match inst_ref.get_type() {
+                        InstrsType::Load => {
+                            let mut inst = LIRInst::new(
+                                InstrsType::Binary(BinaryOp::Add),
+                                vec![temp.clone(), temp.clone(), inst_ref.get_lhs().clone()],
+                            );
+                            inst.set_double();
+                            self.insts.insert(pos, pool.put_inst(inst));
+                            pos += 1;
+                            self.insts[pos].as_mut().replace_op(vec![
+                                inst_ref.get_dst().clone(),
+                                temp,
+                                Operand::IImm(IImm::new(0)),
+                            ]);
+                        }
+                        InstrsType::Store => {
+                            let mut inst = LIRInst::new(
+                                InstrsType::Binary(BinaryOp::Add),
+                                vec![temp.clone(), temp.clone(), inst_ref.get_dst().clone()],
+                            );
+                            inst.set_double();
+                            self.insts.insert(pos, pool.put_inst(inst));
+                            pos += 1;
+                            self.insts[pos].as_mut().replace_op(vec![
+                                temp,
+                                inst_ref.get_lhs().clone(),
+                                Operand::IImm(IImm::new(0)),
+                            ]);
+                        }
+                        _ => {
+                            unreachable!("no more case")
+                        }
+                    }
                 }
                 InstrsType::LoadFromStack | InstrsType::StoreToStack => {
                     let temp = Operand::Reg(Reg::new(3, ScalarType::Int));
@@ -1210,18 +1232,26 @@ impl BB {
                         continue;
                     }
                     self.resolve_overflow_sl(temp.clone(), &mut pos, offset, pool);
-                    self.insts.insert(
-                        pos,
-                        pool.put_inst(LIRInst::new(
-                            InstrsType::Binary(BinaryOp::Add),
-                            vec![
-                                temp.clone(),
-                                temp.clone(),
-                                Operand::Reg(Reg::new(2, ScalarType::Int)),
-                            ],
-                        )),
+                    let mut inst = LIRInst::new(
+                        InstrsType::Binary(BinaryOp::Add),
+                        vec![
+                            temp.clone(),
+                            temp.clone(),
+                            Operand::Reg(Reg::new(2, ScalarType::Int)),
+                        ],
                     );
+                    inst.set_double();
+                    self.insts.insert(pos, pool.put_inst(inst));
                     pos += 1;
+                    match inst_ref.get_type() {
+                        InstrsType::LoadFromStack => {
+                            self.insts[pos].as_mut().replace_kind(InstrsType::Load);
+                        }
+                        InstrsType::StoreToStack => {
+                            self.insts[pos].as_mut().replace_kind(InstrsType::Store);
+                        }
+                        _ => unreachable!(),
+                    }
                     self.insts[pos].as_mut().replace_op(vec![
                         inst_ref.get_dst().clone(),
                         temp,
@@ -1237,18 +1267,29 @@ impl BB {
                         continue;
                     }
                     self.resolve_overflow_sl(temp.clone(), &mut pos, offset, pool);
+                    let mut inst = LIRInst::new(
+                        InstrsType::Binary(BinaryOp::Add),
+                        vec![
+                            temp.clone(),
+                            temp.clone(),
+                            Operand::Reg(Reg::new(2, ScalarType::Int)),
+                        ],
+                    );
+                    inst.set_double();
                     self.insts.insert(
                         pos,
-                        pool.put_inst(LIRInst::new(
-                            InstrsType::Binary(BinaryOp::Add),
-                            vec![
-                                temp.clone(),
-                                temp.clone(),
-                                Operand::Reg(Reg::new(2, ScalarType::Int)),
-                            ],
-                        )),
+                        pool.put_inst(inst),
                     );
                     pos += 1;
+                    match inst_ref.get_type() {
+                        InstrsType::LoadParamFromStack => {
+                            self.insts[pos].as_mut().replace_kind(InstrsType::Load);
+                        }
+                        InstrsType::StoreParamToStack => {
+                            self.insts[pos].as_mut().replace_kind(InstrsType::Store);
+                        }
+                        _ => unreachable!(),
+                    }
                     self.insts[pos].as_mut().replace_op(vec![
                         inst_ref.get_dst().clone(),
                         temp,
@@ -1257,61 +1298,65 @@ impl BB {
                 }
                 InstrsType::Branch(..) | InstrsType::Jump => {
                     // deal with false branch
-                    let mut distance = 0;
-                    let is_j = match inst_ref.get_type() {
-                        InstrsType::Branch(..) => false,
-                        InstrsType::Jump => true,
-                        _ => unreachable!(),
-                    };
-                    let target = match inst_ref.get_label() {
-                        Operand::Addr(label) => label,
-                        _ => unreachable!("branch must have a label"),
-                    };
-                    let mut i = 0;
-                    let (mut flag, mut first_j) = (false, true);
-                    loop {
-                        if i >= func.as_ref().blocks.len() {
-                            break;
-                        }
-                        let block_ref = func.as_ref().blocks[i];
-                        if &self.label == &block_ref.as_ref().label {
-                            flag = true;
-                        }
-                        if &block_ref.as_ref().label == target {
-                            //FIXME: this is a bug
-                            break;
-                        }
-                        if flag {
-                            distance += block_ref.as_ref().insts.len() * 4;
-                        }
-                        i += 1;
-                        if (!is_j && !operand::is_imm_12bs(distance as i32))
-                            || (is_j && !operand::is_imm_20bs(distance as i32))
-                        {
-                            let name = format!("overflow_{}", get_tmp_bb());
-                            let tmp = pool.put_block(BB::new(&name));
-                            func.as_mut().blocks.insert(i, tmp);
-                            if first_j {
-                                self.insts[pos].as_mut().replace_label(name);
-                                if is_j {
-                                    distance -= operand::IMM_20_Bs as usize;
-                                } else {
-                                    distance -= operand::IMM_12_Bs as usize;
-                                }
-                            } else {
-                                self.insts.insert(
-                                    pos,
-                                    pool.put_inst(LIRInst::new(
-                                        InstrsType::Jump,
-                                        vec![Operand::Addr(name)],
-                                    )),
-                                );
-                                distance -= operand::IMM_20_Bs as usize;
-                            }
-                            pos += 1;
-                            first_j = false;
-                        }
-                    }
+                    // let mut distance = 0;
+                    // let is_j = match inst_ref.get_type() {
+                    //     InstrsType::Branch(..) => false,
+                    //     InstrsType::Jump => true,
+                    //     _ => unreachable!(),
+                    // };
+                    // let target = match inst_ref.get_label() {
+                    //     Operand::Addr(label) => label,
+                    //     _ => unreachable!("branch must have a label"),
+                    // };
+                    // let mut i = 0;
+                    // let (mut flag, mut first_j) = (false, true);
+                    // loop {
+                    //     if i >= func.as_ref().blocks.len() {
+                    //         break;
+                    //     }
+                    //     let block_ref = func.as_ref().blocks[i];
+                    //     if &self.label == &block_ref.as_ref().label {
+                    //         flag = true;
+                    //     }
+                    //     if &block_ref.as_ref().label == target {
+                    //         //FIXME: this is a bug
+                    //         break;
+                    //     }
+                    //     if flag {
+                    //         distance += block_ref.as_ref().insts.len() * 4;
+                    //     }
+                    //     i += 1;
+                    //     if (!is_j && !operand::is_imm_12bs(distance as i32))
+                    //         || (is_j && !operand::is_imm_20bs(distance as i32))
+                    //     {
+                    //         let name = format!("overflow_{}", get_tmp_bb());
+                    //         let tmp = pool.put_block(BB::new(&name));
+                    //         tmp.as_mut().insts.push(pool.put_inst(LIRInst::new(
+                    //             InstrsType::Jump,
+                    //             vec![Operand::Addr(target.clone())],
+                    //         )));
+                    //         func.as_mut().blocks.insert(i, tmp);
+                    //         if first_j {
+                    //             self.insts[pos].as_mut().replace_label(name);
+                    //             if is_j {
+                    //                 distance -= operand::IMM_20_Bs as usize;
+                    //             } else {
+                    //                 distance -= operand::IMM_12_Bs as usize;
+                    //             }
+                    //         } else {
+                    //             self.insts.insert(
+                    //                 pos,
+                    //                 pool.put_inst(LIRInst::new(
+                    //                     InstrsType::Jump,
+                    //                     vec![Operand::Addr(name)],
+                    //                 )),
+                    //             );
+                    //             distance -= operand::IMM_20_Bs as usize;
+                    //         }
+                    //         pos += 1;
+                    //         first_j = false;
+                    //     }
+                    // }
                 }
                 InstrsType::Call => {
                     // call 指令不会发生偏移量的溢出
@@ -1329,27 +1374,27 @@ impl BB {
         offset: i32,
         pool: &mut BackendPool,
     ) {
-        let lower = (offset << 20) >> 20;
-        let upper = (offset - lower) >> 12;
-        //取得高20位
-        let op1 = Operand::IImm(IImm::new(upper));
-        //取得低12位
-        let op2 = Operand::IImm(IImm::new(lower));
+        // let lower = (offset << 20) >> 20;
+        // let upper = (offset - lower) >> 12;
+        // //取得高20位
+        // let op1 = Operand::IImm(IImm::new(upper));
+        // //取得低12位
+        // let op2 = Operand::IImm(IImm::new(lower));
         self.insts.insert(
             *pos,
             pool.put_inst(LIRInst::new(
-                InstrsType::OpReg(SingleOp::Lui),
-                vec![temp.clone(), op1],
+                InstrsType::OpReg(SingleOp::Li),
+                vec![temp.clone(), Operand::IImm(IImm::new(offset))],
             )),
         );
-        *pos += 1;
-        self.insts.insert(
-            *pos,
-            pool.put_inst(LIRInst::new(
-                InstrsType::Binary(BinaryOp::Add),
-                vec![temp.clone(), temp.clone(), op2],
-            )),
-        );
+        // *pos += 1;
+        // self.insts.insert(
+        //     *pos,
+        //     pool.put_inst(LIRInst::new(
+        //         InstrsType::Binary(BinaryOp::Add),
+        //         vec![temp.clone(), temp.clone(), op2],
+        //     )),
+        // );
         *pos += 1;
     }
 
@@ -1439,28 +1484,25 @@ impl BB {
     fn load_iimm_to_ireg(&mut self, imm: i32, pool: &mut BackendPool) -> Operand {
         let reg = Operand::Reg(Reg::init(ScalarType::Int));
         let iimm = Operand::IImm(IImm::new(imm));
-        if operand::is_imm_12bs(imm) {
-            self.insts.push(pool.put_inst(LIRInst::new(
-                InstrsType::OpReg(SingleOp::Li),
-                vec![reg.clone(), iimm],
-            )));
-        } else {
-            let lower = (imm << 20) >> 20;
-            let upper = (imm - lower) >> 12;
-            //取得高20位
-            let op1 = Operand::IImm(IImm::new(upper));
-            //取得低12位
-            let op2 = Operand::IImm(IImm::new(lower));
-            self.insts.push(pool.put_inst(LIRInst::new(
-                InstrsType::OpReg(SingleOp::Lui),
-                vec![reg.clone(), op1],
-            )));
-            log!("op2: {:?}", op2);
-            self.insts.push(pool.put_inst(LIRInst::new(
-                InstrsType::Binary(BinaryOp::Add),
-                vec![reg.clone(), reg.clone(), op2],
-            )));
-        }
+        self.insts.push(pool.put_inst(LIRInst::new(
+            InstrsType::OpReg(SingleOp::Li),
+            vec![reg.clone(), iimm],
+        )));
+        // let lower = (imm << 20) >> 20;
+        // let upper = (imm - lower) >> 12;
+        // //取得高20位
+        // let op1 = Operand::IImm(IImm::new(upper));
+        // //取得低12位
+        // let op2 = Operand::IImm(IImm::new(lower));
+        // self.insts.push(pool.put_inst(LIRInst::new(
+        //     InstrsType::OpReg(SingleOp::Lui),
+        //     vec![reg.clone(), op1],
+        // )));
+        // log!("op2: {:?}", op2);
+        // self.insts.push(pool.put_inst(LIRInst::new(
+        //     InstrsType::Binary(BinaryOp::Add),
+        //     vec![reg.clone(), reg.clone(), op2],
+        // )));
         reg
     }
 
@@ -1717,7 +1759,6 @@ impl BB {
         }
         dst_reg
     }
-
 
     fn resolve_opt_mul(&mut self, dst: Operand, src: Operand, imm: i32, pool: &mut BackendPool) {
         let abs = imm.abs();
