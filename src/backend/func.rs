@@ -206,7 +206,7 @@ impl Func {
                 index += 1;
             }
             if let Some(mut target) = info.phis_to_block.get_mut(&block.label) {
-                for inst in target.iter().rev() {
+                for inst in target.iter() {
                     // log!("label: {}", block.label);
                     // log!("insert phi to last: {:?}", inst);
                     block.as_mut().insts.insert(index, *inst);
@@ -399,8 +399,8 @@ impl Func {
         // 函数返回地址保存在ra中
         self.calc_live();
         // let mut allocator = crate::backend::regalloc::easy_ls_alloc::Allocator::new();
-        let mut allocator =crate::backend::regalloc::easy_gc_alloc::Allocator::new();
-        // let mut allocator=crate::backend::regalloc::base_alloc::Allocator::new();
+        // let mut allocator =crate::backend::regalloc::easy_gc_alloc::Allocator::new();
+        let mut allocator=crate::backend::regalloc::base_alloc::Allocator::new();
         let alloc_stat = allocator.alloc(self);
 
         // TODO

@@ -218,8 +218,7 @@ pub struct Mapping {
 
     pub val_map: HashMap<ObjPtr<Inst>, Operand>,
     pub block_branch: HashMap<String, ObjPtr<LIRInst>>,
-    pub phis_to_block: HashMap<String, Vec<ObjPtr<LIRInst>>>,
-    // pub func_
+    pub phis_to_block: HashMap<String, HashSet<ObjPtr<LIRInst>>>,
 }
 
 impl Mapping {
