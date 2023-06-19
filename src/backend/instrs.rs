@@ -387,19 +387,34 @@ impl LIRInst {
             InstrsType::Binary(..)
             | InstrsType::OpReg(..)
             | InstrsType::Load
-            | InstrsType::Store
             | InstrsType::LoadFromStack
-            | InstrsType::StoreToStack
             | InstrsType::Branch(..)
             | InstrsType::Jump
-            | InstrsType::LoadParamFromStack
-            | InstrsType::StoreParamToStack => {
+            | InstrsType::LoadParamFromStack => {
+                let mut regs = self.operands.clone();
+                let mut res = Vec::new();
+                while let Some(operand) = regs.pop() {
+                    if operand == *self.get_dst() {
+                        continue;
+                    }
+                    match operand {
+                        Operand::Reg(reg) => {
+                            res.push(reg)
+                        },
+                        _ => {}
+                    }
+                }
+                res
+            },
+            InstrsType::Store | InstrsType::StoreParamToStack | InstrsType::StoreToStack => {
                 let mut regs = self.operands.clone();
                 let mut res = Vec::new();
                 while let Some(operand) = regs.pop() {
                     if operand==*self.get_dst(){continue;}
                     match operand {
-                        Operand::Reg(reg) => res.push(reg),
+                        Operand::Reg(reg) => {
+                            res.push(reg)
+                        },
                         _ => {}
                     }
                 }
