@@ -7,7 +7,6 @@ impl GenerateAsm for LIRInst {
     
     fn generate(&mut self, context: ObjPtr<Context>, f: &mut File) -> Result<()> {
         let mut builder = AsmBuilder::new(f);
-        log!("generate: {:?}", self);
         let row = context.is_row;
         match self.get_type() {
             InstrsType::Binary(op) => {

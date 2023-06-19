@@ -221,10 +221,10 @@ impl Func {
         // log!("phi insert size: {}", size);
 
         for block in self.blocks.iter() {
-            log!("-----------------");
-            log!("block: {:?}", block.label);
+            // log!("-----------------");
+            // log!("block: {:?}", block.label);
             for inst in block.insts.iter() {
-                log!("row inst: {:?}", inst);
+                // log!("row inst: {:?}", inst);
             }
         }
         self.update(this);
@@ -399,10 +399,8 @@ impl Func {
         // 函数返回地址保存在ra中
         self.calc_live();
         // let mut allocator = crate::backend::regalloc::easy_ls_alloc::Allocator::new();
-        // let mut allocator = crate::backend::regalloc::easy_ls_alloc::Allocator::new();
-        // let mut allocator =crate::backend::regalloc::easy_gc_alloc::Allocator::new();
+        let mut allocator =crate::backend::regalloc::easy_gc_alloc::Allocator::new();
         // let mut allocator=crate::backend::regalloc::base_alloc::Allocator::new();
-        let mut allocator=crate::backend::regalloc::base_alloc::Allocator::new();
         let alloc_stat = allocator.alloc(self);
 
         // TODO

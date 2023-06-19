@@ -705,10 +705,7 @@ impl BB {
                             )]);
                             let obj_inst = pool.put_inst(inst);
                             map_info.block_branch.insert(self.label.clone(), obj_inst);
-                            true_succ_block
-                                .as_mut()
-                                .in_edge
-                                .push(ObjPtr::new(self));
+                            true_succ_block.as_mut().in_edge.push(ObjPtr::new(self));
                             false_succ_block.as_mut().in_edge.push(ObjPtr::new(self));
                             self.out_edge
                                 .append(vec![*true_succ_block, *false_succ_block].as_mut());
@@ -732,10 +729,7 @@ impl BB {
                             )]);
                             let obj_inst = pool.put_inst(inst);
                             map_info.block_branch.insert(self.label.clone(), obj_inst);
-                            true_succ_block
-                                .as_mut()
-                                .in_edge
-                                .push(ObjPtr::new(self));
+                            true_succ_block.as_mut().in_edge.push(ObjPtr::new(self));
                             false_succ_block.as_mut().in_edge.push(ObjPtr::new(self));
                             self.out_edge
                                 .append(vec![*true_succ_block, *false_succ_block].as_mut());
@@ -957,7 +951,7 @@ impl BB {
                         _ => unreachable!("mv must be int or float"),
                     };
 
-                    // log!("phi reg: {:?}, tmp: {:?}", phi_reg.clone(), temp.clone());
+                    log!("phi reg: {:?}, tmp: {:?}", phi_reg.clone(), temp.clone());
                     self.phis
                         .push(pool.put_inst(LIRInst::new(inst_kind, vec![phi_reg, temp.clone()])));
 
@@ -966,8 +960,12 @@ impl BB {
                         if !op_list.insert(*op) {
                             continue;
                         }
-                        // log!("op: {:?}", op.get_kind());
-                        let src_reg = self.resolve_operand(func, *op, false, map_info, pool);
+                        log!("op: {:?}", op.get_kind());
+                        let mut insert_insts: Vec<ObjPtr<LIRInst>> = vec![];
+                        let src_reg  = match op.get_kind() {
+                            InstKind::Parameter => self.resolve_param_phi(func, *op, false, map_info, pool, &mut insert_insts),
+                            _ => self.resolve_operand(func, *op, false, map_info, pool)
+                        };
                         inst_kind = match src_reg {
                             Operand::Reg(reg) => match reg.get_type() {
                                 ScalarType::Int => InstrsType::OpReg(SingleOp::IMv),
@@ -978,8 +976,9 @@ impl BB {
                             _ => unreachable!("phi operand must be reg or iimm"),
                         };
                         let inst = LIRInst::new(inst_kind, vec![temp.clone(), src_reg]);
-                        // log!("save to insert phi inst: {:?}", inst);
+                        log!("save to insert phi inst: {:?}", inst);
                         let obj_inst = pool.put_inst(inst);
+                        insert_insts.push(obj_inst);
                         let incoming_block = map_info
                             .ir_block_map
                             .get(&ir_block_inst.get_phi_predecessor(index))
@@ -989,11 +988,15 @@ impl BB {
 
                         if let Some(insts) = map_info.phis_to_block.get_mut(&incoming_block) {
                             // log!("insert phi inst: {:?}", obj_inst);
-                            insts.insert(obj_inst);
+                            for inst in insert_insts {
+                                insts.insert(inst);
+                            }
                         } else {
                             // log!("insert phi inst: {:?}", obj_inst);
                             let mut set = HashSet::new();
-                            set.insert(obj_inst);
+                            for inst in insert_insts {
+                                set.insert(inst);
+                            }
                             map_info.phis_to_block.insert(incoming_block, set);
                         }
                     }
@@ -1018,7 +1021,7 @@ impl BB {
     }
 
     pub fn save_reg(&mut self, func: ObjPtr<Func>, pool: &mut BackendPool) {
-        let mut index = 0; 
+        let mut index = 0;
         loop {
             if index >= self.insts.len() {
                 break;
@@ -1045,11 +1048,11 @@ impl BB {
             let mut caller_regs: HashSet<i32> = HashSet::new();
             let (icnt, fcnt) = inst.get_param_cnts();
             //FIXME: solve float regs
-            let mut ifp=false;
+            let mut ifp = false;
 
             match inst.get_type() {
                 InstrsType::Call => {
-                    ifp=true;
+                    ifp = true;
                     for op in inst.get_reg_def().iter() {
                         if let Some(reg) = func.as_mut().caller_saved.get(&op.get_id()) {
                             if op.get_id() - 10 < icnt && op.get_id() >= 10 {
@@ -1109,14 +1112,13 @@ impl BB {
             }
             let inst = self.insts[index];
             let spills = inst.is_spill(spill);
-            log!("spills: {:?}", spills);
             if spills.is_empty() {
                 index += 1;
                 continue;
             } else {
                 for (i, id) in spills.iter().enumerate() {
                     let reg = Operand::Reg(Reg::new(5 + (i as i32), ScalarType::Int));
-                    
+
                     if let Some(stack_slot) = func.spill_stack_map.get(&id) {
                         let mut ins = LIRInst::new(
                             InstrsType::LoadFromStack,
@@ -1184,7 +1186,7 @@ impl BB {
             if pos >= self.insts.len() {
                 break;
             }
-            log!("inst: {:?}", self.insts[pos]);
+            // log!("inst: {:?}", self.insts[pos]);
             let inst_ref = self.insts[pos].as_ref();
             match inst_ref.get_type() {
                 InstrsType::Load | InstrsType::Store => {
@@ -1509,11 +1511,12 @@ impl BB {
                                     .as_mut()
                                     .insts
                                     .insert(0, pool.put_inst(inst));
-
+                                log!("insert front {:?}", tmp);
                                 self.insts.push(pool.put_inst(LIRInst::new(
                                     InstrsType::OpReg(SingleOp::IMv),
-                                    vec![reg.clone(), tmp],
+                                    vec![reg.clone(), tmp.clone()],
                                 )));
+                                log!("insert here {:?}, {:?}", reg, tmp);
                             } else {
                                 let inst = LIRInst::new(
                                     InstrsType::LoadParamFromStack,
@@ -1729,6 +1732,111 @@ impl BB {
             _ => unreachable!("cond not illegal"),
         }
         dst_reg
+    }
+
+    fn resolve_param_phi(
+        &mut self,
+        func: ObjPtr<Func>,
+        src: ObjPtr<Inst>,
+        is_left: bool,
+        map: &mut Mapping,
+        pool: &mut BackendPool,
+        insts: &mut Vec<ObjPtr<LIRInst>>,
+    ) -> Operand {
+        if !map.val_map.contains_key(&src) {
+            let params = &func.as_ref().params;
+            let reg = match src.as_ref().get_param_type() {
+                IrType::Int | IrType::IntPtr | IrType::FloatPtr => {
+                    Operand::Reg(Reg::init(ScalarType::Int))
+                }
+                IrType::Float => Operand::Reg(Reg::init(ScalarType::Float)),
+                _ => unreachable!("cannot reach, param either int or float"),
+            };
+            map.val_map.insert(src, reg.clone());
+            let (mut inum, mut fnum) = (0, 0);
+            // 由于寄存器分配策略，读取参数时需要先在函数开头把所有参数保存，再从寄存器中读取
+            for p in params {
+                match p.as_ref().get_param_type() {
+                    IrType::Int | IrType::IntPtr | IrType::FloatPtr => {
+                        if src == *p {
+                            let tmp = Operand::Reg(Reg::init(ScalarType::Int));
+                            if inum < ARG_REG_COUNT {
+                                let inst = LIRInst::new(
+                                    InstrsType::OpReg(SingleOp::IMv),
+                                    vec![
+                                        tmp.clone(),
+                                        Operand::Reg(Reg::new(inum + 10, ScalarType::Int)),
+                                    ],
+                                );
+                                func.as_mut()
+                                    .get_first_block()
+                                    .as_mut()
+                                    .insts
+                                    .insert(0, pool.put_inst(inst));
+                                insts.push(pool.put_inst(LIRInst::new(
+                                    InstrsType::OpReg(SingleOp::IMv),
+                                    vec![reg.clone(), tmp.clone()],
+                                )));
+                            } else {
+                                let inst = LIRInst::new(
+                                    InstrsType::LoadParamFromStack,
+                                    vec![
+                                        reg.clone(),
+                                        Operand::IImm(IImm::new(
+                                            inum - ARG_REG_COUNT + max(fnum - ARG_REG_COUNT, 0) * 4,
+                                        )),
+                                    ],
+                                );
+                                insts.push(pool.put_inst(inst));
+                            }
+                        }
+                        inum += 1;
+                    }
+                    IrType::Float => {
+                        if src == *p {
+                            if fnum < ARG_REG_COUNT {
+                                let tmp = Operand::Reg(Reg::init(ScalarType::Float));
+                                let inst = LIRInst::new(
+                                    InstrsType::OpReg(SingleOp::FMv),
+                                    vec![
+                                        reg.clone(),
+                                        Operand::Reg(Reg::new(fnum + 10, ScalarType::Float)),
+                                    ],
+                                );
+                                func.as_mut()
+                                    .get_first_block()
+                                    .as_mut()
+                                    .insts
+                                    .insert(0, pool.put_inst(inst));
+                                insts.push(pool.put_inst(LIRInst::new(
+                                    InstrsType::OpReg(SingleOp::FMv),
+                                    vec![reg.clone(), tmp],
+                                )));
+                            } else {
+                                let inst = LIRInst::new(
+                                    InstrsType::LoadParamFromStack,
+                                    vec![
+                                        reg.clone(),
+                                        Operand::IImm(IImm::new(
+                                            fnum - ARG_REG_COUNT + max(inum - ARG_REG_COUNT, 0) * 4,
+                                        )),
+                                    ],
+                                );
+                                insts.push(pool.put_inst(inst));
+                            }
+                        }
+                        fnum += 1;
+                    }
+                    _ => {
+                        // log!("{:?}", p.get_param_type());
+                        unreachable!("cannot reach, param must be int, float or ptr")
+                    }
+                }
+            }
+            reg
+        } else {
+            map.val_map.get(&src).unwrap().clone()
+        }
     }
 
     fn resolve_opt_mul(&mut self, dst: Operand, src: Operand, imm: i32, pool: &mut BackendPool) {
@@ -2018,7 +2126,6 @@ impl GenerateAsm for BB {
         }
         context.as_mut().is_row = false;
         for inst in self.insts.iter() {
-            log!("{:?}, generate", self.label);
             inst.as_mut().v_to_phy(context.get_reg_map().clone());
             inst.as_mut().generate(context.clone(), f)?;
         }
