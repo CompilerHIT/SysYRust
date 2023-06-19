@@ -83,21 +83,6 @@ impl Inst {
         self.user.get_operands()
     }
 
-    /// 找到参数对应的索引
-    /// # Arguments
-    /// * `arg` - 参数
-    /// # Return
-    /// 参数对应的索引
-    pub fn find_arg_index(&self, arg: &Inst) -> Option<usize> {
-        // 正确性检查
-        if let InstKind::Call(_) = self.kind {
-        } else {
-            unreachable!("Inst::find_arg_index")
-        }
-
-        self.user.find_operand(arg)
-    }
-
     /// 修改函数调用指令的参数
     /// # Arguments
     /// * `index` - 参数的索引

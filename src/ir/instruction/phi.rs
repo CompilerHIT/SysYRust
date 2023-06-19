@@ -54,38 +54,16 @@ impl Inst {
         self.user.set_operands(operands);
     }
 
-    /// 将一个操作数替换为另一个操作数
-    /// # Arguments
-    /// * 'old' - 被替换的操作数
-    /// * 'new' - 新的操作数
-    pub fn replace_operand(&mut self, old: ObjPtr<Inst>, new: ObjPtr<Inst>) {
-        let index = self.get_operands().iter().position(|x| *x == old).unwrap();
-        self.set_operand(new, index);
-    }
-
     /// 获得phi指令的操作数对应的前继基本快
     /// 使用时确保该操作数是phi指令的操作数
-    pub fn get_phi_predecessor(&self, operand: ObjPtr<Inst>) -> ObjPtr<BasicBlock> {
-        // for (index, op) in self.get_operands().iter().enumerate() {
-        //     debug_assert_eq!(op.get_parent_bb(), self.get_parent_bb().get_up_bb()[index]);
-        // }
-        let index = self
-            .get_operands()
-            .iter()
-            .position(|x| *x == operand)
-            .unwrap();
+    pub fn get_phi_predecessor(&self, index: usize) -> ObjPtr<BasicBlock> {
         self.get_parent_bb().get_up_bb()[index]
     }
 
     /// 删除一个操作数
     /// # Arguments
     /// * 'operand' - 被删除的操作数
-    pub fn remove_operand(&mut self, operand: ObjPtr<Inst>) {
-        let index = self
-            .get_operands()
-            .iter()
-            .position(|x| *x == operand)
-            .unwrap();
+    pub fn remove_operand(&mut self, index: usize) {
         self.user.get_operand(index).remove_user(self);
         self.user.remove_operand(index);
     }

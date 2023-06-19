@@ -24,7 +24,7 @@ pub fn simplify_cfg_run(
         }
 
         remove_unreachable_bb(func.get_head(), pools);
-        merge_one_line_bb(func.get_head());
+        //merge_one_line_bb(func.get_head());
     }
 }
 

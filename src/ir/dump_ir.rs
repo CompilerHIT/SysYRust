@@ -826,11 +826,11 @@ fn dump_inst(
                 "float"
             };
             text += format!("  {} = phi {} ", local_map.get(&inst).unwrap(), phi_type).as_str();
-            for op in inst.get_operands().iter() {
+            for (index, op) in inst.get_operands().iter().enumerate() {
                 text += format!(
                     "[ {}, %{} ], ",
                     get_inst_value(op.clone(), local_map, global_map),
-                    format!("bb_{}", inst.get_phi_predecessor(op.clone()).get_name()).as_str()
+                    format!("bb_{}", inst.get_phi_predecessor(index).get_name()).as_str()
                 )
                 .as_str();
             }

@@ -964,7 +964,7 @@ impl BB {
                         .push(pool.put_inst(LIRInst::new(inst_kind, vec![phi_reg, temp.clone()])));
 
                     let mut op_list: HashSet<ObjPtr<Inst>> = HashSet::new();
-                    for op in ir_block_inst.get_operands().iter() {
+                    for (index, op) in ir_block_inst.get_operands().iter().enumerate() {
                         if !op_list.insert(*op) {
                             continue;
                         }
@@ -984,7 +984,7 @@ impl BB {
                         let obj_inst = pool.put_inst(inst);
                         let incoming_block = map_info
                             .ir_block_map
-                            .get(&ir_block_inst.get_phi_predecessor(*op))
+                            .get(&ir_block_inst.get_phi_predecessor(index))
                             .unwrap()
                             .label
                             .clone();
@@ -1115,9 +1115,7 @@ impl BB {
                         let mut pos = last_slot.get_pos() + last_slot.get_size();
                         let stack_slot = StackSlot::new(pos, ADDR_SIZE);
                         func.as_mut().stack_addr.push_back(stack_slot);
-                        func.as_mut()
-                            .spill_stack_map
-                            .insert(*id, stack_slot);
+                        func.as_mut().spill_stack_map.insert(*id, stack_slot);
                     }
                 }
                 for (i, id) in spills.iter().enumerate() {

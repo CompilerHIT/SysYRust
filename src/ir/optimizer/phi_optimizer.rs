@@ -51,7 +51,8 @@ fn phi_optimize(bb: ObjPtr<BasicBlock>) -> bool {
             // 将phi指令替换为第一个参数
             while inst.get_use_list().len() != 0 {
                 let mut user = inst.get_use_list()[0];
-                user.replace_operand(inst, inst.get_operands()[0]);
+                let index = user.get_operands().iter().position(|x| x == &inst).unwrap();
+                user.set_operand(inst.get_operands()[0], index);
             }
             inst = inst.get_next();
             inst.get_prev().remove_self();

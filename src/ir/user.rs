@@ -28,10 +28,6 @@ impl User {
         self.operands[index]
     }
 
-    pub fn find_operand(&self, inst: &Inst) -> Option<usize> {
-        self.operands.iter().position(|x| eq(x.as_ref(), inst))
-    }
-
     pub fn get_operands_size(&self) -> usize {
         self.operands.len()
     }
