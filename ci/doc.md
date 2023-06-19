@@ -1,12 +1,13 @@
-
 ### 测试镜像版本:
+
+`10.249.12.83:5000/compilerhit/sysy-rv64-cpci:3.0` :
+实现-p参数和时间自定义，见ci使用
 
 `10.249.12.83:5000/compilerhit/sysy-rv64-cpci:2.2` :
 修复了输出格式与标准输出的区别,
 
 `10.249.12.83:5000/compilerhit/sysy-rv64-cpci:2.1` :
 增加目标程序执行时间获取
-
 
 ### ci使用前置(手动版)
 
@@ -46,6 +47,7 @@ docker run --name ci -d -p 50051:50051 -v <your_data_path>:/test/data <latest-ci
 ```
 
 如:
+
 ```
 docker run --name ci -d -p 50051:50051 -v ./data:/test/data 10.249.12.83:5000/compilerhit/sysy-rv64-cpci:2.1
 ```
@@ -101,8 +103,23 @@ ci init -config <config_path>
 ./test all
 ```
 
+测试文件夹下面的每个用例，不会因为错误退出，并且把错误的用例路径附加写入数据根目录下fail.log中
+```
+./test -p <test_folder1> <test_folder2> ..
+```
+
+时间自定义,在数据根目录下建立一个名为time文件，文件中第一行的数字即为设置的超时执行限制秒数
+,例如在/test/data (/实际上你挂载的目录下),如下操作限制超时时间10s, (ps默认超时时间20s):
+```
+touch /test/data/time
+echo "10"> /test/data/time
+```
+
+
+
 ### 更新
 
 1. 增加执行时间获取  ():
-每个测试样例测试后会在当行右侧显示标准程序执行时间和我们的程序执行时间
-每个文件夹测试完成之后log目标程序执行时间总和在最下面
+   每个测试样例测试后会在当行右侧显示标准程序执行时间和我们的程序执行时间
+   每个文件夹测试完成之后log目标程序执行时间总和在最下面
+2. 增加-p参数实现，以及时间自定义
