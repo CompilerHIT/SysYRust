@@ -6,6 +6,7 @@ use crate::{
         instruction::{Inst, InstKind},
         module::Module,
     },
+    log_file,
     utility::{ObjPool, ObjPtr},
 };
 
@@ -24,7 +25,7 @@ pub fn simplify_cfg_run(
         }
 
         remove_unreachable_bb(func.get_head(), pools);
-        //merge_one_line_bb(func.get_head());
+        merge_one_line_bb(func.get_head());
     }
 }
 
@@ -95,6 +96,7 @@ fn remove_unreachable_bb(
     let bb_list = get_bb_list(head);
 
     loop {
+        log_file!("log_ir", "round");
         let mut changed = false;
         for bb in bb_list.iter() {
             // 不考虑头和尾
@@ -121,6 +123,14 @@ fn remove_unreachable_bb(
 
         if !changed {
             break;
+        }
+    }
+
+    // 将从头部不可达的bb也加入到deleted集里
+    let bb_list_now = get_bb_list(head);
+    for bb in bb_list.iter() {
+        if !bb_list_now.contains(bb) {
+            deleted.insert(bb);
         }
     }
 
@@ -168,9 +178,11 @@ fn check_bb(
     match cond.get_kind() {
         InstKind::ConstInt(value) => {
             if value == 0 {
-                bb.as_mut().remove_next_bb(bb.get_next_bb()[1].clone());
+                let next_bb = bb.get_next_bb()[1].clone();
+                bb.as_mut().remove_next_bb(next_bb);
             } else {
-                bb.as_mut().remove_next_bb(bb.get_next_bb()[0].clone());
+                let next_bb = bb.get_next_bb()[0].clone();
+                bb.as_mut().remove_next_bb(next_bb);
             }
             bb.get_tail_inst().remove_self();
             bb.as_mut().push_back(pools.1.make_jmp());
