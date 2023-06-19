@@ -373,13 +373,6 @@ impl Func {
                     .collect::<HashSet<&String>>()
             );
             for pred in block.as_ref().in_edge.iter() {
-                println!("{}",pred.label);
-                if pred.label==".LBB0_2"||pred.label==".LBB1_2" {
-                    
-                }
-                if reg.get_id()==62||reg.get_id()==78 {
-                    let tmp=2;
-                }
                 if pred.as_mut().live_out.insert(reg) {
                     if pred.as_mut().live_def.contains(&reg) {
                         continue;
