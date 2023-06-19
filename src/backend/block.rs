@@ -1134,20 +1134,17 @@ impl BB {
                 for (i, id) in spills.iter().enumerate() {
                     inst.as_mut().replace(*id, 5 + (i as i32))
                 }
+                index += 1;
                 match inst.get_dst() {
                     Operand::Reg(_) => match inst.get_type() {
                         InstrsType::Store
                         | InstrsType::StoreParamToStack
                         | InstrsType::StoreToStack => {
-                            index += 1;
                             continue;
                         }
-                        _ => {
-                            index += 1;
-                        }
+                        _ => {}
                     },
                     _ => {
-                        index += 1;
                         continue;
                     }
                 }
