@@ -206,7 +206,7 @@ impl Func {
                 index += 1;
             }
             if let Some(mut target) = info.phis_to_block.get_mut(&block.label) {
-                for inst in target.iter() {
+                for inst in target.iter().rev() {
                     // log!("label: {}", block.label);
                     // log!("insert phi to last: {:?}", inst);
                     block.as_mut().insts.insert(index, *inst);

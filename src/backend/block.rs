@@ -989,13 +989,13 @@ impl BB {
                         if let Some(insts) = map_info.phis_to_block.get_mut(&incoming_block) {
                             // log!("insert phi inst: {:?}", obj_inst);
                             for inst in insert_insts {
-                                insts.insert(inst);
+                                insts.push(inst);
                             }
                         } else {
                             // log!("insert phi inst: {:?}", obj_inst);
-                            let mut set = HashSet::new();
+                            let mut set = Vec::new();
                             for inst in insert_insts {
-                                set.insert(inst);
+                                set.push(inst);
                             }
                             map_info.phis_to_block.insert(incoming_block, set);
                         }
