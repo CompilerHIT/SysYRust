@@ -976,6 +976,7 @@ impl BB {
                         };
                         let inst = LIRInst::new(inst_kind, vec![temp.clone(), src_reg]);
                         let obj_inst = pool.put_inst(inst);
+                        log!("phi kind {:?}", op.get_kind());
                         let incoming_block = map_info
                             .ir_block_map
                             .get(&ir_block_inst.get_phi_predecessor(index))

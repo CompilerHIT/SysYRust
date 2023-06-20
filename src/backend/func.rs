@@ -558,7 +558,7 @@ impl Func {
                 );
                 if !is_main {
                     for (reg, slot) in map.iter() {
-                        let of = stack_size - ADDR_SIZE * 2 - slot.get_pos();
+                        let of = stack_size - ADDR_SIZE - slot.get_pos();
                         builder.s(&reg.to_string(false), "sp", of, false, true);
                     }
                 }
@@ -569,11 +569,11 @@ impl Func {
                 builder.s(&ra.to_string(false), "gp", -rev_start_pos, false, true);
 
                 if !is_main {
-                    for (i, (reg, slot)) in map.iter().enumerate() {
+                    for (reg, slot) in map.iter() {
                         builder.s(
                             &reg.to_string(false),
                             "gp",
-                            -(rev_start_pos + (i + 1) as i32 * ADDR_SIZE),
+                            -(slot.get_pos()),
                             false,
                             true,
                         );
@@ -588,7 +588,7 @@ impl Func {
             if operand::is_imm_12bs(stack_size) {
                 if !is_main {
                     for (reg, slot) in map_clone.iter() {
-                        let of = stack_size - ADDR_SIZE * 2 - slot.get_pos();
+                        let of = stack_size - ADDR_SIZE - slot.get_pos();
                         builder.l(&reg.to_string(false), "sp", of, false, true);
                     }
                 }
@@ -606,11 +606,11 @@ impl Func {
                 builder.l(&ra.to_string(false), "sp", -rev_start_pos, false, true);
 
                 if !is_main {
-                    for (i, (reg, slot)) in map_clone.iter().enumerate() {
+                    for (reg, slot) in map_clone.iter() {
                         builder.l(
                             &reg.to_string(false),
                             "sp",
-                            -(rev_start_pos + (i + 1) as i32 * ADDR_SIZE),
+                            -(slot.get_pos()),
                             false,
                             true,
                         );

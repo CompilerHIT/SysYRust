@@ -100,9 +100,9 @@ impl GenerateAsm for LIRInst {
             InstrsType::Load => {
                 let mut builder = AsmBuilder::new(f);
                 let offset = self.get_offset();
-                if !operand::is_imm_12bs(offset.get_data()) {
-                    panic!("illegal offset");
-                }
+                // if !operand::is_imm_12bs(offset.get_data()) {
+                //     panic!("illegal offset");
+                // }
                 let dst = match self.get_dst() {
                     Operand::Reg(reg) => reg.to_string(row),
                     _ => panic!("dst of load must be reg, to improve"),
@@ -126,9 +126,9 @@ impl GenerateAsm for LIRInst {
             InstrsType::Store => {
                 let mut builder = AsmBuilder::new(f);
                 let offset = self.get_offset();
-                if !operand::is_imm_12bs(offset.get_data()) {
-                    panic!("illegal offset, {:?}", self);
-                }
+                // if !operand::is_imm_12bs(offset.get_data()) {
+                //     panic!("illegal offset, {:?}", self);
+                // }
                 let src = match self.get_dst() {
                     Operand::Reg(reg) => reg.to_string(row),
                     _ => panic!("src of store must be reg, to improve"),
@@ -149,9 +149,9 @@ impl GenerateAsm for LIRInst {
 
             InstrsType::StoreToStack => {
                 let mut builder = AsmBuilder::new(f);
-                if !operand::is_imm_12bs(self.get_stack_offset().get_data()) {
-                    panic!("illegal offset");
-                }
+                // if !operand::is_imm_12bs(self.get_stack_offset().get_data()) {
+                //     panic!("illegal offset");
+                // }
                 let src = match self.get_dst() {
                     Operand::Reg(reg) => reg,
                     _ => panic!("src of store must be reg, to improve"),
@@ -170,9 +170,9 @@ impl GenerateAsm for LIRInst {
             }
             InstrsType::LoadFromStack => {
                 let mut builder = AsmBuilder::new(f);
-                if !operand::is_imm_12bs(self.get_stack_offset().get_data()) {
-                    panic!("illegal offset");
-                }
+                // if !operand::is_imm_12bs(self.get_stack_offset().get_data()) {
+                //     panic!("illegal offset");
+                // }
                 let dst = match self.get_dst() {
                     Operand::Reg(reg) => reg,
                     _ => panic!("dst of load must be reg, to improve"),
@@ -194,9 +194,9 @@ impl GenerateAsm for LIRInst {
 
                 let true_offset =
                     context.as_ref().get_offset() - self.get_stack_offset().get_data();
-                if !operand::is_imm_12bs(true_offset) {
-                    panic!("illegal offset");
-                }
+                // if !operand::is_imm_12bs(true_offset) {
+                //     panic!("illegal offset");
+                // }
                 let dst = match self.get_dst() {
                     Operand::Reg(reg) => reg,
                     _ => panic!("dst of load must be reg, to improve"),
@@ -216,9 +216,9 @@ impl GenerateAsm for LIRInst {
                 let mut builder = AsmBuilder::new(f);
                 let true_offset =
                     context.as_ref().get_offset() - self.get_stack_offset().get_data();
-                if !operand::is_imm_12bs(true_offset) {
-                    panic!("illegal offset");
-                }
+                // if !operand::is_imm_12bs(true_offset) {
+                //     panic!("illegal offset");
+                // }
                 let dst = match self.get_dst() {
                     Operand::Reg(reg) => reg,
                     _ => panic!("dst of load must be reg, to improve"),
