@@ -1039,14 +1039,13 @@ impl BB {
                     _ => {}
                 }
             }
+            log!("caller reg: {:?}", func.as_ref().caller_saved);
             let mut caller_regs: HashSet<i32> = HashSet::new();
             let (icnt, fcnt) = inst.get_param_cnts();
             //FIXME: solve float regs
-            let mut ifp = false;
 
             match inst.get_type() {
                 InstrsType::Call => {
-                    ifp = true;
                     for op in inst.get_reg_def().iter() {
                         if let Some(reg) = func.as_mut().caller_saved.get(&op.get_id()) {
                             if op.get_id() - 10 < icnt && op.get_id() >= 10 {
@@ -1055,8 +1054,10 @@ impl BB {
                             caller_regs.insert(*reg);
                         }
                     }
+                    log!("caller regs: {:?}", caller_regs);
                     let mut pos = func.stack_addr.back().unwrap().get_pos();
                     pos += func.stack_addr.back().unwrap().get_size();
+                    log!("stack state: {:?}", func.stack_addr);
                     for (i, id) in caller_regs.iter().enumerate() {
                         let offset = pos + i as i32 * ADDR_SIZE;
                         let mut ins = LIRInst::new(
@@ -1098,7 +1099,6 @@ impl BB {
         spill: &HashSet<i32>,
         pool: &mut BackendPool,
     ) {
-        self.save_reg(func, pool);
         let mut index = 0;
         loop {
             if index >= self.insts.len() {

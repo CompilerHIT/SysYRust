@@ -475,6 +475,9 @@ impl Func {
                 .as_mut()
                 .handle_spill(this, &self.reg_alloc_info.spillings, pool);
         }
+        for block in self.blocks.iter() {
+            block.as_mut().save_reg(this, pool);
+        }
         self.update(this);
         self.save_callee(pool, f);
     }
