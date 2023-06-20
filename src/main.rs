@@ -64,10 +64,16 @@ fn run_main() {
     drop(compunit);
 
     // ir优化
-    // sysylib::ir::optimizer_run(&mut module, (&mut pool_bb, &mut pool_inst), o1_option); //o1_option);
+    //sysylib::ir::optimizer_run(&mut module, (&mut pool_bb, &mut pool_inst), o1_option); //o1_option);
+    //sysylib::log_file!(
+    //"call_map",
+    //"file {}:\n{}\n",
+    //filename,
+    //sysylib::ir::call_map_gen(&mut module)
+    //);
 
     // ir打印
-    sysylib::ir::dump_now(&module, "dump_opt.ll");
+    sysylib::ir::dump_now(&module, "dump.ll");
 
     let output2 = matches.value_of("o").unwrap_or("row_asm.log");
     // 后端解析
