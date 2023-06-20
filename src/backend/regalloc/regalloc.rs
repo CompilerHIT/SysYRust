@@ -1,10 +1,13 @@
 use std::collections::{HashSet, HashMap, VecDeque};
 
+use crate::backend::block;
 use crate::backend::func::Func;
 use crate::backend::instrs::{BB, Operand};
 use crate::backend::operand::Reg;
 use crate::backend::regalloc::structs::FuncAllocStat;
-use crate::utility::ObjPtr;
+use crate::utility::{ObjPtr, ScalarType};
+
+use super::structs::RegUsedStat;
 
 // 该处理下，全局量被翻译到内存中，
 // 以函数为寄存器分配的基本单位
@@ -106,3 +109,62 @@ pub fn count_spill_confict(func:&Func)->HashMap<i32,i32> {
 
 
 // 通用寄存器合并
+pub fn merge_alloc(func:&Func,dstr:&mut HashMap<i32,i32>,spillings:& HashSet<i32>){
+    // 合并条件,如果一个mv x55 x66指令， 后面 x66指令不再使用了,
+    // 则x55(color1),x66(color2)可以进行合并，
+    // 可以取一个它们合并之后不会产生新的矛盾的颜色合并
+    let availables:HashMap<i32,RegUsedStat>=HashMap::new();
+    // let reg_use_stat=
+    // 首先进行冲突分析分析出它们的剩余可用颜色
+    let analyse_one=|reg:&Reg| {
+        if !reg.is_virtual() {return;}
+        if spillings.contains(&reg.get_id()) {return;}
+        // 
+        
+
+    };
+    let mut analyse=|bb:ObjPtr<BB>|{
+        // 对某个块进行冲突分析
+        // 获取每个寄存器的终结时间
+        // 获取寄存器链表
+        let mut livenow:VecDeque<i32>=VecDeque::new();
+        let mut end_time:HashMap<i32,i32>=HashMap::new();
+        for (index,inst) in bb.insts.iter().enumerate().rev() {
+            for reg in inst.get_reg_use()  {
+                if !reg.is_virtual() {continue;}
+                if bb.live_out.contains(&reg) {continue;}
+                if spillings.contains(&reg.get_id()) {continue;}
+                if end_time.contains_key(&reg.get_id()) {continue;}
+                end_time.insert(reg.get_id(), index as i32);
+            }
+
+        }
+        // 分析冲突,要么是spilling,要么是可以使用的寄存器
+        dstr.insert(2, 2);
+
+
+
+    };
+    // 分析冲突关系,
+    for block in func.blocks.iter() {
+        analyse(*block);
+    }
+
+    let merge=|bb:ObjPtr<BB>,dstr:&mut HashMap<i32,i32>|{
+        dstr.remove(&2);
+    };
+    // 根据冲突结果进行寄存器合并
+    for block in func.blocks.iter() {
+        merge(*block,dstr);
+    }
+
+}
+
+
+// 通用寄存器分配结果检查
+pub fn check_alloc(func:&Func,alloc_info:&FuncAllocStat)->bool {
+    
+
+
+    false
+}

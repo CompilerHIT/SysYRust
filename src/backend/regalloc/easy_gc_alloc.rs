@@ -79,40 +79,43 @@ impl Allocator {
             }
 
             let mut livenow: HashSet<i32> = HashSet::new();
-            // 重构冲突分析
-            let mut sets_end: HashMap<i32, HashSet<i32>> = HashMap::new();
+            // 冲突分析
+            let mut index_ends: HashMap<i32, HashSet<i32>> = HashMap::new();
 
             let mut end_poses: HashMap<i32, i32> = HashMap::new();
 
-            let mut ends = HashSet::new();
-            cur_bb.live_out.iter().for_each(|e| {
-                if e.is_virtual() && e.get_type() == kind {
-                    ends.insert(e.get_id());
-                }
-            });
+            
             for (index, inst) in cur_bb.insts.iter().enumerate().rev() {
                 for reg in inst.get_reg_use() {
                     if !reg.is_virtual() || reg.get_type() != kind {
                         continue;
                     }
-                    if ends.contains(&reg.get_id()) {
-                        continue;
+                    if cur_bb.live_out.contains(&reg) {continue;}
+                    if let None = index_ends.get(&(index as i32)) {
+                        index_ends.insert(index as i32, HashSet::new());
                     }
-                    ends.insert(reg.get_id());
-                    if let None = sets_end.get(&(index as i32)) {
-                        sets_end.insert(index as i32, HashSet::new());
-                    }
-                    sets_end
+                    index_ends
                         .get_mut(&(index as i32))
                         .unwrap()
                         .insert(reg.get_id());
                     end_poses.insert(reg.get_id(), index as i32);
                 }
             }
+            
+            
             //println!("ends:{:?}",end_poses);
-            end_poses.clear();
             cur_bb.live_in.iter().for_each(|e| {
                 if e.is_virtual() && e.get_type() == kind {
+                    for live in livenow.iter() {
+                        if let None = interef_graph.get(live) {
+                            interef_graph.insert(*live, HashSet::new());
+                        }
+                        if let None = interef_graph.get(&e.get_id()) {
+                            interef_graph.insert(e.get_id(), HashSet::new());
+                        }
+                        interef_graph.get_mut(live).unwrap().insert(e.get_id());
+                        interef_graph.get_mut(&e.get_id()).unwrap().insert(*live);
+                    }
                     livenow.insert(e.get_id());
                 }
             });
@@ -120,26 +123,26 @@ impl Allocator {
                 // 先与reg use冲突,然后消去终结的,然后与reg def冲突,并加上新的reg def
                 //println!("{}",inst.as_ref());
 
-                for reg in inst.get_reg_use() {
-                    if !reg.is_virtual() || reg.get_type() != kind {
-                        continue;
-                    }
-                    if livenow.contains(&reg.get_id()) {
-                        continue;
-                    }
-                    for live in livenow.iter() {
-                        if let None = interef_graph.get(live) {
-                            interef_graph.insert(*live, HashSet::new());
-                        }
-                        if let None = interef_graph.get(&reg.get_id()) {
-                            interef_graph.insert(reg.get_id(), HashSet::new());
-                        }
-                        interef_graph.get_mut(live).unwrap().insert(reg.get_id());
-                        interef_graph.get_mut(&reg.get_id()).unwrap().insert(*live);
-                    }
-                }
+                // for reg in inst.get_regs() {
+                //     if !reg.is_virtual() || reg.get_type() != kind {
+                //         continue;
+                //     }
+                //     if livenow.contains(&reg.get_id()) {
+                //         continue;
+                //     }
+                //     for live in livenow.iter() {
+                //         if let None = interef_graph.get(live) {
+                //             interef_graph.insert(*live, HashSet::new());
+                //         }
+                //         if let None = interef_graph.get(&reg.get_id()) {
+                //             interef_graph.insert(reg.get_id(), HashSet::new());
+                //         }
+                //         interef_graph.get_mut(live).unwrap().insert(reg.get_id());
+                //         interef_graph.get_mut(&reg.get_id()).unwrap().insert(*live);
+                //     }
+                // }
 
-                if let Some(finishes) = sets_end.get(&(index as i32)) {
+                if let Some(finishes) = index_ends.get(&(index as i32)) {
                     for finish in finishes {
                         livenow.remove(finish);
                     }
@@ -149,12 +152,8 @@ impl Allocator {
                     if !reg.is_virtual() || reg.get_type() != kind {
                         continue;
                     }
-                    if end_poses.contains_key(&reg.get_id()) {
-                        //TODO 这里不应该跳过,
-                        // continue;
-                    }
+                   
                     livenow.insert(reg.get_id());
-                    end_poses.insert(reg.get_id(), index as i32);
                     for live in livenow.iter() {
                         if *live == reg.get_id() {
                             continue;
@@ -435,6 +434,7 @@ impl Allocator {
             }
             self.spillings.insert(tospill);
         }
+         
         if let Some(freg) = self.f_interence_reg {
             let mut tospill = freg;
             let mut heuoristic_of_spill = cost(tospill, &self.f_interference_graph); //待消解节点的启发函数值
