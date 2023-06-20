@@ -39,12 +39,11 @@ where
 {
     bfs_bb_proceess(head, |bb| {
         let mut inst = bb.get_head_inst();
-        loop {
+        while !inst.is_tail() {
+            // 这里需要先获取next，因为predicate可能会删除当前指令
+            let next = inst.get_next();
             predicate(inst);
-            if inst.is_tail() {
-                break;
-            }
-            inst = inst.get_next();
+            inst = next;
         }
     })
 }
@@ -65,11 +64,13 @@ where
             continue;
         }
         visited.insert(bb);
-        predicate(bb);
 
+        // 先将bb的后继节点加入队列，以防止在处理bb时把bb的结构改变
         for next_bb in bb.get_next_bb().iter() {
             queue.push_back(next_bb.clone());
         }
+
+        predicate(bb);
     }
 }
 
@@ -95,18 +96,11 @@ where
 }
 
 fn functional_optimizer(module: &mut Module) {
-    for (_, func) in module.get_all_func().iter() {
-        // 空函数不优化
-        if func.is_empty_bb() {
-            continue;
-        }
+    // 一遍死代码删除
+    dead_code_eliminate::dead_code_eliminate(module, false);
 
-        // 一遍死代码删除
-        dead_code_eliminate::dead_code_eliminate(module, false);
-
-        // phi优化
-        phi_optimizer::phi_run(func.get_head());
-    }
+    // phi优化
+    phi_optimizer::phi_run(module);
 
     // 全局死代码删除
     dead_code_eliminate::global_eliminate(module);

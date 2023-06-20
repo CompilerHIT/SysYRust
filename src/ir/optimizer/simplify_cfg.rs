@@ -6,9 +6,10 @@ use crate::{
         instruction::{Inst, InstKind},
         module::Module,
     },
-    log_file,
     utility::{ObjPool, ObjPtr},
 };
+
+use super::func_process;
 
 ///! 对于block的优化
 ///! 1. 删除无法到达的block：除头block外没有前继的就是无法到达的
@@ -19,14 +20,10 @@ pub fn simplify_cfg_run(
     module: &mut Module,
     pools: &mut (&mut ObjPool<BasicBlock>, &mut ObjPool<Inst>),
 ) {
-    for (_, func) in module.get_all_func().iter() {
-        if func.is_empty_bb() || !func.get_head().has_next_bb() {
-            continue;
-        }
-
+    func_process(module, |_, func| {
         remove_unreachable_bb(func.get_head(), pools);
         merge_one_line_bb(func.get_head());
-    }
+    });
 }
 
 fn merge_one_line_bb(head: ObjPtr<BasicBlock>) {
@@ -87,6 +84,7 @@ fn merge_bb(mut bb: ObjPtr<BasicBlock>) {
     tail.insert_before(inst);
     tail.remove_self();
 }
+
 fn remove_unreachable_bb(
     head: ObjPtr<BasicBlock>,
     pools: &mut (&mut ObjPool<BasicBlock>, &mut ObjPool<Inst>),
@@ -96,7 +94,6 @@ fn remove_unreachable_bb(
     let bb_list = get_bb_list(head);
 
     loop {
-        log_file!("log_ir", "round");
         let mut changed = false;
         for bb in bb_list.iter() {
             // 不考虑头和尾

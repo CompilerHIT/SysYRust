@@ -8,32 +8,24 @@
 //! 4. br指令
 //! 5. Head指令
 
-use std::collections::HashSet;
-
+use super::*;
 use crate::{
-    ir::{basicblock::BasicBlock, instruction::InstKind, module::Module},
+    ir::{instruction::InstKind, module::Module},
     utility::ObjPtr,
 };
 
-pub fn dead_code_eliminate(end_bb: ObjPtr<BasicBlock>, more_than_once: bool) {
-    let mut changed = true;
-    let mut next = true;
-    while changed && next {
-        changed = false;
-        let mut visited = HashSet::new();
-        let mut queue = Vec::new();
-        queue.insert(0, end_bb);
-        while let Some(bb) = queue.pop() {
-            if visited.contains(&bb) {
-                continue;
-            }
-            visited.insert(bb);
-            changed |= eliminate_bb_inst(bb);
-            for pred in bb.get_up_bb() {
-                queue.insert(0, pred.clone());
-            }
+pub fn dead_code_eliminate(module: &mut Module, more_than_once: bool) {
+    let mut changed = false;
+    loop {
+        func_process(module, |name, func| {
+            bfs_inst_process(func.get_head(), |inst| {
+                changed |= eliminate_inst(inst);
+            })
+        });
+
+        if !more_than_once || !changed {
+            break;
         }
-        next = more_than_once;
     }
 }
 
@@ -51,31 +43,16 @@ pub fn global_eliminate(module: &mut Module) {
     }
 }
 
-fn eliminate_bb_inst(bb: ObjPtr<BasicBlock>) -> bool {
-    if bb.is_empty() {
-        return false;
-    }
-
+fn eliminate_inst(mut inst: ObjPtr<Inst>) -> bool {
     let mut changed = false;
-    let mut inst = bb.get_head_inst();
-    loop {
-        if let InstKind::Head(_) = inst.get_kind() {
-            break;
-        }
-
-        if inst.get_use_list().len() == 0 {
-            match inst.get_kind() {
-                InstKind::Call(_) | InstKind::Store | InstKind::Return | InstKind::Branch => {}
-                _ => {
-                    changed = true;
-                    let next_inst = inst.get_next();
-                    inst.remove_self();
-                    inst = next_inst;
-                    continue;
-                }
+    if inst.get_use_list().len() == 0 {
+        match inst.get_kind() {
+            InstKind::Call(_) | InstKind::Store | InstKind::Return | InstKind::Branch => {}
+            _ => {
+                changed = true;
+                inst.remove_self();
             }
         }
-        inst = inst.get_next();
     }
 
     changed

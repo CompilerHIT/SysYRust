@@ -51,10 +51,8 @@ impl BasicBlock {
     /// 检查是否为空的BasicBlock
     pub fn is_empty(&self) -> bool {
         if self.inst_head.is_head() {
-            debug_assert_eq!(self.inst_head.is_tail(), true);
             true
         } else {
-            debug_assert_eq!(self.inst_head.is_tail(), false);
             false
         }
     }

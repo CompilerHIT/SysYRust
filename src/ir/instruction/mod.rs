@@ -130,18 +130,19 @@ impl Inst {
     // 链表行为
     /// 判断是否为当前bb的第一条指令
     pub fn is_head(&self) -> bool {
-        match self.list.get_prev().as_ref().get_kind() {
-            InstKind::Head(_) => true,
-            _ => false,
+        if let InstKind::Head(_) = self.get_prev().get_kind() {
+            true
+        } else {
+            false
         }
     }
 
-    /// 判断是否为当前bb的最后一条指令
+    /// 判断是否为当前bb的最后一条指令的后一条指令
     pub fn is_tail(&self) -> bool {
-        // 同上
-        match self.list.get_next().as_ref().get_kind() {
-            InstKind::Head(_) => true,
-            _ => false,
+        if let InstKind::Head(_) = self.get_kind() {
+            true
+        } else {
+            false
         }
     }
 

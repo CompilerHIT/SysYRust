@@ -261,15 +261,11 @@ fn dump_block(
         (name_index, text)
     } else {
         let mut inst = block.get_head_inst();
-        loop {
+        while !inst.is_tail() {
             let temp;
             (name_index, temp) = dump_inst(inst, global_map, local_map, name_index);
             text = format!("{}{}", text, temp);
-            if inst.is_tail() {
-                break;
-            } else {
-                inst = inst.get_next();
-            }
+            inst = inst.get_next();
         }
         (name_index, text)
     }

@@ -1,7 +1,9 @@
 use core::fmt;
-use std::collections::VecDeque;
 
-use crate::ir::instruction::InstKind;
+use crate::ir::{
+    instruction::InstKind,
+    optimizer::{bfs_inst_process, func_process},
+};
 
 use super::*;
 
@@ -23,8 +25,6 @@ impl CallMap {
             .get_mut(caller)
             .unwrap()
             .insert(callee.to_string());
-
-        self.call_map.iter().position(predicate)
     }
 
     pub fn delete_func(&mut self, func_name: &str) {
@@ -55,7 +55,7 @@ impl fmt::Display for CallMap {
     }
 }
 
-pub fn call_map_gen(module: &Module) -> CallMap {
+pub fn call_map_gen(module: &mut Module) -> CallMap {
     let mut call_map = HashMap::new();
 
     // 先找出外部函数
@@ -67,47 +67,22 @@ pub fn call_map_gen(module: &Module) -> CallMap {
     }
 
     // 对每个非外部函数，构造调用边
-    for (name, func) in module.get_all_func() {
-        if extern_func.contains(name) {
-            continue;
-        }
+    func_process(module, |name, func| {
         let call_set = call_set_gen(&extern_func, func.get_head());
         call_map.insert(name.clone(), call_set);
-    }
-
+    });
     CallMap { call_map }
 }
 
 fn call_set_gen(extern_func: &HashSet<String>, head_bb: ObjPtr<BasicBlock>) -> HashSet<String> {
     let mut call_set = HashSet::new();
-
-    // 广度优先遍历
-    let mut queue = VecDeque::new();
-    let mut visited = HashSet::new();
-    queue.push_back(head_bb);
-    while let Some(bb) = queue.pop_front() {
-        if visited.contains(&bb) {
-            continue;
-        }
-        visited.insert(bb);
-        let mut inst = bb.get_head_inst();
-        loop {
-            if let InstKind::Call(callee) = inst.get_kind() {
-                if !extern_func.contains(&callee) {
-                    call_set.insert(callee);
-                }
+    bfs_inst_process(head_bb, |inst| {
+        if let InstKind::Call(callee) = inst.get_kind() {
+            if !extern_func.contains(&callee) {
+                call_set.insert(callee);
             }
-
-            if inst.is_tail() {
-                break;
-            }
-            inst = inst.get_next();
         }
-
-        for next_bb in bb.get_next_bb().iter() {
-            queue.push_back(next_bb.clone());
-        }
-    }
+    });
 
     call_set
 }
