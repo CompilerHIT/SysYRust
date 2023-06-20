@@ -79,7 +79,9 @@ impl Process for GlobalItems {
                     let inst_func = funcdef.process(true, kit_mut).unwrap();
                     match kit_mut.context_mut.bb_now_mut {
                         InfuncChoice::InFunc(bb_now) => {
-                            if !bb_now.get_up_bb().is_empty() {
+                            if !bb_now.get_up_bb().is_empty()
+                                || (bb_now.get_up_bb().is_empty() && inst_func.get_head() == bb_now)
+                            {
                                 if bb_now.is_empty() {
                                     match inst_func.get_return_type() {
                                         IrType::Void => {
