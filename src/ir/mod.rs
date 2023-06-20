@@ -15,7 +15,7 @@ pub use dump_ir::dump_now;
 pub use optimizer::optimizer_run;
 
 /// 侵入式链表
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct IList<T: 'static> {
     prev: Option<ObjPtr<T>>,
     next: Option<ObjPtr<T>>,

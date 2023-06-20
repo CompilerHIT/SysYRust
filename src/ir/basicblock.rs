@@ -5,7 +5,7 @@ use super::{
 };
 use crate::utility::{ObjPool, ObjPtr};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct BasicBlock {
     name: String,
     value: Value,

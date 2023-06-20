@@ -19,7 +19,7 @@ mod phi;
 mod store;
 mod unary;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Inst {
     user: User,
     list: IList<Inst>,

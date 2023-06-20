@@ -1,6 +1,6 @@
 use super::ir_type::IrType;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Value {
     ir_type: IrType,
 }
