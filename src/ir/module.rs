@@ -48,7 +48,7 @@ impl Module {
         if let Some(func) = self.function.get(name) {
             func.clone()
         } else {
-            panic!("在定义函数前就使用函数")
+            panic!("在定义函数前就使用函数, {}", name);
         }
     }
 

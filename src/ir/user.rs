@@ -3,7 +3,7 @@ use std::ptr::eq;
 use super::{instruction::Inst, ir_type::IrType, value::Value};
 use crate::utility::ObjPtr;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct User {
     value: Value,
     operands: Vec<ObjPtr<Inst>>,

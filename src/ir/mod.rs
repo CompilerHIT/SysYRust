@@ -13,6 +13,7 @@ pub mod value;
 
 pub use dump_ir::dump_now;
 pub use optimizer::optimizer_run;
+pub use optimizer::{call_map_gen, CallMap};
 
 /// 侵入式链表
 #[derive(Debug, Clone)]

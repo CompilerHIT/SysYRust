@@ -1,10 +1,13 @@
-use super::{basicblock::BasicBlock, instruction::Inst, module::Module};
+use super::{basicblock::BasicBlock, function::Function, instruction::Inst, module::Module};
 use crate::utility::{ObjPool, ObjPtr};
-use std::collections::HashSet;
+use std::collections::{HashSet, VecDeque};
 
 mod dead_code_eliminate;
+mod func_inline;
 mod phi_optimizer;
 mod simplify_cfg;
+
+pub use func_inline::{call_map_gen, CallMap};
 
 pub fn optimizer_run(
     module: &mut Module,
@@ -15,9 +18,79 @@ pub fn optimizer_run(
     functional_optimizer(module);
 
     if optimize_flag {
+        // 死代码删除
+
         // 简化cfg
         simplify_cfg::simplify_cfg_run(module, &mut pools);
+
+        // 函数内联
+        func_inline::inline_run(module, &mut pools);
         // TODO: 性能优化
+    }
+}
+
+/// 从head开始，广度优先遍历每一个基本块，并对基本块中的指令进行处理
+/// # Arguments
+/// * `head` - 广度优先遍历的起始点
+/// * `predicate` - 对每一个基本块进行处理的闭包，这个闭包接受一个参数，类型为inst,并对inst进行处理
+pub fn bfs_inst_process<F>(head: ObjPtr<BasicBlock>, mut predicate: F)
+where
+    F: FnMut(ObjPtr<Inst>),
+{
+    bfs_bb_proceess(head, |bb| {
+        let mut inst = bb.get_head_inst();
+        loop {
+            predicate(inst);
+            if inst.is_tail() {
+                break;
+            }
+            inst = inst.get_next();
+        }
+    })
+}
+
+/// 从head开始，广度优先遍历每一个基本块，并对基本块进行处理
+/// # Arguments
+/// * `head` - 广度优先遍历的起始点
+/// * `predicate` - 对每一个基本块进行处理的闭包，这个闭包接受一个参数，类型为bb,并对bb进行处理
+pub fn bfs_bb_proceess<F>(head: ObjPtr<BasicBlock>, mut predicate: F)
+where
+    F: FnMut(ObjPtr<BasicBlock>),
+{
+    let mut visited = HashSet::new();
+    let mut queue = VecDeque::new();
+    queue.push_back(head);
+    while let Some(bb) = queue.pop_front() {
+        if visited.contains(&bb) {
+            continue;
+        }
+        visited.insert(bb);
+        predicate(bb);
+
+        for next_bb in bb.get_next_bb().iter() {
+            queue.push_back(next_bb.clone());
+        }
+    }
+}
+
+/// 对每一个函数进行处理，但不处理外部函数
+/// 对每一个函数进行处理
+/// # Arguments
+/// * `module`
+/// * `predicate`
+/// # Arguments
+/// * `module` - 进行处理的模块
+/// * `predicate` - 对每一个函数进行处理的闭包，这个闭包接受两个参数，第一个参数为函数名，第二个参数为函数
+pub fn func_process<F>(module: &mut Module, mut predicate: F)
+where
+    F: FnMut(String, ObjPtr<Function>),
+{
+    for (name, func) in module.get_all_func().iter() {
+        // 空函数不处理
+        if func.is_empty_bb() {
+            continue;
+        }
+        predicate(name.to_string(), func.clone());
     }
 }
 
@@ -28,13 +101,11 @@ fn functional_optimizer(module: &mut Module) {
             continue;
         }
 
-        let end_bb = bfs_find_end_bb(func.get_head());
-
         // 一遍死代码删除
-        dead_code_eliminate::dead_code_eliminate(end_bb, false);
+        dead_code_eliminate::dead_code_eliminate(module, false);
 
         // phi优化
-        phi_optimizer::phi_run(end_bb);
+        phi_optimizer::phi_run(func.get_head());
     }
 
     // 全局死代码删除

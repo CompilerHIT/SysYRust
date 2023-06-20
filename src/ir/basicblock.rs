@@ -38,6 +38,11 @@ impl BasicBlock {
         }
     }
 
+    /// 设置BasicBlock的名字
+    pub fn set_name(&mut self, name: String) {
+        self.name = name;
+    }
+
     /// 获取BasicBlock的名字
     pub fn get_name(&self) -> &str {
         self.name.as_str()
@@ -59,6 +64,11 @@ impl BasicBlock {
     pub fn get_head_inst(&self) -> ObjPtr<Inst> {
         debug_assert_eq!(self.is_empty(), false);
         self.inst_head.get_next()
+    }
+
+    /// 初始化BasicBlock的Head指令
+    pub fn init_head(&mut self) {
+        self.inst_head.init_head(ObjPtr::new(self));
     }
 
     /// 获取BasicBlock的最后一条指令
@@ -108,6 +118,16 @@ impl BasicBlock {
 
         let bb = ObjPtr::new(bb);
         self.up_bb.push(bb);
+    }
+
+    /// 设置up_bb
+    pub fn set_up_bb(&mut self, bb: Vec<ObjPtr<BasicBlock>>) {
+        self.up_bb = bb;
+    }
+
+    /// 设置next_bb
+    pub fn set_next_bb(&mut self, bb: Vec<ObjPtr<BasicBlock>>) {
+        self.next_bb = bb;
     }
 
     /// 获取下一个BB
