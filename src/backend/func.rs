@@ -381,26 +381,26 @@ impl Func {
                         queue.push_back((pred.clone(), reg));
                     }
                 }
-                log_file!(
-                    "19_2.txt",
-                    "live in:{:?}\nlive out:{:?}\nlive def:{:?}\nlive use:{:?}",
-                    pred.live_in
-                        .iter()
-                        .map(|r| r.get_id())
-                        .collect::<HashSet<i32>>(),
-                    pred.live_out
-                        .iter()
-                        .map(|r| r.get_id())
-                        .collect::<HashSet<i32>>(),
-                    pred.live_def
-                        .iter()
-                        .map(|r| r.get_id())
-                        .collect::<HashSet<i32>>(),
-                    pred.live_use
-                        .iter()
-                        .map(|r| r.get_id())
-                        .collect::<HashSet<i32>>(),
-                );
+                // log_file!(
+                //     "19_2.txt",
+                //     "live in:{:?}\nlive out:{:?}\nlive def:{:?}\nlive use:{:?}",
+                //     pred.live_in
+                //         .iter()
+                //         .map(|r| r.get_id())
+                //         .collect::<HashSet<i32>>(),
+                //     pred.live_out
+                //         .iter()
+                //         .map(|r| r.get_id())
+                //         .collect::<HashSet<i32>>(),
+                //     pred.live_def
+                //         .iter()
+                //         .map(|r| r.get_id())
+                //         .collect::<HashSet<i32>>(),
+                //     pred.live_use
+                //         .iter()
+                //         .map(|r| r.get_id())
+                //         .collect::<HashSet<i32>>(),
+                // );
             }
         }
 
@@ -423,9 +423,8 @@ impl Func {
         self.context.as_mut().set_reg_map(&self.reg_alloc_info.dstr);
         log!("dstr map info{:?}", self.reg_alloc_info.dstr);
         log!("spills:{:?}", self.reg_alloc_info.spillings);
-
-        let mut stack_size = self.reg_alloc_info.stack_size as i32;
-        stack_size += self.max_params * ADDR_SIZE;
+        
+        let stack_size = self.max_params * ADDR_SIZE;
         log!("set stack size:{}", stack_size);
         self.context.as_mut().set_offset(stack_size);
     }
@@ -461,6 +460,7 @@ impl Func {
         }
         let slot = StackSlot::new(offset, offset);
         assert!(self.stack_addr.is_empty());
+        self.stack_addr.push_front(StackSlot::new(0, 0));
         self.stack_addr.push_front(slot);
     }
 
@@ -528,8 +528,11 @@ impl Func {
         log!("stack size:{}", stack_size);
 
         if let Some(addition_stack_info) = self.stack_addr.front() {
-            stack_size += addition_stack_info.get_pos() + addition_stack_info.get_size();
+            stack_size += addition_stack_info.get_pos();
         }
+        if let Some(slot) = self.stack_addr.back() {
+            stack_size += slot.get_pos() + slot.get_size();
+        };
         stack_size += self.caller_saved.len() as i32 * ADDR_SIZE;
 
         //栈对齐 - 调用func时sp需按16字节对齐
@@ -540,12 +543,11 @@ impl Func {
         let map_clone = map.clone();
         let (icnt, fcnt) = self.param_cnt;
         let start_pos = stack_size - ADDR_SIZE - ADDR_SIZE * (max(0, icnt - ARG_REG_COUNT) + max(0, fcnt - ARG_REG_COUNT));
-
+        let rev_start_pos = stack_size - start_pos;
         self.context.as_mut().set_prologue_event(move || {
             let mut builder = AsmBuilder::new(&mut f1);
             // addi sp -stack_size
-            let of = stack_size;
-            if operand::is_imm_12bs(of) {
+            if operand::is_imm_12bs(stack_size) {
                 builder.addi("sp", "sp", -stack_size);
                 builder.s(
                     &ra.to_string(false),
@@ -561,32 +563,29 @@ impl Func {
                     }
                 }
             } else {
-                // let lower = (of << 20) >> 20;
-                // let upper = (of - lower) >> 12;
-                // builder.op1("lui", "gp", &upper.to_string());
-                // builder.op2("add", "gp", "gp", &lower.to_string(), true, true);
-                // builder.op2("sub", "sp", "sp", "gp", false, true);
-                // builder.op2("add", "gp", "gp", "sp", false, true);
-                // builder.s(&ra.to_string(false), "gp", -8, false, true);
+                builder.op1("li", "gp", &stack_size.to_string());
+                builder.op2("sub", "sp", "sp", "gp", false, true);
+                builder.op2("add", "gp", "gp", "sp", false, true);
+                builder.s(&ra.to_string(false), "gp", -rev_start_pos, false, true);
 
-                // if !is_main {
-                //     for (i, (reg, slot)) in map.iter().enumerate() {
-                //         builder.s(
-                //             &reg.to_string(false),
-                //             "gp",
-                //             -(i as i32 + 2) * ADDR_SIZE,
-                //             false,
-                //             true,
-                //         );
-                //     }
-                // }
+                if !is_main {
+                    for (i, (reg, slot)) in map.iter().enumerate() {
+                        builder.s(
+                            &reg.to_string(false),
+                            "gp",
+                            -(rev_start_pos + (i + 1) as i32 * ADDR_SIZE),
+                            false,
+                            true,
+                        );
+                    }
+                }
             }
         });
 
         self.context.as_mut().set_epilogue_event(move || {
             let mut builder = AsmBuilder::new(&mut f2);
 
-            if operand::is_imm_12bs(start_pos) {
+            if operand::is_imm_12bs(stack_size) {
                 if !is_main {
                     for (reg, slot) in map_clone.iter() {
                         let of = stack_size - ADDR_SIZE * 2 - slot.get_pos();
@@ -602,24 +601,21 @@ impl Func {
                 );
                 builder.addi("sp", "sp", stack_size);
             } else {
-                // let lower = (of << 20) >> 20;
-                // let upper = (of - lower) >> 12;
-                // builder.op1("lui", "gp", &upper.to_string());
-                // builder.op2("add", "gp", "gp", &lower.to_string(), true, true);
-                // builder.op2("add", "sp", "sp", "gp", false, true);
-                // builder.op2("add", "gp", "gp", "sp", false, true);
-                // builder.l(&ra.to_string(false), "gp", -8, false, true);
-                // if !is_main {
-                //     for (i, (reg, slot)) in map_clone.iter().enumerate() {
-                //         builder.l(
-                //             &reg.to_string(false),
-                //             "gp",
-                //             -(i as i32 + 2) * ADDR_SIZE,
-                //             false,
-                //             true,
-                //         );
-                //     }
-                // }
+                builder.op1("li", "gp", &stack_size.to_string());
+                builder.op2("add", "sp", "sp", "gp", false, true);
+                builder.l(&ra.to_string(false), "sp", -rev_start_pos, false, true);
+
+                if !is_main {
+                    for (i, (reg, slot)) in map_clone.iter().enumerate() {
+                        builder.l(
+                            &reg.to_string(false),
+                            "sp",
+                            -(rev_start_pos + (i + 1) as i32 * ADDR_SIZE),
+                            false,
+                            true,
+                        );
+                    }
+                }
             }
         });
     }

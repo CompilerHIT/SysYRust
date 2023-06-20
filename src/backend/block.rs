@@ -499,8 +499,8 @@ impl BB {
                                     self.insts.push(pool.put_inst(LIRInst::new(
                                         InstrsType::Store,
                                         vec![
-                                            addr_reg.clone(),
                                             value_reg,
+                                            addr_reg.clone(),
                                             Operand::IImm(IImm::new(offset * 4)),
                                         ],
                                     )));
@@ -532,7 +532,7 @@ impl BB {
                                     self.insts.push(pool.put_inst(inst));
                                     self.insts.push(pool.put_inst(LIRInst::new(
                                         InstrsType::Store,
-                                        vec![tmp, value_reg, Operand::IImm(IImm::new(0))],
+                                        vec![value_reg, tmp ,Operand::IImm(IImm::new(0))],
                                     )));
                                 }
                             }
@@ -541,7 +541,7 @@ impl BB {
                             let addr_reg = self.resolve_operand(func, addr, false, map_info, pool);
                             self.insts.push(pool.put_inst(LIRInst::new(
                                 InstrsType::Store,
-                                vec![addr_reg, value_reg, Operand::IImm(IImm::new(0))],
+                                vec![value_reg, addr_reg, Operand::IImm(IImm::new(0))],
                             )));
                         }
                     }
@@ -755,9 +755,9 @@ impl BB {
                     }
                     let reg_cnt = min(icnt, ARG_REG_COUNT);
                     func.as_mut().max_params = max(reg_cnt, func.max_params);
-                    for arg in arg_list.iter() {
-                        log!("call arg: {:?}", arg.get_param_type());
-                    }
+                    // for arg in arg_list.iter() {
+                    //     log!("call arg: {:?}", arg.get_param_type());
+                    // }
                     for arg in arg_list.iter().rev() {
                         match arg.as_ref().get_param_type() {
                             IrType::Int | IrType::IntPtr => {
@@ -1128,6 +1128,7 @@ impl BB {
                         func.as_mut().spill_stack_map.insert(*id, stack_slot);
                     }
                 }
+                log!("func: {}, stack: {:?}", func.label, func.stack_addr);
                 for (i, id) in spills.iter().enumerate() {
                     inst.as_mut().replace(*id, 5 + (i as i32))
                 }
@@ -1174,12 +1175,11 @@ impl BB {
 
     pub fn handle_overflow(&mut self, func: ObjPtr<Func>, pool: &mut BackendPool) {
         let mut pos = 0;
-        log!("{}, len: {}", self.label, self.insts.len());
+        // log!("{}, len: {}", self.label, self.insts.len());
         loop {
             if pos >= self.insts.len() {
                 break;
             }
-            log!("inst: {:?}", self.insts[pos]);
             let inst_ref = self.insts[pos].as_ref();
             match inst_ref.get_type() {
                 InstrsType::Load | InstrsType::Store => {
@@ -1189,7 +1189,7 @@ impl BB {
                         pos += 1;
                         continue;
                     }
-                    log!("over offset: {}", offset);
+                    // log!("over offset: {}", offset);
                     self.resolve_overflow_sl(temp.clone(), &mut pos, offset, pool);
                     // load的dst是reg，lhs是src_addr
                     // store的dst是addr，lhs是val
@@ -1217,8 +1217,8 @@ impl BB {
                             self.insts.insert(pos, pool.put_inst(inst));
                             pos += 1;
                             self.insts[pos].as_mut().replace_op(vec![
-                                temp,
                                 inst_ref.get_lhs().clone(),
+                                temp,
                                 Operand::IImm(IImm::new(0)),
                             ]);
                         }
@@ -1263,7 +1263,7 @@ impl BB {
                 }
                 InstrsType::LoadParamFromStack | InstrsType::StoreParamToStack => {
                     let temp = Operand::Reg(Reg::new(3, ScalarType::Int));
-                    let offset = func.as_ref().reg_alloc_info.stack_size as i32
+                    let offset = func.context.get_offset() as i32
                         - inst_ref.get_stack_offset().get_data();
                     if operand::is_imm_12bs(offset) {
                         pos += 1;
