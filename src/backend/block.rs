@@ -763,8 +763,43 @@ impl BB {
                             IrType::Int | IrType::IntPtr => {
                                 icnt -= 1;
                                 if icnt >= ARG_REG_COUNT {
-                                    let src_reg =
-                                        self.resolve_operand(func, *arg, true, map_info, pool);
+                                    let src_reg = match arg.get_param_type() {
+                                        IrType::Int => {
+                                            self.resolve_operand(func, *arg, true, map_info, pool)
+                                        }
+                                        IrType::IntPtr => {
+                                            let src_reg = self.resolve_operand(
+                                                func,
+                                                arg.get_gep_ptr(),
+                                                true,
+                                                map_info,
+                                                pool,
+                                            );
+                                            let tmp = self.resolve_operand(
+                                                func,
+                                                arg.get_gep_offset(),
+                                                true,
+                                                map_info,
+                                                pool,
+                                            );
+                                            self.insts.push(pool.put_inst(LIRInst::new(
+                                                InstrsType::Binary(BinaryOp::Shl),
+                                                vec![
+                                                    tmp.clone(),
+                                                    tmp.clone(),
+                                                    Operand::IImm(IImm::new(2)),
+                                                ],
+                                            )));
+                                            let mut add = LIRInst::new(
+                                                InstrsType::Binary(BinaryOp::Add),
+                                                vec![src_reg.clone(), src_reg.clone(), tmp],
+                                            );
+                                            add.set_double();
+                                            self.insts.push(pool.put_inst(add));
+                                            src_reg
+                                        }
+                                        _ => unreachable!(),
+                                    };
                                     // 最后一个溢出参数在最下方（最远离sp位置）
                                     let offset = Operand::IImm(IImm::new(
                                         -(max(0, icnt - ARG_REG_COUNT)
@@ -783,13 +818,37 @@ impl BB {
                                     let dst_reg =
                                         Operand::Reg(Reg::new(10 + icnt, ScalarType::Int));
                                     let src_reg = match arg.get_kind() {
-                                        InstKind::Gep => self.resolve_operand(
-                                            func,
-                                            arg.get_gep_ptr(),
-                                            true,
-                                            map_info,
-                                            pool,
-                                        ),
+                                        InstKind::Gep => {
+                                            let src_reg = self.resolve_operand(
+                                                func,
+                                                arg.get_gep_ptr(),
+                                                true,
+                                                map_info,
+                                                pool,
+                                            );
+                                            let tmp = self.resolve_operand(
+                                                func,
+                                                arg.get_gep_offset(),
+                                                true,
+                                                map_info,
+                                                pool,
+                                            );
+                                            self.insts.push(pool.put_inst(LIRInst::new(
+                                                InstrsType::Binary(BinaryOp::Shl),
+                                                vec![
+                                                    tmp.clone(),
+                                                    tmp.clone(),
+                                                    Operand::IImm(IImm::new(2)),
+                                                ],
+                                            )));
+                                            let mut add = LIRInst::new(
+                                                InstrsType::Binary(BinaryOp::Add),
+                                                vec![src_reg.clone(), src_reg.clone(), tmp],
+                                            );
+                                            add.set_double();
+                                            self.insts.push(pool.put_inst(add));
+                                            src_reg
+                                        }
                                         _ => self.resolve_operand(func, *arg, true, map_info, pool),
                                     };
                                     let stack_addr = &func.as_ref().stack_addr;
@@ -1055,7 +1114,6 @@ impl BB {
                     }
                     let mut pos = func.stack_addr.back().unwrap().get_pos();
                     pos += func.stack_addr.back().unwrap().get_size();
-                    log!("stack state: {:?}", func.stack_addr);
                     for (i, id) in caller_regs.iter().enumerate() {
                         let offset = pos + i as i32 * ADDR_SIZE;
                         let mut ins = LIRInst::new(
@@ -1127,7 +1185,6 @@ impl BB {
                         func.as_mut().spill_stack_map.insert(*id, stack_slot);
                     }
                 }
-                log!("func: {}, stack: {:?}", func.label, func.stack_addr);
                 for (i, id) in spills.iter().enumerate() {
                     inst.as_mut().replace(*id, 5 + (i as i32))
                 }
@@ -1307,7 +1364,7 @@ impl BB {
                         Operand::Addr(label) => label,
                         _ => unreachable!("branch must have a label"),
                     };
-                    
+
                     let mut i = 0;
                     let (mut st, mut ed) = (0, 0);
                     let (mut start, mut end) = (0, 0);
@@ -1329,9 +1386,8 @@ impl BB {
                         i += 1;
                     }
                     (st, ed) = (min(start, end), max(start, end));
-                    log!("func's len: {} st: {}, ed: {}", func.blocks.len(), st, ed);
                     let mut distance = 0;
-                    for i in st+1..ed {
+                    for i in st + 1..ed {
                         let block = func.blocks[i];
                         distance += block.insts.len() as i32 * ADDR_SIZE;
                         if (!is_j && !operand::is_imm_12bs(distance as i32))
@@ -1344,8 +1400,6 @@ impl BB {
                                 vec![Operand::Addr(target.clone())],
                             )));
                             func.as_mut().tmp_blocks.insert(tmp, i);
-                            log!("{}", distance);
-                            log!("insert block: {}", func.as_mut().tmp_blocks.len());
                             //FIXME: 最多长跳转一次，或可考虑收敛算法
                             self.insts[pos].as_mut().replace_label(name);
                             break;
