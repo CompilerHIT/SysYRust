@@ -532,7 +532,7 @@ impl BB {
                                     self.insts.push(pool.put_inst(inst));
                                     self.insts.push(pool.put_inst(LIRInst::new(
                                         InstrsType::Store,
-                                        vec![value_reg, tmp ,Operand::IImm(IImm::new(0))],
+                                        vec![value_reg, tmp, Operand::IImm(IImm::new(0))],
                                     )));
                                 }
                             }
@@ -1039,7 +1039,6 @@ impl BB {
                     _ => {}
                 }
             }
-            log!("caller reg: {:?}", func.as_ref().caller_saved);
             let mut caller_regs: HashSet<i32> = HashSet::new();
             let (icnt, fcnt) = inst.get_param_cnts();
             //FIXME: solve float regs
@@ -1054,7 +1053,6 @@ impl BB {
                             caller_regs.insert(*reg);
                         }
                     }
-                    log!("caller regs: {:?}", caller_regs);
                     let mut pos = func.stack_addr.back().unwrap().get_pos();
                     pos += func.stack_addr.back().unwrap().get_size();
                     log!("stack state: {:?}", func.stack_addr);
@@ -1264,8 +1262,8 @@ impl BB {
                 }
                 InstrsType::LoadParamFromStack | InstrsType::StoreParamToStack => {
                     let temp = Operand::Reg(Reg::new(3, ScalarType::Int));
-                    let offset = func.context.get_offset() as i32
-                        - inst_ref.get_stack_offset().get_data();
+                    let offset =
+                        func.context.get_offset() as i32 - inst_ref.get_stack_offset().get_data();
                     if operand::is_imm_12bs(offset) {
                         pos += 1;
                         continue;
@@ -1297,67 +1295,68 @@ impl BB {
                         Operand::IImm(IImm::new(0)),
                     ]);
                 }
+
                 InstrsType::Branch(..) | InstrsType::Jump => {
                     // deal with false branch
-                    // let mut distance = 0;
-                    // let is_j = match inst_ref.get_type() {
-                    //     InstrsType::Branch(..) => false,
-                    //     InstrsType::Jump => true,
-                    //     _ => unreachable!(),
-                    // };
-                    // let target = match inst_ref.get_label() {
-                    //     Operand::Addr(label) => label,
-                    //     _ => unreachable!("branch must have a label"),
-                    // };
-                    // let mut i = 0;
-                    // let (mut flag, mut first_j) = (false, true);
-                    // loop {
-                    //     if i >= func.as_ref().blocks.len() {
-                    //         break;
-                    //     }
-                    //     let block_ref = func.as_ref().blocks[i];
-                    //     if &self.label == &block_ref.as_ref().label {
-                    //         flag = true;
-                    //     }
-                    //     if &block_ref.as_ref().label == target {
-                    //         //FIXME: this is a bug
-                    //         break;
-                    //     }
-                    //     if flag {
-                    //         distance += block_ref.as_ref().insts.len() * 4;
-                    //     }
-                    //     i += 1;
-                    //     if (!is_j && !operand::is_imm_12bs(distance as i32))
-                    //         || (is_j && !operand::is_imm_20bs(distance as i32))
-                    //     {
-                    //         let name = format!("overflow_{}", get_tmp_bb());
-                    //         let tmp = pool.put_block(BB::new(&name));
-                    //         tmp.as_mut().insts.push(pool.put_inst(LIRInst::new(
-                    //             InstrsType::Jump,
-                    //             vec![Operand::Addr(target.clone())],
-                    //         )));
-                    //         func.as_mut().blocks.insert(i, tmp);
-                    //         if first_j {
-                    //             self.insts[pos].as_mut().replace_label(name);
-                    //             if is_j {
-                    //                 distance -= operand::IMM_20_Bs as usize;
-                    //             } else {
-                    //                 distance -= operand::IMM_12_Bs as usize;
-                    //             }
-                    //         } else {
-                    //             self.insts.insert(
-                    //                 pos,
-                    //                 pool.put_inst(LIRInst::new(
-                    //                     InstrsType::Jump,
-                    //                     vec![Operand::Addr(name)],
-                    //                 )),
-                    //             );
-                    //             distance -= operand::IMM_20_Bs as usize;
-                    //         }
-                    //         pos += 1;
-                    //         first_j = false;
-                    //     }
-                    // }
+                    let is_j = match inst_ref.get_type() {
+                        InstrsType::Branch(..) => false,
+                        InstrsType::Jump => true,
+                        _ => unreachable!(),
+                    };
+                    let target = match inst_ref.get_label() {
+                        Operand::Addr(label) => label,
+                        _ => unreachable!("branch must have a label"),
+                    };
+                    
+                    let mut i = 0;
+                    let (mut st, mut ed) = (0, 0);
+                    let (mut start, mut end) = (0, 0);
+
+                    loop {
+                        if i >= func.as_ref().blocks.len() {
+                            break;
+                        }
+                        let block_ref = func.as_ref().blocks[i];
+                        if block_ref.label == self.label {
+                            start = i;
+                        }
+                        if block_ref.label == *target {
+                            end = i;
+                        }
+                        if start != 0 && end != 0 {
+                            break;
+                        }
+                        i += 1;
+                    }
+                    (st, ed) = (min(start, end), max(start, end));
+                    log!("func's len: {} st: {}, ed: {}", func.blocks.len(), st, ed);
+                    let mut distance = 0;
+                    for i in st..ed {
+                        let block = func.blocks[i];
+                        distance += block.insts.len() as i32 * ADDR_SIZE;
+                        if (!is_j && !operand::is_imm_12bs(distance as i32))
+                            || (is_j && !operand::is_imm_20bs(distance as i32))
+                        {
+                            let name = format!("overflow_{}", get_tmp_bb());
+                            let tmp = pool.put_block(BB::new(&name));
+                            tmp.as_mut().insts.push(pool.put_inst(LIRInst::new(
+                                InstrsType::Jump,
+                                vec![Operand::Addr(target.clone())],
+                            )));
+                            func.as_mut().tmp_blocks.insert(tmp, i);
+                            log!("{}", distance);
+                            log!("insert block: {}", func.as_mut().tmp_blocks.len());
+                            //FIXME: 最多长跳转一次，或可考虑收敛算法
+                            self.insts[pos].as_mut().replace_label(name);
+                            break;
+                            // if is_j {
+                            //     distance -= operand::IMM_20_Bs as i32;
+                            // } else {
+                            //     distance -= operand::IMM_12_Bs as i32;
+                            // }
+                        }
+                    }
+                    pos += 1;
                 }
                 InstrsType::Call => {
                     // call 指令不会发生偏移量的溢出

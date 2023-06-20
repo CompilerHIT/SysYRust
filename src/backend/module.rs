@@ -52,7 +52,6 @@ impl<'a> AsmModule<'a> {
         self.allocate_reg(f);
         self.handle_spill(pool, f);
         // 检查地址溢出，插入间接寻址
-        log!("start handle overflow");
         self.handle_overflow(pool);
         self.generate_global_var(f);
         // log!("start generate");

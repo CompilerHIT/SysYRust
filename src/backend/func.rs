@@ -54,6 +54,7 @@ pub struct Func {
     pub callee_saved: HashSet<Reg>,
     pub caller_saved: HashMap<i32, i32>,
     pub max_params: i32,
+    pub tmp_blocks: HashMap<ObjPtr<BB>, usize>
 }
 
 /// reg_num, stack_addr, caller_stack_addr考虑借助回填实现
@@ -81,6 +82,7 @@ impl Func {
             callee_saved: HashSet::new(),
             caller_saved: HashMap::new(),
             max_params: 0,
+            tmp_blocks: HashMap::new()
         }
     }
 
@@ -179,7 +181,6 @@ impl Func {
             }
             index += 1;
         }
-
         // 第三遍pass，拆phi
         let mut size = 0;
         for block in self.blocks.iter() {
@@ -485,10 +486,10 @@ impl Func {
     pub fn handle_overflow(&mut self, pool: &mut BackendPool) {
         let this = pool.put_func(self.clone());
         for block in self.blocks.iter() {
-            log!("handle block {}", block.label);
             block.as_mut().handle_overflow(this, pool);
         }
         self.update(this);
+        self.resolve_tmp_block();
     }
 
     fn update(&mut self, func: ObjPtr<Func>) {
@@ -500,6 +501,13 @@ impl Func {
         self.callee_saved = func_ref.callee_saved.clone();
         self.caller_saved = func_ref.caller_saved.clone();
         self.max_params = func_ref.max_params;
+        self.tmp_blocks = func_ref.tmp_blocks.clone();
+    }
+
+    fn resolve_tmp_block(&mut self) {
+        for (block, i) in self.tmp_blocks.iter() {
+            self.blocks.insert(*i, *block);
+        }
     }
 
     fn save_callee(&mut self, pool: &mut BackendPool, f: &mut File) {
