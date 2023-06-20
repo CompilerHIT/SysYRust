@@ -1331,7 +1331,7 @@ impl BB {
                     (st, ed) = (min(start, end), max(start, end));
                     log!("func's len: {} st: {}, ed: {}", func.blocks.len(), st, ed);
                     let mut distance = 0;
-                    for i in st..ed {
+                    for i in st+1..ed {
                         let block = func.blocks[i];
                         distance += block.insts.len() as i32 * ADDR_SIZE;
                         if (!is_j && !operand::is_imm_12bs(distance as i32))
