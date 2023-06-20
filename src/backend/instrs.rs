@@ -8,6 +8,7 @@ pub use crate::backend::block::BB;
 pub use crate::backend::func::Func;
 use crate::backend::operand::*;
 pub use crate::backend::structs::{Context, GenerateAsm};
+use crate::frontend::ast::Continue;
 pub use crate::utility::{ObjPtr, ScalarType};
 
 #[derive(Clone, PartialEq, Debug)]
@@ -320,10 +321,15 @@ impl LIRInst {
 
     pub fn get_regs(&self) -> Vec<Reg> {
         let mut out = Vec::new();
+        let mut used=HashSet::new();
         self.get_reg_def().iter().for_each(|e| {
+            if used.contains(&e.get_id()) { return;}
+            used.insert(e.get_id());
             out.push(*e);
         });
         self.get_reg_use().iter().for_each(|e| {
+            if used.contains(&e.get_id()) {return;}
+            used.insert(e.get_id());
             out.push(*e);
         });
         out

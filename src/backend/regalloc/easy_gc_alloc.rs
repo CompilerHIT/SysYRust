@@ -150,7 +150,8 @@ impl Allocator {
                         continue;
                     }
                     if end_poses.contains_key(&reg.get_id()) {
-                        continue;
+                        //TODO 这里不应该跳过,
+                        // continue;
                     }
                     livenow.insert(reg.get_id());
                     end_poses.insert(reg.get_id(), index as i32);

@@ -1,335 +1,134 @@
-use crate::algorithm::graphalgo::Graph;
-use crate::backend::block::BB;
-use crate::backend::func::Func;
-use crate::backend::instrs::LIRInst;
-use crate::backend::regalloc::regalloc::Regalloc;
-use crate::backend::regalloc::structs::{FuncAllocStat, RegUsedStat};
-use crate::container::bitmap::Bitmap;
-use crate::container::prioritydeque::PriorityDeque;
-use crate::utility::ObjPtr;
-use crate::utility::ScalarType;
-use std::arch::x86_64::_MM_EXCEPT_UNDERFLOW;
-use std::cmp::Ordering;
-use std::collections::HashMap;
-use std::collections::HashSet;
-use std::collections::VecDeque;
+// 或者可以认为是没有启发的线性扫描寄存器分配
 
-use super::regalloc;
+use std::{collections::{HashMap, HashSet}, fs};
 
-// 摆烂的深度优先指令编码简单实现的线性扫描寄存器分配
+use crate::{backend::{regalloc::{regalloc::Regalloc, self, structs::RegUsedStat}, instrs::BB, operand::Reg, block}, utility::{ObjPtr, ScalarType}, frontend::ast::Continue, log_file};
+
+use super::structs::FuncAllocStat;
+
 pub struct Allocator {
-    depths: HashMap<ObjPtr<BB>, usize>,
-    passed: HashSet<ObjPtr<BB>>,
-    lines: Vec<ObjPtr<LIRInst>>,
-    intervals: HashMap<i32, usize>, //key,val=虚拟寄存器号，周期结尾指令号
-    base: usize,                    //用于分配指令号
-}
 
-#[derive(Eq, PartialEq)]
-struct RegInterval {
-    pub id: i32,
-    pub end: usize,
-}
-
-impl RegInterval {
-    fn new(id: i32, end: usize) -> RegInterval {
-        RegInterval { id, end }
-    }
-}
-
-impl PartialOrd for RegInterval {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.end.cmp(&other.end))
-    }
-}
-impl Ord for RegInterval {
-    fn cmp(&self, other: &Self) -> Ordering {
-        // Rust中BinaryHeap的默认实现是大根堆,我们需要的正是大根堆
-        self.partial_cmp(other).unwrap()
-    }
-    fn max(self, other: Self) -> Self {
-        let o = self.cmp(&other);
-        match o {
-            Ordering::Greater => self,
-            Ordering::Equal => self,
-            Ordering::Less => other,
-        }
-    }
-    // fn min(self, other: Self) -> Self {
-
-    // }
-    // fn clamp(self, min: Self, max: Self) -> Self{
-
-    // }
-}
-
-struct BlockGraph {
-    pub graph: Graph<Bitmap>, //图
-    pub from: i32,            //记录起点节点
-    pub to: HashSet<i32>,     //记录终点节点
 }
 
 impl Allocator {
-    pub fn new() -> Allocator {
-        Allocator {
-            passed: HashSet::new(),
-            lines: Vec::new(),
-            base: 0,
-            depths: HashMap::new(),
-            intervals: HashMap::new(),
-        }
-    }
-
-    // 深度分配
-    fn dfs_bbs(&mut self, bb: ObjPtr<BB>) {
-        let n = self.passed.len();
-        ////println!("bb.length:{n}");
-        if self.passed.contains(&bb) {
-            return;
-        }
-        // 遍历块,更新高度
-        self.depths.insert(bb, self.base);
-        self.passed.insert(bb.clone());
-        self.base += 1;
-        // ////println!("before");
-        // 深度优先遍历后面的块
-        for next in &bb.as_ref().out_edge {
-            self.dfs_bbs(next.clone());
-            ////println!("after clone ");
-        }
-        ////println!("once end");
-    }
-    // 指令编号
-    fn inst_record(&mut self, bb: ObjPtr<BB>) {
-        // 根据块深度分配的结果启发对指令进行编号
-        if self.passed.contains(&bb) {
-            return;
-        }
-        self.passed.insert(bb.clone());
-        for line in &bb.as_ref().insts {
-            self.lines.push(line.clone())
-        }
-        // then choice a block to go through
-        let mut set: HashSet<usize> = HashSet::new();
-        loop {
-            let mut toPass: usize = bb.as_ref().out_edge.len();
-            for (i, next) in bb.as_ref().out_edge.iter().enumerate() {
-                if set.contains(&i) {
-                    continue;
-                }
-                if self.passed.contains(next) {
-                    continue;
-                }
-                if toPass == bb.as_ref().out_edge.len() {
-                    toPass = i;
-                } else {
-                    if self.depths.get(next)
-                        < self.depths.get(bb.as_ref().out_edge.get(toPass).unwrap())
-                    {
-                        toPass = i;
-                    }
-                }
-            }
-            if toPass == bb.as_ref().out_edge.len() {
-                break;
-            }
-            set.insert(toPass);
-            self.inst_record(bb.as_ref().out_edge.get(toPass).unwrap().clone())
-        }
-    }
-
-    // 指令窗口分析
-    fn interval_anaylise(&mut self) {
-        for (i, inst) in self.lines.iter().enumerate() {
-            for reg in inst.as_ref().get_reg_use() { 
-                if !reg.is_virtual() {
-                    continue;
-                }
-                self.intervals.insert(reg.get_id(), i);
-            }
-        }
-    }
-
-    // 从函数得到图
-    fn funcToGraph(func: &Func) -> BlockGraph {
-        let mut out = BlockGraph {
-            graph: Graph::new(),
-            from: 0,
-            to: HashSet::new(),
-        };
-        // TODO ,具体从函数来构建图的操作
-        out
-    }
-
-   
-    // 基于剩余interval长度贪心的线性扫描寄存器分配
-    fn allocRegister(&mut self) -> (HashSet<i32>, HashMap<i32, i32>) {
-        let mut spillings: HashSet<i32> = HashSet::new();
-        let mut dstr: HashMap<i32, i32> = HashMap::new();
-        // 寄存器分配的长度限制
-        // 可用寄存器
-        let mut reg_used_stat = RegUsedStat::new();
-        let mut iwindow: PriorityDeque<RegInterval> = PriorityDeque::new();
-        let mut fwindow: PriorityDeque<RegInterval> = PriorityDeque::new();
-        // 遍历指令
-        for (i, it) in self.lines.iter().enumerate() {
-            
-            // 先通用寄存器窗口中判断有没有可以释放的寄存器
-            while iwindow.len() != 0 {
-                if let Some(min) = iwindow.front() {
-                    if min.end <= i {
-                        // 获取已经使用寄存器号，释放
-                        let iereg: i32 = *dstr.get(&min.id).unwrap();
-                        reg_used_stat.release_ireg(iereg);
-                        iwindow.pop_front();
-                    } else {
-                        break;
-                    }
-                }
-            }
-            // 判断浮点寄存器窗口中有没有可以释放的寄存器,进行释放
-            while fwindow.len() != 0 {
-                if let Some(min) = fwindow.front() {
-                    if min.end <= i {
-                        let fereg: i32 = *dstr.get(&min.id).unwrap();
-                        reg_used_stat.release_freg(fereg);
-                        fwindow.pop_front();
-                    } else {
-                        break;
-                    }
-                }
-            }
-
-            // 处理冲突
-            for reg in it.as_ref().get_reg_def() {
-                if !reg.is_virtual() {
-                    continue;
-                }
-
-                if reg.get_id()==98 {
-                    println!("gg")
-                }
-                let id = reg.get_id();
-                // 如果已经在dstr的key中，也就是已经分配，则忽略处理
-                if dstr.contains_key(&id) {
-                    continue;
-                }
-                // 如果已经归为溢出寄存器，则不再重复处理
-                if spillings.contains(&id) {
-                    continue;
-                }
-                // 在周期表中搜索该寄存器的终结周期
-                let end = self.intervals.get(&id);
-                if let None=end {spillings.insert(id);}
-                let end=*end.unwrap();
-                // 定义寄存器溢出处理流程
-                let mut spill_reg_for = |tmpwindow: &mut PriorityDeque<RegInterval>| {
-                    // let mut tmpwindow=&mut fwindow;
-                    // let available:Option<Reg>;
-                    let max = tmpwindow.back();
-                    let mut maxID = 0;
-                    let mut ifSpilling = false; //记录将新寄存器处理成溢出
-                    match max {
-                        Some(max) => {
-                            if max.end > end {
-                                // 溢出旧寄存器
-                                ifSpilling = false;
-                                maxID = max.id;
-                            } else {
-                                // 溢出新寄存器
-                                ifSpilling = true;
-                            }
-                        }
-                        None => (),
-                    }
-                    if ifSpilling {
-                        spillings.insert(id);
-                    } else {
-                        tmpwindow.pop_back();
-                        dstr.insert(id, *dstr.get(&maxID).unwrap()); //给新寄存器分配旧寄存器所有的寄存器
-                        dstr.remove(&maxID); //解除旧末虚拟寄存器与实际寄存器的契约
-                        spillings.insert(maxID);
-                        tmpwindow.push(RegInterval::new(id, end)); //把新的分配结果加入窗口
-                    }
-                };
-
-                // TODO,逻辑判断选择不同的分配方案
-                if reg.get_type() == ScalarType::Int
-                // 如果是通用寄存器
-                {
-                    if let Some(ereg) = reg_used_stat.get_available_ireg() {
-                        // 如果还有多余的通用寄存器使用
-                        dstr.insert(id, ereg);
-                        reg_used_stat.use_ireg(ereg);
-                        iwindow.push(RegInterval::new(id, end))
-                    } else {
-                        spill_reg_for(&mut iwindow);
-                    }
-                }
-                // 如果是浮点寄存器
-                else if reg.get_type() == ScalarType::Float {
-                    if let Some(ereg) = reg_used_stat.get_available_freg() {
-                        // 如果还有多余的浮点寄存器
-                        dstr.insert(id, ereg);
-                        reg_used_stat.use_freg(ereg); //记录float_entity_reg为被使用状态
-                        fwindow.push(RegInterval::new(id, end))
-                    } else {
-                        spill_reg_for(&mut fwindow);
-                    }
-                }
-            }
-       
-        }
-        (spillings, dstr)
-    }
-
-    // 统计一个块中spilling的寄存器数量
-    fn count_block_spillings(bb: &BB, spillings: &HashSet<i32>) -> usize {
-        let mut set: HashSet<i32> = HashSet::new();
-        for inst in &bb.insts {
-            let inst = inst.as_ref();
-            for reg in inst.get_reg_def() {
-                let id = reg.get_id();
-                if spillings.contains(&id) {
-                    set.insert(id);
-                }
-            }
-            for reg in inst.get_reg_use() {
-                let id = reg.get_id();
-                if spillings.contains(&id) {
-                    set.insert(id);
-                }
-            }
-        }
-        set.len()
+    pub fn new()->Allocator {
+        Allocator {  }
     }
 }
-
 impl Regalloc for Allocator {
-    fn alloc(&mut self, func: &Func) -> FuncAllocStat {
-        // TODO第一次遍历，块深度标记
-        self.passed.clear();
-        self.dfs_bbs(func.entry.unwrap());
-        // 第二次遍历,指令深度标记
-        self.passed.clear();
-        self.inst_record(func.entry.unwrap());
-        // 第三次遍历,指令遍历，寄存器interval标记
-        self.interval_anaylise();
-        self.passed.clear();
-        // 第四次遍历，堆滑动窗口更新获取FuncAllocStat
-        let (spillings, dstr) = self.allocRegister();
-        // //println!("_______________________________________________");
-        // //println!("{}",func.label);
-        // //println!("{:?}",spillings);
-        let (stack_size, bb_stack_sizes) = regalloc::countStackSize(func, &spillings);
-        // let stack_size=spillings.len(); //TO REMOVE
-        let mut out = FuncAllocStat {
-            stack_size,
-            bb_stack_sizes,
+    fn alloc(&mut self, func: &crate::backend::instrs::Func) -> super::structs::FuncAllocStat {
+        let  calout="calout.txt";
+        // fs::remove_file(calout);
+        let mut dstr:HashMap<i32,i32>=HashMap::new();
+        let mut spillings:HashSet<i32>=HashSet::new();
+
+        log_file!(calout,"\n\n{} start:\n",func.label);
+        let alloc_one=|reg:&Reg,reg_used_stat:&mut RegUsedStat,dstr:&mut HashMap<i32,i32>,spillings:&mut HashSet<i32>,livenow:&mut HashSet<i32>,kind:ScalarType|{
+            if reg.get_type()!=kind{ return;}
+            if !reg.is_virtual() {return;}
+            if spillings.contains(&reg.get_id()) {return;}
+            if livenow.contains(&reg.get_id()) { return;}
+            livenow.insert(reg.get_id());
+            if dstr.contains_key(&reg.get_id()) {
+                // 
+                let color=dstr.get(&reg.get_id()).unwrap();
+                if !reg_used_stat.is_available_reg(*color) {
+                    dstr.remove(&reg.get_id());
+                    spillings.insert(reg.get_id());
+                }else{
+                    reg_used_stat.use_reg(*color);
+                }
+                return;
+            }
+            let mut color=Option::None;
+            // 寻找个可用颜色,否则加入spilling
+            if reg.get_type()==ScalarType::Int {
+                color=reg_used_stat.get_available_ireg();
+               
+            }else if reg.get_type()==ScalarType::Float {
+                color=reg_used_stat.get_available_freg();
+            }
+            if let Some(color)=color {
+                dstr.insert(reg.get_id(), color);
+                reg_used_stat.use_reg(color);
+            }else{
+                spillings.insert(reg.get_id());
+            }
+
+        };
+
+        let mut count =|bb:ObjPtr<BB>,kind:ScalarType|{
+            if bb.label==".LBB0_3"{
+                log_file!(calout,"g?");
+            }
+            log_file!(calout,"block {} start",bb.label);
+            log_file!(calout,"live in:{:?}\nlive out:{:?}",bb.live_in.iter().map(|e|e.get_id()).collect::<HashSet<i32>>(),bb.live_in.iter().map(|e|e.get_id()).collect::<HashSet<i32>>());
+            let mut livenow:HashSet<i32>=HashSet::new();
+            let mut reg_used_stat=RegUsedStat::new();
+            let mut last_use:HashMap<i32,HashSet<i32>> =HashMap::new();  //记录最后一次use
+            let mut passed_regs=HashSet::new(); //记录遍历过的寄存器号
+            // 根据live now给某个虚拟寄存器分配寄存器
+            // 获取寄存器终结时间
+            for (index,inst) in bb.insts.iter().enumerate().rev() {
+                for reg in inst.get_reg_use() {
+                    if reg.get_type()!=kind {continue;}
+                    if !reg.is_virtual() {continue;}
+                    if bb.live_out.contains(&reg) {continue;}   //live out中的寄存器器 不可能有终结时间
+                    if passed_regs.contains(&reg.get_id()) {continue;}
+                    passed_regs.insert(reg.get_id());
+                    if let None=last_use.get_mut(&(index as i32)) {
+                        last_use.insert(index as i32 , HashSet::new());
+                    }
+                    last_use.get_mut(&(index as i32)).unwrap().insert(reg.get_id());
+                }
+            }
+            log_file!(calout,"ends:{:?}",last_use);
+            
+            bb.live_in.iter()
+                .for_each(|reg|{
+                   alloc_one(&reg,&mut reg_used_stat,&mut dstr,&mut spillings,&mut livenow,kind);
+            });
+
+            for (index,inst) in bb.insts.iter().enumerate() {
+                // 删除旧live now
+                if let Some(ends)=last_use.get(&(index as i32)){
+                    for reg in ends.iter() {
+                        livenow.remove(reg);
+                        if spillings.contains(reg) {continue;}
+                        let color=dstr.get(reg).unwrap();
+                        reg_used_stat.release_reg(*color);
+                    }
+                }
+                // 加入新live now,
+                for reg in inst.get_reg_def() {
+                    alloc_one(&reg,&mut reg_used_stat,&mut dstr,&mut spillings,&mut livenow,kind);
+                }
+            }
+        
+            
+        
+        };
+
+
+
+        for bb in func.blocks.iter() {
+            count(*bb,ScalarType::Float);
+            count(*bb,ScalarType::Int);
+        }  
+
+        let  (func_stack,bbstacks)=regalloc::regalloc::countStackSize(func,&spillings);
+        
+        log_file!(calout,"\n\n{} final:\n",func.label);
+        log_file!(calout,"dstr:{:?}\nspillings:{:?}",dstr ,spillings);
+
+
+
+        FuncAllocStat{
+            stack_size: func_stack,
+            bb_stack_sizes: bbstacks,
             spillings,
             dstr,
-        };
-        // //println!("{:?}",out.spillings);
-        out
+        }
+        
     }
 }
