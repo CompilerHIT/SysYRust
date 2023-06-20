@@ -635,6 +635,9 @@ impl Process for VarDecl {
                                 ) {
                                     return Err(Error::MultipleDeclaration);
                                 }
+                                let inst_ptr = kit_mut.pool_inst_mut.make_int_const(0);
+                                kit_mut.context_mut.update_var_scope_now(id, inst_ptr);
+                                kit_mut.context_mut.push_inst_bb(inst_ptr);
                                 // // println!(
                                 //     "插入新变量,符号表长度为:{:?}",
                                 //     kit_mut.context_mut.symbol_table.len()
@@ -853,6 +856,9 @@ impl Process for VarDecl {
                                 ) {
                                     return Err(Error::MultipleDeclaration);
                                 }
+                                let inst_ptr = kit_mut.pool_inst_mut.make_float_const(0.0);
+                                kit_mut.context_mut.update_var_scope_now(id, inst_ptr);
+                                kit_mut.context_mut.push_inst_bb(inst_ptr);
                             }
                         }
                         VarDef::ArrayInit((id, exp_vec, val)) => {
