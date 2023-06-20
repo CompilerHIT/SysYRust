@@ -1212,13 +1212,13 @@ impl BB {
                         InstrsType::Store => {
                             let mut inst = LIRInst::new(
                                 InstrsType::Binary(BinaryOp::Add),
-                                vec![temp.clone(), temp.clone(), inst_ref.get_dst().clone()],
+                                vec![temp.clone(), temp.clone(), inst_ref.get_lhs().clone()],
                             );
                             inst.set_double();
                             self.insts.insert(pos, pool.put_inst(inst));
                             pos += 1;
                             self.insts[pos].as_mut().replace_op(vec![
-                                inst_ref.get_lhs().clone(),
+                                inst_ref.get_dst().clone(),
                                 temp,
                                 Operand::IImm(IImm::new(0)),
                             ]);
