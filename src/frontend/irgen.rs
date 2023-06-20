@@ -79,32 +79,64 @@ impl Process for GlobalItems {
                     let inst_func = funcdef.process(true, kit_mut).unwrap();
                     match kit_mut.context_mut.bb_now_mut {
                         InfuncChoice::InFunc(bb_now) => {
-                            if bb_now.is_empty() {
-                                match inst_func.get_return_type() {
-                                    IrType::Void => {
-                                        bb_now
-                                            .as_mut()
-                                            .push_back(kit_mut.pool_inst_mut.make_return_void());
-                                        let func_name = &kit_mut.context_mut.func_now;
-                                        if let Some(vec) =
-                                            kit_mut.context_mut.terminated_map.get_mut(func_name)
-                                        {
-                                            vec.push((
-                                                bb_now,
-                                                kit_mut.pool_inst_mut.make_int_const(-1129),
-                                            ));
+                            if !bb_now.get_up_bb().is_empty() {
+                                if bb_now.is_empty() {
+                                    match inst_func.get_return_type() {
+                                        IrType::Void => {
+                                            bb_now.as_mut().push_back(
+                                                kit_mut.pool_inst_mut.make_return_void(),
+                                            );
+                                            let func_name = &kit_mut.context_mut.func_now;
+                                            if let Some(vec) = kit_mut
+                                                .context_mut
+                                                .terminated_map
+                                                .get_mut(func_name)
+                                            {
+                                                vec.push((
+                                                    bb_now,
+                                                    kit_mut.pool_inst_mut.make_int_const(-1129),
+                                                ));
+                                            }
+                                        }
+                                        IrType::Int => {
+                                            let inst_val = kit_mut.pool_inst_mut.make_int_const(0);
+                                            bb_now.as_mut().push_back(inst_val);
+                                            bb_now.as_mut().push_back(
+                                                kit_mut.pool_inst_mut.make_return(inst_val),
+                                            );
+                                            let func_name = &kit_mut.context_mut.func_now;
+                                            if let Some(vec) = kit_mut
+                                                .context_mut
+                                                .terminated_map
+                                                .get_mut(func_name)
+                                            {
+                                                vec.push((bb_now, inst_val));
+                                            }
+                                        }
+                                        IrType::Float => {
+                                            let inst_val =
+                                                kit_mut.pool_inst_mut.make_float_const(0.0);
+                                            bb_now.as_mut().push_back(inst_val);
+                                            bb_now.as_mut().push_back(
+                                                kit_mut.pool_inst_mut.make_return(inst_val),
+                                            );
+                                            let func_name = &kit_mut.context_mut.func_now;
+                                            if let Some(vec) = kit_mut
+                                                .context_mut
+                                                .terminated_map
+                                                .get_mut(func_name)
+                                            {
+                                                vec.push((bb_now, inst_val));
+                                            }
+                                        }
+                                        _ => {
+                                            unreachable!()
                                         }
                                     }
-                                    _ => {
-                                        // println!("{:?}",&kit_mut.context_mut.func_now);
-                                        // unreachable!("返回值非空,但最后一个块却是空的")
-                                    }
-                                }
-                            } else {
-                                match bb_now.get_tail_inst().get_kind() {
-                                    InstKind::Return => {}
-                                    _ => {
-                                        match inst_func.get_return_type() {
+                                } else {
+                                    match bb_now.get_tail_inst().get_kind() {
+                                        InstKind::Return => {}
+                                        _ => match inst_func.get_return_type() {
                                             IrType::Void => {
                                                 bb_now.as_mut().push_back(
                                                     kit_mut.pool_inst_mut.make_return_void(),
@@ -121,19 +153,54 @@ impl Process for GlobalItems {
                                                     ));
                                                 }
                                             }
-                                            _ => {
-                                                unreachable!("返回值非空,但最后一个块的最后一条指令却不是ret")
+                                            IrType::Int => {
+                                                let inst_val =
+                                                    kit_mut.pool_inst_mut.make_int_const(0);
+                                                bb_now.as_mut().push_back(inst_val);
+                                                bb_now.as_mut().push_back(
+                                                    kit_mut.pool_inst_mut.make_return(inst_val),
+                                                );
+                                                let func_name = &kit_mut.context_mut.func_now;
+                                                if let Some(vec) = kit_mut
+                                                    .context_mut
+                                                    .terminated_map
+                                                    .get_mut(func_name)
+                                                {
+                                                    vec.push((bb_now, inst_val));
+                                                }
                                             }
-                                        }
+                                            IrType::Float => {
+                                                let inst_val =
+                                                    kit_mut.pool_inst_mut.make_float_const(0.0);
+                                                bb_now.as_mut().push_back(inst_val);
+                                                bb_now.as_mut().push_back(
+                                                    kit_mut.pool_inst_mut.make_return(inst_val),
+                                                );
+                                                let func_name = &kit_mut.context_mut.func_now;
+                                                if let Some(vec) = kit_mut
+                                                    .context_mut
+                                                    .terminated_map
+                                                    .get_mut(func_name)
+                                                {
+                                                    vec.push((bb_now, inst_val));
+                                                }
+                                            }
+                                            _ => {
+                                                unreachable!(
+                                                "返回值非空,但最后一个块的最后一条指令却不是ret"
+                                            )
+                                            }
+                                        },
                                     }
                                 }
-                            }
+                            } //
                         }
                         _ => {
                             unreachable!("函数ir生成完毕,本应处于最后一个bb中")
                         }
                     }
                     kit_mut.context_mut.bb_now_mut = InfuncChoice::NInFunc();
+                    kit_mut.context_mut.set_stop_genir(false);
                     Ok(1)
                 }
             }
@@ -1430,14 +1497,17 @@ impl Process for Stmt {
                 }
                 Stmt::Break(break_stmt) => {
                     break_stmt.process(input, kit_mut);
+                    kit_mut.context_mut.set_stop_genir(true);
                     Ok(1)
                 }
                 Stmt::Continue(continue_stmt) => {
                     continue_stmt.process(input, kit_mut);
+                    kit_mut.context_mut.set_stop_genir(true);
                     Ok(1)
                 }
                 Stmt::Return(ret_stmt) => {
                     ret_stmt.process(input, kit_mut);
+                    kit_mut.context_mut.set_stop_genir(true);
                     Ok(1)
                 }
             }
@@ -1580,25 +1650,18 @@ impl Process for If {
             let inst_bb_successor = kit_mut
                 .pool_bb_mut
                 .new_basic_block(bb_successor_name.clone());
-
-            // match kit_mut.context_mut.bb_now_mut {
-            //     InfuncChoice::InFunc(bb_now) => {
-
-            //         bb_now.as_mut().add_next_bb(inst_bb_else); //先放判断为假的else语句
-            //         bb_now.as_mut().add_next_bb(inst_bb_if);
-            //     }
-            //     _ => {
-            //         unreachable!()
-            //     }
-            // }
             kit_mut.context_mut.bb_now_set(inst_bb_else); //设置现在所在的bb块，准备归约
             stmt_else.process(input, kit_mut).unwrap(); //向该分支块内生成指令
                                                         //加一条直接跳转语句
 
             match kit_mut.context_mut.bb_now_mut {
                 InfuncChoice::InFunc(bb_now) => {
-                    // // println!("下一块:{:?}", inst_bb_successor.get_name());
                     if !kit_mut.context_mut.stop_genir {
+                        // println!(
+                        //     "当前块:{:?}if下一块:{:?}",
+                        //     bb_now.get_name(),
+                        //     inst_bb_successor.get_name()
+                        // );
                         kit_mut
                             .context_mut
                             .push_inst_bb(kit_mut.pool_inst_mut.make_jmp()); //bb_mut_now是else分支的叶子交汇点
@@ -1616,6 +1679,11 @@ impl Process for If {
             match kit_mut.context_mut.bb_now_mut {
                 InfuncChoice::InFunc(bb_now) => {
                     if !kit_mut.context_mut.stop_genir {
+                        // println!(
+                        //     "当前块:{:?}if下一块:{:?}",
+                        //     bb_now.get_name(),
+                        //     inst_bb_successor.get_name()
+                        // );
                         kit_mut
                             .context_mut
                             .push_inst_bb(kit_mut.pool_inst_mut.make_jmp()); //bb_now_mut是if语句块的叶子交汇点
@@ -1627,6 +1695,9 @@ impl Process for If {
                 }
             }
             kit_mut.context_mut.set_stop_genir(false);
+            if inst_bb_successor.get_up_bb().is_empty() {
+                kit_mut.context_mut.set_stop_genir(true);
+            }
             kit_mut.context_mut.bb_now_set(inst_bb_successor); //设置现在所在的bb
         } else {
             // // println!("有if没else");
@@ -1646,21 +1717,17 @@ impl Process for If {
                 )
                 .unwrap();
 
-            // match kit_mut.context_mut.bb_now_mut {
-            //     InfuncChoice::InFunc(bb_now) => {
-            //         bb_now.as_mut().add_next_bb(inst_bb_successor); //先放判断为假的else语句
-            //         bb_now.as_mut().add_next_bb(inst_bb_if);
-            //     }
-            //     _ => {
-            //         unreachable!()
-            //     }
-            // }
             kit_mut.context_mut.bb_now_set(inst_bb_if);
             self.then.process(input, kit_mut).unwrap();
 
             match kit_mut.context_mut.bb_now_mut {
                 InfuncChoice::InFunc(bb_now) => {
                     if !kit_mut.context_mut.stop_genir {
+                        // println!(
+                        //     "当前块:{:?}if 没else下一块:{:?}",
+                        //     bb_now.get_name(),
+                        //     inst_bb_successor.get_name()
+                        // );
                         kit_mut
                             .context_mut
                             .push_inst_bb(kit_mut.pool_inst_mut.make_jmp()); //bb_now_mut是if语句块的叶子交汇点
@@ -1672,6 +1739,9 @@ impl Process for If {
                 }
             }
             kit_mut.context_mut.set_stop_genir(false);
+            if inst_bb_successor.get_up_bb().is_empty() {
+                kit_mut.context_mut.set_stop_genir(true);
+            } //没必要,可以继续翻译，但是该块不和任何块相连接
             kit_mut.context_mut.bb_now_set(inst_bb_successor); //设置现在所在的bb
         }
         Ok(1)
@@ -1696,13 +1766,23 @@ impl Process for While {
         self.body
             .process((Some(block_while_head), Some(block_false)), kit_mut)
             .unwrap(); //在块内生成指令
-        let (inst_cond, val_cond) = self
-            .cond
-            .process(
-                (Type::Int, Some(block_while_head), Some(block_false)),
-                kit_mut,
-            )
-            .unwrap(); //当前块中放入cond
+        match kit_mut.context_mut.bb_now_mut {
+            InfuncChoice::InFunc(bb_now) => {
+                if !bb_now.get_up_bb().is_empty() {
+                    //有前继到达汇合点
+                    let (inst_cond, val_cond) = self
+                        .cond
+                        .process(
+                            (Type::Int, Some(block_while_head), Some(block_false)),
+                            kit_mut,
+                        )
+                        .unwrap(); //当前块中放入cond
+                }
+            }
+            _ => {
+                unreachable!()
+            }
+        }
         kit_mut.context_mut.set_stop_genir(false);
         kit_mut.context_mut.bb_now_set(block_false);
         // todo!()
@@ -1721,6 +1801,11 @@ impl Process for Break {
                 let (_, false_opt) = input;
                 if let Some(bb_false) = false_opt {
                     if bb_now.get_next_bb().len() <= 1 {
+                        // println!(
+                        //     "当前块:{:?}break下一块:{:?}",
+                        //     bb_now.get_name(),
+                        //     bb_false.get_name()
+                        // );
                         bb_now.as_mut().add_next_bb(bb_false);
                     }
                     // bb_now.as_mut().add_next_bb(bb_false);
@@ -1734,7 +1819,7 @@ impl Process for Break {
                 unreachable!()
             }
         }
-        kit_mut.context_mut.set_stop_genir(true);
+        // kit_mut.context_mut.set_stop_genir(true);
         Ok(1)
     }
 }
@@ -1749,6 +1834,11 @@ impl Process for Continue {
                 let (head_opt, _) = input;
                 if let Some(bb_false) = head_opt {
                     if bb_now.get_next_bb().len() <= 1 {
+                        // println!(
+                        //     "当前块:{:?}continue下一块:{:?}",
+                        //     bb_now.get_name(),
+                        //     bb_false.get_name()
+                        // );
                         bb_now.as_mut().add_next_bb(bb_false);
                     }
                 }
@@ -1761,7 +1851,7 @@ impl Process for Continue {
                 unreachable!()
             }
         }
-        kit_mut.context_mut.set_stop_genir(true);
+        // kit_mut.context_mut.set_stop_genir(true);
         Ok(1)
     }
 }
@@ -1770,7 +1860,6 @@ impl Process for Return {
     type Ret = i32;
     type Message = (Option<ObjPtr<BasicBlock>>, Option<ObjPtr<BasicBlock>>);
     fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
-        kit_mut.context_mut.set_stop_genir(true);
         match kit_mut.context_mut.bb_now_mut {
             InfuncChoice::InFunc(bb_now) => {
                 kit_mut
@@ -2869,9 +2958,21 @@ impl Process for LAndExp {
                 match kit_mut.context_mut.bb_now_mut {
                     InfuncChoice::InFunc(bb_now) => {
                         if let Some(bb_false) = input.2 {
+                            // println!("eq:{:?}", inst_ret.get_kind());
+                            // println!(
+                            //     "当前块:{:?}eq下一块false:{:?}",
+                            //     bb_now.get_name(),
+                            //     bb_false.get_name()
+                            // );
                             bb_now.as_mut().add_next_bb(bb_false);
                         }
                         if let Some(bb_true) = input.1 {
+                            // println!("eq:{:?}", inst_ret.get_kind());
+                            // println!(
+                            //     "当前块:{:?}eq下一块true:{:?}",
+                            //     bb_now.get_name(),
+                            //     bb_true.get_name()
+                            // );
                             bb_now.as_mut().add_next_bb(bb_true);
                         }
                         let inst_branch = kit_mut.pool_inst_mut.make_br(inst_ret);
@@ -2895,9 +2996,19 @@ impl Process for LAndExp {
                 match kit_mut.context_mut.bb_now_mut {
                     InfuncChoice::InFunc(bb_now) => {
                         if let Some(bb_false) = input.2 {
+                            // println!(
+                            //     "当前块:{:?}and下一块false:{:?}",
+                            //     bb_now.get_name(),
+                            //     bb_false.get_name()
+                            // );
                             bb_now.as_mut().add_next_bb(bb_false);
                         }
                         if let Some(bb_true) = input.1 {
+                            // println!(
+                            //     "当前块:{:?}and下一块true:{:?}",
+                            //     bb_now.get_name(),
+                            //     bb_true.get_name()
+                            // );
                             bb_now.as_mut().add_next_bb(bb_true);
                         }
                     }

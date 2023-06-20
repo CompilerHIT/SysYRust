@@ -229,6 +229,7 @@ impl Kit<'_> {
         // println!("填phi:{:?},所在bb:{:?}", name_changed, bb.get_name());
         let vec_pre = bb.get_up_bb();
         for pre in vec_pre {
+            // println!("前继块:{:?}", pre.get_name());
             let inst_find = self.find_var(*pre, &name_changed).unwrap();
             inst_phi.as_mut().add_operand(inst_find); //向上找,填充
                                                       // println!("其参数为:{:?}", inst_find.get_kind());
