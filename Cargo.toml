@@ -15,6 +15,7 @@ lazy_static = "1.4"
 lalrpop-util = {version = "0.19.9", features = ["lexer"]}
 regex = "1"
 clap = "2.33"
+hexponent = "0.3.1"
 
 [build-dependencies]
 lalrpop = "0.19.9"
