@@ -190,6 +190,18 @@ impl Inst {
         self.list.prev = None;
     }
 
+    /// 把自己从指令序列中删除但不删除use
+    pub fn move_self(&mut self) {
+        let next = self.list.get_next().as_mut();
+        let prev = self.list.get_prev().as_mut();
+
+        next.list.set_prev(ObjPtr::new(prev));
+        prev.list.set_next(ObjPtr::new(next));
+
+        self.list.next = None;
+        self.list.prev = None;
+    }
+
     /// 获得当前指令所在的bb
     pub fn get_parent_bb(&self) -> ObjPtr<BasicBlock> {
         Self::find_bb(ObjPtr::new(self))
