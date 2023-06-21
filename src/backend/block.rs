@@ -833,6 +833,7 @@ impl BB {
                                                 map_info,
                                                 pool,
                                             );
+                                            let dst_reg = self.resolve_operand(func, *arg, true, map_info, pool);
                                             self.insts.push(pool.put_inst(LIRInst::new(
                                                 InstrsType::Binary(BinaryOp::Shl),
                                                 vec![
@@ -843,11 +844,11 @@ impl BB {
                                             )));
                                             let mut add = LIRInst::new(
                                                 InstrsType::Binary(BinaryOp::Add),
-                                                vec![src_reg.clone(), src_reg.clone(), tmp],
+                                                vec![dst_reg.clone(), src_reg.clone(), tmp],
                                             );
                                             add.set_double();
                                             self.insts.push(pool.put_inst(add));
-                                            src_reg
+                                            dst_reg
                                         }
                                         _ => self.resolve_operand(func, *arg, true, map_info, pool),
                                     };
@@ -1023,7 +1024,11 @@ impl BB {
                             continue;
                         }
                         log!("op: {:?}", op.get_kind());
-                        let src_reg = self.resolve_operand(func, *op, false, map_info, pool);
+                        let src_reg = match op.get_kind() {
+                            InstKind::ConstInt(iimm) | InstKind::GlobalConstInt(iimm) => {Operand::IImm(IImm::new(iimm))},
+                            InstKind::ConstFloat(fimm) | InstKind::GlobalConstFloat(fimm) => todo!("const float phi"),
+                            _ => self.resolve_operand(func, *op, true, map_info, pool), 
+                        };
                         inst_kind = match src_reg {
                             Operand::Reg(reg) => match reg.get_type() {
                                 ScalarType::Int => InstrsType::OpReg(SingleOp::IMv),
@@ -1036,6 +1041,7 @@ impl BB {
                         let inst = LIRInst::new(inst_kind, vec![temp.clone(), src_reg]);
                         let obj_inst = pool.put_inst(inst);
                         log!("phi kind {:?}", op.get_kind());
+                        
                         let incoming_block = map_info
                             .ir_block_map
                             .get(&ir_block_inst.get_phi_predecessor(index))
