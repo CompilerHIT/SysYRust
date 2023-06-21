@@ -15,9 +15,9 @@ use crate::{
 };
 
 pub fn dead_code_eliminate(module: &mut Module, more_than_once: bool) {
-    let mut changed = false;
     loop {
-        func_process(module, |name, func| {
+        let mut changed = false;
+        func_process(module, |_, func| {
             bfs_inst_process(func.get_head(), |inst| {
                 changed |= eliminate_inst(inst);
             })
