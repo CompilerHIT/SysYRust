@@ -833,6 +833,7 @@ impl BB {
                                                 map_info,
                                                 pool,
                                             );
+                                            let dst_reg = self.resolve_operand(func, *arg, true, map_info, pool);
                                             self.insts.push(pool.put_inst(LIRInst::new(
                                                 InstrsType::Binary(BinaryOp::Shl),
                                                 vec![
@@ -843,11 +844,11 @@ impl BB {
                                             )));
                                             let mut add = LIRInst::new(
                                                 InstrsType::Binary(BinaryOp::Add),
-                                                vec![src_reg.clone(), src_reg.clone(), tmp],
+                                                vec![dst_reg.clone(), src_reg.clone(), tmp],
                                             );
                                             add.set_double();
                                             self.insts.push(pool.put_inst(add));
-                                            src_reg
+                                            dst_reg
                                         }
                                         _ => self.resolve_operand(func, *arg, true, map_info, pool),
                                     };
