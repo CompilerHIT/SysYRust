@@ -1,10 +1,12 @@
+use crate::ir::optimizer::bfs_bb_proceess;
+
 use super::*;
 pub fn copy_func(
     func_name: &str,
     func: ObjPtr<Function>,
     arg_list: Vec<ObjPtr<Inst>>,
     pools: &mut (&mut ObjPool<BasicBlock>, &mut ObjPool<Inst>),
-) -> ObjPtr<BasicBlock> {
+) -> (ObjPtr<BasicBlock>, ObjPtr<BasicBlock>) {
     let mut bb_map = HashMap::new();
     let mut inst_map = HashMap::new();
 
@@ -15,31 +17,19 @@ pub fn copy_func(
 
     // 广度优先遍历，拷贝bb
     let mut copy_bb_list = Vec::new();
-    let mut queue = vec![func.get_head()];
-    let mut visited = HashSet::new();
-    while let Some(bb) = queue.pop() {
-        if visited.contains(&bb) {
-            continue;
-        }
-        visited.insert(bb);
-        let copy_bb = copy_bb(func_name, bb, pools, &mut inst_map, &mut bb_map);
-        copy_bb_list.push(copy_bb);
-
-        for next_bb in bb.get_next_bb() {
-            queue.insert(0, next_bb.clone());
-        }
-    }
+    bfs_bb_proceess(func.get_head(), |bb| {
+        copy_bb_list.push(copy_bb(func_name, bb, pools, &mut inst_map, &mut bb_map));
+    });
 
     // 映射bb
     for bb in copy_bb_list.iter() {
         map_bb(bb.clone(), &mut bb_map, &mut inst_map);
     }
 
-    copy_bb_list
-        .iter()
-        .find(|x| x.get_up_bb().len() == 0)
-        .unwrap()
-        .clone()
+    (
+        copy_bb_list.iter().find(|x| x.is_entry()).unwrap().clone(),
+        copy_bb_list.iter().find(|x| x.is_exit()).unwrap().clone(),
+    )
 }
 
 fn map_bb(

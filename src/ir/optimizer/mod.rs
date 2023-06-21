@@ -29,6 +29,18 @@ pub fn optimizer_run(
     }
 }
 
+pub fn inst_process_in_bb<F>(mut inst: ObjPtr<Inst>, mut predicate: F)
+where
+    F: FnMut(ObjPtr<Inst>),
+{
+    while !inst.is_tail() {
+        // 这里需要先获取next，因为predicate可能会删除当前指令
+        let next = inst.get_next();
+        predicate(inst);
+        inst = next;
+    }
+}
+
 /// 从head开始，广度优先遍历每一个基本块，并对基本块中的指令进行处理
 /// # Arguments
 /// * `head` - 广度优先遍历的起始点
@@ -38,14 +50,21 @@ where
     F: FnMut(ObjPtr<Inst>),
 {
     bfs_bb_proceess(head, |bb| {
-        let mut inst = bb.get_head_inst();
-        while !inst.is_tail() {
-            // 这里需要先获取next，因为predicate可能会删除当前指令
-            let next = inst.get_next();
-            predicate(inst);
-            inst = next;
-        }
-    })
+        inst_process_in_bb(bb.get_head_inst(), &mut predicate)
+    });
+}
+
+/// 从head开始，深度优先遍历每一个基本块，并对基本块中的指令进行处理
+/// # Arguments
+/// * `head` - 深度优先遍历的起始点
+/// * `predicate` - 对每一个基本块进行处理的闭包，这个闭包接受一个参数，类型为inst,并对inst进行处理
+pub fn dfs_inst_process<F>(head: ObjPtr<BasicBlock>, mut predicate: F)
+where
+    F: FnMut(ObjPtr<Inst>),
+{
+    dfs_bb_process(head, |bb| {
+        inst_process_in_bb(bb.get_head_inst(), &mut predicate)
+    });
 }
 
 /// 从head开始，广度优先遍历每一个基本块，并对基本块进行处理
@@ -70,6 +89,30 @@ where
             queue.push_back(next_bb.clone());
         }
 
+        predicate(bb);
+    }
+}
+
+/// 从head开始，深度优先遍历每一个基本块，并对基本块进行处理
+/// # Arguments
+/// * `head` - 深度优先遍历的起始点
+/// * `predicate` - 对每一个基本块进行处理的闭包，这个闭包接受一个参数，类型为bb,并对bb进行处理
+pub fn dfs_bb_process<F>(head: ObjPtr<BasicBlock>, mut predicate: F)
+where
+    F: FnMut(ObjPtr<BasicBlock>),
+{
+    let mut visited = HashSet::new();
+    let mut stack = Vec::new();
+    stack.push(head);
+    while let Some(bb) = stack.pop() {
+        if visited.contains(&bb) {
+            continue;
+        }
+        visited.insert(bb);
+        // 先将bb的后继节点加入队列，以防止在处理bb时把bb的结构改变
+        for next_bb in bb.get_next_bb().iter() {
+            stack.push(next_bb.clone());
+        }
         predicate(bb);
     }
 }

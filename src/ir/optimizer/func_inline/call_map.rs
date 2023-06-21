@@ -33,12 +33,27 @@ impl CallMap {
 
     pub fn find_predecessors(&self, func_name: &str) -> Vec<String> {
         let mut predecessors = Vec::new();
-        for (caller, callees) in &self.call_map {
+        for (caller, callees) in self.call_map.iter() {
             if callees.contains(func_name) {
                 predecessors.push(caller.clone());
             }
         }
         predecessors
+    }
+
+    pub fn contains_edge(&self, caller: &str, callee: &str) -> bool {
+        self.call_map
+            .get(caller)
+            .unwrap()
+            .contains(&callee.to_string())
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = (&String, &HashSet<String>)> {
+        self.call_map.iter()
+    }
+
+    pub fn get_all_func(&self) -> Vec<String> {
+        self.call_map.keys().cloned().collect()
     }
 }
 
