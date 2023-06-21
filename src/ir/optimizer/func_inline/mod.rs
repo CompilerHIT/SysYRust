@@ -60,7 +60,7 @@ fn inline_no_self_call(
                 // 内联函数
                 let caller = module.get_function(&func_name);
                 let callee = module.get_function(succ);
-                inline_func(caller, callee, succ, pools);
+                inline_func(caller, callee, succ, module.get_all_var(), pools);
             }
         }
 
@@ -92,13 +92,13 @@ fn inline_no_succ(
         let mut changed = false;
         let mut delete_list = Vec::new();
         for (func_name, succs) in call_map.iter() {
-            if succs.is_empty() {
+            if succs.is_empty() && !func_name.eq("main") {
                 changed = true;
                 let callee = module.get_function(func_name);
                 let callers = call_map.find_predecessors(func_name);
                 for caller_name in callers {
                     let caller = module.get_function(&caller_name);
-                    inline_func(caller, callee, &func_name, pools);
+                    inline_func(caller, callee, &func_name, module.get_all_var(), pools);
                     delete_list.push((caller_name, func_name.clone()));
                 }
             }
