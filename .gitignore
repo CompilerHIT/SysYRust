@@ -10,6 +10,7 @@ data/
 *.sy
 log
 out
+png
 __pycache__
 dump*.ll
 row_asm.log
