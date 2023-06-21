@@ -80,10 +80,12 @@ pub fn count_spill_confict(func: &Func) -> HashMap<i32, i32> {
     //
     for bb in func.blocks.iter() {
         for inst in bb.insts.iter() {
-            let mut dst_reg: Option<Reg> = None;
-            if let Operand::Reg(r) = inst.get_dst() {
-                dst_reg = Option::Some(*r);
-            }
+            let dst_reg= match inst.get_reg_def().get(0){
+                Some(reg)=>Some(*reg),
+                None=>None,
+            }; 
+            // TODO,判断这个指令是否有目标寄存器
+            
             let mut is_use = false;
             for reg in inst.get_reg_use() {
                 if !reg.is_virtual() {
@@ -96,7 +98,7 @@ pub fn count_spill_confict(func: &Func) -> HashMap<i32, i32> {
                 }
                 out.insert(reg.get_id(), out.get(&reg.get_id()).unwrap_or(&0) + 1);
             }
-            for reg in inst.get_reg_use() {
+            for reg in inst.get_reg_def() {
                 if !reg.is_virtual() {
                     continue;
                 }
@@ -114,6 +116,7 @@ pub fn count_spill_confict(func: &Func) -> HashMap<i32, i32> {
 
 // TODO 获取冲突表
 pub fn interferences_reg(func:&Func)->HashMap<i32,HashSet<i32>> {
+
     todo!()
 }
 
@@ -241,34 +244,37 @@ pub fn merge_alloc(func: &Func, dstr: &mut HashMap<i32, i32>, spillings: &HashSe
 pub fn check_alloc(func: & Func, dstr: &HashMap<i32, i32>, spillings: &HashSet<i32>) -> Vec<(i32,i32,i32, String)> {
     let mut out:Vec<(i32,i32,i32, String)>=Vec::new();
     let ends_index_bb=ends_index_bb(func);
+    let mut check_alloc_one=|reg:&Reg,index:i32,bb:ObjPtr<BB>,reg_use_stat:&mut RegUsedStat,livenow:&mut HashMap<i32, HashSet<i32>>| {
+        if spillings.contains(&reg.get_id()) {return;}
+        if reg.is_physic() {
+            if reg.get_type()==ScalarType::Float {
+                //fixme
+            }else if reg.get_type()==ScalarType::Int {
+                reg_use_stat.use_ireg(reg.get_id())
+            }
+            return;
+        }
+        println!("g?{}",reg.get_id());
+        let color=dstr.get(&reg.get_id()).unwrap();
+        // 
+        if !reg_use_stat.is_available_reg(*color) {
+            let interef_regs=livenow.get(color).unwrap();
+            if interef_regs.contains(&reg.get_id()) {return;}
+            for interef_reg in interef_regs.iter() {
+                out.push( (*interef_reg,reg.get_id(),index,bb.label.clone()));
+            }
+        }
+        reg_use_stat.use_reg(*color);
+        livenow.get_mut(color).unwrap().insert(reg.get_id());
+    };
     for bb in func.blocks.iter() {
         let mut reg_use_stat=RegUsedStat::new();
         let mut livenow:HashMap<i32,HashSet<i32>>=HashMap::new();
         for i in 0..=63 {
             livenow.insert(i, HashSet::new());
         }
-        let mut check_alloc_one=|reg:&Reg,index:i32,reg_use_stat:&mut RegUsedStat,livenow:&mut HashMap<i32, HashSet<i32>>| {
-            if spillings.contains(&reg.get_id()) {return;}
-            if reg.is_physic() {
-                if reg.get_type()==ScalarType::Float {
-                    //fixme
-                }else if reg.get_type()==ScalarType::Int {
-                    reg_use_stat.use_ireg(reg.get_id())
-                }
-                return;
-            }
-            let color=dstr.get(&reg.get_id()).unwrap();
-            // 
-            if !reg_use_stat.is_available_reg(*color) {
-                let interef_regs=livenow.get(color).unwrap();
-                for interef_reg in interef_regs.iter() {
-                    out.push( (*interef_reg,reg.get_id(),index,bb.label.clone()));
-                }
-            }
-            reg_use_stat.use_reg(*color);
-            livenow.get_mut(color).unwrap().insert(reg.get_id());
-        };
-        bb.live_in.iter().for_each(|reg|check_alloc_one(reg,-1,&mut reg_use_stat, &mut livenow));
+        
+        bb.live_in.iter().for_each(|reg|check_alloc_one(reg,-1,*bb,&mut reg_use_stat, &mut livenow));
         for (index,inst) in  bb.insts.iter().enumerate() {
             // 先處理生命周期結束的寄存器
             if let Some(end_regs) = ends_index_bb.get(&(index as i32,*bb)) {
@@ -291,7 +297,7 @@ pub fn check_alloc(func: & Func, dstr: &HashMap<i32, i32>, spillings: &HashSet<i
                 }    
             }
             for reg in inst.get_reg_def() {
-                check_alloc_one(&reg,index as i32,&mut reg_use_stat,&mut livenow);
+                check_alloc_one(&reg,index as i32,*bb,&mut reg_use_stat,&mut livenow);
             }
         }
     }

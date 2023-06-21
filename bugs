@@ -1,0 +1,24 @@
+用例 71
+出现了寄存器定义但是未使用的问题
+
+
+fail at:/test/data/functional/71_full_conn.sy
+fail at:/test/data/functional/89_many_globals.sy
+fail at:/test/data/functional/73_int_io.sy
+fail at:/test/data/functional/97_matrix_sub.sy
+fail at:/test/data/functional/96_matrix_add.sy
+fail at:/test/data/functional/94_nested_loops.sy
+fail at:/test/data/functional/82_long_func.sy
+fail at:/test/data/functional/87_many_params.sy
+fail at:/test/data/functional/88_many_params2.sy
+fail at:/test/data/functional/98_matrix_mul.sy
+fail at:/test/data/functional/74_kmp.sy
+fail at:/test/data/functional/91_many_locals2.sy
+fail at:/test/data/functional/99_matrix_tran.sy
+fail at:/test/data/functional/62_percolation.sy
+fail at:/test/data/functional/92_register_alloc.sy
+fail at:/test/data/functional/86_long_code2.sy
+fail at:/test/data/functional/75_max_flow.sy
+fail at:/test/data/functional/95_float.sy
+
+234,149,160

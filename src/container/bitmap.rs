@@ -37,11 +37,8 @@ impl Bitmap {
         out
     }
 
-    
 
 }
-
-
 
 
 impl Bitmap {
