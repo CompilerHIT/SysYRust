@@ -256,19 +256,16 @@ fn dump_block(
     local_map: &mut HashMap<ObjPtr<Inst>, String>,
     mut name_index: i32,
 ) -> (i32, String) {
+    crate::log!("dump block {}", block.get_name());
     let mut text = String::new();
-    if block.is_empty() {
-        (name_index, text)
-    } else {
-        let mut inst = block.get_head_inst();
-        while !inst.is_tail() {
-            let temp;
-            (name_index, temp) = dump_inst(inst, global_map, local_map, name_index);
-            text = format!("{}{}", text, temp);
-            inst = inst.get_next();
-        }
-        (name_index, text)
+    let mut inst = block.get_head_inst();
+    while !inst.is_tail() {
+        let temp;
+        (name_index, temp) = dump_inst(inst, global_map, local_map, name_index);
+        text = format!("{}{}", text, temp);
+        inst = inst.get_next();
     }
+    (name_index, text)
 }
 
 fn dump_inst(
@@ -339,6 +336,24 @@ fn dump_inst(
                 } else {
                     text += format!(
                         "  {} = getelementptr inbounds float, ptr {}, i32 {}\n",
+                        local_map.get(&inst).unwrap().clone(),
+                        name,
+                        get_inst_value(inst.get_gep_offset(), local_map, global_map)
+                    )
+                    .as_str();
+                }
+            } else if let InstKind::Gep = ptr.get_kind() {
+                if let IrType::IntPtr = ptr.get_ir_type() {
+                    text += format!(
+                        "  {} = getelementptr i32, i32* {}, i32 {}\n",
+                        local_map.get(&inst).unwrap().clone(),
+                        name,
+                        get_inst_value(inst.get_gep_offset(), local_map, global_map)
+                    )
+                    .as_str();
+                } else {
+                    text += format!(
+                        "  {} = getelementptr float, float* {}, i32 {}\n",
                         local_map.get(&inst).unwrap().clone(),
                         name,
                         get_inst_value(inst.get_gep_offset(), local_map, global_map)
