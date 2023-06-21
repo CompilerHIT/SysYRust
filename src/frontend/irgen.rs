@@ -1757,6 +1757,21 @@ impl Process for While {
         let block_while_head = kit_mut.pool_bb_mut.new_basic_block(block_while_head_name); //生成新的块(false)
         let block_false_name = kit_mut.context_mut.get_newbb_name();
         let block_false = kit_mut.pool_bb_mut.new_basic_block(block_false_name); //生成新的块(false)
+
+        let block_cond_name = kit_mut.context_mut.get_newbb_name();
+        let block_cond = kit_mut.pool_bb_mut.new_basic_block(block_cond_name);
+        let inst_jmp = kit_mut.pool_inst_mut.make_jmp();
+        kit_mut.context_mut.push_inst_bb(inst_jmp);
+        match kit_mut.context_mut.bb_now_mut {
+            InfuncChoice::InFunc(bb_now) => {
+                bb_now.as_mut().add_next_bb(block_cond);
+            }
+            _ => {
+                unreachable!()
+            }
+        }
+        kit_mut.context_mut.bb_now_set(block_cond);
+
         let (inst_cond, val_cond) = self
             .cond
             .process(
@@ -1772,13 +1787,16 @@ impl Process for While {
             InfuncChoice::InFunc(bb_now) => {
                 if !bb_now.get_up_bb().is_empty() {
                     //有前继到达汇合点
-                    let (inst_cond, val_cond) = self
-                        .cond
-                        .process(
-                            (Type::Int, Some(block_while_head), Some(block_false)),
-                            kit_mut,
-                        )
-                        .unwrap(); //当前块中放入cond
+                    // let (inst_cond, val_cond) = self
+                    //     .cond
+                    //     .process(
+                    //         (Type::Int, Some(block_while_head), Some(block_false)),
+                    //         kit_mut,
+                    //     )
+                    //     .unwrap(); //当前块中放入cond
+                    bb_now.as_mut().add_next_bb(block_cond);
+                    let inst_jmp = kit_mut.pool_inst_mut.make_jmp();
+                    kit_mut.context_mut.push_inst_bb(inst_jmp);
                 }
             }
             _ => {
