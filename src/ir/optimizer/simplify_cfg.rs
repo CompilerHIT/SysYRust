@@ -9,7 +9,7 @@ use crate::{
     utility::{ObjPool, ObjPtr},
 };
 
-use super::func_process;
+use super::{func_process, inst_process_in_bb, phi_optimizer};
 
 ///! 对于block的优化
 ///! 1. 删除无法到达的block：除头block外没有前继的就是无法到达的
@@ -22,8 +22,13 @@ pub fn simplify_cfg_run(
 ) {
     func_process(module, |_, func| {
         remove_unreachable_bb(func.get_head(), pools);
-        merge_one_line_bb(func.get_head());
     });
+
+    phi_optimizer::phi_run(module);
+
+    func_process(module, |_, func| {
+        merge_one_line_bb(func.get_head());
+    })
 }
 
 fn merge_one_line_bb(head: ObjPtr<BasicBlock>) {
@@ -33,7 +38,7 @@ fn merge_one_line_bb(head: ObjPtr<BasicBlock>) {
         let mut changed = false;
         for bb in bb_list.iter() {
             // 不考虑尾
-            if bb_is_end(bb.clone()) {
+            if bb.is_exit() {
                 continue;
             }
 
@@ -51,38 +56,27 @@ fn merge_one_line_bb(head: ObjPtr<BasicBlock>) {
 
 fn merge_bb(mut bb: ObjPtr<BasicBlock>) {
     let next_bb = bb.get_next_bb()[0].clone();
-    if bb_is_end(next_bb) {
+    if next_bb.is_exit() {
         bb.clear_next_bb();
     } else {
-        bb.as_mut()
-            .replace_next_bb(next_bb, next_bb.get_next_bb()[0].clone());
+        bb.replace_next_bb(next_bb, next_bb.get_next_bb()[0].clone());
 
         if !bb_has_jump(next_bb) {
-            next_bb.get_next_bb()[1]
-                .as_mut()
-                .replace_up_bb(next_bb, bb.clone());
-            bb.add_next_bb(next_bb.get_next_bb()[1].clone());
+            bb.add_next_bb(next_bb);
+            bb.replace_next_bb(next_bb, next_bb.get_next_bb()[1].clone());
         }
     }
 
-    let mut inst = next_bb.get_head_inst();
-
-    // 先移动phi指令
-    while let InstKind::Phi = inst.get_kind() {
-        let next = inst.get_next();
-        bb.push_front(inst);
-        inst = next;
+    // 在进行phi优化后，单前继的块不会有phi指令
+    if let InstKind::Phi = next_bb.get_head_inst().get_kind() {
+        unreachable!("只有单前继的块不会有phi, bb: {}", next_bb.get_name());
     }
 
-    // 再移动剩下的指令
-    let mut tail = bb.get_tail_inst();
-    while !inst.is_tail() {
-        let next = inst.get_next();
-        tail.insert_before(inst);
-        inst = next;
-    }
-    tail.insert_before(inst);
-    tail.remove_self();
+    // 移动剩下的指令
+    bb.get_tail_inst().remove_self();
+    inst_process_in_bb(next_bb.get_head_inst(), |inst| {
+        bb.push_back(inst);
+    });
 }
 
 fn remove_unreachable_bb(
@@ -97,7 +91,7 @@ fn remove_unreachable_bb(
         let mut changed = false;
         for bb in bb_list.iter() {
             // 不考虑头和尾
-            if bb.clone() == head || bb_is_end(bb.clone()) {
+            if bb.is_entry() || bb.is_exit() {
                 continue;
             }
 
@@ -213,10 +207,6 @@ fn get_bb_list(head: ObjPtr<BasicBlock>) -> Vec<ObjPtr<BasicBlock>> {
         }
     }
     visited.iter().cloned().collect::<Vec<_>>()
-}
-
-fn bb_is_end(bb: ObjPtr<BasicBlock>) -> bool {
-    bb.get_next_bb().is_empty()
 }
 
 fn bb_has_jump(bb: ObjPtr<BasicBlock>) -> bool {
