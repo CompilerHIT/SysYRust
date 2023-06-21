@@ -57,6 +57,16 @@ impl BasicBlock {
         }
     }
 
+    /// 判断是否为初始块
+    pub fn is_entry(&self) -> bool {
+        self.up_bb.len() == 0
+    }
+
+    /// 判断是否为结束块
+    pub fn is_exit(&self) -> bool {
+        self.next_bb.len() == 0
+    }
+
     /// 获取BasicBlock的第一条指令
     /// 请确保BasicBlock不为空再使用
     pub fn get_head_inst(&self) -> ObjPtr<Inst> {
