@@ -13,6 +13,7 @@ use crate::backend::asm_builder::AsmBuilder;
 use crate::backend::instrs::{LIRInst, Operand};
 use crate::backend::module::AsmModule;
 use crate::backend::operand::{Reg, ARG_REG_COUNT};
+use crate::backend::regalloc::regalloc;
 use crate::backend::{block::*, operand};
 // use crate::backend::regalloc::simulate_assign;
 use crate::backend::regalloc::{
@@ -409,9 +410,12 @@ impl Func {
         self.calc_live();
         // let mut allocator = crate::backend::regalloc::easy_ls_alloc::Allocator::new();
         let mut allocator =crate::backend::regalloc::easy_gc_alloc::Allocator::new();
-        // let mut allocator = crate::backend::regalloc::base_alloc::Allocator::new();
+        let mut allocator = crate::backend::regalloc::base_alloc::Allocator::new();
         let alloc_stat = allocator.alloc(self);
 
+        let check_alloc_path="check_alloc.txt";
+        log_file!(check_alloc_path,"{:?}",self.label);
+        log_file!(check_alloc_path,"{:?}",regalloc::check_alloc(self, &alloc_stat.dstr, &alloc_stat.spillings));
         // TODO
         // simulate_assign::Simulator::simulate(&self, &alloc_stat);
 

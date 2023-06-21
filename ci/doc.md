@@ -1,5 +1,8 @@
 ### 测试镜像版本:
 
+`10.249.12.83:5000/compilerhit/sysy-rv64-cpci:3.2` :
+允许使用-p参数 进行performance等的测试,
+
 `10.249.12.83:5000/compilerhit/sysy-rv64-cpci:3.0` :
 实现-p参数和时间自定义，见ci使用
 

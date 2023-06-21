@@ -11,7 +11,7 @@ use crate::{
         instrs::{Func, BB},
         operand::Reg,
     },
-    utility::{ObjPool, ObjPtr, ScalarType},
+    utility::{ObjPool, ObjPtr, ScalarType}, log_file,
 };
 
 use super::{
@@ -65,9 +65,6 @@ impl Allocator {
     fn build_interference_graph(&mut self, func: &Func) {
         // TODO,更新cost
         // 遍历所有块,得到所有虚拟寄存器和所有虚拟寄存器之间的冲突关系
-        let mut que: VecDeque<ObjPtr<BB>> = VecDeque::new(); //广度优先遍历块用到的队列
-        let mut passed: HashSet<ObjPtr<BB>> = HashSet::new();
-        que.push_front(func.entry.unwrap());
         let mut passed_reg: HashSet<Reg> = HashSet::new();
         // 定义处理函数
         let process = |cur_bb: ObjPtr<BB>,
@@ -81,9 +78,6 @@ impl Allocator {
             let mut livenow: HashSet<i32> = HashSet::new();
             // 冲突分析
             let mut index_ends: HashMap<i32, HashSet<i32>> = HashMap::new();
-
-            let mut end_poses: HashMap<i32, i32> = HashMap::new();
-
             
             for (index, inst) in cur_bb.insts.iter().enumerate().rev() {
                 for reg in inst.get_reg_use() {
@@ -98,12 +92,9 @@ impl Allocator {
                         .get_mut(&(index as i32))
                         .unwrap()
                         .insert(reg.get_id());
-                    end_poses.insert(reg.get_id(), index as i32);
                 }
             }
             
-            
-            //println!("ends:{:?}",end_poses);
             cur_bb.live_in.iter().for_each(|e| {
                 if e.is_virtual() && e.get_type() == kind {
                     for live in livenow.iter() {
@@ -121,27 +112,6 @@ impl Allocator {
             });
             for (index, inst) in cur_bb.insts.iter().enumerate() {
                 // 先与reg use冲突,然后消去终结的,然后与reg def冲突,并加上新的reg def
-                //println!("{}",inst.as_ref());
-
-                // for reg in inst.get_regs() {
-                //     if !reg.is_virtual() || reg.get_type() != kind {
-                //         continue;
-                //     }
-                //     if livenow.contains(&reg.get_id()) {
-                //         continue;
-                //     }
-                //     for live in livenow.iter() {
-                //         if let None = interef_graph.get(live) {
-                //             interef_graph.insert(*live, HashSet::new());
-                //         }
-                //         if let None = interef_graph.get(&reg.get_id()) {
-                //             interef_graph.insert(reg.get_id(), HashSet::new());
-                //         }
-                //         interef_graph.get_mut(live).unwrap().insert(reg.get_id());
-                //         interef_graph.get_mut(&reg.get_id()).unwrap().insert(*live);
-                //     }
-                // }
-
                 if let Some(finishes) = index_ends.get(&(index as i32)) {
                     for finish in finishes {
                         livenow.remove(finish);
@@ -152,8 +122,6 @@ impl Allocator {
                     if !reg.is_virtual() || reg.get_type() != kind {
                         continue;
                     }
-                   
-                    livenow.insert(reg.get_id());
                     for live in livenow.iter() {
                         if *live == reg.get_id() {
                             continue;
@@ -167,23 +135,16 @@ impl Allocator {
                         interef_graph.get_mut(live).unwrap().insert(reg.get_id());
                         interef_graph.get_mut(&reg.get_id()).unwrap().insert(*live);
                     }
+                    livenow.insert(reg.get_id());
                 }
                 //println!("live now:{:?}",livenow);
                 //println!("intereference :{:?}",interef_graph);
             }
-            //println!("starts:{:?}",end_poses);
-            for (k, v) in interef_graph {
-                //println!("{k} interefer:");
-                //println!("{:?}",v);
-            }
         };
 
-        while (!que.is_empty()) {
-            let cur_bb = que.pop_front().unwrap();
-            if passed.contains(&cur_bb) {
-                continue;
-            }
-            passed.insert(cur_bb);
+
+        for cur_bb in func.blocks.iter() {
+            let cur_bb=*cur_bb;
             // 把不同类型寄存器统计加入表中
             for inst in cur_bb.insts.iter() {
                 for reg in inst.get_reg_def() {
@@ -208,17 +169,10 @@ impl Allocator {
                     }
                 }
             }
-
             //分别处理浮点寄存器的情况和通用寄存器的情况
             process(cur_bb, &mut self.i_interference_graph, ScalarType::Int);
             process(cur_bb, &mut self.f_interference_graph, ScalarType::Float);
             // 加入还没有处理过的bb
-            for bb_next in cur_bb.out_edge.iter() {
-                if passed.contains(bb_next) {
-                    continue;
-                }
-                que.push_back(*bb_next);
-            }
         }
 
         // 查看简历的冲突图
@@ -479,7 +433,7 @@ impl Regalloc for Allocator {
 
         //println!("dstr:{:?}",self.dstr);
         //println!("spillings:{:?}",self.spillings);
-
+        
         FuncAllocStat {
             stack_size: func_stack_size,
             bb_stack_sizes: bb_sizes,
