@@ -88,6 +88,12 @@ impl Kit<'_> {
             .set_parameter("b".to_string(), param_putfarray2); //
         inst_putfarray.as_mut().set_return_type(IrType::Void);
 
+        let inst_starttime = self.pool_func_mut.new_function();
+        inst_starttime.as_mut().set_return_type(IrType::Void);
+
+        let inst_stoptime = self.pool_func_mut.new_function();
+        inst_stoptime.as_mut().set_return_type(IrType::Void);
+
         self.context_mut
             .module_mut
             .push_function("getint".to_string(), inst_getint);
@@ -118,6 +124,12 @@ impl Kit<'_> {
         self.context_mut
             .module_mut
             .push_function("putfarray".to_string(), inst_putfarray);
+        self.context_mut
+            .module_mut
+            .push_function("starttime".to_string(), inst_starttime);
+        self.context_mut
+            .module_mut
+            .push_function("stoptime".to_string(), inst_stoptime);
     }
 
     pub fn push_inst(&mut self, inst_ptr: ObjPtr<Inst>) {
