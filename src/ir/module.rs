@@ -32,6 +32,16 @@ impl Module {
         }
     }
 
+    /// 删除函数
+    pub fn delete_function(&mut self, name: &str) {
+        self.function.remove(name);
+    }
+
+    /// 删除全局变量
+    pub fn delete_var(&mut self, name: &str) {
+        self.global_variable.remove(name);
+    }
+
     /// 根据名字查找变量
     /// 默认先前已经放入module中
     pub fn get_var(&self, name: &str) -> ObjPtr<Inst> {
