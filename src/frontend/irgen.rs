@@ -1249,9 +1249,18 @@ impl Process for FuncDef {
                 let bb = kit_mut.pool_bb_mut.new_basic_block(id.clone());
                 func_mut.insert_first_bb(bb);
                 match tp {
-                    FuncType::Void => func_mut.set_return_type(IrType::Void),
-                    FuncType::Int => func_mut.set_return_type(IrType::Int),
-                    FuncType::Float => func_mut.set_return_type(IrType::Float),
+                    FuncType::Void => {
+                        func_mut.set_return_type(IrType::Void);
+                        kit_mut.context_mut.set_return_type(Type::NotForce);
+                    }
+                    FuncType::Int => {
+                        func_mut.set_return_type(IrType::Int);
+                        kit_mut.context_mut.set_return_type(Type::Int);
+                    }
+                    FuncType::Float => {
+                        func_mut.set_return_type(IrType::Float);
+                        kit_mut.context_mut.set_return_type(Type::Float);
+                    }
                 }
                 kit_mut.context_mut.bb_now_set(bb);
                 kit_mut
@@ -1274,10 +1283,24 @@ impl Process for FuncDef {
                 let func_mut = func_ptr.as_mut();
                 let bb = kit_mut.pool_bb_mut.new_basic_block(id.clone());
                 func_mut.insert_first_bb(bb);
+                // match tp {
+                //     FuncType::Void => func_mut.set_return_type(IrType::Void),
+                //     FuncType::Int => func_mut.set_return_type(IrType::Int),
+                //     FuncType::Float => func_mut.set_return_type(IrType::Float),
+                // }
                 match tp {
-                    FuncType::Void => func_mut.set_return_type(IrType::Void),
-                    FuncType::Int => func_mut.set_return_type(IrType::Int),
-                    FuncType::Float => func_mut.set_return_type(IrType::Float),
+                    FuncType::Void => {
+                        func_mut.set_return_type(IrType::Void);
+                        kit_mut.context_mut.set_return_type(Type::NotForce);
+                    }
+                    FuncType::Int => {
+                        func_mut.set_return_type(IrType::Int);
+                        kit_mut.context_mut.set_return_type(Type::Int);
+                    }
+                    FuncType::Float => {
+                        func_mut.set_return_type(IrType::Float);
+                        kit_mut.context_mut.set_return_type(Type::Float);
+                    }
                 }
 
                 kit_mut
@@ -1892,7 +1915,31 @@ impl Process for Return {
             }
         }
         if let Some(exp) = &mut self.exp {
-            let (inst, val) = exp.process(Type::Int, kit_mut).unwrap(); //这里可能有问题
+            let mut ret_tp = Type::Int;
+            match kit_mut.context_mut.ret_tp {
+                Type::Int => {
+                    ret_tp = Type::Int;
+                    println!(
+                        "函数{:?}返回类型{:?}",
+                        kit_mut.context_mut.func_now, kit_mut.context_mut.ret_tp
+                    );
+                }
+                Type::Float => {
+                    ret_tp = Type::Float;
+                    println!(
+                        "函数{:?}返回类型{:?}",
+                        kit_mut.context_mut.func_now, kit_mut.context_mut.ret_tp
+                    );
+                }
+                _ => {
+                    println!(
+                        "函数{:?}返回类型{:?}",
+                        kit_mut.context_mut.func_now, kit_mut.context_mut.ret_tp
+                    );
+                    // unreachable!()
+                }
+            }
+            let (inst, val) = exp.process(ret_tp, kit_mut).unwrap(); //这里可能有问题
             match val {
                 ExpValue::Float(f) => {
                     let inst_float = kit_mut.pool_inst_mut.make_float_const(f);
