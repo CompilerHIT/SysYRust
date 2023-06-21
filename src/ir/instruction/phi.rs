@@ -47,6 +47,14 @@ impl Inst {
         self.user.set_operand(index, operand);
     }
 
+    /// 获得操作数的索引，如果有重复的，会给出第一个
+    pub fn get_operand_index(&self, operand: ObjPtr<Inst>) -> usize {
+        self.get_operands()
+            .iter()
+            .position(|inst| inst.clone() == operand)
+            .unwrap()
+    }
+
     /// 这个函数非常危险，因为其将原来的operends设置为新的operands,但并没有修改use_list
     /// # Arguments
     /// * 'operands' - 操作数列表
