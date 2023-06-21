@@ -1353,20 +1353,19 @@ impl BB {
                     ]);
                 }
 
-                InstrsType::Branch(..) | InstrsType::Jump => {
+                InstrsType::Branch(..) => {
                     // deal with false branch
-                    let is_j = match inst_ref.get_type() {
-                        InstrsType::Branch(..) => false,
-                        InstrsType::Jump => true,
-                        _ => unreachable!(),
-                    };
+                    // let is_j = match inst_ref.get_type() {
+                    //     InstrsType::Branch(..) => false,
+                    //     InstrsType::Jump => true,
+                    //     _ => unreachable!(),
+                    // };
                     let target = match inst_ref.get_label() {
                         Operand::Addr(label) => label,
                         _ => unreachable!("branch must have a label"),
                     };
 
                     let mut i = 0;
-                    let (mut st, mut ed) = (0, 0);
                     let (mut start, mut end) = (0, 0);
 
                     loop {
@@ -1385,35 +1384,34 @@ impl BB {
                         }
                         i += 1;
                     }
-                    (st, ed) = (min(start, end), max(start, end));
                     let mut distance = 0;
-                    for i in st + 1..ed {
-                        let block = func.blocks[i];
-                        distance += block.insts.len() as i32 * ADDR_SIZE;
-                        if (!is_j && !operand::is_imm_12bs(distance as i32))
-                            || (is_j && !operand::is_imm_20bs(distance as i32))
-                        {
-                            let name = format!("overflow_{}", get_tmp_bb());
-                            let tmp = pool.put_block(BB::new(&name));
-                            tmp.as_mut().insts.push(pool.put_inst(LIRInst::new(
-                                InstrsType::Jump,
-                                vec![Operand::Addr(target.clone())],
-                            )));
-                            func.as_mut().tmp_blocks.insert(tmp, i);
-                            //FIXME: 最多长跳转一次，或可考虑收敛算法
-                            self.insts[pos].as_mut().replace_label(name);
-                            break;
-                            // if is_j {
-                            //     distance -= operand::IMM_20_Bs as i32;
-                            // } else {
-                            //     distance -= operand::IMM_12_Bs as i32;
-                            // }
+                    let (st, ed) = (min(start, end), max(start, end));
+                    let rev = start > end;
+                        for i in st+1..=ed-1 {
+                            let index = if rev { ed - i + st } else { i };
+                            let block = func.blocks[index];
+                            distance += block.insts.len() as i32 * ADDR_SIZE;
+                            if !operand::is_imm_12bs(distance)
+                            {
+                                let name = format!("overflow_{}", get_tmp_bb());
+                                let tmp = pool.put_block(BB::new(&name));
+                                tmp.as_mut().insts.push(pool.put_inst(LIRInst::new(
+                                    InstrsType::Jump,
+                                    vec![Operand::Addr(target.clone())],
+                                )));
+                                func.as_mut().blocks.insert(index, tmp);
+                                //FIXME: 最多长跳转一次，或可考虑收敛算法
+                                self.insts[pos].as_mut().replace_label(name);
+                                break;
+                            }
                         }
-                    }
                     pos += 1;
                 }
                 InstrsType::Call => {
                     // call 指令不会发生偏移量的溢出
+                }
+                InstrsType::Jump => {
+                    // j 型指令认为不会overflow
                 }
                 _ => {}
             }
