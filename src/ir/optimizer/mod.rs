@@ -21,11 +21,11 @@ pub fn optimizer_run(
         // 死代码删除
         dead_code_eliminate::dead_code_eliminate(module, true);
 
-        // 简化cfg
-        simplify_cfg::simplify_cfg_run(module, &mut pools);
-
         // 函数内联
         func_inline::inline_run(module, &mut pools);
+
+        // 简化cfg
+        simplify_cfg::simplify_cfg_run(module, &mut pools);
         // TODO: 性能优化
     }
 }
