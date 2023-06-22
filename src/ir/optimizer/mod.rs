@@ -25,7 +25,7 @@ pub fn optimizer_run(
         simplify_cfg::simplify_cfg_run(module, &mut pools);
 
         // 函数内联
-        //func_inline::inline_run(module, &mut pools);
+        func_inline::inline_run(module, &mut pools);
         // TODO: 性能优化
     }
 }

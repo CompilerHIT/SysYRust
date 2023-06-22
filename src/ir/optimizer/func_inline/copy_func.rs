@@ -4,6 +4,7 @@ use super::*;
 pub fn copy_func(
     func_name: &str,
     func: ObjPtr<Function>,
+    global_var: Vec<(&String, ObjPtr<Inst>)>,
     arg_list: Vec<ObjPtr<Inst>>,
     pools: &mut (&mut ObjPool<BasicBlock>, &mut ObjPool<Inst>),
 ) -> (ObjPtr<BasicBlock>, ObjPtr<BasicBlock>) {
@@ -13,6 +14,11 @@ pub fn copy_func(
     // 先做形参与实参的映射
     for (i, arg) in arg_list.iter().enumerate() {
         inst_map.insert(func.get_parameter_list()[i], arg.clone());
+    }
+
+    // 再做全局变量的映射
+    for (_, inst) in global_var.iter() {
+        inst_map.insert(inst.clone(), inst.clone());
     }
 
     // 广度优先遍历，拷贝bb
@@ -61,45 +67,35 @@ fn copy_bb(
     inst_map: &mut HashMap<ObjPtr<Inst>, ObjPtr<Inst>>,
     bb_map: &mut HashMap<ObjPtr<BasicBlock>, ObjPtr<BasicBlock>>,
 ) -> ObjPtr<BasicBlock> {
-    let mut copy_bb = pools.0.put(bb.as_ref().clone());
+    let mut bb_copy = pools.0.put(bb.as_ref().clone());
 
     // 初始化bb
-    copy_bb.init_head();
-    let name = copy_bb.get_name().to_string();
-    copy_bb.set_name(format!("func_{}_{}_inline", func_name, name));
+    bb_copy.init_head();
+    let name = bb_copy.get_name().to_string();
+    bb_copy.set_name(format!("{}_{}_inline", func_name, name));
 
     // 复制指令
-    let mut inst = bb.get_head_inst();
-    loop {
-        let copy_inst = copy_inst(inst, inst_map, pools);
-        copy_bb.push_back(copy_inst);
-        if inst.is_tail() {
-            break;
-        }
-        inst = inst.get_next();
-    }
+    inst_process_in_bb(bb.get_head_inst(), |inst| {
+        let inst_copy = copy_inst(inst, inst_map, pools);
+        bb_copy.push_back(inst_copy);
+    });
 
-    bb_map.insert(bb, copy_bb);
+    bb_map.insert(bb, bb_copy);
 
-    copy_bb
+    bb_copy
 }
 
 fn map_inst_in_bb(inst: ObjPtr<Inst>, inst_map: &mut HashMap<ObjPtr<Inst>, ObjPtr<Inst>>) {
-    let mut inst = inst;
-    loop {
-        let operands = inst
-            .get_operands()
+    let inst_map = |inst_list: &Vec<ObjPtr<Inst>>| {
+        inst_list
             .iter()
-            .map(|x| inst_map.get(x).unwrap().clone())
-            .collect();
-
-        inst.set_operands(operands);
-
-        if inst.is_tail() {
-            break;
-        }
-        inst = inst.get_next();
-    }
+            .map(|op| inst_map.get(op).unwrap().clone())
+            .collect()
+    };
+    inst_process_in_bb(inst, |x| {
+        x.as_mut().set_operands(inst_map(x.get_operands()));
+        x.as_mut().set_users(inst_map(x.get_use_list()));
+    });
 }
 
 fn copy_inst(
@@ -107,7 +103,8 @@ fn copy_inst(
     inst_map: &mut HashMap<ObjPtr<Inst>, ObjPtr<Inst>>,
     pools: &mut (&mut ObjPool<BasicBlock>, &mut ObjPool<Inst>),
 ) -> ObjPtr<Inst> {
-    let copy_inst = pools.1.put(inst.as_ref().clone());
-    inst_map.insert(inst, copy_inst);
-    copy_inst
+    let copyed_inst = pools.1.put(inst.as_ref().clone());
+    debug_assert_eq!(inst_map.contains_key(&inst), false);
+    inst_map.insert(inst, copyed_inst);
+    copyed_inst
 }

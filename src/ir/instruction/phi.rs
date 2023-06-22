@@ -62,6 +62,13 @@ impl Inst {
         self.user.set_operands(operands);
     }
 
+    /// 这个函数非常危险，因为其将原来的operends设置为新的operands,但并没有修改use_list
+    /// # Arguments
+    /// * 'users' - 使用者列表
+    pub fn set_users(&mut self, users: Vec<ObjPtr<Inst>>) {
+        self.user.set_users(users);
+    }
+
     /// 获得phi指令的操作数对应的前继基本快
     /// 使用时确保该操作数是phi指令的操作数
     pub fn get_phi_predecessor(&self, index: usize) -> ObjPtr<BasicBlock> {
