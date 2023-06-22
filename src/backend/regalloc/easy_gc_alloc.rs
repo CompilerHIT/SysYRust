@@ -488,13 +488,13 @@ impl Regalloc for Allocator {
         self.count_spill_costs(func);
         // 打印冲突图
         let intereref_path = "interference_graph.txt";
-        self.i_interference_graph
-            .iter()
-            .for_each(|(reg, neighbors)| {
-                log_file_uln!(intereref_path, "node {reg}\n{{");
-                neighbors.iter().for_each(|neighbor| log_file_uln!(intereref_path,"({},{})",reg,neighbor));
-                log_file!(intereref_path,"}}\n");
-            });
+        // self.i_interference_graph
+        //     .iter()
+        //     .for_each(|(reg, neighbors)| {
+        //         // log_file_uln!(intereref_path, "node {reg}\n{{");
+        //         // neighbors.iter().for_each(|neighbor| log_file_uln!(intereref_path,"({},{})",reg,neighbor));
+        //         // log_file!(intereref_path,"}}\n");
+        //     });
 
         // TODO
         while !self.color() {

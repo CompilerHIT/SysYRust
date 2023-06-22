@@ -150,7 +150,7 @@ pub fn merge_alloc(func: &Func, dstr: &mut HashMap<i32, i32>, spillings: &HashSe
     // 则x55(color1),x66(color2)可以进行合并，
     // 可以取一个它们合并之后不会产生新的矛盾的颜色合并
     let ends_index_bb=ends_index_bb(func);
-    let mut availables: HashMap<i32, RegUsedStat> = HashMap::new();
+    let mut availables: HashMap<i32, HashMap<i32,i32>> = HashMap::new();
     // let reg_use_stat=
     // 首先进行冲突分析分析出它们的剩余可用颜色
     let mut analyse_one = |livenow: &mut VecDeque<Reg>,
@@ -164,15 +164,15 @@ pub fn merge_alloc(func: &Func, dstr: &mut HashMap<i32, i32>, spillings: &HashSe
             return;
         }
         if let None = availables.get(&reg.get_id()) {
-            availables.insert(reg.get_id(), RegUsedStat::new());
+            availables.insert(reg.get_id(), HashMap::new());
         }
         let color = dstr.get(&reg.get_id()).unwrap();
         for reg_another in livenow.iter() {
             let available = availables.get_mut(&reg.get_id()).unwrap();
             let color_another = dstr.get(&reg_another.get_id()).unwrap();
-            available.use_reg(*color_another);
+            available.insert(*color_another,available.get(color_another).unwrap_or(&0)+1);
             let available_another = availables.get_mut(&reg_another.get_id()).unwrap();
-            available_another.use_reg(*color);
+            available_another.insert(*color, available_another.get(color).unwrap_or(&0)+1);
         }
         livenow.push_back(*reg);
     };
@@ -183,7 +183,7 @@ pub fn merge_alloc(func: &Func, dstr: &mut HashMap<i32, i32>, spillings: &HashSe
         let mut livenow: VecDeque<Reg> = VecDeque::new();
         bb.live_in.iter().for_each(|reg|analyse_one(&mut livenow,reg,dstr,spillings));
         for (index, inst) in bb.insts.iter().enumerate().rev() {
-            // 先对live now中的参数进行排序,找到结束时间最晚的一个
+            //TODO 先对live now中的参数进行排序,找到结束时间最晚的一个
             let mut i=0;
             while i<livenow.len() {
                 
@@ -208,34 +208,41 @@ pub fn merge_alloc(func: &Func, dstr: &mut HashMap<i32, i32>, spillings: &HashSe
         analyse(*block, dstr, spillings);
     }
     
-    let merge = |bb: ObjPtr<BB>,availables:& HashMap<i32, RegUsedStat>, dstr: &mut HashMap<i32, i32>,spillings: &HashSet<i32>| {
+    let merge = |bb: ObjPtr<BB>,availables:&mut HashMap<i32, HashMap<i32,i32>>, dstr: &mut HashMap<i32, i32>,spillings: &HashSet<i32>| {
         // 首先定位到可能出现merge的指令，比如mv
         let tmp_set:HashSet<i32>=HashSet::new();
         for  (index ,inst) in bb.insts.iter().enumerate() {
             if inst.get_type()!=InstrsType::OpReg(crate::backend::instrs::SingleOp::IMv) {
                 continue;
             }
-            let dst_reg=inst.get_reg_def().get(0).unwrap().get_id();
-            let src_reg=inst.get_reg_use().get(0).unwrap().get_id();
+            let dst_reg=*inst.get_reg_def().get(0).unwrap();
+            let src_reg=*inst.get_reg_use().get(1).unwrap();
+            if dst_reg.is_special()||src_reg.is_special() {continue;}
+            if spillings.contains(&dst_reg.get_id())||spillings.contains(&src_reg.get_id()) {continue;}
             if dst_reg==src_reg {
                 continue;
             }
-            // fixme
-            // if ends_index_bb.get(&(index as i32,bb)).unwrap_or(&tmp_set).contains(&src_reg) {
-            //     //TODO
-
-            // }
-
+            if let Some(ends)=ends_index_bb.get(&(index as i32,bb)) {
+                if !ends.contains(&src_reg) {continue;}
+                // 判断融合哪个的颜色
+                let dst_available=availables.get_mut(&dst_reg.get_id()).unwrap();
+                if dst_available.contains_key(&src_reg.get_id())&&*dst_available.get(&src_reg.get_id()).unwrap()==1 {
+                    dstr.insert(dst_reg.get_id(),*dstr.get(&src_reg.get_id()).unwrap());
+                    continue;
+                }
+                let src_available=availables.get_mut(&src_reg.get_id()).unwrap();
+                if src_available.contains_key(&dst_reg.get_id())&&*src_available.get(&dst_reg.get_id()).unwrap()==1 {
+                    dstr.insert(src_reg.get_id(), *dstr.get(&dst_reg.get_id()).unwrap());
+                }
+            }
         }
-
-
-
     };
     // 根据冲突结果进行寄存器合并
     for block in func.blocks.iter() {
-        merge(*block, &availables  ,dstr,spillings);
+        merge(*block, &mut availables  ,dstr,spillings);
     }
 }
+
 
 
 // 通用寄存器分配结果检查,判断是否仍然存在冲突情况,若存在,返回冲突的寄存器集合以及所在的指令编号，块标识符)

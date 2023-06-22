@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 
 use crate::backend::block::BB;
+use crate::frontend::ast::UnaryExp;
 use crate::utility::ObjPtr;
 
 #[derive(Clone)]
@@ -19,90 +20,49 @@ impl RegUsedStat {
         }
     }
     pub fn is_available_ireg(&self, ireg: i32) -> bool {
-        let mut unusable= HashSet::from([1,3]);
-        unusable.extend(11..=17);
+        let mut unusable:HashSet<i32>= HashSet::from([0]); //保存x0
+        unusable.insert(2); //保留sp
+        unusable.insert(1); //保留ra
+        unusable.insert(3); //保留gp
+        unusable.insert(4); //保留tp寄存器
+        unusable.extend(5..=7);//三个临时寄存器用来处理spill逻辑
+        unusable.extend(10..=17);   //保留a0-a7
         if unusable.contains(&ireg) {return  false;}
-        if (1 << ireg & self.iregs_used) != 0 {
-            return false;
+        if (1 << ireg & self.iregs_used) == 0 {
+            return true;
         }
-        return true
+        return false;
     }
     pub fn is_available_freg(&self, freg: i32) -> bool {
-        if HashSet::from([32]).contains(&freg) {return  false;}
-        if (1 << freg & self.fregs_used) != 0 {
-            return false;
+        let freg=freg-32;
+        let mut unusable=HashSet::from([0]);
+        if unusable.contains(&freg) {return  false;}
+        if (1 << freg & self.fregs_used) == 0 {
+            return true;
         }
-        return true;
+        return false;
     }
 
-    // pub fn num_available_iregs(&self)->i32 {
-    //     let mut out=0;
-    //     for i in 0..31 {
-    //         if self.is_available_ireg(i) {
-    //             out+=1;
-    //         }
-    //     }
-    //     out
-    // }
-    // pub fn num_available_fregs(&self)->i32 {
-    //     let mut out=0;
-    //     for i in 0..31 {
-    //         if self.is_available_freg(i) {
-    //             out+=1;
-    //         }
-    //     }
-    //     out
-    // }
 
     // 获取一个可用的整数寄存器
     pub fn get_available_ireg(&self) -> Option<i32> {
         // 对于通用寄存器来说，x0-x4有特殊用途
         // x10-x17用来传递函数参数
-
-        // if self.iregs_used & (1 << 1) == 0 {
-        //     // 分配ra,也就是x1
-        //     return Some(1);
-        // }
-
-        // if self.iregs_used & (1 << 3) == 0 {
-        //     // gp寄存器x3,后面可能保留不分配用来做优化
-        //     return Some(3);
-        // }
-        if self.iregs_used & (1 << 8) == 0 {
-            return Some(8);
-        }
-
-        for i in 8..=9 {
-            if self.iregs_used & (1 << i) == 0 {
-                return Some(i);
+        for i in 0..=31 {
+            if self.is_available_ireg(i) {
+                return  Some(i);
             }
         }
-        // 参数寄存器x10也就是a0保留
-
-        // 先分配其他寄存器再使用a0-a7
-        for i in 18..=31 {
-            if self.iregs_used & (1 << i) == 0 {
-                return Some(i);
-            }
-        }
-        
-        // 但是a1-a7自由使用
-        // for i in 11..=17 {
-        //     if self.iregs_used & (1 << i) == 0 {
-        //         return Some(i);
-        //     }
-        // }
-       
         None
     }
 
     // 获取一个可用的浮点寄存器
     pub fn get_available_freg(&self) -> Option<i32> {
         // f0作为特殊浮点寄存器保持0
-        for i in 1..=31 {
-            if self.fregs_used & (1 << i) == 0 {
-                return Some(i + 32);
-            }
+        for i in 32..=63 {
+           if self.is_available_freg(i) {
+            return  Some(i);
+           }
         }
         None
     }
