@@ -552,7 +552,7 @@ impl Func {
                 );
                 if !is_main {
                     for (reg, slot) in map.iter() {
-                        let of = stack_size - ADDR_SIZE * 2 - slot.get_pos();
+                        let of = stack_size - ADDR_SIZE - slot.get_pos();
                         builder.s(&reg.to_string(false), "sp", of, false, true);
                     }
                 }
@@ -582,7 +582,7 @@ impl Func {
             if operand::is_imm_12bs(stack_size) {
                 if !is_main {
                     for (reg, slot) in map_clone.iter() {
-                        let of = stack_size - ADDR_SIZE * 2 - slot.get_pos();
+                        let of = stack_size - ADDR_SIZE - slot.get_pos();
                         builder.l(&reg.to_string(false), "sp", of, false, true);
                     }
                 }
