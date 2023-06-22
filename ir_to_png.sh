@@ -16,8 +16,12 @@ for file in .*.dot; do
 	dot -Tpng "$file" -o "${file%.dot}.png"
 done
 
+rm .*.dot
+
 opt -dot-cfg dump_opt.ll -disable-output -enable-new-pm=0 -opaque-pointers
 
-for file in *.dot; do
+for file in .*.dot; do
 	dot -Tpng "$file" -o "${file%.dot}_opt.png"
 done
+
+rm .*.dot
