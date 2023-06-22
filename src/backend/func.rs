@@ -6,9 +6,6 @@ pub use std::hash::{Hash, Hasher};
 pub use std::io::Result;
 use std::io::Write;
 use std::vec::Vec;
-use std::{fmt, fs};
-
-use lazy_static::__Deref;
 
 use super::instrs::InstrsType;
 use super::{structs::*, BackendPool};
@@ -452,11 +449,7 @@ impl Func {
         let mut offset = 0;
         let overflow_param =
             max(0, self.param_cnt.0 - ARG_REG_COUNT) + max(0, self.param_cnt.1 - ARG_REG_COUNT);
-        if overflow_param % 2 == 1 {
-            offset = (overflow_param + 1) * ADDR_SIZE;
-        } else {
-            offset = overflow_param * ADDR_SIZE;
-        }
+        offset = overflow_param * ADDR_SIZE;
         let slot = StackSlot::new(offset, offset);
         assert!(self.stack_addr.is_empty());
         self.stack_addr.push_front(StackSlot::new(0, 0));
@@ -539,13 +532,12 @@ impl Func {
 
         //栈对齐 - 调用func时sp需按16字节对齐
         stack_size = stack_size / 16 * 16 + 16;
+        let (icnt, fcnt) = self.param_cnt;
         self.context.as_mut().set_offset(stack_size - ADDR_SIZE);
 
         let ra = Reg::new(1, ScalarType::Int);
         let map_clone = map.clone();
-        let (icnt, fcnt) = self.param_cnt;
-        let start_pos = stack_size - ADDR_SIZE - ADDR_SIZE * (max(0, icnt - ARG_REG_COUNT) + max(0, fcnt - ARG_REG_COUNT));
-        let rev_start_pos = stack_size - start_pos;
+
         self.context.as_mut().set_prologue_event(move || {
             let mut builder = AsmBuilder::new(&mut f1);
             // addi sp -stack_size
@@ -554,13 +546,13 @@ impl Func {
                 builder.s(
                     &ra.to_string(false),
                     "sp",
-                    start_pos,
+                    stack_size - ADDR_SIZE,
                     false,
                     true,
                 );
                 if !is_main {
                     for (reg, slot) in map.iter() {
-                        let of = stack_size - ADDR_SIZE - slot.get_pos();
+                        let of = stack_size - ADDR_SIZE * 2 - slot.get_pos();
                         builder.s(&reg.to_string(false), "sp", of, false, true);
                     }
                 }
@@ -568,7 +560,7 @@ impl Func {
                 builder.op1("li", "gp", &stack_size.to_string());
                 builder.op2("sub", "sp", "sp", "gp", false, true);
                 builder.op2("add", "gp", "gp", "sp", false, true);
-                builder.s(&ra.to_string(false), "gp", -rev_start_pos, false, true);
+                builder.s(&ra.to_string(false), "gp", -ADDR_SIZE, false, true);
 
                 if !is_main {
                     for (reg, slot) in map.iter() {
@@ -590,14 +582,14 @@ impl Func {
             if operand::is_imm_12bs(stack_size) {
                 if !is_main {
                     for (reg, slot) in map_clone.iter() {
-                        let of = stack_size - ADDR_SIZE - slot.get_pos();
+                        let of = stack_size - ADDR_SIZE * 2 - slot.get_pos();
                         builder.l(&reg.to_string(false), "sp", of, false, true);
                     }
                 }
                 builder.l(
                     &ra.to_string(false),
                     "sp",
-                    start_pos,
+                    stack_size - ADDR_SIZE,
                     false,
                     true,
                 );
@@ -605,7 +597,7 @@ impl Func {
             } else {
                 builder.op1("li", "gp", &stack_size.to_string());
                 builder.op2("add", "sp", "sp", "gp", false, true);
-                builder.l(&ra.to_string(false), "sp", -rev_start_pos, false, true);
+                builder.l(&ra.to_string(false), "sp", -ADDR_SIZE, false, true);
 
                 if !is_main {
                     for (reg, slot) in map_clone.iter() {
@@ -653,6 +645,7 @@ impl GenerateAsm for Func {
         }
         AsmBuilder::new(f).show_func(&self.label)?;
         self.context.as_mut().call_prologue_event();
+        log!("func: {}, stack size:{}", self.label, self.context.get_offset());
         let mut size = 0;
         for block in self.blocks.iter() {
             size += block.insts.len();
