@@ -28,7 +28,42 @@ pub fn simplify_cfg_run(
 
     func_process(module, |_, func| {
         merge_one_line_bb(func.get_head());
-    })
+    });
+
+    func_process(module, |_, func| delete_one_jump_bb(func.get_head()));
+}
+
+fn delete_one_jump_bb(head: ObjPtr<BasicBlock>) {
+    let mut bb_list = get_bb_list(head);
+    loop {
+        let mut changed = false;
+        let mut index = Vec::new();
+        for (i, bb) in bb_list.iter().enumerate() {
+            if bb.is_exit() || bb.is_entry() {
+                continue;
+            }
+
+            if let InstKind::Branch = bb.get_head_inst().get_kind() {
+                println!("delete one jump bb: {}", bb.get_name());
+                debug_assert_eq!(bb.get_head_inst().is_jmp(), true);
+                changed = true;
+
+                index.push(i);
+                bb.get_up_bb().iter().for_each(|up_bb| {
+                    up_bb
+                        .as_mut()
+                        .replace_next_bb(bb.clone(), bb.get_next_bb()[0])
+                });
+            }
+        }
+        if !changed {
+            break;
+        }
+
+        index.iter().for_each(|&i| {
+            bb_list.remove(i);
+        });
+    }
 }
 
 fn merge_one_line_bb(head: ObjPtr<BasicBlock>) {
