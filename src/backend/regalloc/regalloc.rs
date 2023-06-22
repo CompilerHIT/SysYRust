@@ -207,8 +207,6 @@ pub fn merge_alloc(func: &Func, dstr: &mut HashMap<i32, i32>, spillings: &HashSe
     for block in func.blocks.iter() {
         analyse(*block, dstr, spillings);
     }
-
-
     
     let merge = |bb: ObjPtr<BB>,availables:& HashMap<i32, RegUsedStat>, dstr: &mut HashMap<i32, i32>,spillings: &HashSet<i32>| {
         // 首先定位到可能出现merge的指令，比如mv
@@ -222,6 +220,7 @@ pub fn merge_alloc(func: &Func, dstr: &mut HashMap<i32, i32>, spillings: &HashSe
             if dst_reg==src_reg {
                 continue;
             }
+            // fixme
             // if ends_index_bb.get(&(index as i32,bb)).unwrap_or(&tmp_set).contains(&src_reg) {
             //     //TODO
 
@@ -254,7 +253,7 @@ pub fn check_alloc(func: & Func, dstr: &HashMap<i32, i32>, spillings: &HashSet<i
             }
             return;
         }
-        println!("g?{}",reg.get_id());
+        // println!("g?{}",reg.get_id());
         let color=dstr.get(&reg.get_id()).unwrap();
         // 
         if !reg_use_stat.is_available_reg(*color) {

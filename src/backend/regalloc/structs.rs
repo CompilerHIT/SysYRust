@@ -19,12 +19,16 @@ impl RegUsedStat {
         }
     }
     pub fn is_available_ireg(&self, ireg: i32) -> bool {
+        let mut unusable= HashSet::from([1,3]);
+        unusable.extend(11..=17);
+        if unusable.contains(&ireg) {return  false;}
         if (1 << ireg & self.iregs_used) != 0 {
             return false;
         }
         return true
     }
     pub fn is_available_freg(&self, freg: i32) -> bool {
+        if HashSet::from([32]).contains(&freg) {return  false;}
         if (1 << freg & self.fregs_used) != 0 {
             return false;
         }
@@ -130,11 +134,11 @@ impl RegUsedStat {
 
     pub fn release_reg(&mut self,reg:i32){
         if reg>=0&&reg<32 {self.release_ireg(reg);}
-        else if reg>=32&&reg<63 {self.release_freg(reg);}
+        else if reg>=32&&reg<=63 {self.release_freg(reg);}
     }
     pub fn use_reg(&mut self,reg:i32){
         if reg>=0&&reg<32 {self.use_ireg(reg);}
-        else if reg>=32&&reg<63 {self.use_freg(reg);}
+        else if reg>=32&&reg<=63 {self.use_freg(reg);}
     }
     
     pub fn is_available_reg(&self,reg:i32)->bool {

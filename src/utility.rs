@@ -35,6 +35,24 @@ macro_rules! log_file {
     };
 }
 
+// 该宏用来进行不换行的文件log
+#[macro_export]
+macro_rules! log_file_uln {
+    ($file:expr, $($arg:tt)*) => {
+        {
+            use std::fs::OpenOptions;
+            use std::io::Write;
+
+            let mut file = OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open($file)
+                .expect("Failed to open log file");
+            write!(file, $($arg)*).expect("Failed to write to log file");
+        }
+    };
+}
+
 #[derive(Clone, Copy, PartialEq, Hash, Eq, Debug)]
 pub enum ScalarType {
     Void,

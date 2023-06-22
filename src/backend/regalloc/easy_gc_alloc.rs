@@ -6,19 +6,19 @@ use crate::{
         operand::Reg,
     },
     log_file,
-    utility::{ObjPool, ObjPtr, ScalarType},
+    utility::{ObjPool, ObjPtr, ScalarType}, log_file_uln,
 };
 use core::panic;
 use std::{
     collections::{HashMap, HashSet, LinkedList},
-    fmt,
-    future::IntoFuture,
+    fmt::{self, format},
 };
 
 use super::{
     regalloc::{self, Regalloc},
     structs::{FuncAllocStat, RegUsedStat},
 };
+
 
 pub struct Allocator {
     i_regs: LinkedList<i32>,                   //所有虚拟通用寄存器的列表
@@ -38,6 +38,7 @@ pub struct Allocator {
 }
 
 impl Allocator {
+
     pub fn new() -> Allocator {
         Allocator {
             i_regs: LinkedList::new(),
@@ -58,7 +59,6 @@ impl Allocator {
     }
 
     // 判断两个虚拟寄存器是否是通用寄存器分配冲突
-
     // 建立虚拟寄存器之间的冲突图
     fn build_interference_graph(&mut self, func: &Func) {
         // TODO,更新cost
@@ -185,87 +185,188 @@ impl Allocator {
         self.costs_reg = regalloc::count_spill_confict(func);
     }
 
-    // 寻找最小度寄存器进行着色,作色成功返回true,着色失败返回true
+    // 寻找最小度寄存器进行着色,作色成功返回true,着色失败返回false
     fn color(&mut self) -> bool {
         // TODO,优化执行速度,使用双向链表保存待着色点
         // 开始着色,着色直到无法再找到可着色的点为止,如果全部点都可以着色,返回true,否则返回false
         let mut out = true;
         // 对通用虚拟寄存器进行着色 (已经着色的点不用着色)
-
-        // 着色成功返回true,作色失败返回false
-        let color_one = |reg: i32,
-                         kind: ScalarType,
-                         colors: &mut HashMap<i32, i32>,
-                         availables: &mut HashMap<i32, RegUsedStat>,
-                         neighbors: Option<&HashSet<i32>>|
-         -> bool {
-            if colors.contains_key(&reg) {
-                panic!("already color!");
-            }
-
-            let available = availables.get(&reg).unwrap();
-            let color = match kind {
-                ScalarType::Float => available.get_available_freg(),
-                ScalarType::Int => available.get_available_ireg(),
-                _ => None,
-            };
-            if color.is_none() {
-                return false;
-            }
-            let color = color.unwrap();
-            colors.insert(reg, color);
-            if let Some(neighbors) = neighbors {
-                for neighbor in neighbors {
-                    if self.spillings.contains(&neighbor) {
-                        continue;
-                    }
-                    availables.get_mut(&neighbor).unwrap().use_reg(color);
-                }
-            }
-            return true;
-        };
-
         while !self.i_regs.is_empty() {
-            let reg = self.i_regs.front().unwrap();
-            if self.icolors.contains_key(reg) {
+            let reg = *self.i_regs.front().unwrap();
+            if self.icolors.contains_key(&reg)||self.spillings.contains(&reg) {
                 self.i_regs.pop_front();
                 continue;
             }
-            let ok = color_one(
-                *reg,
-                ScalarType::Int,
-                &mut self.icolors,
-                &mut self.regs_available,
-                self.i_interference_graph.get(reg),
-            );
+            // TODO ,使用self.colors
+            let ok = self.color_one(reg, ScalarType::Int);
             if ok {
                 self.i_regs.pop_front();
             } else {
-                self.i_interence_reg = Some(*reg);
+                out=false;
+                Allocator::debug("interef", [reg].into_iter().collect());
+                self.i_interence_reg = Some(reg);
                 break;
             }
         }
+        
         while !self.f_regs.is_empty() {
-            let reg = self.f_regs.front().unwrap();
-            if self.fcolors.contains_key(reg) {
+            let reg = *self.f_regs.front().unwrap();
+            if self.fcolors.contains_key(&reg) ||self.spillings.contains(&reg){
                 self.f_regs.pop_front();
                 continue;
             }
-            let ok = color_one(
-                *reg,
-                ScalarType::Float,
-                &mut self.fcolors,
-                &mut self.regs_available,
-                self.i_interference_graph.get(reg),
-            );
+            // TODO
+            let ok = self.color_one(reg, ScalarType::Float);
             if ok {
                 self.f_regs.pop_front();
             } else {
-                self.f_interence_reg = Some(*reg);
+                out=false;
+                self.f_interence_reg = Some(reg);
                 break;
             }
         }
         out
+    }
+    
+    // 简化成功返回true,简化失败返回falses
+    fn simplify(&mut self) -> bool {
+        // 简化方式
+        // 处理产生冲突的寄存器
+        // 方式,周围的寄存器变换颜色,直到该寄存器有不冲突颜色
+        let mut out = true;
+        // 简化成功返回true,简化失败返回false化简
+        if let Some(i_reg) = self.i_interence_reg {
+            if self.simplify_one(i_reg, ScalarType::Int) {
+                self.i_interence_reg=None;
+            }else{
+                out=false;
+            }
+        }
+        // 对浮点寄存器的化简
+        if let Some(f_reg) = self.f_interence_reg {
+            if self.simplify_one(f_reg, ScalarType::Float){
+                self.f_interence_reg=None;
+            }else{
+                out=false;
+            }
+        }
+        out //化简失败
+    }
+
+    // 简化失败后执行溢出操作,选择一个节点进行溢出,然后对已经作色节点进行重新分配
+    fn spill(&mut self) {
+        // 选择冲突寄存器或者是周围寄存器中的一个进行溢出,
+        // 溢出的选择贪心: f=cost/degree.
+        // 选择使得贪心函数最小的一个
+        let cost = |reg: i32, inference_graph: &HashMap<i32, HashSet<i32>>| {
+            return self.costs_reg.get(&reg).unwrap()
+                / inference_graph.get(&reg).unwrap_or(&HashSet::new()).len() as i32;
+        };
+        // 溢出寄存器之后更新节点周围节点颜色
+
+        let spill_one = |tospill: i32,
+                         spillings: &mut HashSet<i32>,
+                         colors: &mut HashMap<i32, i32>,
+                         interference_graph: &HashMap<i32, HashSet<i32>>| {
+            if tospill==43||tospill==42{
+                println!("gg");
+            }
+            let mut tospill = tospill;
+            let mut heuoristic_of_spill = cost(tospill, &self.i_interference_graph); //待消解节点的启发函数值
+            let inters = interference_graph.get(&tospill).unwrap();
+            for reg in inters {
+                if spillings.contains(reg) {
+                    continue;
+                }
+                if !colors.contains_key(reg) {
+                    continue;
+                } //没有着色的寄存器无法选择溢出
+                if *reg <= 31 {
+                    continue;
+                } //物理寄存器无法溢出
+                let tmp_cost = cost(*reg, interference_graph);
+                if tmp_cost < heuoristic_of_spill {
+                    heuoristic_of_spill = tmp_cost;
+                    tospill = *reg;
+                }
+            }
+            if tospill==43||tospill==42{
+                println!("gg");
+            }
+            Allocator::debug("spill", [tospill].into_iter().collect());
+            colors.remove(&tospill);
+            spillings.insert(tospill);
+        };
+        // 寻找周围节点中spill后能够消解冲突的节点中 启发函数值最小的一个
+        if let Some(ireg) = self.i_interence_reg {
+            spill_one(
+                ireg,
+                &mut self.spillings,
+                &mut self.icolors,
+                &self.i_interference_graph,
+            );
+            self.i_interence_reg = None;
+        }
+
+        if let Some(freg) = self.f_interence_reg {
+            spill_one(
+                freg,
+                &mut self.spillings,
+                &mut self.fcolors,
+                &self.f_interference_graph,
+            );
+            self.f_interence_reg = None;
+        }
+    }
+    // 返回分配结果
+    fn alloc_register(&mut self) -> (HashSet<i32>, HashMap<i32, i32>) {
+        let mut dstr: HashMap<i32, i32> = HashMap::new();
+        // 返回分配结果,根据当前着色结果,
+        for (vreg, icolor) in self.icolors.iter() {
+            self.dstr.insert(*vreg, *icolor);
+        }
+        for (vreg, fcolor) in self.fcolors.iter() {
+            self.dstr.insert(*vreg, *fcolor);
+        }
+        self.dstr.iter().for_each(|(k, v)| {
+            dstr.insert(*k, *v);
+        });
+        println!("{:?}",self.spillings);
+        (self.spillings.iter().cloned().collect(), dstr)
+    }
+
+
+    fn color_one(&mut self,reg:i32,kind:ScalarType)->bool {
+        let (mut colors,mut availables,interference_graph)=match kind {
+            ScalarType::Float=>(&mut self.fcolors,&mut self.regs_available,&mut self.f_interference_graph),
+            ScalarType::Int=>(&mut self.icolors,&mut self.regs_available,&mut self.i_interference_graph),
+            _=>panic!(),
+        };
+        if reg==42||reg==43 {
+            // debug
+            println!("G1");
+        }
+        let available = availables.get(&reg).unwrap();
+        let color = match kind {
+            ScalarType::Float => available.get_available_freg(),
+            ScalarType::Int => available.get_available_ireg(),
+            _ => None,
+        };
+        if color.is_none() {
+            return false;
+        }
+        let color = color.unwrap();
+        Allocator::debug("color", [reg,color].into_iter().collect());
+        colors.insert(reg, color);
+        if let Some(neighbors) = interference_graph.get(&reg){
+            for neighbor in neighbors{
+                if self.spillings.contains(&neighbor) {
+                    continue;
+                }
+                availables.get_mut(&neighbor).unwrap().use_reg(color);
+            }
+        }
+        return true;
     }
 
     fn refresh(&mut self, reg: i32, kind: ScalarType) {
@@ -300,191 +401,99 @@ impl Allocator {
         }
     }
 
-    // 简化成功返回true,简化失败返回falses
-    fn simplify(&mut self) -> bool {
-        // 简化方式
-        // 处理产生冲突的寄存器
-        // 方式,周围的寄存器变换颜色,直到该寄存器有不冲突颜色
-        let mut out = true;
-        let refresh = |reg: i32,
-                       colors: &HashMap<i32, i32>,
-                       regs_available: &mut HashMap<i32, RegUsedStat>,
-                       interference_graph: &HashMap<i32, HashSet<i32>>,
-                       kind: ScalarType| {
-            // TODO,没有加异常处理,不能发现外部不合理的修改
-            // 更新某个节点周围颜色
-            if let Some(neighbors) = interference_graph.get(&reg) {
-                let mut new_usestat = RegUsedStat::new();
-                for neighbor in neighbors {
-                    //TODO fix
-                    if let Some(color) = colors.get(neighbor) {
-                        if kind == ScalarType::Int {
-                            new_usestat.use_ireg(*color)
-                        } else if kind == ScalarType::Float {
-                            new_usestat.use_freg(*color)
-                        }
-                    }
-                }
-                regs_available.insert(reg, new_usestat);
-            }
+    fn simplify_one(&mut self,target_reg:i32,kind:ScalarType)->bool{
+        let (colors,interference_graph)=match kind {
+            ScalarType::Float=>(&mut self.fcolors,&mut self.f_interference_graph),
+            ScalarType::Int=>(&mut self.icolors,&mut self.i_interference_graph),
+            _=>panic!("unlegal reg"),
         };
-        // 简化成功返回true,简化失败返回false
-        let mut one_simplify = |target_reg: i32,
-                                colors: &mut HashMap<i32, i32>,
-                                interference_graph: &mut HashMap<i32, HashSet<i32>>,
-                                kind: ScalarType|
-         -> bool {
-            // 遍历目标寄存器的周围寄存器
-            let neighbors = interference_graph.get(&target_reg).unwrap();
-            let mut nums_colors: HashMap<i32, i32> = HashMap::new();
-            //统计目标寄存器周围寄存器的颜色
-            for reg in neighbors {
-                if !colors.contains_key(reg) {
-                    continue;
-                }
-                let color = colors.get(reg).unwrap();
-                let num = nums_colors.get(color).unwrap_or(&0);
-                nums_colors.insert(*color, num + 1);
+        let mut out=false;
+        // 遍历目标寄存器的周围寄存器
+        let neighbors = interference_graph.get(&target_reg).unwrap();
+        let mut nums_colors: HashMap<i32, i32> = HashMap::new();
+        let mut to_refresh:Vec<i32>=Vec::new();
+        //统计目标寄存器周围寄存器的颜色
+        for reg in neighbors {
+            if !colors.contains_key(reg) {
+                continue;
             }
-            // 对周围的寄存器进行颜色更换,
-            for neighbor in neighbors { 
-                if *neighbor<=31 {continue;}    //对于物理寄存器不能进行颜色交换
-                if !colors.contains_key(neighbor) {
-                    continue;
-                }
-                let color=colors.get(neighbor).unwrap();
-                if *nums_colors.get(color).unwrap()>1 {
-                    continue;
-                }
-                let mut available=self.regs_available.get(neighbor).unwrap();
-                // TODO,
-                match kind {
-                    ScalarType::Float=>{
-
-
-                    },
-                    ScalarType::Int=>{
-
-                    },
-                    _=>(),
-                }
-            }
-            false
-        };
-        // 对通用寄存器的化简
-        if let Some(i_reg) = self.i_interence_reg {
-            if one_simplify(
-                i_reg,
-                &mut self.icolors,
-                &mut self.i_interference_graph,
-                ScalarType::Int,
-            ) {
-                self.i_interence_reg = None;
-            } else {
-                out = false;
-            }
+            let color = colors.get(reg).unwrap();
+            let num = nums_colors.get(color).unwrap_or(&0);
+            nums_colors.insert(*color, num + 1);
         }
-        // 对浮点寄存器的化简
-        if let Some(f_reg) = self.f_interence_reg {
-            if one_simplify(
-                f_reg,
-                &mut self.fcolors,
-                &mut self.f_interference_graph,
-                ScalarType::Float,
-            ) {
-                self.f_interence_reg = None;
-            } else {
-                out = false;
+        // 对周围的寄存器进行颜色更换,
+        for neighbor in neighbors { 
+            if *neighbor<=31 {continue;}    //对于物理寄存器不能进行颜色交换
+            if self.spillings.contains(neighbor) {continue;}
+            if !colors.contains_key(neighbor) {
+                continue;
             }
+            let color=colors.get(neighbor).unwrap();
+            if *nums_colors.get(color).unwrap()>1 {
+                continue;
+            }
+            let available=self.regs_available.get_mut(neighbor).unwrap();
+            available.use_reg(*color);
+            let rest=match kind {
+                ScalarType::Float=>{
+                    available.get_rest_fregs()
+                },
+                ScalarType::Int=>{
+                    available.get_rest_iregs()
+                },
+                _=>panic!("un match reg type!"),
+            };
+            if rest.len()<=0 {
+                available.release_reg(*color);
+                continue;
+            }   
+            out=true;
+            Allocator::debug("simplify", [target_reg,*color,*neighbor,*rest.get(0).unwrap()].into_iter().collect());
+            // TODO
+            colors.insert(target_reg, *color);
+            colors.insert(*neighbor, *rest.get(0).unwrap());
+            to_refresh.push(target_reg);
+            to_refresh.push(*neighbor);
+            neighbors.iter().for_each(|reg|if reg!=neighbor {to_refresh.push(*reg)});
+            interference_graph.get(&target_reg).unwrap().iter().for_each(|reg|if *reg!=target_reg { to_refresh.push(*reg)});
+            break;
         }
-        out //化简失败
+        if out {
+            to_refresh.iter().for_each(|reg|self.refresh(*reg, kind));
+        }
+        out
     }
 
-    // 简化失败后执行溢出操作,选择一个节点进行溢出,然后对已经作色节点进行重新分配
-    fn spill(&mut self) {
-        // 选择冲突寄存器或者是周围寄存器中的一个进行溢出,
-        // 溢出的选择贪心: f=cost/degree.
-        // 选择使得贪心函数最小的一个
-        let cost = |reg: i32, inference_graph: &HashMap<i32, HashSet<i32>>| {
-            return self.costs_reg.get(&reg).unwrap()
-                / inference_graph.get(&reg).unwrap_or(&HashSet::new()).len() as i32;
+    fn debug(kind:&'static str,regs:Vec<i32>){
+        let color_spill_path="color_spill.txt";
+        match kind {
+            "interef"=>log_file!(color_spill_path,"inter:{}",regs.get(0).unwrap()),
+            "spill"=>log_file!(color_spill_path,"tospill:{}",regs.get(0).unwrap()),
+            "color"=>log_file!(color_spill_path,"color:{}({})",regs.get(0).unwrap(),regs.get(1).unwrap()),
+            "simplify"=>log_file!(color_spill_path,"simplify:{}({}),{}({})",regs.get(0).unwrap(),regs.get(1).unwrap(),regs.get(2).unwrap(),regs.get(3).unwrap()),
+            _=>panic!("unleagal debug"),
         };
-        // 溢出寄存器之后更新节点周围节点颜色
-
-        let spill_one = |tospill: i32,
-                         spillings: &mut HashSet<i32>,
-                         colors: &HashMap<i32, i32>,
-                         interference_graph: &HashMap<i32, HashSet<i32>>| {
-            let mut tospill = tospill;
-            let mut heuoristic_of_spill = cost(tospill, &self.i_interference_graph); //待消解节点的启发函数值
-            let inters = interference_graph.get(&tospill).unwrap();
-            for reg in inters {
-                if spillings.contains(reg) {
-                    continue;
-                }
-                if colors.contains_key(reg) {
-                    continue;
-                } //没有着色的寄存器无法选择溢出
-                if *reg <= 31 {
-                    continue;
-                } //物理寄存器无法溢出
-                let tmp_cost = cost(*reg, interference_graph);
-                if tmp_cost < heuoristic_of_spill {
-                    heuoristic_of_spill = tmp_cost;
-                    tospill = *reg;
-                }
-            }
-            spillings.insert(tospill);
-        };
-        // 寻找周围节点中spill后能够消解冲突的节点中 启发函数值最小的一个
-        if let Some(ireg) = self.i_interence_reg {
-            spill_one(
-                ireg,
-                &mut self.spillings,
-                &self.icolors,
-                &self.i_interference_graph,
-            );
-            self.i_interence_reg = None;
-        }
-
-        if let Some(freg) = self.f_interence_reg {
-            spill_one(
-                freg,
-                &mut self.spillings,
-                &self.fcolors,
-                &self.f_interference_graph,
-            );
-            self.f_interence_reg = None;
-        }
     }
-    // 返回分配结果
-    fn alloc_register(&mut self) -> (HashSet<i32>, HashMap<i32, i32>) {
-        let mut dstr: HashMap<i32, i32> = HashMap::new();
-        // 返回分配结果,根据当前着色结果,
-        for (vreg, icolor) in self.icolors.iter() {
-            self.dstr.insert(*vreg, *icolor);
-        }
-        for (vreg, fcolor) in self.fcolors.iter() {
-            self.dstr.insert(*vreg, *fcolor);
-        }
-        self.dstr.iter().for_each(|(k, v)| {
-            dstr.insert(*k, *v);
-        });
-        (self.spillings.iter().cloned().collect(), dstr)
-    }
+
 }
 
 impl Regalloc for Allocator {
     fn alloc(&mut self, func: &crate::backend::func::Func) -> super::structs::FuncAllocStat {
         self.build_interference_graph(func);
+        // for r in self.i_regs.iter() {
+        //     if *r==57||*r==66{
+        //         let a=2;
+        //     }
+        // }
         self.count_spill_costs(func);
         // 打印冲突图
         let intereref_path = "interference_graph.txt";
         self.i_interference_graph
             .iter()
             .for_each(|(reg, neighbors)| {
-                log_file!(intereref_path, "node {reg}");
-                log_file!(intereref_path, "{:?}\n", neighbors);
+                log_file_uln!(intereref_path, "node {reg}\n{{");
+                neighbors.iter().for_each(|neighbor| log_file_uln!(intereref_path,"({},{})",reg,neighbor));
+                log_file!(intereref_path,"}}\n");
             });
 
         // TODO

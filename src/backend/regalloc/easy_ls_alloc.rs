@@ -121,8 +121,6 @@ impl Regalloc for Allocator {
         log_file!(calout,"\n\n{} final:\n",func.label);
         log_file!(calout,"dstr:{:?}\nspillings:{:?}",dstr ,spillings);
 
-
-
         FuncAllocStat{
             stack_size: func_stack,
             bb_stack_sizes: bbstacks,
