@@ -1919,23 +1919,23 @@ impl Process for Return {
             match kit_mut.context_mut.ret_tp {
                 Type::Int => {
                     ret_tp = Type::Int;
-                    println!(
-                        "函数{:?}返回类型{:?}",
-                        kit_mut.context_mut.func_now, kit_mut.context_mut.ret_tp
-                    );
+                    // println!(
+                    //     "函数{:?}返回类型{:?}",
+                    //     kit_mut.context_mut.func_now, kit_mut.context_mut.ret_tp
+                    // );
                 }
                 Type::Float => {
                     ret_tp = Type::Float;
-                    println!(
-                        "函数{:?}返回类型{:?}",
-                        kit_mut.context_mut.func_now, kit_mut.context_mut.ret_tp
-                    );
+                    // println!(
+                    //     "函数{:?}返回类型{:?}",
+                    //     kit_mut.context_mut.func_now, kit_mut.context_mut.ret_tp
+                    // );
                 }
                 _ => {
-                    println!(
-                        "函数{:?}返回类型{:?}",
-                        kit_mut.context_mut.func_now, kit_mut.context_mut.ret_tp
-                    );
+                    // println!(
+                    //     "函数{:?}返回类型{:?}",
+                    //     kit_mut.context_mut.func_now, kit_mut.context_mut.ret_tp
+                    // );
                     // unreachable!()
                 }
             }
