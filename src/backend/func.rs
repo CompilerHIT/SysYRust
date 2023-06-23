@@ -7,7 +7,7 @@ pub use std::io::Result;
 use std::io::Write;
 use std::vec::Vec;
 
-use super::instrs::InstrsType;
+use super::instrs::{InstrsType, self};
 use super::{structs::*, BackendPool};
 use crate::backend::asm_builder::AsmBuilder;
 use crate::backend::instrs::{LIRInst, Operand};
@@ -405,18 +405,18 @@ impl Func {
         printinterval();
     }
 
-    pub fn allocate_reg(&mut self, f: &mut File) {
+    pub fn allocate_reg(&mut self) {
         // 函数返回地址保存在ra中
         self.calc_live();
         // let mut allocator = crate::backend::regalloc::easy_ls_alloc::Allocator::new();
-        // let mut allocator =crate::backend::regalloc::easy_gc_alloc::Allocator::new();
-        let mut allocator = crate::backend::regalloc::base_alloc::Allocator::new();
-        let alloc_stat = allocator.alloc(self);
+        let mut allocator =crate::backend::regalloc::easy_gc_alloc::Allocator::new();
+        // let mut allocator = crate::backend::regalloc::base_alloc::Allocator::new();
+        let mut alloc_stat = allocator.alloc(self);
 
-        // log_file!("calout.txt","{:?},\n{:?}",alloc_stat.dstr,alloc_stat.spillings);
-        // let check_alloc_path="check_alloc.txt";
-        // log_file!(check_alloc_path,"{:?}",self.label);
-        // log_file!(check_alloc_path,"{:?}",regalloc::check_alloc(self, &alloc_stat.dstr, &alloc_stat.spillings));
+        log_file!("calout.txt","{:?},\n{:?}",alloc_stat.dstr,alloc_stat.spillings);
+        let check_alloc_path="check_alloc.txt";
+        log_file!(check_alloc_path,"{:?}",self.label);
+        log_file!(check_alloc_path,"{:?}",regalloc::check_alloc(self, &alloc_stat.dstr, &alloc_stat.spillings));
         // TODO
         // simulate_assign::Simulator::simulate(&self, &alloc_stat);
 
@@ -430,6 +430,22 @@ impl Func {
         self.context.as_mut().set_offset(stack_size);
     }
 
+    pub fn remove_unuse_inst(&mut self){
+        //TOCHECK
+
+        // 移除mv va va 类型指令
+        for bb in self.blocks.iter() {
+            let mut index=0;
+            while index<bb.insts.len() {
+                let inst=bb.insts.get(index).unwrap();
+                if inst.get_type()!=InstrsType::OpReg(super::instrs::SingleOp::IMv) {
+                    index+=1;
+                    continue;
+                }
+                bb.as_mut().insts.remove(index);
+            }
+        }
+    }
     fn handle_parameters(&mut self, ir_func: &Function) {
         let mut iparam: Vec<_> = ir_func
             .get_parameter_list()
@@ -671,3 +687,17 @@ fn set_append(blocks: &Vec<ObjPtr<BasicBlock>>) -> HashSet<ObjPtr<BasicBlock>> {
     }
     set
 }
+
+impl Func {
+    // 实现一些关于函数信息的估计和获取的方法
+
+    // 估计寄存器数量
+    pub fn estimate_num_regs(&self)->usize {
+        let mut out=0;
+        self.blocks.iter().for_each(|bb|out+=bb.insts.len());
+        return  out;
+    }
+    
+
+}
+

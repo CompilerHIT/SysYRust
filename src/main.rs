@@ -1,5 +1,6 @@
-use std::env;
 
+
+use std::env;
 use lalrpop_util::lalrpop_mod;
 use sysylib::backend::module::AsmModule;
 use sysylib::frontend::irgen::irgen;
@@ -13,7 +14,10 @@ fn main() {
     run_main();
 }
 
+
 fn run_main() {
+    // let m=LinkedList::new();
+    // let cursor=m.cursor_front_mut();
     // ---------------------测试代码---------------------
     env::set_var("RUST_BACKTRACE", "1");
     // --------------------------------------------------

@@ -73,3 +73,22 @@ where T:Ord {
     }
 
 }
+
+
+#[cfg(test)]
+mod test_biheap {
+    use std::collections::VecDeque;
+
+    use biheap::core::BiHeap;
+    #[test]
+    fn test_biheap() {
+        // let tmp=VecDeque::new();
+        // tmp.remove(22);
+        let mut m=BiHeap::new();
+        m.push(222);
+        m.push(333);
+        m.push(111);
+        assert_eq!(111,*m.peek_min().unwrap());
+        assert_eq!(333,*m.peek_max().unwrap())
+    }
+}

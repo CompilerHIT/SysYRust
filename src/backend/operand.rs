@@ -1,4 +1,4 @@
-use std::fmt::format;
+use std::fmt::{format, Display};
 
 use crate::utility::ScalarType;
 use crate::log;
@@ -14,6 +14,19 @@ pub static mut F_REG_ID: i32 = 32;
 pub struct Reg {
     id: i32,
     r_type: ScalarType,
+}
+
+impl  Display for Reg {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let id=self.get_id();
+        if id>32 {return write!(f,"v{}",id);}
+        match self.get_type() {
+            ScalarType::Float=> write!(f,"f{}",id),
+            ScalarType::Int=>write!(f,"i{}",id),
+            ScalarType::Void=>write!(f,"void{}",id),
+            _=>write!(f,"u{}",id),
+        }
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, Hash, Eq, Debug)]

@@ -41,6 +41,7 @@ impl Bitmap {
 }
 
 
+// FIXME 编写单元测试检查
 impl Bitmap {
     pub fn new()->Bitmap {
         Bitmap{arr:Vec::new()}
@@ -53,9 +54,23 @@ impl Bitmap {
             self.arr.push(0);
         }
         let mut v=&mut self.arr[i/64];
-        *v=*v | (i as u64%64)
+        *v=*v | (1<< (i as u64%64))
     }
-    
+    pub fn remove(&mut self,i:usize)->bool{
+        if i/64>=self.arr.len() {return  false;}
+        let v= &mut self.arr[i/64];
+        if *v&(1<< (i as u64%64))==0 {return  false;}
+        *v=*v& (!(1<<(i as u64%64)));
+        true
+    }
+
+    pub fn contains(&self,i:usize)->bool{
+        if i/64>=self.arr.len() {return  false;}
+        let v= self.arr[i/64];
+        if v&(1<< (i as u64%64))==0 {return  false;}
+        true
+    }
+
     pub fn cap(&self) -> usize{
         self.arr.len()
     }
@@ -69,6 +84,7 @@ impl Bitmap {
         i=0;
         while i<a.cap()&&i<b.cap() {
             out.arr[i]=a.arr[i]&b.arr[i];
+            i+=1;
         }
         out
     }
@@ -87,3 +103,60 @@ impl Bitmap {
 
 
 }
+
+
+#[cfg(test)]
+mod test_bitmap{
+    use std::collections::HashSet;
+
+    use rand::random;
+
+
+    use super::Bitmap;
+    #[test]
+    fn test_insert(){
+        let mut bitmap=Bitmap::new();
+        bitmap.insert(33);
+        assert!(bitmap.contains(33));
+    }
+
+    #[test]
+    fn test_remove(){
+        let mut bitmap=Bitmap::new();
+        bitmap.insert(33);
+        assert!(bitmap.contains(33));
+        bitmap.remove(33);
+        assert!(!bitmap.contains(33));
+    }
+
+    #[test]
+    fn test_use(){
+        // 创建一个bitmap,进行随机插入删除n次
+        let n=1000000;
+        let mode:usize=10000;
+        let mut set:HashSet<usize>=HashSet::new();
+        let mut bitmap=Bitmap::new();
+        for i in 0..n {
+            // 获取一个随机数
+            let use_val=rand::random::<usize>()%mode;
+            let insert_or=rand::random::<bool>();
+            let delete_or=rand::random::<bool>();
+            if insert_or {
+                set.insert(use_val);
+                bitmap.insert(use_val);
+            }
+            if delete_or {
+                assert!(set.remove(&use_val)==bitmap.remove(use_val));
+            }
+        }
+        // 然后判断它与HashSet的随机插入删除判断结果是否一致
+        for value in set.iter() {
+            assert!(bitmap.contains(*value));
+        }
+    }
+}
+
+
+
+
+

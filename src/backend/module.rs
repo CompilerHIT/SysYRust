@@ -46,10 +46,20 @@ impl<'a> AsmModule<'a> {
         }
     }
 
+    // 移除无用指令(TODO,可以把窥孔优化放在这里)
+    fn remove_unuse_inst(&mut self){
+        self.func_map.iter().for_each(|(_,func)|{
+            func.as_mut().remove_unuse_inst();
+        });
+    }
+
     pub fn generator(&mut self, f: &mut File, f2: &mut File, pool: &mut BackendPool) {
         self.build_lir(pool);
-        // self.generate_row_asm(f2, pool); //注释
-        self.allocate_reg(f);
+        // TOCHECK 删除函数中无用指令
+        // self.remove_unuse_inst();
+
+        self.generate_row_asm(f2, pool); //注释
+        self.allocate_reg();
         self.handle_spill(pool, f);
         // 检查地址溢出，插入间接寻址
         self.handle_overflow(pool);
@@ -66,11 +76,11 @@ impl<'a> AsmModule<'a> {
         });
     }
 
-    fn allocate_reg(&mut self, f: &mut File) {
+    fn allocate_reg(&mut self) {
         self.func_map.iter_mut().for_each(|(_, func)| {
             // log!("allocate reg fun: {}", func.as_ref().label);
             if !func.is_extern {
-                func.as_mut().allocate_reg(f);
+                func.as_mut().allocate_reg();
             }
         });
     }

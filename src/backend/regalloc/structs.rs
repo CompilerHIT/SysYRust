@@ -1,9 +1,12 @@
 use std::collections::HashMap;
 use std::collections::HashSet;
+use std::ops::Range;
 
 use crate::backend::block::BB;
+use crate::backend::operand::Reg;
 use crate::frontend::ast::UnaryExp;
 use crate::utility::ObjPtr;
+use crate::utility::ScalarType;
 
 #[derive(Clone)]
 pub struct RegUsedStat {
@@ -19,6 +22,18 @@ impl RegUsedStat {
             fregs_used: 0,
         }
     }
+
+    pub fn get_color(reg:&Reg)->i32 {
+        if reg.get_id()>=32 {panic!("get color from virtual reg!")}
+        match reg.get_type() {
+            ScalarType::Float=>reg.get_id()+32,
+            ScalarType::Int=>reg.get_id(),
+            _=>panic!("tocolor:unlegal type reg")
+        }
+    }
+
+    
+
     pub fn is_available_ireg(&self, ireg: i32) -> bool {
         let mut unusable:HashSet<i32>= HashSet::from([0]); //保存x0
         unusable.insert(2); //保留sp
@@ -44,6 +59,22 @@ impl RegUsedStat {
     }
 
 
+    // 获取可用寄存器数量
+    pub fn num_available_regs(&self,kind:ScalarType)->usize {
+        match kind {
+            ScalarType::Float=>self.num_available_fregs(),
+            ScalarType::Int=>self.num_avialable_iregs(),
+            _=>panic!("{:?}",kind),
+        }
+    }
+    pub fn num_avialable_iregs(&self)->usize{
+        (0..=31).filter(|ireg|self.is_available_ireg(*ireg)).count()
+    }
+    pub fn num_available_fregs(&self)->usize{
+        let m:Range<i32>;
+        (32..=63).filter(|freg|self.is_available_freg(*freg)).count()
+    }
+
     // 获取一个可用的整数寄存器
     pub fn get_available_ireg(&self) -> Option<i32> {
         // 对于通用寄存器来说，x0-x4有特殊用途
@@ -67,7 +98,13 @@ impl RegUsedStat {
         None
     }
 
-
+    pub fn get_available_reg(&self,kind:ScalarType) ->Option<i32>{
+        match kind {
+            ScalarType::Float=>self.get_available_freg(),
+            ScalarType::Int=>self.get_available_ireg(),
+            _=>panic!("{:?}",kind),
+        }
+    }
 
     // 获取剩余的可用通用寄存器
     pub fn get_rest_iregs(&self)->Vec<i32>{
@@ -136,6 +173,7 @@ pub struct FuncAllocStat {
 }
 
 impl FuncAllocStat {
+
     pub fn new() -> FuncAllocStat {
         let mut out = FuncAllocStat {
             spillings: HashSet::new(),
@@ -164,3 +202,18 @@ impl BlockAllocStat {
     }
 }
 
+
+
+#[cfg(test)]
+mod test_regusestat{
+    use crate::backend::regalloc::regalloc::Regalloc;
+
+    use super::RegUsedStat;
+
+    #[test]
+    fn test_num(){
+        // TODO
+        let a=RegUsedStat::new();
+        assert_eq!(a.num_available_fregs(),31);
+    }
+}
