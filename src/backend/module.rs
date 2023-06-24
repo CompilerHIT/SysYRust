@@ -56,7 +56,7 @@ impl<'a> AsmModule<'a> {
     pub fn generator(&mut self, f: &mut File, f2: &mut File, pool: &mut BackendPool) {
         self.build_lir(pool);
         // TOCHECK 删除函数中无用指令
-        // self.remove_unuse_inst();
+        self.remove_unuse_inst();
 
         self.generate_row_asm(f2, pool); //注释
         self.allocate_reg();
@@ -138,7 +138,7 @@ impl<'a> AsmModule<'a> {
                 }
                 GlobalVar::FGlobalVar(fg) => {
                     let name = fg.get_name();
-                    let value = fg.get_init().to_hex_string();
+                    let value = fg.get_init().to_string();
                     writeln!(f, "{name}:\n    .word   {value}\n");
                 }
                 GlobalVar::GlobalConstArray(array) => {

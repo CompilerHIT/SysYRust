@@ -7,7 +7,7 @@ pub use std::io::Result;
 use std::io::Write;
 use std::vec::Vec;
 
-use super::instrs::{InstrsType, self};
+use super::instrs::{self, InstrsType};
 use super::{structs::*, BackendPool};
 use crate::backend::asm_builder::AsmBuilder;
 use crate::backend::instrs::{LIRInst, Operand};
@@ -409,14 +409,23 @@ impl Func {
         // 函数返回地址保存在ra中
         self.calc_live();
         // let mut allocator = crate::backend::regalloc::easy_ls_alloc::Allocator::new();
-        let mut allocator =crate::backend::regalloc::easy_gc_alloc::Allocator::new();
+        let mut allocator = crate::backend::regalloc::easy_gc_alloc::Allocator::new();
         // let mut allocator = crate::backend::regalloc::base_alloc::Allocator::new();
         let mut alloc_stat = allocator.alloc(self);
 
-        log_file!("calout.txt","{:?},\n{:?}",alloc_stat.dstr,alloc_stat.spillings);
-        let check_alloc_path="check_alloc.txt";
-        log_file!(check_alloc_path,"{:?}",self.label);
-        log_file!(check_alloc_path,"{:?}",regalloc::check_alloc(self, &alloc_stat.dstr, &alloc_stat.spillings));
+        log_file!(
+            "calout.txt",
+            "{:?},\n{:?}",
+            alloc_stat.dstr,
+            alloc_stat.spillings
+        );
+        let check_alloc_path = "check_alloc.txt";
+        log_file!(check_alloc_path, "{:?}", self.label);
+        log_file!(
+            check_alloc_path,
+            "{:?}",
+            regalloc::check_alloc(self, &alloc_stat.dstr, &alloc_stat.spillings)
+        );
         // TODO
         // simulate_assign::Simulator::simulate(&self, &alloc_stat);
 
@@ -424,25 +433,31 @@ impl Func {
         self.context.as_mut().set_reg_map(&self.reg_alloc_info.dstr);
         log!("dstr map info{:?}", self.reg_alloc_info.dstr);
         log!("spills:{:?}", self.reg_alloc_info.spillings);
-        
+
         let stack_size = self.max_params * ADDR_SIZE;
         log!("set stack size:{}", stack_size);
         self.context.as_mut().set_offset(stack_size);
     }
 
-    pub fn remove_unuse_inst(&mut self){
+    pub fn remove_unuse_inst(&mut self) {
         //TOCHECK
 
         // 移除mv va va 类型指令
         for bb in self.blocks.iter() {
-            let mut index=0;
-            while index<bb.insts.len() {
-                let inst=bb.insts.get(index).unwrap();
-                if inst.get_type()!=InstrsType::OpReg(super::instrs::SingleOp::IMv) {
-                    index+=1;
+            let mut index = 0;
+            while index < bb.insts.len() {
+                let inst = bb.insts[index];
+                if inst.operands.len() < 2 {
+                    index += 1;
                     continue;
                 }
-                bb.as_mut().insts.remove(index);
+                let dst = inst.get_dst();
+                let src = inst.get_lhs();
+                if inst.get_type() == InstrsType::OpReg(super::instrs::SingleOp::IMv) && dst == src {
+                    bb.as_mut().insts.remove(index);
+                } else {
+                    index += 1;
+                }
             }
         }
     }
@@ -514,7 +529,6 @@ impl Func {
         self.max_params = func_ref.max_params;
     }
 
-
     fn save_callee(&mut self, pool: &mut BackendPool, f: &mut File) {
         let mut callee_map: HashMap<Reg, StackSlot> = HashMap::new();
         if self.label == "main" {
@@ -585,13 +599,7 @@ impl Func {
 
                 if !is_main {
                     for (reg, slot) in map.iter() {
-                        builder.s(
-                            &reg.to_string(false),
-                            "gp",
-                            -(slot.get_pos()),
-                            false,
-                            true,
-                        );
+                        builder.s(&reg.to_string(false), "gp", -(slot.get_pos()), false, true);
                     }
                 }
             }
@@ -622,13 +630,7 @@ impl Func {
 
                 if !is_main {
                     for (reg, slot) in map_clone.iter() {
-                        builder.l(
-                            &reg.to_string(false),
-                            "sp",
-                            -(slot.get_pos()),
-                            false,
-                            true,
-                        );
+                        builder.l(&reg.to_string(false), "sp", -(slot.get_pos()), false, true);
                     }
                 }
             }
@@ -666,7 +668,11 @@ impl GenerateAsm for Func {
         }
         AsmBuilder::new(f).show_func(&self.label)?;
         self.context.as_mut().call_prologue_event();
-        log!("func: {}, stack size:{}", self.label, self.context.get_offset());
+        log!(
+            "func: {}, stack size:{}",
+            self.label,
+            self.context.get_offset()
+        );
         let mut size = 0;
         for block in self.blocks.iter() {
             size += block.insts.len();
@@ -692,12 +698,9 @@ impl Func {
     // 实现一些关于函数信息的估计和获取的方法
 
     // 估计寄存器数量
-    pub fn estimate_num_regs(&self)->usize {
-        let mut out=0;
-        self.blocks.iter().for_each(|bb|out+=bb.insts.len());
-        return  out;
+    pub fn estimate_num_regs(&self) -> usize {
+        let mut out = 0;
+        self.blocks.iter().for_each(|bb| out += bb.insts.len());
+        return out;
     }
-    
-
 }
-

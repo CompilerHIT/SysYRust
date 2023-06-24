@@ -77,7 +77,7 @@ impl BB {
         map_info: &mut Mapping,
         pool: &mut BackendPool,
     ) {
-        log!(">>>>{}", block.get_name());
+        // log!(">>>>{}", block.get_name());
         if block.is_empty() {
             self.showed = false;
             return;
@@ -85,7 +85,7 @@ impl BB {
         let mut ir_block_inst = block.as_ref().get_head_inst();
         loop {
             let inst_ref = ir_block_inst.as_ref();
-            log!("inst_ref: {:?}", inst_ref.get_kind());
+            // log!("inst_ref: {:?}", inst_ref.get_kind());
             // translate ir to lir, use match
             match inst_ref.get_kind() {
                 InstKind::Binary(op) => {
@@ -1015,7 +1015,7 @@ impl BB {
                         _ => unreachable!("mv must be int or float"),
                     };
 
-                    log!("phi reg: {:?}, tmp: {:?}", phi_reg.clone(), temp.clone());
+                    // log!("phi reg: {:?}, tmp: {:?}", phi_reg.clone(), temp.clone());
                     self.phis
                         .push(pool.put_inst(LIRInst::new(inst_kind, vec![phi_reg, temp.clone()])));
 
@@ -1024,7 +1024,7 @@ impl BB {
                         if !op_list.insert(*op) {
                             continue;
                         }
-                        log!("op: {:?}", op.get_kind());
+                        // log!("op: {:?}", op.get_kind());
                         let mut addition: Option<ObjPtr<LIRInst>> = None;
                         let src_reg = match op.get_kind() {
                             InstKind::ConstInt(iimm) | InstKind::GlobalConstInt(iimm) => {
@@ -1046,7 +1046,7 @@ impl BB {
                         };
                         let inst = LIRInst::new(inst_kind, vec![temp.clone(), src_reg]);
                         let obj_inst = pool.put_inst(inst);
-                        log!("phi kind {:?}", op.get_kind());
+                        // log!("phi kind {:?}", op.get_kind());
 
                         let incoming_block = map_info
                             .ir_block_map
@@ -2126,10 +2126,10 @@ impl GenerateAsm for BB {
             builder.show_block(&self.label)?;
         }
         context.as_mut().is_row = false;
-        log!("generate bb:{}", self.label);
+        // log!("generate bb:{}", self.label);
         for inst in self.insts.iter() {
             inst.as_mut().v_to_phy(context.get_reg_map().clone());
-            log!("generate inst:{:?}", inst);
+            // log!("generate inst:{:?}", inst);
             inst.as_mut().generate(context.clone(), f)?;
         }
         Ok(())
@@ -2156,16 +2156,6 @@ fn log2(imm: i32) -> i32 {
     }
     res
 }
-
-// fn get_current_global_seq() -> i32 {
-//     unsafe { GLOBAL_SEQ }
-// }
-
-// fn inc_global_seq() {
-//     unsafe {
-//         GLOBAL_SEQ += 1;
-//     }
-// }
 
 fn get_current_array_num() -> i32 {
     unsafe { ARRAY_NUM }
