@@ -1,6 +1,5 @@
-use super::{instrs::*, operand};
+use super::instrs::*;
 use crate::backend::operand::ToString;
-use crate::log;
 use std::fs::File;
 impl GenerateAsm for LIRInst {
     fn generate(&mut self, context: ObjPtr<Context>, f: &mut File) -> Result<()> {
@@ -27,11 +26,13 @@ impl GenerateAsm for LIRInst {
                     "add" | "sub" | "and" | "or" | "xor" | "sll" | "srl" | "sra" | "slt" => true,
                     _ => false,
                 };
-                let fop = &format!("f{}", op);
+                let mut is_double = self.is_double();
+                let fop = &format!("f{}.s", op);
                 let dst = match self.get_dst() {
                     Operand::Reg(reg) => {
                         if reg.get_type() == ScalarType::Float {
-                            op = fop
+                            op = fop;
+                            is_double = true;
                         }
                         reg.to_string(row)
                     }
@@ -44,19 +45,21 @@ impl GenerateAsm for LIRInst {
                 let rhs = match self.get_rhs() {
                     Operand::Reg(reg) => {
                         if reg.get_type() == ScalarType::Float {
-                            op = fop
+                            is_double = true;
+                            op = fop;
                         }
                         is_imm = false;
                         reg.to_string(row)
                     }
                     Operand::FImm(fimm) => {
                         op = fop;
+                        is_double = true;
                         fimm.to_string()
                     }
                     Operand::IImm(iimm) => iimm.to_string(),
                     _ => panic!("rhs of binary op must be reg or imm, to improve"),
                 };
-                builder.op2(op, &dst, &lhs, &rhs, is_imm, self.is_double())?;
+                builder.op2(op, &dst, &lhs, &rhs, is_imm, is_double)?;
                 Ok(())
             }
             InstrsType::OpReg(op) => {
@@ -72,7 +75,7 @@ impl GenerateAsm for LIRInst {
                     SingleOp::LoadAddr => "la",
                     SingleOp::Seqz => "seqz",
                     SingleOp::Snez => "snez",
-                    SingleOp::LoadImm => "addiw"
+                    SingleOp::LoadImm => "addiw",
                 };
                 let dst = match self.get_dst() {
                     Operand::Reg(reg) => reg.to_string(row),
@@ -81,8 +84,8 @@ impl GenerateAsm for LIRInst {
                 let src = match self.get_lhs() {
                     Operand::Reg(reg) => reg.to_string(row),
                     Operand::IImm(iimm) => iimm.to_string(),
+                    Operand::FImm(fimm) => fimm.to_string(),
                     Operand::Addr(addr) => addr.to_string(),
-                    _ => unreachable!("src of single op must be reg or imm, to improve"),
                 };
                 if dst == src && (op == "mv" || op == "fmv.s") {
                     return Ok(());
@@ -96,8 +99,14 @@ impl GenerateAsm for LIRInst {
                 // if !operand::is_imm_12bs(offset.get_data()) {
                 //     panic!("illegal offset");
                 // }
+                let mut is_float = self.is_float();
                 let dst = match self.get_dst() {
-                    Operand::Reg(reg) => reg.to_string(row),
+                    Operand::Reg(reg) => {
+                        if reg.get_type() == ScalarType::Float {
+                            is_float = true;
+                        }
+                        reg.to_string(row)
+                    }
                     _ => panic!("dst of load must be reg, to improve"),
                 };
                 let addr = match self.get_lhs() {
@@ -107,13 +116,7 @@ impl GenerateAsm for LIRInst {
                     }
                 };
 
-                builder.l(
-                    &dst,
-                    &addr,
-                    offset.get_data(),
-                    self.is_float(),
-                    self.is_double(),
-                )?;
+                builder.l(&dst, &addr, offset.get_data(), is_float, self.is_double())?;
                 Ok(())
             }
             InstrsType::Store => {
@@ -122,8 +125,15 @@ impl GenerateAsm for LIRInst {
                 // if !operand::is_imm_12bs(offset.get_data()) {
                 //     panic!("illegal offset, {:?}", self);
                 // }
+                let mut is_float = self.is_float();
                 let src = match self.get_dst() {
-                    Operand::Reg(reg) => reg.to_string(row),
+                    Operand::Reg(reg) => {
+                        if reg.get_type() == ScalarType::Float {
+                            is_float = true;
+                        }
+
+                        reg.to_string(row)
+                    }
                     _ => panic!("src of store must be reg, to improve"),
                 };
                 let addr = match self.get_lhs() {
@@ -134,13 +144,7 @@ impl GenerateAsm for LIRInst {
                         self
                     ),
                 };
-                builder.s(
-                    &src,
-                    &addr,
-                    offset.get_data(),
-                    self.is_float(),
-                    self.is_double(),
-                )?;
+                builder.s(&src, &addr, offset.get_data(), is_float, self.is_double())?;
                 Ok(())
             }
 
@@ -149,8 +153,14 @@ impl GenerateAsm for LIRInst {
                 // if !operand::is_imm_12bs(self.get_stack_offset().get_data()) {
                 //     panic!("illegal offset");
                 // }
+                let mut is_float = self.is_float();
                 let src = match self.get_dst() {
-                    Operand::Reg(reg) => reg,
+                    Operand::Reg(reg) => {
+                        if reg.get_type() == ScalarType::Float {
+                            is_float = true;
+                        }
+                        reg
+                    }
                     _ => panic!("src of store must be reg, to improve"),
                 };
                 let offset = self.get_stack_offset().get_data();
@@ -160,7 +170,7 @@ impl GenerateAsm for LIRInst {
                     &src.to_string(row),
                     "sp",
                     offset,
-                    self.is_float(),
+                    is_float,
                     self.is_double(),
                 )?;
                 Ok(())
@@ -170,8 +180,15 @@ impl GenerateAsm for LIRInst {
                 // if !operand::is_imm_12bs(self.get_stack_offset().get_data()) {
                 //     panic!("illegal offset");
                 // }
+                let mut is_float = self.is_float();
                 let dst = match self.get_dst() {
-                    Operand::Reg(reg) => reg,
+                    Operand::Reg(reg) => {
+                        if reg.get_type() == ScalarType::Float {
+                            is_float = true;
+                        }
+
+                        reg
+                    }
                     _ => panic!("dst of load must be reg, to improve"),
                 };
                 // let inst_off = self.get_offset().
@@ -181,7 +198,7 @@ impl GenerateAsm for LIRInst {
                     &dst.to_string(row),
                     "sp",
                     offset,
-                    self.is_float(),
+                    is_float,
                     self.is_double(),
                 )?;
                 Ok(())
@@ -194,8 +211,15 @@ impl GenerateAsm for LIRInst {
                 // if !operand::is_imm_12bs(true_offset) {
                 //     panic!("illegal offset");
                 // }
+                let mut is_float = self.is_float();
                 let dst = match self.get_dst() {
-                    Operand::Reg(reg) => reg,
+                    Operand::Reg(reg) => {
+                        if reg.get_type() == ScalarType::Float {
+                            is_float = true;
+                        }
+
+                        reg
+                    }
                     _ => panic!("dst of load must be reg, to improve"),
                 };
 
@@ -203,7 +227,7 @@ impl GenerateAsm for LIRInst {
                     &dst.to_string(row),
                     "sp",
                     true_offset,
-                    self.is_float(),
+                    is_float,
                     self.is_double(),
                 )?;
                 Ok(())
@@ -216,8 +240,14 @@ impl GenerateAsm for LIRInst {
                 // if !operand::is_imm_12bs(true_offset) {
                 //     panic!("illegal offset");
                 // }
+                let mut is_float = self.is_float();
                 let dst = match self.get_dst() {
-                    Operand::Reg(reg) => reg,
+                    Operand::Reg(reg) => {
+                        if reg.get_type() == ScalarType::Float {
+                            is_float = true;
+                        }
+                        reg
+                    }
                     _ => panic!("dst of load must be reg, to improve"),
                 };
 
@@ -225,7 +255,7 @@ impl GenerateAsm for LIRInst {
                     &dst.to_string(row),
                     "sp",
                     true_offset,
-                    self.is_float(),
+                    is_float,
                     self.is_double(),
                 )?;
                 Ok(())

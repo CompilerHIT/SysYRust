@@ -243,6 +243,14 @@ pub struct IntArray {
     pub value: Vec<i32>,
 }
 
+#[derive(Clone)]
+pub struct FloatArray {
+    pub name: String,
+    pub size: i32,
+    pub init: bool,
+    pub value: Vec<f32>,
+}
+
 impl IntArray {
     pub fn new(name: String, size: i32, init: bool, value: Vec<i32>) -> Self {
         Self {
@@ -287,3 +295,48 @@ impl PartialEq for IntArray {
 }
 
 impl Eq for IntArray {}
+
+impl FloatArray {
+    pub fn new(name: String, size: i32, init: bool, value: Vec<f32>) -> Self {
+        Self {
+            name,
+            size,
+            init,
+            value,
+        }
+    }
+    pub fn set_use(&mut self, used: bool) {
+        self.init = used;
+    }
+    pub fn get_use(&self) -> bool {
+        self.init
+    }
+    pub fn get_value(&self, index: i32) -> f32 {
+        self.value[index as usize]
+    }
+    pub fn get_array(&self) -> &Vec<f32> {
+        &self.value
+    }
+}
+
+impl GenerateAsm for FloatArray {
+    fn generate(&mut self, _: ObjPtr<Context>, f: &mut File) -> Result<()> {
+        let mut builder = AsmBuilder::new(f);
+        builder.print_farray(&self.value, self.name.clone(), self.size);
+        Ok(())
+    }
+}
+
+impl Hash for FloatArray {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.name.hash(state);
+    }
+}
+
+impl PartialEq for FloatArray {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name
+    }
+}
+
+impl Eq for FloatArray {}

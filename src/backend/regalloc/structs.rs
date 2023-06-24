@@ -4,7 +4,6 @@ use std::ops::Range;
 
 use crate::backend::block::BB;
 use crate::backend::operand::Reg;
-use crate::frontend::ast::UnaryExp;
 use crate::utility::ObjPtr;
 use crate::utility::ScalarType;
 
@@ -50,7 +49,7 @@ impl RegUsedStat {
     }
     pub fn is_available_freg(&self, freg: i32) -> bool {
         let freg=freg-32;
-        let mut unusable=HashSet::from([0]);
+        let mut unusable=HashSet::from([18, 19, 20]);
         if unusable.contains(&freg) {return  false;}
         if (1 << freg & self.fregs_used) == 0 {
             return true;

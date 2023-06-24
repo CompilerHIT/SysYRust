@@ -373,7 +373,6 @@ pub fn merge_alloc(func: &Func, dstr: &mut HashMap<i32, i32>, spillings: &HashSe
                     dstr.insert(dst_reg.get_id(), *dstr.get(&src_reg.get_id()).unwrap());
                     continue;
                 }
-                println!("{}", src_reg.get_id());
                 let src_available = nexttos.get_mut(&src_reg.get_id()).unwrap();
                 if src_available.contains_key(&dst_reg.get_id())
                     && *src_available.get(&dst_reg.get_id()).unwrap() == 1
@@ -415,7 +414,6 @@ pub fn check_alloc(
                 }
                 return;
             }
-            println!("g?{}",reg.get_id());
             let color = dstr.get(&reg.get_id());
             // fix me
             // if color.is_none() {
@@ -457,7 +455,6 @@ pub fn check_alloc(
                     if !reg.is_virtual() {
                         continue;
                     }
-                    println!("{}", reg.get_id());
                     let color = dstr.get(&reg.get_id());
                     // if color.is_none() {return  out;}   //FIXME
                     let color=color.unwrap();

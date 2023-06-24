@@ -7,7 +7,7 @@ pub use std::io::Result;
 use std::io::Write;
 use std::vec::Vec;
 
-use super::instrs::{self, InstrsType};
+use super::instrs::InstrsType;
 use super::{structs::*, BackendPool};
 use crate::backend::asm_builder::AsmBuilder;
 use crate::backend::instrs::{LIRInst, Operand};
@@ -44,12 +44,13 @@ pub struct Func {
     pub context: ObjPtr<Context>,
 
     pub reg_alloc_info: FuncAllocStat,
-    pub spill_stack_map: HashMap<i32, StackSlot>,
+    pub spill_stack_map: HashMap<Reg, StackSlot>,
 
     pub const_array: HashSet<IntArray>,
+    pub float_array: HashSet<FloatArray>,
     //FIXME: resolve float regs
     pub callee_saved: HashSet<Reg>,
-    pub caller_saved: HashMap<i32, i32>,
+    pub caller_saved: HashMap<Reg, Reg>,
     pub max_params: i32,
 }
 
@@ -74,6 +75,7 @@ impl Func {
             reg_alloc_info: FuncAllocStat::new(),
             spill_stack_map: HashMap::new(),
             const_array: HashSet::new(),
+            float_array: HashSet::new(),
             callee_saved: HashSet::new(),
             caller_saved: HashMap::new(),
             max_params: 0,

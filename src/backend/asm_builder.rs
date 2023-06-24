@@ -18,8 +18,6 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::io::Result;
 
-use super::block::NUM_SIZE;
-
 /// Assembly builder.
 pub struct AsmBuilder<'f> {
     f: &'f File,
@@ -54,9 +52,10 @@ impl<'f> AsmBuilder<'f> {
 
     pub fn op1(&mut self, op: &str, dest: &str, src: &str) -> Result<()> {
         if op == "addiw" {
-            writeln!(self.f, "    addiw {dest}, zero, {src}")?;
+            writeln!(self.f, "    addiw {dest}, zero, {src}")
+        } else {
+            writeln!(self.f, "    {op} {dest}, {src}")
         }
-        writeln!(self.f, "    {op} {dest}, {src}")
     }
 
     pub fn addi(&mut self, dest: &str, opr: &str, imm: i32) -> Result<()> {
@@ -200,6 +199,19 @@ impl<'f> AsmBuilder<'f> {
     // }
 
     pub fn print_array(&mut self, array: &Vec<i32>, name: String, size: i32) -> Result<()> {
+        writeln!(self.f, "{name}:")?;
+        if array.len() == 0 {
+            for i in 0..size {
+                writeln!(self.f, "	.word	0")?;
+            }
+        }
+        for i in array {
+            writeln!(self.f, "	.word	{i}")?;
+        }
+        Ok(())
+    }
+
+    pub fn print_farray(&mut self, array: &Vec<f32>, name: String, size: i32) -> Result<()> {
         writeln!(self.f, "{name}:")?;
         if array.len() == 0 {
             for i in 0..size {

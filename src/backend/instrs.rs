@@ -10,6 +10,8 @@ use crate::backend::operand::*;
 pub use crate::backend::structs::{Context, GenerateAsm};
 pub use crate::utility::{ObjPtr, ScalarType};
 
+use super::block::FLOAT_BASE;
+
 #[derive(Clone, PartialEq, Debug)]
 pub enum Operand {
     IImm(IImm),
@@ -150,7 +152,7 @@ impl fmt::Display for LIRInst {
                     SingleOp::LoadAddr => "la",
                     SingleOp::Seqz => "seqz",
                     SingleOp::Snez => "snez",
-                    SingleOp::LoadImm => "addi",
+                    SingleOp::LoadImm => "addiw",
                 };
             }
             InstrsType::Load | InstrsType::LoadParamFromStack | InstrsType::LoadFromStack => {
@@ -265,13 +267,13 @@ impl LIRInst {
         }
     }
 
-    pub fn is_spill(&self, id: &HashSet<i32>) -> HashSet<i32> {
+    pub fn is_spill(&self, id: &HashSet<i32>) -> HashSet<Reg> {
         let mut res = HashSet::new();
         for op in &self.operands {
             match op {
                 Operand::Reg(reg) => {
                     if id.contains(&reg.get_id()) {
-                        res.insert(reg.get_id());
+                        res.insert(*reg);
                     }
                 }
                 _ => {}
@@ -349,7 +351,7 @@ impl LIRInst {
                     if ireg.is_caller_save() {
                         set.push(ireg);
                     }
-                    let freg = Reg::new(cnt - n, ScalarType::Float);
+                    let freg = Reg::new(cnt - n + FLOAT_BASE, ScalarType::Float);
                     if freg.is_caller_save() {
                         set.push(freg);
                     }
@@ -365,7 +367,7 @@ impl LIRInst {
 
             InstrsType::Ret(re_type) => match re_type {
                 ScalarType::Int => vec![Reg::new(10, ScalarType::Int)],
-                ScalarType::Float => vec![Reg::new(10, ScalarType::Float)],
+                ScalarType::Float => vec![Reg::new(10 + FLOAT_BASE, ScalarType::Float)],
                 ScalarType::Void => vec![],
             },
         }
@@ -418,7 +420,7 @@ impl LIRInst {
                 }
                 let mut nf = 0;
                 while nf < min(farg_cnt, REG_COUNT) {
-                    set.push(Reg::new(nf, ScalarType::Float));
+                    set.push(Reg::new(nf + FLOAT_BASE, ScalarType::Float));
                     nf += 1;
                 }
                 set
