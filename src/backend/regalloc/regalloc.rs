@@ -108,9 +108,8 @@ pub fn count_spill_cost(func: &Func) -> HashMap<Reg, i32> {
 }
 
 // 获取冲突表
-pub fn build_intereference(func: &Func) -> HashMap<Reg, HashSet<Reg>> {
+pub fn build_intereference(func: &Func,ends_index_bb:&HashMap<(i32, ObjPtr<BB>), HashSet<Reg>>) -> HashMap<Reg, HashSet<Reg>> {
     let mut interference_graph: HashMap<Reg, HashSet<Reg>> = HashMap::new();
-    let ends_index_bb = ends_index_bb(func);
     let process =
         |cur_bb: ObjPtr<BB>, interef_graph: &mut HashMap<Reg, HashSet<Reg>>, kind: ScalarType| {
             let mut livenow: HashSet<Reg> = HashSet::new();
@@ -168,9 +167,8 @@ pub fn build_intereference(func: &Func) -> HashMap<Reg, HashSet<Reg>> {
 }
 
 // 获取可分配表
-pub fn build_availables(func:&Func)->HashMap<Reg,RegUsedStat> {
+pub fn build_availables(func:&Func,ends_index_bb:&HashMap<(i32, ObjPtr<BB>), HashSet<Reg>>)->HashMap<Reg,RegUsedStat> {
     let mut availables:HashMap<Reg,RegUsedStat>=HashMap::new();
-    let ends_index_bb = ends_index_bb(func);
     let process =
         |cur_bb: ObjPtr<BB>, availables:&mut HashMap<Reg, RegUsedStat>, kind: ScalarType| {
             let mut livenow: HashSet<Reg> = HashSet::new();
@@ -262,6 +260,8 @@ pub fn ends_index_bb(func: &Func) -> HashMap<(i32, ObjPtr<BB>), HashSet<Reg>> {
     }
     out
 }
+
+
 
 // 通用寄存器合并
 pub fn merge_alloc(func: &Func, dstr: &mut HashMap<i32, i32>, spillings: &HashSet<i32>) {

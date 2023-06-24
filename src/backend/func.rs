@@ -19,6 +19,7 @@ use crate::backend::{block::*, operand};
 use crate::backend::regalloc::{
     easy_ls_alloc::Allocator, regalloc::Regalloc, structs::FuncAllocStat,
 };
+use crate::container::bitmap::Bitmap;
 use crate::ir::basicblock::BasicBlock;
 use crate::ir::function::Function;
 use crate::ir::instruction::Inst;
@@ -410,6 +411,7 @@ impl Func {
         self.calc_live();
         // let mut allocator = crate::backend::regalloc::easy_ls_alloc::Allocator::new();
         let mut allocator =crate::backend::regalloc::easy_gc_alloc::Allocator::new();
+        let mut allocator=crate::backend::regalloc::opt_gc_alloc::Allocator::new();
         // let mut allocator = crate::backend::regalloc::base_alloc::Allocator::new();
         let mut alloc_stat = allocator.alloc(self);
 
@@ -710,6 +712,30 @@ impl Func {
         self.blocks.iter().for_each(|bb| out += bb.insts.len());
         return out;
     }
-    
+    // 获取指令数量
+    pub fn num_insts(&self)->usize {
+        let mut out = 0;
+        self.blocks.iter().for_each(|bb| out += bb.insts.len());
+        return out;
+    }
+
+    // 获取寄存器数量
+    pub fn num_regs(&self)->usize{
+        let mut passed:Bitmap=Bitmap::with_cap(1000);
+        let mut out = 0;
+        self.blocks.iter().for_each(|bb|{
+            bb.insts.iter().for_each(|inst|{
+                for reg in inst.get_reg_def() {
+                    let id=reg.get_id()<<1|match reg.get_type() {
+                        ScalarType::Float=>0,ScalarType::Int=>1,_=>panic!("unleagal")
+                    };
+                    if passed.contains(id as usize) {continue;}
+                    passed.insert(id as usize);
+                    out+=1;
+                }
+            })
+        });
+        return out;
+    }
 
 }

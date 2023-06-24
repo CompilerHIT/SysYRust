@@ -22,14 +22,14 @@ use super::{
 
 
 pub struct Allocator {
-    regs: LinkedList<Reg>,                   //所有虚拟寄存器的列表
-    colors: HashMap<i32, i32>,                // 保存着色结果
-    costs_reg: HashMap<Reg, i32>,              //记录虚拟寄存器的使用次数(作为代价)
-    availables: HashMap<Reg, RegUsedStat>, // 保存每个点的可用寄存器集合
-    nums_neighbor_color:HashMap<Reg,HashMap<i32,i32>>,
-    interference_regs:HashSet<Reg>,
-    interference_graph: HashMap<Reg, HashSet<Reg>>, //浮点寄存器冲突图
-    spillings: HashSet<i32>,                          //记录溢出寄存器
+    pub regs: LinkedList<Reg>,                   //所有虚拟寄存器的列表
+    pub colors: HashMap<i32, i32>,                // 保存着色结果
+    pub costs_reg: HashMap<Reg, i32>,              //记录虚拟寄存器的使用次数(作为代价)
+    pub availables: HashMap<Reg, RegUsedStat>, // 保存每个点的可用寄存器集合
+    pub nums_neighbor_color:HashMap<Reg,HashMap<i32,i32>>,
+    pub interference_regs:HashSet<Reg>,
+    pub interference_graph: HashMap<Reg, HashSet<Reg>>, //浮点寄存器冲突图
+    pub spillings: HashSet<i32>,                          //记录溢出寄存器
 }
 
 
@@ -51,8 +51,9 @@ impl Allocator {
     // 判断两个虚拟寄存器是否是通用寄存器分配冲突
     // 建立虚拟寄存器之间的冲突图
     fn build_interference_graph(&mut self, func: &Func) {
-        self.interference_graph=regalloc::build_intereference(func,);
-        self.availables=regalloc::build_availables(func);
+        let ends_index_bb=regalloc::ends_index_bb(func);
+        self.interference_graph=regalloc::build_intereference(func,&ends_index_bb);
+        self.availables=regalloc::build_availables(func,&ends_index_bb);
         // 初始化虚拟寄存器的剩余可用物理寄存器表
         for cur_bb in func.blocks.iter() {
             for inst in cur_bb.insts.iter() {
