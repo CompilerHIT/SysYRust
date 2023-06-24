@@ -8,6 +8,7 @@ pub mod instruction;
 pub mod ir_type;
 pub mod module;
 mod optimizer;
+mod tools;
 pub mod user;
 pub mod value;
 
