@@ -1803,8 +1803,11 @@ impl Process for While {
             )
             .unwrap();
         kit_mut.context_mut.bb_now_set(block_while_head); //设置当前basicblock
+                                                          // self.body
+                                                          //     .process((Some(block_while_head), Some(block_false)), kit_mut)
+                                                          //     .unwrap(); //在块内生成指令
         self.body
-            .process((Some(block_while_head), Some(block_false)), kit_mut)
+            .process((Some(block_cond), Some(block_false)), kit_mut)
             .unwrap(); //在块内生成指令
         match kit_mut.context_mut.bb_now_mut {
             InfuncChoice::InFunc(bb_now) => {
