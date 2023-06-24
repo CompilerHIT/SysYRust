@@ -8,7 +8,8 @@ pub const ARG_REG_COUNT: i32 = 8;
 pub const REG_SP: i32 = 2;
 pub const IMM_12_Bs: i32 = 2047;
 pub const IMM_20_Bs: i32 = 524287;
-pub static mut REG_ID: i32 = 32;
+pub static mut I_REG_ID: i32 = 32;
+pub static mut F_REG_ID: i32 = 32;
 
 #[derive(Clone, Copy, PartialEq, Hash, Eq, Debug)]
 pub struct Reg {
@@ -86,11 +87,20 @@ impl Reg {
     pub fn new(id: i32, r_type: ScalarType) -> Self {
         Self { id, r_type }
     }
+
     pub fn init(r_type: ScalarType) -> Self {
-        unsafe {
-            let id = REG_ID;
-            REG_ID += 1;
-            Self { id, r_type }
+        match r_type {
+            ScalarType::Int => unsafe {
+                let id = I_REG_ID;
+                I_REG_ID += 1;
+                Self { id, r_type }
+            },
+            ScalarType::Float => unsafe {
+                let id = F_REG_ID;
+                F_REG_ID += 1;
+                Self { id, r_type }
+            },
+            _ => panic!("Wrong Type"),
         }
     }
     pub fn to_string(&self, is_row: bool) -> String {

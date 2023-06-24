@@ -124,9 +124,20 @@ impl BB {
                             }
                         }
                         BinOp::Sub => {
-                            let inst_kind = InstrsType::Binary(BinaryOp::Sub);
+                            let mut inst_kind = InstrsType::Binary(BinaryOp::Sub);
                             lhs_reg = self.resolve_operand(func, lhs, true, map_info, pool);
-                            rhs_reg = self.resolve_operand(func, rhs, false, map_info, pool);
+
+                            match rhs.as_ref().get_kind() {
+                                InstKind::ConstInt(imm) => {
+                                    inst_kind = InstrsType::Binary(BinaryOp::Add);
+                                    rhs_reg = self.resolve_iimm(-imm, pool);
+                                }
+                                _ => {
+                                    //不是立即数
+                                    rhs_reg =
+                                        self.resolve_operand(func, rhs, false, map_info, pool);
+                                }
+                            }
                             // log!("lhs_reg: {:?}", lhs_reg);
                             // log!("rhs_reg: {:?}", rhs_reg);
                             self.insts.push(pool.put_inst(LIRInst::new(
@@ -1176,6 +1187,7 @@ impl BB {
                         //FIXME: solve float regs
                         if let Some(phy_id) = func.reg_alloc_info.dstr.get(&reg.get_id()) {
                             let save_reg = Reg::new(*phy_id, reg.get_type());
+                            println!("save reg: {:?}", save_reg);
                             if save_reg.is_caller_save() {
                                 func.as_mut().caller_saved.insert(save_reg, *reg);
                             }
