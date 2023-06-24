@@ -2528,13 +2528,29 @@ impl Process for UnaryExp {
                 UnaryOp::Minus => {
                     let (mut inst_u, mut val) = unaryexp.as_mut().process(input, kit_mut).unwrap();
                     let mut inst = inst_u;
-                    // match val {
-                    //     ExpValue::Bool(_) => {}
-                    //     _ => {
-                    //         inst = kit_mut.pool_inst_mut.make_neg(inst_u);
-                    //         kit_mut.context_mut.push_inst_bb(inst);
-                    //     }
-                    // }
+
+                    let mut val_ret = val;
+                    match val {
+                        ExpValue::Float(f) => {
+                            val_ret = ExpValue::Float(-f);
+                            inst = kit_mut.pool_inst_mut.make_float_const(-f);
+                            kit_mut.context_mut.push_inst_bb(inst);
+                            return Ok((inst, val_ret));
+                        }
+                        ExpValue::Int(i) => {
+                            val_ret = ExpValue::Int(-i);
+                            inst = kit_mut.pool_inst_mut.make_int_const(-i);
+                            kit_mut.context_mut.push_inst_bb(inst);
+                            return Ok((inst, val_ret));
+                        }
+                        ExpValue::Bool(i) => {
+                            val_ret = ExpValue::Bool(-i);
+                        }
+                        _ => {
+                            val_ret = ExpValue::None;
+                        }
+                    }
+
                     match inst_u.get_kind() {
                         InstKind::Unary(op) => match op {
                             UnOp::Neg => {
@@ -2550,41 +2566,74 @@ impl Process for UnaryExp {
                             kit_mut.context_mut.push_inst_bb(inst);
                         }
                     }
-                    let mut val_ret = val;
-                    match val {
-                        ExpValue::Float(f) => {
-                            val_ret = ExpValue::Float(-f);
-                        }
-                        ExpValue::Int(i) => {
-                            val_ret = ExpValue::Int(-i);
-                        }
-                        ExpValue::Bool(i) => {
-                            val_ret = ExpValue::Bool(-i);
-                        }
-                        _ => {
-                            val_ret = ExpValue::None;
-                        }
-                    }
+                    // let mut val_ret = val;
+                    // match val {
+                    //     ExpValue::Float(f) => {
+                    //         val_ret = ExpValue::Float(-f);
+                    //     }
+                    //     ExpValue::Int(i) => {
+                    //         val_ret = ExpValue::Int(-i);
+                    //     }
+                    //     ExpValue::Bool(i) => {
+                    //         val_ret = ExpValue::Bool(-i);
+                    //     }
+                    //     _ => {
+                    //         val_ret = ExpValue::None;
+                    //     }
+                    // }
                     Ok((inst, val_ret))
                 }
                 UnaryOp::Exclamation => {
-                    let (inst_u, _) = unaryexp.as_mut().process(input, kit_mut).unwrap();
+                    let (inst_u, val) = unaryexp.as_mut().process(input, kit_mut).unwrap();
+                    let mut inst = inst_u;
+                    let mut val_ret = val;
+                    match val {
+                        //能推断出值
+                        ExpValue::Float(f) => {
+                            if f == 0.0 {
+                                val_ret = ExpValue::Float(1.0);
+                                inst = kit_mut.pool_inst_mut.make_float_const(1.0);
+                                kit_mut.context_mut.push_inst_bb(inst);
+                                return Ok((inst, val_ret));
+                            } else {
+                                val_ret = ExpValue::Float(0.0);
+                                inst = kit_mut.pool_inst_mut.make_float_const(0.0);
+                                kit_mut.context_mut.push_inst_bb(inst);
+                                return Ok((inst, val_ret));
+                            }
+                        }
+                        ExpValue::Int(i) => {
+                            if i == 0 {
+                                val_ret = ExpValue::Int(1);
+                                inst = kit_mut.pool_inst_mut.make_int_const(1);
+                                kit_mut.context_mut.push_inst_bb(inst);
+                                return Ok((inst, val_ret));
+                            } else {
+                                val_ret = ExpValue::Int(0);
+                                inst = kit_mut.pool_inst_mut.make_int_const(0);
+                                kit_mut.context_mut.push_inst_bb(inst);
+                                return Ok((inst, val_ret));
+                            }
+                        }
+                        _ => {}
+                    }
                     match inst_u.get_kind() {
                         InstKind::Unary(op) => match op {
                             UnOp::Not => {
-                                let inst = inst_u.get_unary_operand();
-                                Ok((inst, ExpValue::Bool(1)))
+                                inst = inst_u.get_unary_operand();
+                                Ok((inst, ExpValue::None))
                             }
                             _ => {
-                                let inst = kit_mut.pool_inst_mut.make_not(inst_u);
+                                inst = kit_mut.pool_inst_mut.make_not(inst_u);
                                 kit_mut.context_mut.push_inst_bb(inst);
-                                Ok((inst, ExpValue::Bool(1)))
+                                Ok((inst, ExpValue::None))
                             }
                         },
                         _ => {
-                            let inst = kit_mut.pool_inst_mut.make_not(inst_u);
+                            inst = kit_mut.pool_inst_mut.make_not(inst_u);
                             kit_mut.context_mut.push_inst_bb(inst);
-                            Ok((inst, ExpValue::Bool(1)))
+                            // Ok((inst, ExpValue::Bool(1)))
+                            Ok((inst, ExpValue::None))
                         }
                     }
                 }
@@ -2703,13 +2752,14 @@ impl Process for MulExp {
             MulExp::MulExp((mulexp, unaryexp)) => {
                 let (inst_left, lval) = mulexp.as_mut().process(input, kit_mut).unwrap();
                 let (inst_right, rval) = unaryexp.process(input, kit_mut).unwrap();
-                let inst = kit_mut.pool_inst_mut.make_mul(inst_left, inst_right);
-                kit_mut.context_mut.push_inst_bb(inst);
+                let mut inst = kit_mut.pool_inst_mut.make_mul(inst_left, inst_right);
+
                 let mut val_ret = lval;
                 match lval {
                     ExpValue::Float(f1) => match rval {
                         ExpValue::Float(f2) => {
                             val_ret = ExpValue::Float(f1 * f2);
+                            inst = kit_mut.pool_inst_mut.make_float_const(f1 * f2);
                         }
                         _ => {
                             val_ret = ExpValue::None;
@@ -2718,6 +2768,7 @@ impl Process for MulExp {
                     ExpValue::Int(i1) => match rval {
                         ExpValue::Int(i2) => {
                             val_ret = ExpValue::Int(i1 * i2);
+                            inst = kit_mut.pool_inst_mut.make_int_const(i1 * i2);
                         }
                         _ => {
                             val_ret = ExpValue::None;
@@ -2727,18 +2778,20 @@ impl Process for MulExp {
                         val_ret = ExpValue::None;
                     }
                 }
+                kit_mut.context_mut.push_inst_bb(inst);
                 Ok((inst, val_ret))
             }
             MulExp::DivExp((mulexp, unaryexp)) => {
                 let (inst_left, lval) = mulexp.as_mut().process(input, kit_mut).unwrap();
                 let (inst_right, rval) = unaryexp.process(input, kit_mut).unwrap();
-                let inst = kit_mut.pool_inst_mut.make_div(inst_left, inst_right);
-                kit_mut.context_mut.push_inst_bb(inst);
+                let mut inst = kit_mut.pool_inst_mut.make_div(inst_left, inst_right);
+
                 let mut val_ret = lval;
                 match lval {
                     ExpValue::Float(f1) => match rval {
                         ExpValue::Float(f2) => {
                             val_ret = ExpValue::Float(f1 / f2);
+                            inst = kit_mut.pool_inst_mut.make_float_const(f1 / f2);
                         }
                         _ => {
                             val_ret = ExpValue::None;
@@ -2747,6 +2800,7 @@ impl Process for MulExp {
                     ExpValue::Int(i1) => match rval {
                         ExpValue::Int(i2) => {
                             val_ret = ExpValue::Int(i1 / i2);
+                            inst = kit_mut.pool_inst_mut.make_int_const(i1 / i2);
                         }
                         _ => {
                             val_ret = ExpValue::None;
@@ -2756,18 +2810,21 @@ impl Process for MulExp {
                         val_ret = ExpValue::None;
                     }
                 }
+                kit_mut.context_mut.push_inst_bb(inst);
                 Ok((inst, val_ret))
             }
             MulExp::ModExp((mulexp, unaryexp)) => {
                 let (inst_left, lval) = mulexp.as_mut().process(input, kit_mut).unwrap();
                 let (inst_right, rval) = unaryexp.process(input, kit_mut).unwrap();
-                let inst = kit_mut.pool_inst_mut.make_rem(inst_left, inst_right);
-                kit_mut.context_mut.push_inst_bb(inst);
+                let mut inst = kit_mut.pool_inst_mut.make_rem(inst_left, inst_right);
+
                 let mut val_ret = lval;
                 match lval {
                     ExpValue::Float(f1) => match rval {
                         ExpValue::Float(f2) => {
                             val_ret = ExpValue::Float(f1 % f2);
+                            inst = kit_mut.pool_inst_mut.make_float_const(f1 % f2);
+                            unreachable!("浮点数求余")
                         }
                         _ => {
                             val_ret = ExpValue::None;
@@ -2776,6 +2833,7 @@ impl Process for MulExp {
                     ExpValue::Int(i1) => match rval {
                         ExpValue::Int(i2) => {
                             val_ret = ExpValue::Int(i1 % i2);
+                            inst = kit_mut.pool_inst_mut.make_int_const(i1 % i2);
                         }
                         _ => {
                             val_ret = ExpValue::None;
@@ -2785,6 +2843,7 @@ impl Process for MulExp {
                         val_ret = ExpValue::None;
                     }
                 }
+                kit_mut.context_mut.push_inst_bb(inst);
                 Ok((inst, val_ret))
             }
         }
@@ -2809,13 +2868,14 @@ impl Process for AddExp {
                     let (inst_left, lval) = opexp.process(input, kit_mut).unwrap();
                     let (inst_right, rval) = mulexp.process(input, kit_mut).unwrap();
                     // // println!("lvar:{:?},type:{:?},rvar:{:?},type:{:?}",inst_left.as_ref().get_kind(),inst_left.as_ref().get_ir_type(),inst_right.as_ref().get_kind(),inst_right.as_ref().get_ir_type());
-                    let inst = kit_mut.pool_inst_mut.make_add(inst_left, inst_right);
-                    kit_mut.context_mut.push_inst_bb(inst);
+                    let mut inst = kit_mut.pool_inst_mut.make_add(inst_left, inst_right);
+
                     let mut val_ret = lval;
                     match lval {
                         ExpValue::Float(f1) => match rval {
                             ExpValue::Float(f2) => {
                                 val_ret = ExpValue::Float(f1 + f2);
+                                inst = kit_mut.pool_inst_mut.make_float_const(f1 + f2);
                             }
                             _ => {
                                 val_ret = ExpValue::None;
@@ -2824,6 +2884,7 @@ impl Process for AddExp {
                         ExpValue::Int(i1) => match rval {
                             ExpValue::Int(i2) => {
                                 val_ret = ExpValue::Int(i1 + i2);
+                                inst = kit_mut.pool_inst_mut.make_int_const(i1 + i2);
                             }
                             _ => {
                                 val_ret = ExpValue::None;
@@ -2833,20 +2894,22 @@ impl Process for AddExp {
                             val_ret = ExpValue::None;
                         }
                     }
+                    kit_mut.context_mut.push_inst_bb(inst);
                     Ok((inst, val_ret))
                 }
                 AddOp::Minus => {
                     let (inst_left, lval) = opexp.process(input, kit_mut).unwrap();
                     let (inst_right, rval) = mulexp.process(input, kit_mut).unwrap();
                     // let inst_right_neg = kit_mut.pool_inst_mut.make_neg(inst_right);
-                    let inst = kit_mut.pool_inst_mut.make_sub(inst_left, inst_right);
+                    let mut inst = kit_mut.pool_inst_mut.make_sub(inst_left, inst_right);
                     // kit_mut.context_mut.push_inst_bb(inst_right);
-                    kit_mut.context_mut.push_inst_bb(inst);
+
                     let mut val_ret = lval;
                     match lval {
                         ExpValue::Float(f1) => match rval {
                             ExpValue::Float(f2) => {
                                 val_ret = ExpValue::Float(f1 - f2);
+                                inst = kit_mut.pool_inst_mut.make_float_const(f1 - f2);
                             }
                             _ => {
                                 val_ret = ExpValue::None;
@@ -2855,6 +2918,7 @@ impl Process for AddExp {
                         ExpValue::Int(i1) => match rval {
                             ExpValue::Int(i2) => {
                                 val_ret = ExpValue::Int(i1 - i2);
+                                inst = kit_mut.pool_inst_mut.make_int_const(i1 - i2);
                             }
                             _ => {
                                 val_ret = ExpValue::None;
@@ -2864,6 +2928,7 @@ impl Process for AddExp {
                             val_ret = ExpValue::None;
                         }
                     }
+                    kit_mut.context_mut.push_inst_bb(inst);
                     Ok((inst, val_ret))
                 }
             },
