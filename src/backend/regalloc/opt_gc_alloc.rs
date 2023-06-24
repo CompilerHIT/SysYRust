@@ -4,3 +4,29 @@
 1.基于贪心的color选择和spill选择
 2.合并寄存器
  */
+
+
+// 或者可以认为是没有启发的线性扫描寄存器分配
+
+use std::{collections::{HashMap, HashSet}, fs};
+use crate::backend::regalloc::{easy_gc_alloc,structs::FuncAllocStat};
+
+use super::regalloc::{Regalloc, self};
+
+pub struct Allocator {
+    easy_gc_allocator:easy_gc_alloc::Allocator
+}
+
+impl Allocator {
+    pub fn new()->Allocator {
+        Allocator { easy_gc_allocator: easy_gc_alloc::Allocator::new() }
+    }
+}
+impl Regalloc for Allocator {
+    fn alloc(&mut self, func: &crate::backend::instrs::Func) -> FuncAllocStat {
+        let mut out=self.easy_gc_allocator.alloc(func);
+        // 寄存器合并
+        regalloc::merge_alloc(func, &mut out.dstr, &mut out.spillings);
+        out
+    }
+}

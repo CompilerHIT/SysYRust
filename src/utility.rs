@@ -40,15 +40,15 @@ macro_rules! log_file {
 macro_rules! log_file_uln {
     ($file:expr, $($arg:tt)*) => {
         {
-            // use std::fs::OpenOptions;
-            // use std::io::Write;
+            use std::fs::OpenOptions;
+            use std::io::Write;
 
-            // let mut file = OpenOptions::new()
-            //     .create(true)
-            //     .append(true)
-            //     .open($file)
-            //     .expect("Failed to open log file");
-            // write!(file, $($arg)*).expect("Failed to write to log file");
+            let mut file = OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open($file)
+                .expect("Failed to open log file");
+            write!(file, $($arg)*).expect("Failed to write to log file");
         }
     };
 }

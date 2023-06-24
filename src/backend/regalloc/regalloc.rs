@@ -1,15 +1,9 @@
-use std::collections::{HashMap, HashSet, LinkedList, VecDeque};
-use std::process::Output;
+use std::collections::{HashMap, HashSet, VecDeque};
 
-use crate::algorithm::graphalgo::Value;
-use crate::backend::block;
 use crate::backend::func::Func;
-use crate::backend::instrs::{InstrsType, Operand, BB};
+use crate::backend::instrs::{InstrsType, BB};
 use crate::backend::operand::Reg;
 use crate::backend::regalloc::structs::FuncAllocStat;
-use crate::container::bitmap::Bitmap;
-use crate::frontend::ast::Continue;
-use crate::ir::instruction::Inst;
 use crate::utility::{ObjPtr, ScalarType};
 
 use super::structs::RegUsedStat;
@@ -85,8 +79,7 @@ pub fn count_spill_cost(func: &Func) -> HashMap<Reg, i32> {
                 Some(reg) => Some(*reg),
                 None => None,
             };
-            // TODO,判断这个指令是否有目标寄存器
-
+            // FIXME,使用跟精确的统计方法，针对具体指令类型
             let mut is_use = false;
             for reg in inst.get_reg_use() {
                 if !reg.is_virtual() {
@@ -471,4 +464,14 @@ pub fn check_alloc(
         }
     }
     out
+}
+
+
+// 对分配结果的评估
+pub fn eval_alloc(func:&Func,dstr:&mut HashMap<i32,i32>,spillings: &HashSet<i32>) {
+    // 
+    let mut cost=0;
+    let counts=count_spill_cost(func);
+    counts.iter().for_each(|(reg,v)|if reg.is_virtual(){cost+=v} );
+    cost;
 }

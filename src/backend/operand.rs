@@ -208,3 +208,14 @@ impl Reg {
         self.r_type
     }
 }
+
+
+impl Reg {
+    pub fn get_color(&self)->i32 {
+        match self.get_type() {
+            ScalarType::Float=>self.get_id()+32,
+            ScalarType::Int=>self.get_id(),
+            _=>panic!("gg"),
+        }
+    }
+}
