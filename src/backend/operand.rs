@@ -66,24 +66,17 @@ pub fn is_imm_12bs(imm: i32) -> bool {
 
 pub trait ToString {
     fn to_string(&self) -> String;
-    fn to_hex_string(&self) -> String;
 }
 
 impl ToString for IImm {
     fn to_string(&self) -> String {
         self.data.to_string()
     }
-    fn to_hex_string(&self) -> String {
-        format!("{:x}", self.data)
-    }
 }
+
 impl ToString for FImm {
     fn to_string(&self) -> String {
-        self.data.to_string()
-    }
-    fn to_hex_string(&self) -> String {
-        let bits = self.data.to_bits();
-        format!("0x{:x}", bits)
+        unsafe {format!("{:x}", *(&self.data as *const f32 as *const i32))}
     }
 }
 
@@ -192,7 +185,7 @@ impl Reg {
     }
 
     pub fn is_allocable(&self) -> bool {
-        !self.is_special()
+        !self.is_special() && self.is_physic()
     }
 
     // if virtual reg
