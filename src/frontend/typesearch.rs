@@ -22,13 +22,14 @@ impl TypeProcess for RelExp {
                 return addexp.type_process(input, kit_mut);
             }
             RelExp::OpExp((relexp, _, addexp)) => {
-                let tp_left = relexp.type_process(input, kit_mut).unwrap();
-                let tp_right = addexp.type_process(input, kit_mut).unwrap();
-                if tp_left > tp_right {
-                    return Ok(tp_left);
-                } else {
-                    return Ok(tp_right);
-                }
+                // let tp_left = relexp.type_process(input, kit_mut).unwrap();
+                // let tp_right = addexp.type_process(input, kit_mut).unwrap();
+                // if tp_left > tp_right {
+                //     return Ok(tp_left);
+                // } else {
+                //     return Ok(tp_right);
+                // }
+                return Ok(1);
             }
         }
         // Err(Error::TypeCheckError)
@@ -175,13 +176,14 @@ impl TypeProcess for EqExp {
                 return relexp.type_process(input, kit_mut);
             }
             EqExp::EqualExp((eqexp, relexp)) | EqExp::NotEqualExp((eqexp, relexp)) => {
-                let tp_left = eqexp.type_process(input, kit_mut).unwrap();
-                let tp_right = relexp.type_process(input, kit_mut).unwrap();
-                if tp_left > tp_right {
-                    return Ok(tp_left);
-                } else {
-                    return Ok(tp_right);
-                }
+                // let tp_left = eqexp.type_process(input, kit_mut).unwrap();
+                // let tp_right = relexp.type_process(input, kit_mut).unwrap();
+                // if tp_left > tp_right {
+                //     return Ok(tp_left);
+                // } else {
+                //     return Ok(tp_right);
+                // }
+                return Ok(1);
             }
         }
     }

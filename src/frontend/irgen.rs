@@ -2951,6 +2951,7 @@ impl Process for RelExp {
         match self {
             RelExp::AddExp(addexp) => addexp.process(input, kit_mut),
             RelExp::OpExp((relexp, op, addexp)) => {
+                let mut val_ret = ExpValue::None;
                 let mut tp_in = Type::Int;
                 if tp > 1 {
                     //float或floatconst
@@ -2958,14 +2959,22 @@ impl Process for RelExp {
                 }
                 let (mut inst_left, val_left) = relexp.process(tp_in, kit_mut).unwrap();
                 let (mut inst_right, val_right) = addexp.process(tp_in, kit_mut).unwrap();
+                let mut fflag = -1;
+                let mut iflag = -1;
+                let mut fvec = vec![];
+                let mut ivec = vec![];
                 match val_left {
                     ExpValue::Float(f) => {
                         inst_left = kit_mut.pool_inst_mut.make_float_const(f);
                         kit_mut.context_mut.push_inst_bb(inst_left);
+                        fflag = fflag + 1;
+                        fvec.push(f);
                     }
                     ExpValue::Int(i) => {
                         inst_left = kit_mut.pool_inst_mut.make_int_const(i);
                         kit_mut.context_mut.push_inst_bb(inst_left);
+                        iflag = iflag + 1;
+                        ivec.push(i);
                     }
                     _ => {}
                 }
@@ -2973,35 +2982,155 @@ impl Process for RelExp {
                     ExpValue::Float(f) => {
                         inst_right = kit_mut.pool_inst_mut.make_float_const(f);
                         kit_mut.context_mut.push_inst_bb(inst_right);
+                        fflag = fflag + 1;
+                        fvec.push(f);
                     }
                     ExpValue::Int(i) => {
                         inst_right = kit_mut.pool_inst_mut.make_int_const(i);
                         kit_mut.context_mut.push_inst_bb(inst_right);
+                        iflag = iflag + 1;
+                        ivec.push(i);
                     }
                     _ => {}
                 } //这里可以进一步优化,计算cond是否恒为真或假
+                let mut inst_cond = kit_mut.pool_inst_mut.make_int_const(-1129);
+                let mut result = -1;
                 match op {
                     RelOp::Greater => {
-                        let inst_cond = kit_mut.pool_inst_mut.make_gt(inst_left, inst_right);
-                        kit_mut.context_mut.push_inst_bb(inst_cond);
-                        Ok((inst_cond, ExpValue::None)) //这里可能可以优化，只考虑左操作数和右操作数只有一个的情况
+                        if fflag == 1 {
+                            if fvec[0] > fvec[1] {
+                                inst_cond = kit_mut.pool_inst_mut.make_int_const(1);
+                                kit_mut.context_mut.push_inst_bb(inst_cond);
+                                result = 1;
+                            } else {
+                                inst_cond = kit_mut.pool_inst_mut.make_int_const(0);
+                                kit_mut.context_mut.push_inst_bb(inst_cond);
+                                result = 0;
+                            }
+                        } else if iflag == 1 {
+                            if ivec[0] > ivec[1] {
+                                inst_cond = kit_mut.pool_inst_mut.make_int_const(1);
+                                kit_mut.context_mut.push_inst_bb(inst_cond);
+                                result = 1;
+                            } else {
+                                inst_cond = kit_mut.pool_inst_mut.make_int_const(0);
+                                kit_mut.context_mut.push_inst_bb(inst_cond);
+                                result = 0;
+                            }
+                        } else {
+                            inst_cond = kit_mut.pool_inst_mut.make_gt(inst_left, inst_right);
+                            kit_mut.context_mut.push_inst_bb(inst_cond);
+                        }
+
+                        // Ok((inst_cond, ExpValue::None)) //这里可能可以优化，只考虑左操作数和右操作数只有一个的情况
                     }
                     RelOp::GreaterOrEqual => {
-                        let inst_cond = kit_mut.pool_inst_mut.make_ge(inst_left, inst_right);
-                        kit_mut.context_mut.push_inst_bb(inst_cond);
-                        Ok((inst_cond, ExpValue::None))
+                        if fflag == 1 {
+                            if fvec[0] >= fvec[1] {
+                                inst_cond = kit_mut.pool_inst_mut.make_int_const(1);
+                                kit_mut.context_mut.push_inst_bb(inst_cond);
+                                result = 1;
+                            } else {
+                                inst_cond = kit_mut.pool_inst_mut.make_int_const(0);
+                                kit_mut.context_mut.push_inst_bb(inst_cond);
+                                result = 0;
+                            }
+                        } else if iflag == 1 {
+                            if ivec[0] >= ivec[1] {
+                                inst_cond = kit_mut.pool_inst_mut.make_int_const(1);
+                                kit_mut.context_mut.push_inst_bb(inst_cond);
+                                result = 1;
+                            } else {
+                                inst_cond = kit_mut.pool_inst_mut.make_int_const(0);
+                                kit_mut.context_mut.push_inst_bb(inst_cond);
+                                result = 0;
+                            }
+                        } else {
+                            inst_cond = kit_mut.pool_inst_mut.make_ge(inst_left, inst_right);
+                            kit_mut.context_mut.push_inst_bb(inst_cond);
+                        }
+
+                        // Ok((inst_cond, ExpValue::None))
                     }
                     RelOp::Less => {
-                        let inst_cond = kit_mut.pool_inst_mut.make_lt(inst_left, inst_right);
-                        kit_mut.context_mut.push_inst_bb(inst_cond);
-                        Ok((inst_cond, ExpValue::None))
+                        if fflag == 1 {
+                            if fvec[0] < fvec[1] {
+                                inst_cond = kit_mut.pool_inst_mut.make_int_const(1);
+                                kit_mut.context_mut.push_inst_bb(inst_cond);
+                                result = 1;
+                            } else {
+                                inst_cond = kit_mut.pool_inst_mut.make_int_const(0);
+                                kit_mut.context_mut.push_inst_bb(inst_cond);
+                                result = 0;
+                            }
+                        } else if iflag == 1 {
+                            if ivec[0] < ivec[1] {
+                                inst_cond = kit_mut.pool_inst_mut.make_int_const(1);
+                                kit_mut.context_mut.push_inst_bb(inst_cond);
+                                result = 1;
+                            } else {
+                                inst_cond = kit_mut.pool_inst_mut.make_int_const(0);
+                                kit_mut.context_mut.push_inst_bb(inst_cond);
+                                result = 0;
+                            }
+                        } else {
+                            inst_cond = kit_mut.pool_inst_mut.make_lt(inst_left, inst_right);
+                            kit_mut.context_mut.push_inst_bb(inst_cond);
+                        }
+
+                        // Ok((inst_cond, ExpValue::None))
                     }
                     RelOp::LessOrEqual => {
-                        let inst_cond = kit_mut.pool_inst_mut.make_le(inst_left, inst_right);
-                        kit_mut.context_mut.push_inst_bb(inst_cond);
-                        Ok((inst_cond, ExpValue::None))
+                        if fflag == 1 {
+                            if fvec[0] <= fvec[1] {
+                                inst_cond = kit_mut.pool_inst_mut.make_int_const(1);
+                                kit_mut.context_mut.push_inst_bb(inst_cond);
+                                result = 1;
+                            } else {
+                                inst_cond = kit_mut.pool_inst_mut.make_int_const(0);
+                                kit_mut.context_mut.push_inst_bb(inst_cond);
+                                result = 0;
+                            }
+                        } else if iflag == 1 {
+                            if ivec[0] <= ivec[1] {
+                                inst_cond = kit_mut.pool_inst_mut.make_int_const(1);
+                                kit_mut.context_mut.push_inst_bb(inst_cond);
+                                result = 1;
+                            } else {
+                                inst_cond = kit_mut.pool_inst_mut.make_int_const(0);
+                                kit_mut.context_mut.push_inst_bb(inst_cond);
+                                result = 0;
+                            }
+                        } else {
+                            inst_cond = kit_mut.pool_inst_mut.make_le(inst_left, inst_right);
+                            kit_mut.context_mut.push_inst_bb(inst_cond);
+                        }
                     }
                 }
+                match input {
+                    Type::ConstFloat | Type::Float => {
+                        if result == 1 {
+                            inst_cond = kit_mut.pool_inst_mut.make_float_const(1.0);
+                            kit_mut.context_mut.push_inst_bb(inst_cond);
+                            val_ret = ExpValue::Float(1.0);
+                        } else if result == 0 {
+                            inst_cond = kit_mut.pool_inst_mut.make_float_const(0.0);
+                            kit_mut.context_mut.push_inst_bb(inst_cond);
+                            val_ret = ExpValue::Float(0.0);
+                        } else {
+                            inst_cond = kit_mut.pool_inst_mut.make_int_to_float(inst_cond);
+                            kit_mut.context_mut.push_inst_bb(inst_cond);
+                        }
+                    }
+                    _ => {
+                        if result == 1 {
+                            val_ret = ExpValue::Int(1);
+                        } else if result == 0 {
+                            val_ret = ExpValue::Int(0);
+                        }
+                    }
+                }
+                Ok((inst_cond, val_ret))
             }
         }
     }
@@ -3017,67 +3146,174 @@ impl Process for EqExp {
                 Ok((inst, ExpValue::Bool(1))) //这里可以优化
             }
             EqExp::EqualExp((eqexp, relexp)) => {
+                let mut val_ret = ExpValue::None;
                 let mut tp_in = Type::Int;
                 if tp > 1 {
                     tp_in = Type::Float;
                 }
+                let mut fflag = -1;
+                let mut iflag = -1;
+                let mut fvec = vec![];
+                let mut ivec = vec![];
                 let (mut inst_left, val_left) = eqexp.process(tp_in, kit_mut).unwrap();
                 let (mut inst_right, val_right) = relexp.process(tp_in, kit_mut).unwrap();
                 match val_left {
                     ExpValue::Float(f) => {
-                        inst_left = kit_mut.pool_inst_mut.make_float_const(f);
-                        kit_mut.context_mut.push_inst_bb(inst_left);
+                        // inst_left = kit_mut.pool_inst_mut.make_float_const(f);
+                        // kit_mut.context_mut.push_inst_bb(inst_left);
+                        fflag = fflag + 1;
+                        fvec.push(f);
                     }
                     ExpValue::Int(i) => {
-                        inst_left = kit_mut.pool_inst_mut.make_int_const(i);
-                        kit_mut.context_mut.push_inst_bb(inst_left);
+                        // inst_left = kit_mut.pool_inst_mut.make_int_const(i);
+                        // kit_mut.context_mut.push_inst_bb(inst_left);
+                        iflag = iflag + 1;
+                        ivec.push(i);
                     }
                     _ => {}
                 }
                 match val_right {
                     ExpValue::Float(f) => {
-                        inst_right = kit_mut.pool_inst_mut.make_float_const(f);
-                        kit_mut.context_mut.push_inst_bb(inst_right);
+                        // inst_right = kit_mut.pool_inst_mut.make_float_const(f);
+                        // kit_mut.context_mut.push_inst_bb(inst_right);
+                        fflag = fflag + 1;
+                        fvec.push(f);
                     }
                     ExpValue::Int(i) => {
-                        inst_right = kit_mut.pool_inst_mut.make_int_const(i);
-                        kit_mut.context_mut.push_inst_bb(inst_right);
+                        // inst_right = kit_mut.pool_inst_mut.make_int_const(i);
+                        // kit_mut.context_mut.push_inst_bb(inst_right);
+                        iflag = iflag + 1;
+                        ivec.push(i);
                     }
                     _ => {}
                 } //这里可以进一步优化,计算cond是否恒为真或假
-                let inst_eq = kit_mut.pool_inst_mut.make_eq(inst_left, inst_right);
+                let mut inst_eq = kit_mut.pool_inst_mut.make_eq(inst_left, inst_right);
+                let mut result = -1;
+                if fflag == 1 {
+                    if fvec[0] == fvec[1] {
+                        inst_eq = kit_mut.pool_inst_mut.make_int_const(1);
+                        result = 1;
+                    } else {
+                        inst_eq = kit_mut.pool_inst_mut.make_int_const(0);
+                        result = 0;
+                    }
+                } else if iflag == 1 {
+                    if ivec[0] == ivec[1] {
+                        inst_eq = kit_mut.pool_inst_mut.make_int_const(1);
+                        result = 1;
+                    } else {
+                        inst_eq = kit_mut.pool_inst_mut.make_int_const(0);
+                        result = 0;
+                    }
+                }
+                // kit_mut.context_mut.push_inst_bb(inst_eq);
+                match input {
+                    Type::ConstFloat | Type::Float => {
+                        if result == 1 {
+                            inst_eq = kit_mut.pool_inst_mut.make_float_const(1.0);
+                            val_ret = ExpValue::Float(1.0);
+                        } else if result == 0 {
+                            inst_eq = kit_mut.pool_inst_mut.make_float_const(0.0);
+                            val_ret = ExpValue::Float(0.0);
+                        } else {
+                            kit_mut.context_mut.push_inst_bb(inst_eq); //算不出来,把之前的先放进去
+                            inst_eq = kit_mut.pool_inst_mut.make_int_to_float(inst_eq);
+                            val_ret = ExpValue::None;
+                        }
+                        kit_mut.context_mut.push_inst_bb(inst_eq);
+                    }
+                    _ => {
+                        kit_mut.context_mut.push_inst_bb(inst_eq); //把之前的先放进去
+                        if result == 1 {
+                            val_ret = ExpValue::Int(1);
+                        } else if result == 0 {
+                            val_ret = ExpValue::Int(0);
+                        }
+                    }
+                }
                 // // println!("push_inst_eq into bb{:?}",inst_eq.as_ref().get_kind());
-                kit_mut.context_mut.push_inst_bb(inst_eq);
-                Ok((inst_eq, ExpValue::Bool(1)))
+
+                Ok((inst_eq, val_ret))
             }
             EqExp::NotEqualExp((eqexp, relexp)) => {
-                let (mut inst_left, val_left) = eqexp.process(input, kit_mut).unwrap();
-                let (mut inst_right, val_right) = relexp.process(input, kit_mut).unwrap();
+                let mut val_ret = ExpValue::None;
+                let mut tp_in = Type::Int;
+                if tp > 1 {
+                    tp_in = Type::Float;
+                }
+                let mut fflag = -1;
+                let mut iflag = -1;
+                let mut fvec = vec![];
+                let mut ivec = vec![];
+                let (inst_left, val_left) = eqexp.process(tp_in, kit_mut).unwrap();
+                let (inst_right, val_right) = relexp.process(tp_in, kit_mut).unwrap();
                 match val_left {
                     ExpValue::Float(f) => {
-                        inst_left = kit_mut.pool_inst_mut.make_float_const(f);
-                        kit_mut.context_mut.push_inst_bb(inst_left);
+                        fflag = fflag + 1;
+                        fvec.push(f);
                     }
                     ExpValue::Int(i) => {
-                        inst_left = kit_mut.pool_inst_mut.make_int_const(i);
-                        kit_mut.context_mut.push_inst_bb(inst_left);
+                        iflag = iflag + 1;
+                        ivec.push(i);
                     }
                     _ => {}
                 }
                 match val_right {
                     ExpValue::Float(f) => {
-                        inst_right = kit_mut.pool_inst_mut.make_float_const(f);
-                        kit_mut.context_mut.push_inst_bb(inst_right);
+                        fflag = fflag + 1;
+                        fvec.push(f);
                     }
                     ExpValue::Int(i) => {
-                        inst_right = kit_mut.pool_inst_mut.make_int_const(i);
-                        kit_mut.context_mut.push_inst_bb(inst_right);
+                        iflag = iflag + 1;
+                        ivec.push(i);
                     }
                     _ => {}
                 } //这里可以进一步优化,计算cond是否恒为真或假
-                let inst_ne = kit_mut.pool_inst_mut.make_ne(inst_left, inst_right);
-                kit_mut.context_mut.push_inst_bb(inst_ne);
-                Ok((inst_ne, ExpValue::Bool(1)))
+                let mut inst_ne = kit_mut.pool_inst_mut.make_ne(inst_left, inst_right);
+                let mut result = -1;
+                if fflag == 1 {
+                    if fvec[0] != fvec[1] {
+                        inst_ne = kit_mut.pool_inst_mut.make_int_const(1);
+                        result = 1;
+                    } else {
+                        inst_ne = kit_mut.pool_inst_mut.make_int_const(0);
+                        result = 0;
+                    }
+                } else if iflag == 1 {
+                    if ivec[0] != ivec[1] {
+                        inst_ne = kit_mut.pool_inst_mut.make_int_const(1);
+                        result = 1;
+                    } else {
+                        inst_ne = kit_mut.pool_inst_mut.make_int_const(0);
+                        result = 0;
+                    }
+                }
+                // kit_mut.context_mut.push_inst_bb(inst_ne);
+                match input {
+                    Type::ConstFloat | Type::Float => {
+                        if result == 1 {
+                            inst_ne = kit_mut.pool_inst_mut.make_float_const(1.0);
+                            val_ret = ExpValue::Float(1.0);
+                        } else if result == 0 {
+                            inst_ne = kit_mut.pool_inst_mut.make_float_const(0.0);
+                            val_ret = ExpValue::Float(0.0);
+                        } else {
+                            kit_mut.context_mut.push_inst_bb(inst_ne); //算不出来,把之前的先放进去
+                            inst_ne = kit_mut.pool_inst_mut.make_int_to_float(inst_ne);
+                            val_ret = ExpValue::None;
+                        }
+                        kit_mut.context_mut.push_inst_bb(inst_ne);
+                    }
+                    _ => {
+                        kit_mut.context_mut.push_inst_bb(inst_ne); //把之前的先放进去
+                        if result == 1 {
+                            val_ret = ExpValue::Int(1);
+                        } else if result == 0 {
+                            val_ret = ExpValue::Int(0);
+                        }
+                    }
+                }
+                Ok((inst_ne, val_ret))
             }
         }
     }
