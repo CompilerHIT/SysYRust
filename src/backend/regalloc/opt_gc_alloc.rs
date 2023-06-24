@@ -26,7 +26,9 @@ impl Regalloc for Allocator {
     fn alloc(&mut self, func: &crate::backend::instrs::Func) -> FuncAllocStat {
         let mut out=self.easy_gc_allocator.alloc(func);
         // 寄存器合并
-        regalloc::merge_alloc(func, &mut out.dstr, &mut out.spillings);
+        // regalloc::merge_alloc(func, &mut out.dstr, &mut out.spillings, 
+        //     & self.easy_gc_allocator.ends_index_bb, &mut self.easy_gc_allocator.nums_neighbor_color, &mut self.easy_gc_allocator.availables, &mut self.easy_gc_allocator.interference_graph);
+
         out
     }
 }
