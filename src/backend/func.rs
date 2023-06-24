@@ -47,7 +47,6 @@ pub struct Func {
     pub spill_stack_map: HashMap<i32, StackSlot>,
 
     pub const_array: HashSet<IntArray>,
-    pub floats: Vec<(String, f32)>,
     //FIXME: resolve float regs
     pub callee_saved: HashSet<Reg>,
     pub caller_saved: HashMap<i32, i32>,
@@ -75,7 +74,6 @@ impl Func {
             reg_alloc_info: FuncAllocStat::new(),
             spill_stack_map: HashMap::new(),
             const_array: HashSet::new(),
-            floats: Vec::new(),
             callee_saved: HashSet::new(),
             caller_saved: HashMap::new(),
             max_params: 0,
@@ -658,13 +656,6 @@ impl GenerateAsm for Func {
         }
         for mut a in self.const_array.clone() {
             a.generate(self.context, f)?;
-        }
-        if self.floats.len() > 0 {
-            // log!("generate float");
-            writeln!(f, "   .data")?;
-        }
-        for (name, data) in self.floats.clone() {
-            writeln!(f, "{name}:  .float  {data}")?;
         }
         AsmBuilder::new(f).show_func(&self.label)?;
         self.context.as_mut().call_prologue_event();

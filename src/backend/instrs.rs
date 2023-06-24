@@ -8,7 +8,6 @@ pub use crate::backend::block::BB;
 pub use crate::backend::func::Func;
 use crate::backend::operand::*;
 pub use crate::backend::structs::{Context, GenerateAsm};
-use crate::frontend::ast::Continue;
 pub use crate::utility::{ObjPtr, ScalarType};
 
 #[derive(Clone, PartialEq, Debug)]
@@ -49,10 +48,8 @@ pub enum SingleOp {
     // Lui,
     IMv,
     FMv,
-    INot,
     INeg,
     //FIXME: whether fnot exist
-    FNot,
     FNeg,
     I2F,
     F2I,
@@ -61,6 +58,7 @@ pub enum SingleOp {
     // D2F,
     Seqz,
     Snez,
+    LoadImm,
 }
 
 /// 比较运算符
@@ -145,23 +143,16 @@ impl fmt::Display for LIRInst {
                     // SingleOp::Lui => "lui",
                     SingleOp::IMv => "mv",
                     SingleOp::FMv => "fmv",
-                    SingleOp::INot => "not",
                     SingleOp::INeg => "neg",
-                    SingleOp::FNot => "fnot",
                     SingleOp::FNeg => "fneg",
                     SingleOp::I2F => "fcvt.s.w",
                     SingleOp::F2I => "fcvt.w.s",
                     SingleOp::LoadAddr => "la",
                     SingleOp::Seqz => "seqz",
                     SingleOp::Snez => "snez",
+                    SingleOp::LoadImm => "addi",
                 };
             }
-            // InstrsType::ChangeSp => {
-            //     let mut builder = AsmBuilder::new(f);
-            //     let imm = self.get_change_sp_offset();
-            //     builder.addi("sp", "sp", imm)?;
-            //     Ok(())
-            // },
             InstrsType::Load | InstrsType::LoadParamFromStack | InstrsType::LoadFromStack => {
                 kind = "load";
             }
@@ -513,33 +504,4 @@ impl LIRInst {
             }
         }
     }
-
-    // LoadParamFromStack(include alloca):
-    // pub fn set_true_offset(&mut self, offset: i32) {
-    //     self.operands[1] = Operand::IImm(IImm::new(offset));
-    // }
-    // pub fn get_true_offset(&self) -> IImm {
-    //     match self.operands[1].clone() {
-    //         Operand::IImm(iimm) => iimm,
-    //         _ => unreachable!("only support imm sp offset"),
-    //     }
-    // }
-
-    // TODO: maybe todo
-    // for reg alloc
-    // fn replace_reg() {}  // todo: add regs() to get all regs the inst use
-
-    // for conditional branch
-
-    // fn replace_value() {}
-    // fn replace_def_value() {}
-    // fn replace_use_value() {}
 }
-
-//TODO: maybe
-// enum StackOp {
-//     ParamLoad,
-//     StackAddr,
-//     StackLoad,
-//     StackStore,
-// }

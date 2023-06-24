@@ -53,6 +53,9 @@ impl<'f> AsmBuilder<'f> {
     }
 
     pub fn op1(&mut self, op: &str, dest: &str, src: &str) -> Result<()> {
+        if op == "addiw" {
+            writeln!(self.f, "    addiw {dest}, zero, {src}")?;
+        }
         writeln!(self.f, "    {op} {dest}, {src}")
     }
 
