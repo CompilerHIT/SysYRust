@@ -1,4 +1,4 @@
-use crate::ir::optimizer::bfs_bb_proceess;
+use crate::ir::tools::bfs_bb_proceess;
 
 use super::*;
 pub fn copy_func(

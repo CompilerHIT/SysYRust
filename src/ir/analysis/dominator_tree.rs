@@ -3,9 +3,10 @@ use std::{
     fmt::Debug,
 };
 
-use crate::{ir::basicblock::BasicBlock, utility::ObjPtr};
-
-use super::bfs_bb_proceess;
+use crate::{
+    ir::{basicblock::BasicBlock, tools::bfs_bb_proceess},
+    utility::ObjPtr,
+};
 
 pub struct DominatorTree {
     dominatee: HashMap<ObjPtr<BasicBlock>, HashSet<ObjPtr<BasicBlock>>>,

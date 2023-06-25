@@ -1,11 +1,15 @@
 use core::fmt;
+use std::collections::{HashMap, HashSet};
 
-use crate::ir::{
-    instruction::InstKind,
-    optimizer::{bfs_inst_process, func_process},
+use crate::{
+    ir::{
+        basicblock::BasicBlock,
+        instruction::InstKind,
+        module::Module,
+        tools::{bfs_inst_process, func_process},
+    },
+    utility::ObjPtr,
 };
-
-use super::*;
 
 pub struct CallMap {
     call_map: HashMap<String, HashSet<String>>,

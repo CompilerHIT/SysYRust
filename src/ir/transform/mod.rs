@@ -1,4 +1,3 @@
-use super::tools::dominator_tree::calculate_dominator;
 use super::tools::*;
 use super::{basicblock::BasicBlock, instruction::Inst, module::Module};
 use crate::utility::ObjPool;
@@ -8,8 +7,6 @@ mod func_inline;
 mod phi_optimizer;
 mod simplify_cfg;
 
-pub use func_inline::{call_map_gen, CallMap};
-
 pub fn optimizer_run(
     module: &mut Module,
     mut pools: (&mut ObjPool<BasicBlock>, &mut ObjPool<Inst>),
@@ -17,10 +14,6 @@ pub fn optimizer_run(
 ) {
     // 在功能点上对phi指令进行优化
     functional_optimizer(module);
-
-    func_process(module, |_, func| {
-        calculate_dominator(func.get_head());
-    });
 
     if optimize_flag {
         // 死代码删除

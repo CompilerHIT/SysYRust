@@ -1,20 +1,21 @@
 //! src/ir/mod.rs
 
 use crate::utility::ObjPtr;
+mod analysis;
 pub mod basicblock;
 mod dump_ir;
 pub mod function;
 pub mod instruction;
 pub mod ir_type;
 pub mod module;
-mod optimizer;
 mod tools;
+mod transform;
 pub mod user;
 pub mod value;
 
+pub use analysis::call_map::{call_map_gen, CallMap};
 pub use dump_ir::dump_now;
-pub use optimizer::optimizer_run;
-pub use optimizer::{call_map_gen, CallMap};
+pub use transform::optimizer_run;
 
 /// 侵入式链表
 #[derive(Debug, Clone)]

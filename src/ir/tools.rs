@@ -1,4 +1,3 @@
-pub mod dominator_tree;
 use std::collections::{HashSet, VecDeque};
 
 use crate::utility::ObjPtr;

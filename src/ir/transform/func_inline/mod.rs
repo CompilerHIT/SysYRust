@@ -3,20 +3,18 @@ use std::collections::{HashMap, HashSet};
 use crate::{
     ir::{
         basicblock::BasicBlock,
+        call_map_gen,
         function::Function,
         instruction::{Inst, InstKind},
         ir_type::IrType,
         module::Module,
+        CallMap,
     },
     utility::{ObjPool, ObjPtr},
 };
 
-mod call_map;
 mod copy_func;
 mod inline_operation;
-
-pub use call_map::call_map_gen;
-pub use call_map::CallMap;
 
 use self::inline_operation::inline_func;
 use self::{copy_func::copy_func, inline_operation::delete_uncalled_func};
@@ -24,7 +22,7 @@ use self::{copy_func::copy_func, inline_operation::delete_uncalled_func};
 use super::{bfs_inst_process, inst_process_in_bb};
 
 pub fn inline_run(module: &mut Module, pools: &mut (&mut ObjPool<BasicBlock>, &mut ObjPool<Inst>)) {
-    let mut call_map = call_map::call_map_gen(module);
+    let mut call_map = call_map_gen(module);
 
     // 先内联没有后继的函数
     inline_no_succ(module, &mut call_map, pools);
