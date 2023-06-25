@@ -35,17 +35,33 @@ impl<'f> AsmBuilder<'f> {
 
     pub fn op2(&mut self, op: &str, dest: &str, lhs: &str, rhs: &str, is_imm: bool, is_double: bool) -> Result<()> {
         //FIXME: mul使用w是否有超过32位的用例
-        if is_imm {
-            if op == "or" || op == "xor" || op == "and" || op == "slt" || is_double {
-                writeln!(self.f, "    {op}i {dest}, {lhs}, {rhs}")
-            } else {
-                writeln!(self.f, "    {op}iw {dest}, {lhs}, {rhs}")
-            }
-        } else {
-            if op == "or" || op == "xor" || op == "and" || op == "slt" || op == "mulhs" || is_double {
-                writeln!(self.f, "    {op} {dest}, {lhs}, {rhs}")
-            } else {
-                writeln!(self.f, "    {op}w {dest}, {lhs}, {rhs}")
+        match op {
+            "fne.s" => {
+                writeln!(self.f, "    feq.s {dest}, {lhs}, {rhs}")?;
+                writeln!(self.f, "    xori {dest}, 1")
+            },
+            "fgt.s" => {
+                writeln!(self.f, "    flt.s {dest}, {lhs}, {rhs}")?;
+                writeln!(self.f, "    xori {dest}, 1")
+            },
+            "fge.s" => {
+                writeln!(self.f, "    flt.s {dest}, {rhs}, {lhs}")?;
+                writeln!(self.f, "    xori {dest}, 1")
+            },
+            _ => {
+                if is_imm {
+                    if op == "or" || op == "xor" || op == "and" || op == "slt" || is_double {
+                        writeln!(self.f, "    {op}i {dest}, {lhs}, {rhs}")
+                    } else {
+                        writeln!(self.f, "    {op}iw {dest}, {lhs}, {rhs}")
+                    }
+                } else {
+                    if op == "or" || op == "xor" || op == "and" || op == "slt" || op == "mulhs" || is_double {
+                        writeln!(self.f, "    {op} {dest}, {lhs}, {rhs}")
+                    } else {
+                        writeln!(self.f, "    {op}w {dest}, {lhs}, {rhs}")
+                    }
+                }
             }
         }
     }

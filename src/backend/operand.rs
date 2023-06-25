@@ -1,5 +1,5 @@
 use std::fmt::{format, Display};
-
+use crate::log;
 use crate::utility::ScalarType;
 
 use super::block::FLOAT_BASE;
@@ -8,8 +8,7 @@ pub const ARG_REG_COUNT: i32 = 8;
 pub const REG_SP: i32 = 2;
 pub const IMM_12_Bs: i32 = 2047;
 pub const IMM_20_Bs: i32 = 524287;
-pub static mut I_REG_ID: i32 = 32;
-pub static mut F_REG_ID: i32 = 32;
+pub static mut REG_ID: i32 = 32;
 
 #[derive(Clone, Copy, PartialEq, Hash, Eq, Debug)]
 pub struct Reg {
@@ -27,7 +26,6 @@ impl Display for Reg {
             ScalarType::Float => write!(f, "f{}", id),
             ScalarType::Int => write!(f, "i{}", id),
             ScalarType::Void => write!(f, "void{}", id),
-            _ => write!(f, "u{}", id),
         }
     }
 }
@@ -89,18 +87,10 @@ impl Reg {
     }
 
     pub fn init(r_type: ScalarType) -> Self {
-        match r_type {
-            ScalarType::Int => unsafe {
-                let id = I_REG_ID;
-                I_REG_ID += 1;
-                Self { id, r_type }
-            },
-            ScalarType::Float => unsafe {
-                let id = F_REG_ID;
-                F_REG_ID += 1;
-                Self { id, r_type }
-            },
-            _ => panic!("Wrong Type"),
+        unsafe {
+            let id = REG_ID;
+            REG_ID += 1;
+            Self { id, r_type }
         }
     }
     pub fn to_string(&self, is_row: bool) -> String {
@@ -158,6 +148,7 @@ impl Reg {
             }
             ScalarType::Float => {
                 let id = self.id - FLOAT_BASE;
+                log!("id: {}", id);
                 assert!(id >= 0);
                 (id >= 0 && id <= 7) || (id >= 10 && id <= 17) || (id >= 28 && id <= 31)
             }
@@ -173,7 +164,7 @@ impl Reg {
                 self.id == 2 || self.id == 8 || self.id == 9 || (self.id >= 18 && self.id <= 27)
             }
             ScalarType::Float => {
-                let id = self.id;
+                let id = self.id - FLOAT_BASE;
                 assert!(id >= 0);
                 (id >= 8 && id <= 9) || (id >= 18 && id <= 27)
             }

@@ -21,6 +21,17 @@ impl GenerateAsm for LIRInst {
                     BinaryOp::Shr => "srl",
                     BinaryOp::Sar => "sra",
                     BinaryOp::Mulhs => "mulhs",
+                    BinaryOp::FCmp(cmp) => {
+                        match cmp {
+                            CmpOp::Eq => "eq",
+                            CmpOp::Ne => "ne",
+                            CmpOp::Lt => "lt",
+                            CmpOp::Le => "le",
+                            CmpOp::Gt => "gt",
+                            CmpOp::Ge => "ge",
+                            _ => unreachable!()
+                        }
+                    }
                 };
                 let mut is_imm = match op {
                     "add" | "sub" | "and" | "or" | "xor" | "sll" | "srl" | "sra" | "slt" => true,
@@ -76,6 +87,7 @@ impl GenerateAsm for LIRInst {
                     SingleOp::Seqz => "seqz",
                     SingleOp::Snez => "snez",
                     SingleOp::LoadImm => "addiw",
+                    SingleOp::LoadFImm => "fmv.w.x",
                 };
                 let dst = match self.get_dst() {
                     Operand::Reg(reg) => reg.to_string(row),

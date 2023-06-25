@@ -41,6 +41,7 @@ pub enum BinaryOp {
     Sar,
     /// 执行带符号整数高位乘法操作
     Mulhs,
+    FCmp(CmpOp),
 }
 
 /// 单目运算符
@@ -61,6 +62,7 @@ pub enum SingleOp {
     Seqz,
     Snez,
     LoadImm,
+    LoadFImm,
 }
 
 /// 比较运算符
@@ -137,6 +139,7 @@ impl fmt::Display for LIRInst {
                     BinaryOp::Sar => "sra",
                     BinaryOp::Mulhs => "mulhs",
                     BinaryOp::Slt => "slt",
+                    BinaryOp::FCmp(..) => "fcmp",
                 };
             }
             InstrsType::OpReg(op) => {
@@ -152,7 +155,8 @@ impl fmt::Display for LIRInst {
                     SingleOp::LoadAddr => "la",
                     SingleOp::Seqz => "seqz",
                     SingleOp::Snez => "snez",
-                    SingleOp::LoadImm => "addiw",
+                    SingleOp::LoadImm => "addi",
+                    SingleOp::LoadFImm => "fmv.w.x",
                 };
             }
             InstrsType::Load | InstrsType::LoadParamFromStack | InstrsType::LoadFromStack => {
@@ -343,21 +347,22 @@ impl LIRInst {
                 ),
             },
             InstrsType::Call => {
-                let mut set = Vec::new();
-                let cnt: i32 = REG_COUNT;
-                let mut n = cnt;
-                while n > 0 {
-                    let ireg = Reg::new(cnt - n, ScalarType::Int);
-                    if ireg.is_caller_save() {
-                        set.push(ireg);
-                    }
-                    let freg = Reg::new(cnt - n + FLOAT_BASE, ScalarType::Float);
-                    if freg.is_caller_save() {
-                        set.push(freg);
-                    }
-                    n -= 1;
-                }
-                set
+                // let mut set = Vec::new();
+                // let cnt: i32 = REG_COUNT;
+                // let mut n = cnt;
+                // while n > 0 {
+                //     let ireg = Reg::new(cnt - n, ScalarType::Int);
+                //     if ireg.is_caller_save() {
+                //         set.push(ireg);
+                //     }
+                //     let freg = Reg::new(cnt - n + FLOAT_BASE, ScalarType::Float);
+                //     if freg.is_caller_save() {
+                //         set.push(freg);
+                //     }
+                //     n -= 1;
+                // }
+                // set
+                vec![]
             }
             InstrsType::StoreToStack
             | InstrsType::StoreParamToStack
@@ -410,20 +415,21 @@ impl LIRInst {
                 res
             }
             InstrsType::Call => {
-                let mut set = Vec::new();
-                let (iarg_cnt, farg_cnt) = self.param_cnt;
-                let mut ni = 0;
-                while ni < min(iarg_cnt, REG_COUNT) {
-                    // if
-                    set.push(Reg::new(ni, ScalarType::Int));
-                    ni += 1;
-                }
-                let mut nf = 0;
-                while nf < min(farg_cnt, REG_COUNT) {
-                    set.push(Reg::new(nf + FLOAT_BASE, ScalarType::Float));
-                    nf += 1;
-                }
-                set
+                // let mut set = Vec::new();
+                // let (iarg_cnt, farg_cnt) = self.param_cnt;
+                // let mut ni = 0;
+                // while ni < min(iarg_cnt, REG_COUNT) {
+                //     // if
+                //     set.push(Reg::new(ni + 10, ScalarType::Int));
+                //     ni += 1;
+                // }
+                // let mut nf = 0;
+                // while nf < min(farg_cnt, REG_COUNT) {
+                //     set.push(Reg::new(nf + FLOAT_BASE + 10, ScalarType::Float));
+                //     nf += 1;
+                // }
+                // set
+                vec![]
             }
             InstrsType::Ret(..) => {
                 vec![]

@@ -32,7 +32,8 @@ pub struct FGlobalVar {
 pub enum GlobalVar {
     IGlobalVar(IGlobalVar),
     FGlobalVar(FGlobalVar),
-    GlobalConstArray(IntArray)
+    GlobalConstIntArray(IntArray),
+    GlobalConstFloatArray(FloatArray),
 }
 
 impl GlobalVar {
@@ -40,7 +41,8 @@ impl GlobalVar {
         match self {
             GlobalVar::IGlobalVar(var) => &var.name,
             GlobalVar::FGlobalVar(var) => &var.name,
-            GlobalVar::GlobalConstArray(var) => &var.name,
+            GlobalVar::GlobalConstIntArray(var) => &var.name,
+            GlobalVar::GlobalConstFloatArray(var) => &var.name,
         }
     }
 }

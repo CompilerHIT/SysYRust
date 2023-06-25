@@ -3,10 +3,11 @@ use std::io::Write;
 
 use crate::backend::func::Func;
 use crate::backend::operand::ToString;
-use crate::backend::structs::{FGlobalVar, GlobalVar, IGlobalVar, IntArray};
+use crate::backend::structs::{FGlobalVar, FloatArray, GlobalVar, IGlobalVar, IntArray};
 use crate::backend::BackendPool;
 use crate::ir::function::Function;
 use crate::ir::instruction::{Inst, InstKind};
+use crate::ir::ir_type::IrType;
 use crate::ir::module::Module;
 use crate::log;
 use crate::utility::ObjPtr;
@@ -47,8 +48,8 @@ impl<'a> AsmModule<'a> {
     }
 
     // 移除无用指令(TODO,可以把窥孔优化放在这里)
-    fn remove_unuse_inst(&mut self){
-        self.func_map.iter().for_each(|(_,func)|{
+    fn remove_unuse_inst(&mut self) {
+        self.func_map.iter().for_each(|(_, func)| {
             func.as_mut().remove_unuse_inst();
         });
     }
@@ -64,7 +65,7 @@ impl<'a> AsmModule<'a> {
         // 检查地址溢出，插入间接寻址
         self.handle_overflow(pool);
         self.generate_global_var(f);
-        // log!("start generate");
+        self.print_model();
         self.generate_asm(f, pool);
     }
 
@@ -109,13 +110,27 @@ impl<'a> AsmModule<'a> {
                     GlobalVar::FGlobalVar(FGlobalVar::init(name.to_string(), value, true)),
                 )),
                 InstKind::Alloca(size) => {
-                    let alloca = IntArray::new(
-                        name.clone(),
-                        size,
-                        true,
-                        iter.as_ref().get_int_init().clone(),
-                    );
-                    list.push((*iter, GlobalVar::GlobalConstArray(alloca)));
+                    match iter.get_ir_type() {
+                        IrType::IntPtr => {
+                            let alloca = IntArray::new(
+                                name.clone(),
+                                size,
+                                true,
+                                iter.as_ref().get_int_init().clone(),
+                            );
+                            list.push((*iter, GlobalVar::GlobalConstIntArray(alloca)));
+                        }
+                        IrType::FloatPtr => {
+                            let alloca = FloatArray::new(
+                                name.clone(),
+                                size,
+                                true,
+                                iter.as_ref().get_float_init().clone(),
+                            );
+                            list.push((*iter, GlobalVar::GlobalConstFloatArray(alloca)));
+                        }
+                        _ => unreachable!(),
+                    };
                 }
                 _ => panic!("fail to analyse GlobalConst"),
             };
@@ -141,22 +156,24 @@ impl<'a> AsmModule<'a> {
                     let value = fg.get_init().to_string();
                     writeln!(f, "{name}:\n    .word   {value}\n");
                 }
-                GlobalVar::GlobalConstArray(array) => {
-                    let not_init: i32 = array.value.iter().map(|x| x * x).sum();
+                GlobalVar::GlobalConstIntArray(array) => {
                     writeln!(f, "   .globl {name}\n    .align  3\n     .type   {name}, @object\n   .size   {name}, {num}", name = array.name, num = array.size * 4);
                     writeln!(f, "{name}:", name = array.name);
-                    if not_init != 0 {
-                        for value in array.value.iter() {
-                            writeln!(f, "    .word   {value}");
-                        }
-                    } else {
-                        writeln!(f, "    .zero   {num}", num = array.size * 4);
+                    for value in array.value.iter() {
+                        writeln!(f, "    .word   {value}");
+                    }
+                }
+                GlobalVar::GlobalConstFloatArray(array) => {
+                    writeln!(f, "   .globl {name}\n    .align  3\n     .type   {name}, @object\n   .size   {name}, {num}", name = array.name, num = array.size * 4);
+                    writeln!(f, "{name}:", name = array.name);
+                    for value in array.value.iter() {
+                        writeln!(f, "    .word   {value}");
                     }
                 }
             }
         }
     }
-    
+
     fn generate_asm(&mut self, f: &mut File, pool: &mut BackendPool) {
         self.func_map.iter_mut().for_each(|(_, func)| {
             if !func.is_extern {
@@ -168,7 +185,16 @@ impl<'a> AsmModule<'a> {
     fn generate_row_asm(&mut self, f: &mut File, pool: &mut BackendPool) {
         self.func_map.iter_mut().for_each(|(_, func)| {
             if !func.is_extern {
-                func.as_mut().generate_row(pool.put_context(Context::new()), f);
+                func.as_mut()
+                    .generate_row(pool.put_context(Context::new()), f);
+            }
+        });
+    }
+
+    fn print_model(&self) {
+        self.func_map.iter().for_each(|(_, func)| {
+            if !func.is_extern {
+                func.print_func();
             }
         });
     }

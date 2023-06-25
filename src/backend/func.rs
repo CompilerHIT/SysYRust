@@ -524,6 +524,7 @@ impl Func {
         self.stack_addr = func_ref.stack_addr.clone();
         self.spill_stack_map = func_ref.spill_stack_map.clone();
         self.const_array = func_ref.const_array.clone();
+        self.float_array = func_ref.float_array.clone();
         self.callee_saved = func_ref.callee_saved.clone();
         self.caller_saved = func_ref.caller_saved.clone();
         self.max_params = func_ref.max_params;
@@ -651,12 +652,25 @@ impl Func {
     }
 }
 
+impl Func {
+    pub fn print_func(&self) {
+        for block in self.blocks.iter() {
+            for inst in block.insts.iter() {
+                log!("{:?}", inst.as_ref());
+            }
+        }
+    }
+}
+
 impl GenerateAsm for Func {
     fn generate(&mut self, _: ObjPtr<Context>, f: &mut File) -> Result<()> {
-        if self.const_array.len() > 0 {
+        if self.const_array.len() > 0 || self.float_array.len() > 0 {
             writeln!(f, "	.data\n   .align  3")?;
         }
         for mut a in self.const_array.clone() {
+            a.generate(self.context, f)?;
+        }
+        for mut a in self.float_array.clone() {
             a.generate(self.context, f)?;
         }
         AsmBuilder::new(f).show_func(&self.label)?;
