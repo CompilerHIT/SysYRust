@@ -112,7 +112,7 @@ impl ObjPool<Inst> {
         debug_assert_eq!(lhs.get_ir_type(), rhs.get_ir_type());
 
         let inst = self.put(Inst::new(
-            lhs.get_ir_type(),
+            IrType::Int,
             InstKind::Binary(BinOp::Le),
             vec![lhs, rhs],
         ));
@@ -132,7 +132,7 @@ impl ObjPool<Inst> {
         debug_assert_eq!(lhs.get_ir_type(), rhs.get_ir_type());
 
         let inst = self.put(Inst::new(
-            lhs.get_ir_type(),
+            IrType::Int,
             InstKind::Binary(BinOp::Lt),
             vec![lhs, rhs],
         ));
@@ -152,7 +152,7 @@ impl ObjPool<Inst> {
         debug_assert_eq!(lhs.get_ir_type(), rhs.get_ir_type());
 
         let inst = self.put(Inst::new(
-            lhs.get_ir_type(),
+            IrType::Int,
             InstKind::Binary(BinOp::Ge),
             vec![lhs, rhs],
         ));
@@ -172,7 +172,7 @@ impl ObjPool<Inst> {
         debug_assert_eq!(lhs.get_ir_type(), rhs.get_ir_type());
 
         let inst = self.put(Inst::new(
-            lhs.get_ir_type(),
+            IrType::Int,
             InstKind::Binary(BinOp::Gt),
             vec![lhs, rhs],
         ));
@@ -191,7 +191,7 @@ impl ObjPool<Inst> {
         debug_assert_eq!(lhs.get_ir_type(), rhs.get_ir_type());
 
         let inst = self.put(Inst::new(
-            lhs.get_ir_type(),
+            IrType::Int,
             InstKind::Binary(BinOp::Eq),
             vec![lhs, rhs],
         ));
@@ -211,7 +211,7 @@ impl ObjPool<Inst> {
         debug_assert_eq!(lhs.get_ir_type(), rhs.get_ir_type());
 
         let inst = self.put(Inst::new(
-            lhs.get_ir_type(),
+            IrType::Int,
             InstKind::Binary(BinOp::Ne),
             vec![lhs, rhs],
         ));
