@@ -753,6 +753,7 @@ impl Process for VarDecl {
                             // } //添加该变量，但没有生成实际的指令
 
                             // unreachable!()
+                            // println!("数组{id}初始化");
                             let (mut init_vec, mut inst_vec) = val
                                 .process((Type::Int, dimension_vec_in.clone(), 0, 1), kit_mut)
                                 .unwrap(); //获得初始值
@@ -1136,7 +1137,10 @@ impl Process for InitVal {
                     after = after * dimension[i];
                 } //计算当前维度每增1对应多少元素
                   ////这里:!
-                after = dimension[dimension.len() - 1];
+                // if layer_now==1{
+                    after = dimension[dimension.len() - 1];
+                // }
+                
                 let mut vec_dimension_now = vec![];
                 for i in (layer_now - 1)..dimension.len() {
                     vec_dimension_now.push(dimension[i]);
@@ -1213,11 +1217,27 @@ impl Process for InitVal {
 
                 match tp {
                     Type::Float | Type::ConstFloat => {
+                        // if layer_now == 1 {
+                        //     init_padding_float(&mut vec_val_f, vec_dimension_now);
+                        // } else {
+                        //     let vec_temp = vec![after];
+                        //     init_padding_float(&mut vec_val_f, vec_temp);
+                        // }
                         init_padding_float(&mut vec_val_f, vec_dimension_now);
+
                         Ok((RetInitVec::Float(vec_val_f), vec_inst_init))
                     }
                     Type::Int | Type::ConstInt => {
+                        // if layer_now == 1 {
+                        //     init_padding_int(&mut vec_val_i, vec_dimension_now);
+                        // } else {
+                        //     println!("after:{:?}",after);
+                        //     let vec_temp = vec![after];
+                        //     // for i in vec_val_f
+                        //     init_padding_int(&mut vec_val_i, vec_temp);
+                        // }
                         init_padding_int(&mut vec_val_i, vec_dimension_now);
+
                         Ok((RetInitVec::Int(vec_val_i), vec_inst_init))
                     }
                     _ => {
@@ -2040,7 +2060,7 @@ impl Process for Cond {
         if kit_mut.context_mut.stop_genir {
             Ok((kit_mut.pool_inst_mut.make_int_const(-1129), ExpValue::None))
         } else {
-            self.l_or_exp.process(input, kit_mut)
+            self.l_or_exp.process((Type::NotForce,input.1,input.2), kit_mut)
         }
     }
 }
@@ -2426,6 +2446,7 @@ impl Process for Number {
 
                 match input {
                     Type::ConstInt | Type::Int => {
+                        unreachable!("这里有问题,但是不可能到这");
                         let f = *f as i32;
                         if let Some(inst) = kit_mut.context_mut.get_const_int(f) {
                             // // println!("找到：{:?}", f);
@@ -2441,7 +2462,7 @@ impl Process for Number {
                     // Type::Float =>{
 
                     // }
-                    Type::ConstFloat | Type::Float => {
+                    Type::ConstFloat | Type::Float |Type::NotForce=> {
                         if let Some(inst) = kit_mut.context_mut.get_const_float(*f) {
                             // // println!("找到：{:?}", i);
                             return Ok((inst, ExpValue::Float(*f)));
@@ -2477,7 +2498,7 @@ impl Process for Number {
                     // Type::Float =>{
 
                     // }
-                    Type::ConstInt | Type::Int => {
+                    Type::ConstInt | Type::Int |Type::NotForce=> {
                         if let Some(inst) = kit_mut.context_mut.get_const_int(*i) {
                             // // println!("找到：{:?}", i);
                             return Ok((inst, ExpValue::Int(*i)));
@@ -2490,9 +2511,7 @@ impl Process for Number {
                             return Ok((inst, ExpValue::Int(*i)));
                         }
                     } // Type::Int =>{
-                    _ => {
-                        todo!()
-                    } // }
+                   
                 }
             }
         }
@@ -2673,8 +2692,17 @@ impl Process for UnaryExp {
                         {
                             fname = funcname_in.clone();
                         }
-                        let inst = kit_mut.pool_inst_mut.make_float_call(fname, args);
+                        let mut inst = kit_mut.pool_inst_mut.make_float_call(fname, args);
                         kit_mut.context_mut.push_inst_bb(inst);
+                        match input {
+                            Type::ConstInt |Type::Int =>{
+                                inst = kit_mut.pool_inst_mut.make_float_to_int(inst);
+                                kit_mut.context_mut.push_inst_bb(inst);
+                            }
+                            _=>{
+
+                            }
+                        }
                         Ok((inst, ExpValue::None)) //这里可以进一步对返回值进行分析
                     }
                     IrType::Int => {
@@ -2688,8 +2716,17 @@ impl Process for UnaryExp {
                         {
                             fname = funcname_in.clone();
                         }
-                        let inst = kit_mut.pool_inst_mut.make_int_call(fname, args);
+                        let mut inst = kit_mut.pool_inst_mut.make_int_call(fname, args);
                         kit_mut.context_mut.push_inst_bb(inst);
+                        match input {
+                            Type::ConstFloat |Type::Float =>{
+                                inst = kit_mut.pool_inst_mut.make_int_to_float(inst);
+                                kit_mut.context_mut.push_inst_bb(inst);
+                            }
+                            _=>{
+                                
+                            }
+                        }
                         Ok((inst, ExpValue::None)) //这里可以进一步对返回值进行分析
                     }
                     IrType::Void => {
@@ -2705,6 +2742,14 @@ impl Process for UnaryExp {
                         }
                         let inst = kit_mut.pool_inst_mut.make_void_call(fname, args);
                         kit_mut.context_mut.push_inst_bb(inst);
+                        // match input {
+                        //     Type::NotForce =>{
+
+                        //     }
+                        //     _=>{
+                        //         // unreachable!("该函数返回值为void,不应该被强制类型转换")
+                        //     }
+                        // }
                         Ok((inst, ExpValue::None)) //这里可以进一步对返回值进行分析
                     }
                     _ => {
@@ -2784,6 +2829,7 @@ impl Process for MulExp {
             MulExp::DivExp((mulexp, unaryexp)) => {
                 let (inst_left, lval) = mulexp.as_mut().process(input, kit_mut).unwrap();
                 let (inst_right, rval) = unaryexp.process(input, kit_mut).unwrap();
+                // println!("left:{:?}right:{:?}",inst_left.get_kind(),inst_right.get_kind());
                 let mut inst = kit_mut.pool_inst_mut.make_div(inst_left, inst_right);
 
                 let mut val_ret = lval;
@@ -2947,15 +2993,23 @@ impl Process for RelExp {
     type Ret = (ObjPtr<Inst>, ExpValue);
     type Message = (Type);
     fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
-        let tp = self.type_process(1, kit_mut).unwrap(); //获得表达式中各比较元素应该给的类型
         match self {
             RelExp::AddExp(addexp) => addexp.process(input, kit_mut),
             RelExp::OpExp((relexp, op, addexp)) => {
+                let tp1 = relexp.type_process(1, kit_mut).unwrap(); //获得表达式中各比较元素应该给的类型
+                let tp2 = addexp.type_process(1, kit_mut).unwrap(); //获得表达式中各比较元素应该给的类型
+                let mut tp = 0;
+                if tp1 > tp2 {
+                    tp = tp1;
+                } else {
+                    tp = tp2;
+                }
                 let mut val_ret = ExpValue::None;
                 let mut tp_in = Type::Int;
                 if tp > 1 {
                     //float或floatconst
                     tp_in = Type::Float;
+                    // println!("func: op两边操作数类型:float");
                 }
                 let (mut inst_left, val_left) = relexp.process(tp_in, kit_mut).unwrap();
                 let (mut inst_right, val_right) = addexp.process(tp_in, kit_mut).unwrap();
@@ -3139,13 +3193,21 @@ impl Process for EqExp {
     type Ret = (ObjPtr<Inst>, ExpValue);
     type Message = (Type); //第一个为true,第二个为false //if中默认给Type::Int
     fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
-        let tp = self.type_process(1, kit_mut).unwrap(); //获得表达式中各比较元素应该给的类型
+        // let tp = self.type_process(1, kit_mut).unwrap(); //获得表达式中各比较元素应该给的类型
         match self {
             EqExp::RelExp(relexp) => {
                 let (inst, _) = relexp.process(input, kit_mut).unwrap();
                 Ok((inst, ExpValue::Bool(1))) //这里可以优化
             }
             EqExp::EqualExp((eqexp, relexp)) => {
+                let tp1 = relexp.type_process(1, kit_mut).unwrap(); //获得表达式中各比较元素应该给的类型
+                let tp2 = eqexp.type_process(1, kit_mut).unwrap(); //获得表达式中各比较元素应该给的类型
+                let mut tp = 0;
+                if tp1 > tp2 {
+                    tp = tp1;
+                } else {
+                    tp = tp2;
+                }
                 let mut val_ret = ExpValue::None;
                 let mut tp_in = Type::Int;
                 if tp > 1 {
@@ -3236,6 +3298,14 @@ impl Process for EqExp {
                 Ok((inst_eq, val_ret))
             }
             EqExp::NotEqualExp((eqexp, relexp)) => {
+                let tp1 = relexp.type_process(1, kit_mut).unwrap(); //获得表达式中各比较元素应该给的类型
+                let tp2 = eqexp.type_process(1, kit_mut).unwrap(); //获得表达式中各比较元素应该给的类型
+                let mut tp = 0;
+                if tp1 > tp2 {
+                    tp = tp1;
+                } else {
+                    tp = tp2;
+                }
                 let mut val_ret = ExpValue::None;
                 let mut tp_in = Type::Int;
                 if tp > 1 {
@@ -3269,6 +3339,7 @@ impl Process for EqExp {
                     }
                     _ => {}
                 } //这里可以进一步优化,计算cond是否恒为真或假
+                println!("left{:?}right{:?}",inst_left.get_kind(),inst_right.get_kind());
                 let mut inst_ne = kit_mut.pool_inst_mut.make_ne(inst_left, inst_right);
                 let mut result = -1;
                 if fflag == 1 {
@@ -3325,7 +3396,7 @@ impl Process for LAndExp {
     fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
         match self {
             LAndExp::EqExp(eqexp) => {
-                let (inst_ret, val_ret) = eqexp.process(input.0, kit_mut).unwrap();
+                let (mut inst_ret, val_ret) = eqexp.process(input.0, kit_mut).unwrap();
                 match kit_mut.context_mut.bb_now_mut {
                     InfuncChoice::InFunc(bb_now) => {
                         if let Some(bb_false) = input.2 {
@@ -3346,6 +3417,23 @@ impl Process for LAndExp {
                             // );
                             bb_now.as_mut().add_next_bb(bb_true);
                         }
+                        //这里
+                        match inst_ret.get_ir_type() {
+                            IrType::Float =>{
+                                let inst_zero = kit_mut.pool_inst_mut.make_float_const(0.0);
+                                inst_ret = kit_mut.pool_inst_mut.make_eq(inst_ret, inst_zero);
+                                kit_mut.context_mut.push_inst_bb(inst_ret);
+                                kit_mut.context_mut.push_inst_bb(inst_zero);
+                            }
+                            IrType::Int =>{
+
+                            }
+                            _=>{
+                                unreachable!("应该是一个bool值(int或float)才对")
+                            }
+                        }
+                        // let inst_zero = kit_mut.pool_inst_mut.make_int_const(0);
+                        // inst_ret = kit_mut.pool_inst_mut.
                         let inst_branch = kit_mut.pool_inst_mut.make_br(inst_ret);
                         kit_mut.context_mut.push_inst_bb(inst_branch);
                     }
@@ -3387,6 +3475,23 @@ impl Process for LAndExp {
                         unreachable!()
                     }
                 }
+                //这里
+                match inst_right.get_ir_type() {
+                    IrType::Float =>{
+                        let inst_zero = kit_mut.pool_inst_mut.make_float_const(0.0);
+                        inst_right = kit_mut.pool_inst_mut.make_eq(inst_right, inst_zero);
+                        kit_mut.context_mut.push_inst_bb(inst_right);
+                        kit_mut.context_mut.push_inst_bb(inst_zero);
+                    }
+                    IrType::Int =>{
+
+                    }
+                    _=>{
+                        unreachable!("应该是一个bool值(int或float)才对")
+                    }
+                }
+
+
                 let inst_branch = kit_mut.pool_inst_mut.make_br(inst_right);
                 kit_mut.context_mut.push_inst_bb(inst_branch);
                 // let mut inst_and = kit_mut.pool_inst_mut.make_and(inst_left, inst_right);

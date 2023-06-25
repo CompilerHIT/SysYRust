@@ -129,7 +129,10 @@ impl TypeProcess for PrimaryExp {
             PrimaryExp::LVal(lval) => {
                 let sym = kit_mut.get_var_symbol(&lval.id).unwrap();
                 match sym.tp {
-                    Type::ConstFloat | Type::Float => Ok(3),
+                    Type::ConstFloat | Type::Float => {
+                        // println!("typesearch:{:?}float型", lval.id);
+                        Ok(3)
+                    }
                     Type::ConstInt | Type::Int => Ok(1),
                     _ => {
                         todo!()
