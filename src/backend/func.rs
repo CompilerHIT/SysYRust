@@ -468,6 +468,7 @@ impl Func {
             }
         }
     }
+    
     fn handle_parameters(&mut self, ir_func: &Function) {
         let mut iparam: Vec<_> = ir_func
             .get_parameter_list()

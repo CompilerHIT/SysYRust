@@ -47,25 +47,39 @@ impl<'a> AsmModule<'a> {
         }
     }
 
-    // 移除无用指令(TODO,可以把窥孔优化放在这里)
-    fn remove_unuse_inst(&mut self) {
+    // 寄存器分配和寄存器赋值前,移除无用指令(比如移除mv)
+    fn remove_unuse_inst_pre_alloc(&mut self) {
         self.func_map.iter().for_each(|(_, func)| {
             func.as_mut().remove_unuse_inst();
         });
     }
 
-    pub fn generator(&mut self, f: &mut File, f2: &mut File, pool: &mut BackendPool) {
-        self.build_lir(pool);
-        // TOCHECK 删除函数中无用指令
-        self.remove_unuse_inst();
+    // 寄存器分配和使用后 移除无用指令(比如移除多余的缓存指令)
+    fn remove_unuse_inst_suf_alloc(&mut self) {
 
+    }
+    
+    
+    pub fn generate(&mut self, f: &mut File, f2: &mut File, pool: &mut BackendPool) {
+        self.build_lir(pool);
+        // TOCHECK 寄存器分配和handlespill前无用指令删除,比如删除mv指令方便寄存器分配
+        self.remove_unuse_inst_pre_alloc(); //fixme: to imporve
         self.generate_row_asm(f2, pool); //注释
         self.allocate_reg();
-        self.handle_spill(pool, f);
+        self.handle_spill(pool, f);         //yjh: i am going to adjust
+        self.remove_unuse_inst_suf_alloc(); //yjh:i am going to do
+        
         // 检查地址溢出，插入间接寻址
         self.handle_overflow(pool);
         self.generate_global_var(f);
         self.print_model();
+
+        // TODO 1:汇编前进行窥孔优化,比如移除mv循环 a->b,b->a
+
+        // TODO 2:并行化分析,进行长块内并行分析,找出所有并行区间和串行区域
+
+        // TODO 3:使用并行化分析结果,插入调用并行函数汇编
+
         self.generate_asm(f, pool);
     }
 
