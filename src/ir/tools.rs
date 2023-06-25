@@ -1,34 +1,8 @@
-use super::{basicblock::BasicBlock, function::Function, instruction::Inst, module::Module};
-use crate::utility::{ObjPool, ObjPtr};
 use std::collections::{HashSet, VecDeque};
 
-mod dead_code_eliminate;
-mod func_inline;
-mod phi_optimizer;
-mod simplify_cfg;
+use crate::utility::ObjPtr;
 
-pub use func_inline::{call_map_gen, CallMap};
-
-pub fn optimizer_run(
-    module: &mut Module,
-    mut pools: (&mut ObjPool<BasicBlock>, &mut ObjPool<Inst>),
-    optimize_flag: bool,
-) {
-    // 在功能点上对phi指令进行优化
-    functional_optimizer(module);
-
-    if optimize_flag {
-        // 死代码删除
-        dead_code_eliminate::dead_code_eliminate(module, true);
-
-        // 函数内联
-        func_inline::inline_run(module, &mut pools);
-
-        // 简化cfg
-        simplify_cfg::simplify_cfg_run(module, &mut pools);
-        // TODO: 性能优化
-    }
-}
+use super::{basicblock::BasicBlock, function::Function, instruction::Inst, module::Module};
 
 pub fn inst_process_in_bb<F>(mut inst: ObjPtr<Inst>, mut predicate: F)
 where
@@ -139,18 +113,7 @@ where
     }
 }
 
-fn functional_optimizer(module: &mut Module) {
-    // 一遍死代码删除
-    dead_code_eliminate::dead_code_eliminate(module, false);
-
-    // phi优化
-    phi_optimizer::phi_run(module);
-
-    // 全局死代码删除
-    dead_code_eliminate::global_eliminate(module);
-}
-
-fn bfs_find_end_bb(head: ObjPtr<BasicBlock>) -> ObjPtr<BasicBlock> {
+pub fn bfs_find_end_bb(head: ObjPtr<BasicBlock>) -> ObjPtr<BasicBlock> {
     // 如果只有一个块，那么这个块就是end_bb
     if !head.has_next_bb() {
         return head;

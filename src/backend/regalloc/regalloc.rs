@@ -1,15 +1,10 @@
-use std::collections::{HashMap, HashSet, LinkedList, VecDeque};
-use std::process::Output;
+use std::collections::{HashMap, HashSet, VecDeque};
 
-use crate::algorithm::graphalgo::Value;
-use crate::backend::block;
 use crate::backend::func::Func;
-use crate::backend::instrs::{InstrsType, Operand, BB};
+use crate::backend::instrs::{InstrsType, BB};
 use crate::backend::operand::Reg;
 use crate::backend::regalloc::structs::FuncAllocStat;
-use crate::container::bitmap::Bitmap;
-use crate::frontend::ast::Continue;
-use crate::ir::instruction::Inst;
+use crate::log_file;
 use crate::utility::{ObjPtr, ScalarType};
 
 use super::structs::RegUsedStat;
@@ -85,8 +80,7 @@ pub fn count_spill_cost(func: &Func) -> HashMap<Reg, i32> {
                 Some(reg) => Some(*reg),
                 None => None,
             };
-            // TODO,判断这个指令是否有目标寄存器
-
+            // FIXME,使用跟精确的统计方法，针对具体指令类型
             let mut is_use = false;
             for reg in inst.get_reg_use() {
                 if !reg.is_virtual() {
@@ -115,21 +109,27 @@ pub fn count_spill_cost(func: &Func) -> HashMap<Reg, i32> {
 }
 
 // 获取冲突表
-pub fn build_intereference(func: &Func) -> HashMap<Reg, HashSet<Reg>> {
+pub fn build_intereference(
+    func: &Func,
+    ends_index_bb: &HashMap<(i32, ObjPtr<BB>), HashSet<Reg>>,
+) -> HashMap<Reg, HashSet<Reg>> {
     let mut interference_graph: HashMap<Reg, HashSet<Reg>> = HashMap::new();
-    let ends_index_bb = ends_index_bb(func);
+    let tmp_set=HashSet::new();
     let process =
         |cur_bb: ObjPtr<BB>, interef_graph: &mut HashMap<Reg, HashSet<Reg>>, kind: ScalarType| {
             let mut livenow: HashSet<Reg> = HashSet::new();
             // 冲突分析
-            let mut passed_regs: HashSet<Reg> = HashSet::new();
             cur_bb.live_in.iter().for_each(|e| {
-                if e.get_type()!=kind {return;}
+                if e.get_type() != kind {
+                    return;
+                }
                 if let None = interef_graph.get(e) {
                     interef_graph.insert(*e, HashSet::new());
                 }
                 for live in livenow.iter() {
-                    if live==e {continue;}
+                    if live == e {
+                        continue;
+                    }
                     interef_graph.get_mut(live).unwrap().insert(*e);
                     interef_graph.get_mut(e).unwrap().insert(*live);
                 }
@@ -137,12 +137,9 @@ pub fn build_intereference(func: &Func) -> HashMap<Reg, HashSet<Reg>> {
             });
             for (index, inst) in cur_bb.insts.iter().enumerate() {
                 // 先与reg use冲突,然后消去终结的,然后与reg def冲突,并加上新的reg def
-                if let Some(finishes) = ends_index_bb
-                    .get(&(index as i32, cur_bb))
-                {
-                    for finish in finishes {
-                        livenow.remove(finish);
-                    }
+                let finishes=ends_index_bb.get(&(index as i32,cur_bb)).unwrap_or(&tmp_set);
+                for finish in finishes {
+                    livenow.remove(finish);
                 }
                 for reg in inst.get_reg_def() {
                     if reg.get_type() != kind {
@@ -158,8 +155,10 @@ pub fn build_intereference(func: &Func) -> HashMap<Reg, HashSet<Reg>> {
                         interef_graph.get_mut(live).unwrap().insert(reg);
                         interef_graph.get_mut(&reg).unwrap().insert(*live);
                     }
+                    if finishes.contains(&reg) {continue;}      //fixme,修复增加这里的bug
                     livenow.insert(reg);
                 }
+                
             }
         };
     // 遍历所有块，分析冲突关系
@@ -168,43 +167,51 @@ pub fn build_intereference(func: &Func) -> HashMap<Reg, HashSet<Reg>> {
         // 把不同类型寄存器统计加入表中
         //分别处理浮点寄存器的情况和通用寄存器的情况
         process(cur_bb, &mut interference_graph, ScalarType::Float);
-        process(cur_bb,&mut interference_graph,ScalarType::Int);
+        process(cur_bb, &mut interference_graph, ScalarType::Int);
         // 加入还没有处理过的bb
     }
     interference_graph
 }
 
 // 获取可分配表
-pub fn build_availables(func:&Func)->HashMap<Reg,RegUsedStat> {
-    let mut availables:HashMap<Reg,RegUsedStat>=HashMap::new();
-    let ends_index_bb = ends_index_bb(func);
+pub fn build_availables(
+    func: &Func,
+    ends_index_bb: &HashMap<(i32, ObjPtr<BB>), HashSet<Reg>>,
+) -> HashMap<Reg, RegUsedStat> {
+    let mut availables: HashMap<Reg, RegUsedStat> = HashMap::new();
     let process =
-        |cur_bb: ObjPtr<BB>, availables:&mut HashMap<Reg, RegUsedStat>, kind: ScalarType| {
+        |cur_bb: ObjPtr<BB>, availables: &mut HashMap<Reg, RegUsedStat>, kind: ScalarType| {
             let mut livenow: HashSet<Reg> = HashSet::new();
             // 冲突分析
             let mut passed_regs: HashSet<Reg> = HashSet::new();
             cur_bb.live_in.iter().for_each(|reg| {
-                if reg.get_type()!=kind {return;}
+                if reg.get_type() != kind {
+                    return;
+                }
                 if let None = availables.get(reg) {
                     availables.insert(*reg, RegUsedStat::new());
                 }
                 if reg.is_physic() {
-                    livenow.iter().for_each(|live|{
-                        availables.get_mut(live).unwrap().use_reg(RegUsedStat::get_color(reg));
+                    livenow.iter().for_each(|live| {
+                        availables
+                            .get_mut(live)
+                            .unwrap()
+                            .use_reg(RegUsedStat::get_color(reg));
                     });
                 }
                 for live in livenow.iter() {
                     if live.is_physic() {
-                        availables.get_mut(reg).unwrap().use_reg(RegUsedStat::get_color(live));
+                        availables
+                            .get_mut(reg)
+                            .unwrap()
+                            .use_reg(RegUsedStat::get_color(live));
                     }
                 }
                 livenow.insert(*reg);
             });
             for (index, inst) in cur_bb.insts.iter().enumerate() {
                 // 先与reg use冲突,然后消去终结的,然后与reg def冲突,并加上新的reg def
-                if let Some(finishes) = ends_index_bb
-                    .get(&(index as i32, cur_bb))
-                {
+                if let Some(finishes) = ends_index_bb.get(&(index as i32, cur_bb)) {
                     for finish in finishes {
                         livenow.remove(finish);
                     }
@@ -217,8 +224,11 @@ pub fn build_availables(func:&Func)->HashMap<Reg,RegUsedStat> {
                         availables.insert(reg, RegUsedStat::new());
                     }
                     if reg.is_physic() {
-                        livenow.iter().for_each(|live|{
-                            availables.get_mut(&live).unwrap().use_reg(RegUsedStat::get_color(&reg));
+                        livenow.iter().for_each(|live| {
+                            availables
+                                .get_mut(&live)
+                                .unwrap()
+                                .use_reg(RegUsedStat::get_color(&reg));
                         });
                     }
                     for live in livenow.iter() {
@@ -226,7 +236,10 @@ pub fn build_availables(func:&Func)->HashMap<Reg,RegUsedStat> {
                             continue;
                         }
                         if live.is_physic() {
-                            availables.get_mut(&reg).unwrap().use_reg(RegUsedStat::get_color(live));
+                            availables
+                                .get_mut(&reg)
+                                .unwrap()
+                                .use_reg(RegUsedStat::get_color(live));
                         }
                     }
                     livenow.insert(reg);
@@ -239,7 +252,7 @@ pub fn build_availables(func:&Func)->HashMap<Reg,RegUsedStat> {
         // 把不同类型寄存器统计加入表中
         //分别处理浮点寄存器的情况和通用寄存器的情况
         process(cur_bb, &mut availables, ScalarType::Float);
-        process(cur_bb,&mut availables,ScalarType::Int);
+        process(cur_bb, &mut availables, ScalarType::Int);
         // 加入还没有处理过的bb
     }
     return availables;
@@ -271,80 +284,24 @@ pub fn ends_index_bb(func: &Func) -> HashMap<(i32, ObjPtr<BB>), HashSet<Reg>> {
 }
 
 // 通用寄存器合并
-pub fn merge_alloc(func: &Func, dstr: &mut HashMap<i32, i32>, spillings: &HashSet<i32>) {
+pub fn merge_alloc(
+    func: &Func,
+    dstr: &mut HashMap<i32, i32>,
+    spillings: &mut HashSet<i32>,
+    ends_index_bb: &HashMap<(i32, ObjPtr<BB>), HashSet<Reg>>,
+    nums_neighbor_color: &mut HashMap<Reg, HashMap<i32, i32>>,
+    availables: &mut HashMap<Reg, RegUsedStat>,
+    interference_graph: &HashMap<Reg, HashSet<Reg>>,
+) {
     // 合并条件,如果一个mv x55 x66指令， 后面 x66指令不再使用了,
     // 则x55(color1),x66(color2)可以进行合并，
-    // 可以取一个它们合并之后不会产生新的矛盾的颜色合并
-    let ends_index_bb = ends_index_bb(func);
-    let mut nexttos: HashMap<i32, HashMap<i32, i32>> = HashMap::new();
-    // let reg_use_stat=
-    // 首先进行冲突分析分析出它们的剩余可用颜色
-    let mut analyse_one = |livenow: &mut VecDeque<Reg>,
-                           reg: &Reg,
-                           dstr: &mut HashMap<i32, i32>,
-                           spillings: &HashSet<i32>| {
-        if !reg.is_virtual() {
-            return;
-        }
-        if spillings.contains(&reg.get_id()) {
-            return;
-        }
-        if let None = nexttos.get(&reg.get_id()) {
-            nexttos.insert(reg.get_id(), HashMap::new());
-        }
-        let color = dstr.get(&reg.get_id()).unwrap();
-        for reg_another in livenow.iter() {
-            let available = nexttos.get_mut(&reg.get_id()).unwrap();
-            let color_another = dstr.get(&reg_another.get_id()).unwrap();
-            available.insert(
-                *color_another,
-                available.get(color_another).unwrap_or(&0) + 1,
-            );
-            let available_another = nexttos.get_mut(&reg_another.get_id()).unwrap();
-            available_another.insert(*color, available_another.get(color).unwrap_or(&0) + 1);
-        }
-        livenow.push_back(*reg);
-    };
-    let mut analyse = |bb: ObjPtr<BB>, dstr: &mut HashMap<i32, i32>, spillings: &HashSet<i32>| {
-        // 对某个块进行冲突分析
-        // 获取每个寄存器的终结时间
-        // 获取寄存器链表
-        let mut livenow: VecDeque<Reg> = VecDeque::new();
-        bb.live_in
-            .iter()
-            .for_each(|reg| analyse_one(&mut livenow, reg, dstr, spillings));
-        for (index, inst) in bb.insts.iter().enumerate().rev() {
-            //TODO 先对live now中的参数进行排序,找到结束时间最晚的一个
-            let mut i = 0;
-            while i < livenow.len() {
-                // println!("{},{}",i,livenow.len());
-                let tmp_set: HashSet<Reg> = HashSet::new();
-                let tmp_reg = livenow.get(i).unwrap();
-                if ends_index_bb
-                    .get(&(index as i32, bb))
-                    .unwrap_or(&tmp_set)
-                    .contains(tmp_reg)
-                {
-                    livenow.remove(i);
-                } else {
-                    i += 1;
-                }
-            }
-
-            for reg in inst.get_reg_def() {
-                analyse_one(&mut livenow, &reg, dstr, spillings);
-            }
-        }
-    };
-    // 分析寄存器的availble关系
-    for block in func.blocks.iter() {
-        analyse(*block, dstr, spillings);
-    }
-
     let merge = |bb: ObjPtr<BB>,
-                 nexttos: &mut HashMap<i32, HashMap<i32, i32>>,
                  dstr: &mut HashMap<i32, i32>,
-                 spillings: &HashSet<i32>| {
+                 spillings: &mut HashSet<i32>,
+                 ends_index_bb: &HashMap<(i32, ObjPtr<BB>), HashSet<Reg>>,
+                 nums_neighbor_color: &mut HashMap<Reg, HashMap<i32, i32>>,
+                 availables: &mut HashMap<Reg, RegUsedStat>,
+                 interference_graph: &HashMap<Reg, HashSet<Reg>>| {
         // 首先定位到可能出现merge的指令，比如mv
         for (index, inst) in bb.insts.iter().enumerate() {
             if inst.get_type() != InstrsType::OpReg(crate::backend::instrs::SingleOp::IMv) {
@@ -355,37 +312,121 @@ pub fn merge_alloc(func: &Func, dstr: &mut HashMap<i32, i32>, spillings: &HashSe
             if dst_reg == src_reg {
                 continue;
             }
+            // 不处理特殊寄存器的合并
             if dst_reg.is_special() || src_reg.is_special() {
                 continue;
             }
-            if dst_reg.is_physic() || src_reg.is_physic() {
+            let tmp_set=HashSet::with_capacity(0);
+            //不处理物理寄存器的寄存器合并
+            if dst_reg.is_physic() && src_reg.is_physic() {
+                //TODO,暂时不考虑物理寄存器的合并，分配器不应该修改函数或者指令的内容
                 continue;
-            } //暂时不处理物理寄存器的寄存器合并
-            if let Some(ends) = ends_index_bb.get(&(index as i32, bb)) {
-                if !ends.contains(&src_reg) {
+            }
+            //不处理两个spilling的寄存器合并且 // 不处理两个相同颜色的寄存器合并
+            if dst_reg.is_virtual() && src_reg.is_virtual()
+            {   
+                if spillings.contains(&dst_reg.get_id())&&spillings.contains(&src_reg.get_id()) 
+                {
                     continue;
                 }
-                // 判断融合哪个的颜色
-                let dst_available = nexttos.get_mut(&dst_reg.get_id()).unwrap();
-                if dst_available.contains_key(&src_reg.get_id())
-                    && *dst_available.get(&src_reg.get_id()).unwrap() == 1
-                {
-                    dstr.insert(dst_reg.get_id(), *dstr.get(&src_reg.get_id()).unwrap());
+                if dstr.contains_key(&src_reg.get_id()) &&dstr.contains_key(&dst_reg.get_id()) &&
+                dstr.get(&src_reg.get_id()).unwrap()==dstr.get(&dst_reg.get_id()).unwrap() {
+                    // 不处理同色寄存器合并
                     continue;
-                }
-                println!("{}", src_reg.get_id());
-                let src_available = nexttos.get_mut(&src_reg.get_id()).unwrap();
-                if src_available.contains_key(&dst_reg.get_id())
-                    && *src_available.get(&dst_reg.get_id()).unwrap() == 1
-                {
-                    dstr.insert(src_reg.get_id(), *dstr.get(&dst_reg.get_id()).unwrap());
                 }
             }
+            
+            // TODO ,fix bug
+
+
+            if interference_graph.get(&dst_reg).unwrap_or(&tmp_set).contains(&src_reg) {
+                continue;
+            }
+
+            let available_src=availables.get(&src_reg).unwrap();
+            let available_dst=availables.get(&dst_reg).unwrap();
+            let mut tomerge:Option<Reg>=None;
+            let mut merge_color:Option<i32>=None;
+
+            if dst_reg.is_physic() {
+                if available_src.is_available_reg(dst_reg.get_color()) {
+                    if spillings.contains(&src_reg.get_id()) {
+                        tomerge=Some(src_reg);
+                        merge_color=Some(dst_reg.get_color());
+                    }else{  
+                        // TODO,分析这里的情况是否需要合并
+                    }
+                }
+            }else if src_reg.is_physic(){
+                if available_dst.is_available_reg(src_reg.get_color()) {
+                    if spillings.contains(&dst_reg.get_id()) {
+                        tomerge=Some(dst_reg);
+                        merge_color=Some(src_reg.get_color());
+                    }else{  
+                        // TODO,分析这里的情况是否需要合并
+                    }
+                }
+            }else {
+                // 必然其中一个有颜色或者两个有颜色
+                let num_inter_dst=interference_graph.get(&dst_reg).unwrap_or(&tmp_set).len();
+                let num_inter_src=interference_graph.get(&src_reg).unwrap_or(&tmp_set).len();
+                let mut base_inter:usize=0;
+                if dstr.contains_key(&src_reg.get_id())&&available_dst.is_available_reg(*dstr.get(&src_reg.get_id()).unwrap()) {
+                    if num_inter_dst>base_inter {
+                        base_inter=num_inter_dst;
+                        tomerge=Some(dst_reg);
+                        merge_color=Some(*dstr.get(&src_reg.get_id()).unwrap());
+                    }
+                }
+                if dstr.contains_key(&dst_reg.get_id())&& available_src.is_available_reg(*dstr.get(&dst_reg.get_id()).unwrap()){
+                    if num_inter_src>base_inter {
+                        tomerge=Some(src_reg);
+                        merge_color=Some(*dstr.get(&dst_reg.get_id()).unwrap());
+                    }
+                }
+
+            }
+            
+            // TODO,选择好合并对象之后进行合并
+            if let Some(reg)=tomerge {
+                spillings.remove(&reg.get_id());
+                log_file!("color_spill.txt","inst:{:?},src:{},dst:{}",inst.get_type(),src_reg,dst_reg);
+                log_file!("color_spill.txt","availables:\nsrc:{}\ndst{}",available_src,available_dst);
+                log_file!("color_spill.txt","merge:{}({}) index:{},bb:{}",reg,merge_color.unwrap(),index,bb.label.clone());
+                let merge_color=merge_color.unwrap();
+                let neighbors=interference_graph.get(&reg).unwrap();
+                if dstr.contains_key(&reg.get_id()) {
+                    let old_color=dstr.get(&reg.get_id()).unwrap();
+                    for neighbor in neighbors {
+                        let nums_neighbor_color=nums_neighbor_color.get_mut(neighbor).unwrap();
+                        let new_num=nums_neighbor_color.get(old_color).unwrap_or(&1)-1;
+                        nums_neighbor_color.insert(*old_color,new_num);
+                        if new_num==0 {
+                            availables.get_mut(neighbor).unwrap().release_reg(*old_color);
+                        }
+                    }
+                }
+                dstr.insert(reg.get_id(), merge_color);
+                for neighbor in neighbors {
+                    let nums_neighbor_color=nums_neighbor_color.get_mut(neighbor).unwrap();
+                    nums_neighbor_color.insert(merge_color,nums_neighbor_color.get(&merge_color).unwrap_or(&0)+1);
+                    availables.get_mut(neighbor).unwrap().use_reg(merge_color);
+                }
+            }
+        
         }
     };
     // 根据冲突结果进行寄存器合并
     for block in func.blocks.iter() {
-        merge(*block, &mut nexttos, dstr, spillings);
+        merge(
+            *block,
+            dstr,
+            spillings,
+            ends_index_bb,
+            nums_neighbor_color,
+            availables,
+            interference_graph,
+        );
     }
 }
 
@@ -398,6 +439,7 @@ pub fn check_alloc(
 ) -> Vec<(i32, i32, i32, String)> {
     let mut out: Vec<(i32, i32, i32, String)> = Vec::new();
     let ends_index_bb = ends_index_bb(func);
+    let tmp_set=HashSet::new();
     let mut check_alloc_one =
         |reg: &Reg,
          index: i32,
@@ -415,7 +457,7 @@ pub fn check_alloc(
                 }
                 return;
             }
-            println!("g?{}",reg.get_id());
+            println!("g?{}", reg.get_id());
             let color = dstr.get(&reg.get_id());
             // fix me
             // if color.is_none() {
@@ -423,7 +465,7 @@ pub fn check_alloc(
             //     return;
             // }
 
-            let color=color.unwrap();
+            let color = color.unwrap();
             //
             if !reg_use_stat.is_available_reg(*color) {
                 let interef_regs = livenow.get(color).unwrap();
@@ -449,29 +491,78 @@ pub fn check_alloc(
             .for_each(|reg| check_alloc_one(reg, -1, *bb, &mut reg_use_stat, &mut livenow));
         for (index, inst) in bb.insts.iter().enumerate() {
             // 先處理生命周期結束的寄存器
-            if let Some(end_regs) = ends_index_bb.get(&(index as i32, *bb)) {
-                for reg in end_regs {
+            let end_regs=ends_index_bb.get(&(index as i32, *bb)).unwrap_or(&tmp_set);
+            for reg in end_regs {
+                if spillings.contains(&reg.get_id()) {
+                    continue;
+                }
+                if !reg.is_virtual() {
+                    continue;
+                }
+                println!("{}", reg.get_id());
+                let color = dstr.get(&reg.get_id());
+                // if color.is_none() {return  out;}   //FIXME
+                let color = color.unwrap();
+                livenow.get_mut(color).unwrap().remove(&reg.get_id());
+                if livenow.get(color).unwrap().is_empty() {
+                    reg_use_stat.release_reg(*color);
+                }
+            }
+            // if let Some(end_regs) = ends_index_bb.get(&(index as i32, *bb)) {
+            //     for reg in end_regs {
+            //         if spillings.contains(&reg.get_id()) {
+            //             continue;
+            //         }
+            //         if !reg.is_virtual() {
+            //             continue;
+            //         }
+            //         println!("{}", reg.get_id());
+            //         let color = dstr.get(&reg.get_id());
+            //         // if color.is_none() {return  out;}   //FIXME
+            //         let color = color.unwrap();
+            //         livenow.get_mut(color).unwrap().remove(&reg.get_id());
+            //         if livenow.get(color).unwrap().is_empty() {
+            //             reg_use_stat.release_reg(*color);
+            //         }
+            //     }
+            // }
+
+            for reg in inst.get_reg_def() {
+                check_alloc_one(&reg, index as i32, *bb, &mut reg_use_stat, &mut livenow);
+                if end_regs.contains(&reg) {
                     if spillings.contains(&reg.get_id()) {
                         continue;
                     }
                     if !reg.is_virtual() {
                         continue;
                     }
-                    println!("{}", reg.get_id());
                     let color = dstr.get(&reg.get_id());
                     // if color.is_none() {return  out;}   //FIXME
-                    let color=color.unwrap();
+                    let color = color.unwrap();
                     livenow.get_mut(color).unwrap().remove(&reg.get_id());
                     if livenow.get(color).unwrap().is_empty() {
                         reg_use_stat.release_reg(*color);
                     }
                 }
             }
+
             
-            for reg in inst.get_reg_def() {
-                check_alloc_one(&reg, index as i32, *bb, &mut reg_use_stat, &mut livenow);
-            }
         }
     }
     out
+}
+
+// 对分配结果的评估
+pub fn eval_alloc(func: &Func, dstr: & HashMap<i32, i32>, spillings: &HashSet<i32>)->i32{
+    //
+    let mut cost:i32 = 0;
+    let counts = count_spill_cost(func);
+    counts.iter().for_each(|(reg, v)| {
+        if reg.is_virtual() {
+            if spillings.contains(&reg.get_id()) {
+                cost+=v;
+            }
+        }
+    });
+    cost
 }

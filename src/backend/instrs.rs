@@ -8,8 +8,9 @@ pub use crate::backend::block::BB;
 pub use crate::backend::func::Func;
 use crate::backend::operand::*;
 pub use crate::backend::structs::{Context, GenerateAsm};
-use crate::frontend::ast::Continue;
 pub use crate::utility::{ObjPtr, ScalarType};
+
+use super::block::FLOAT_BASE;
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum Operand {
@@ -40,6 +41,7 @@ pub enum BinaryOp {
     Sar,
     /// 执行带符号整数高位乘法操作
     Mulhs,
+    FCmp(CmpOp),
 }
 
 /// 单目运算符
@@ -49,10 +51,8 @@ pub enum SingleOp {
     // Lui,
     IMv,
     FMv,
-    INot,
     INeg,
     //FIXME: whether fnot exist
-    FNot,
     FNeg,
     I2F,
     F2I,
@@ -61,6 +61,8 @@ pub enum SingleOp {
     // D2F,
     Seqz,
     Snez,
+    LoadImm,
+    LoadFImm,
 }
 
 /// 比较运算符
@@ -137,6 +139,7 @@ impl fmt::Display for LIRInst {
                     BinaryOp::Sar => "sra",
                     BinaryOp::Mulhs => "mulhs",
                     BinaryOp::Slt => "slt",
+                    BinaryOp::FCmp(..) => "fcmp",
                 };
             }
             InstrsType::OpReg(op) => {
@@ -145,23 +148,17 @@ impl fmt::Display for LIRInst {
                     // SingleOp::Lui => "lui",
                     SingleOp::IMv => "mv",
                     SingleOp::FMv => "fmv",
-                    SingleOp::INot => "not",
                     SingleOp::INeg => "neg",
-                    SingleOp::FNot => "fnot",
                     SingleOp::FNeg => "fneg",
                     SingleOp::I2F => "fcvt.s.w",
                     SingleOp::F2I => "fcvt.w.s",
                     SingleOp::LoadAddr => "la",
                     SingleOp::Seqz => "seqz",
                     SingleOp::Snez => "snez",
+                    SingleOp::LoadImm => "addi",
+                    SingleOp::LoadFImm => "fmv.w.x",
                 };
             }
-            // InstrsType::ChangeSp => {
-            //     let mut builder = AsmBuilder::new(f);
-            //     let imm = self.get_change_sp_offset();
-            //     builder.addi("sp", "sp", imm)?;
-            //     Ok(())
-            // },
             InstrsType::Load | InstrsType::LoadParamFromStack | InstrsType::LoadFromStack => {
                 kind = "load";
             }
@@ -274,13 +271,13 @@ impl LIRInst {
         }
     }
 
-    pub fn is_spill(&self, id: &HashSet<i32>) -> HashSet<i32> {
+    pub fn is_spill(&self, id: &HashSet<i32>) -> HashSet<Reg> {
         let mut res = HashSet::new();
         for op in &self.operands {
             match op {
                 Operand::Reg(reg) => {
                     if id.contains(&reg.get_id()) {
-                        res.insert(reg.get_id());
+                        res.insert(*reg);
                     }
                 }
                 _ => {}
@@ -350,21 +347,22 @@ impl LIRInst {
                 ),
             },
             InstrsType::Call => {
-                let mut set = Vec::new();
-                let cnt: i32 = REG_COUNT;
-                let mut n = cnt;
-                while n > 0 {
-                    let ireg = Reg::new(cnt - n, ScalarType::Int);
-                    if ireg.is_caller_save() {
-                        set.push(ireg);
-                    }
-                    let freg = Reg::new(cnt - n, ScalarType::Float);
-                    if freg.is_caller_save() {
-                        set.push(freg);
-                    }
-                    n -= 1;
-                }
-                set
+                // let mut set = Vec::new();
+                // let cnt: i32 = REG_COUNT;
+                // let mut n = cnt;
+                // while n > 0 {
+                //     let ireg = Reg::new(cnt - n, ScalarType::Int);
+                //     if ireg.is_caller_save() {
+                //         set.push(ireg);
+                //     }
+                //     let freg = Reg::new(cnt - n + FLOAT_BASE, ScalarType::Float);
+                //     if freg.is_caller_save() {
+                //         set.push(freg);
+                //     }
+                //     n -= 1;
+                // }
+                // set
+                vec![]
             }
             InstrsType::StoreToStack
             | InstrsType::StoreParamToStack
@@ -374,7 +372,7 @@ impl LIRInst {
 
             InstrsType::Ret(re_type) => match re_type {
                 ScalarType::Int => vec![Reg::new(10, ScalarType::Int)],
-                ScalarType::Float => vec![Reg::new(10, ScalarType::Float)],
+                ScalarType::Float => vec![Reg::new(10 + FLOAT_BASE, ScalarType::Float)],
                 ScalarType::Void => vec![],
             },
         }
@@ -417,20 +415,21 @@ impl LIRInst {
                 res
             }
             InstrsType::Call => {
-                let mut set = Vec::new();
-                let (iarg_cnt, farg_cnt) = self.param_cnt;
-                let mut ni = 0;
-                while ni < min(iarg_cnt, REG_COUNT) {
-                    // if
-                    set.push(Reg::new(ni, ScalarType::Int));
-                    ni += 1;
-                }
-                let mut nf = 0;
-                while nf < min(farg_cnt, REG_COUNT) {
-                    set.push(Reg::new(nf, ScalarType::Float));
-                    nf += 1;
-                }
-                set
+                // let mut set = Vec::new();
+                // let (iarg_cnt, farg_cnt) = self.param_cnt;
+                // let mut ni = 0;
+                // while ni < min(iarg_cnt, REG_COUNT) {
+                //     // if
+                //     set.push(Reg::new(ni + 10, ScalarType::Int));
+                //     ni += 1;
+                // }
+                // let mut nf = 0;
+                // while nf < min(farg_cnt, REG_COUNT) {
+                //     set.push(Reg::new(nf + FLOAT_BASE + 10, ScalarType::Float));
+                //     nf += 1;
+                // }
+                // set
+                vec![]
             }
             InstrsType::Ret(..) => {
                 vec![]
@@ -513,33 +512,4 @@ impl LIRInst {
             }
         }
     }
-
-    // LoadParamFromStack(include alloca):
-    // pub fn set_true_offset(&mut self, offset: i32) {
-    //     self.operands[1] = Operand::IImm(IImm::new(offset));
-    // }
-    // pub fn get_true_offset(&self) -> IImm {
-    //     match self.operands[1].clone() {
-    //         Operand::IImm(iimm) => iimm,
-    //         _ => unreachable!("only support imm sp offset"),
-    //     }
-    // }
-
-    // TODO: maybe todo
-    // for reg alloc
-    // fn replace_reg() {}  // todo: add regs() to get all regs the inst use
-
-    // for conditional branch
-
-    // fn replace_value() {}
-    // fn replace_def_value() {}
-    // fn replace_use_value() {}
 }
-
-//TODO: maybe
-// enum StackOp {
-//     ParamLoad,
-//     StackAddr,
-//     StackLoad,
-//     StackStore,
-// }

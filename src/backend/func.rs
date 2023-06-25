@@ -7,18 +7,19 @@ pub use std::io::Result;
 use std::io::Write;
 use std::vec::Vec;
 
-use super::instrs::{self, InstrsType};
+use super::instrs::InstrsType;
 use super::{structs::*, BackendPool};
 use crate::backend::asm_builder::AsmBuilder;
 use crate::backend::instrs::{LIRInst, Operand};
 use crate::backend::module::AsmModule;
 use crate::backend::operand::{Reg, ARG_REG_COUNT};
 use crate::backend::regalloc::regalloc;
-use crate::backend::{block::*, operand};
+use crate::backend::{block::*, operand, func};
 // use crate::backend::regalloc::simulate_assign;
 use crate::backend::regalloc::{
     easy_ls_alloc::Allocator, regalloc::Regalloc, structs::FuncAllocStat,
 };
+use crate::container::bitmap::Bitmap;
 use crate::ir::basicblock::BasicBlock;
 use crate::ir::function::Function;
 use crate::ir::instruction::Inst;
@@ -44,13 +45,13 @@ pub struct Func {
     pub context: ObjPtr<Context>,
 
     pub reg_alloc_info: FuncAllocStat,
-    pub spill_stack_map: HashMap<i32, StackSlot>,
+    pub spill_stack_map: HashMap<Reg, StackSlot>,
 
     pub const_array: HashSet<IntArray>,
-    pub floats: Vec<(String, f32)>,
+    pub float_array: HashSet<FloatArray>,
     //FIXME: resolve float regs
     pub callee_saved: HashSet<Reg>,
-    pub caller_saved: HashMap<i32, i32>,
+    pub caller_saved: HashMap<Reg, Reg>,
     pub max_params: i32,
 }
 
@@ -75,7 +76,7 @@ impl Func {
             reg_alloc_info: FuncAllocStat::new(),
             spill_stack_map: HashMap::new(),
             const_array: HashSet::new(),
-            floats: Vec::new(),
+            float_array: HashSet::new(),
             callee_saved: HashSet::new(),
             caller_saved: HashMap::new(),
             max_params: 0,
@@ -409,9 +410,15 @@ impl Func {
         // 函数返回地址保存在ra中
         self.calc_live();
         // let mut allocator = crate::backend::regalloc::easy_ls_alloc::Allocator::new();
-        let mut allocator = crate::backend::regalloc::easy_gc_alloc::Allocator::new();
+        // let mut allocator =crate::backend::regalloc::easy_gc_alloc::Allocator::new();
+        let mut allocator=crate::backend::regalloc::opt_gc_alloc::Allocator::new();
         // let mut allocator = crate::backend::regalloc::base_alloc::Allocator::new();
         let mut alloc_stat = allocator.alloc(self);
+
+        // 评价估计结果
+        log_file!("000_eval_alloc","func:{},alloc_cost:{}",self.label,regalloc::eval_alloc(self,& alloc_stat.dstr, &alloc_stat.spillings));
+
+
 
         log_file!(
             "calout.txt",
@@ -524,6 +531,7 @@ impl Func {
         self.stack_addr = func_ref.stack_addr.clone();
         self.spill_stack_map = func_ref.spill_stack_map.clone();
         self.const_array = func_ref.const_array.clone();
+        self.float_array = func_ref.float_array.clone();
         self.callee_saved = func_ref.callee_saved.clone();
         self.caller_saved = func_ref.caller_saved.clone();
         self.max_params = func_ref.max_params;
@@ -651,20 +659,26 @@ impl Func {
     }
 }
 
+impl Func {
+    pub fn print_func(&self) {
+        for block in self.blocks.iter() {
+            for inst in block.insts.iter() {
+                log!("{:?}", inst.as_ref());
+            }
+        }
+    }
+}
+
 impl GenerateAsm for Func {
     fn generate(&mut self, _: ObjPtr<Context>, f: &mut File) -> Result<()> {
-        if self.const_array.len() > 0 {
+        if self.const_array.len() > 0 || self.float_array.len() > 0 {
             writeln!(f, "	.data\n   .align  3")?;
         }
         for mut a in self.const_array.clone() {
             a.generate(self.context, f)?;
         }
-        if self.floats.len() > 0 {
-            // log!("generate float");
-            writeln!(f, "   .data")?;
-        }
-        for (name, data) in self.floats.clone() {
-            writeln!(f, "{name}:  .float  {data}")?;
+        for mut a in self.float_array.clone() {
+            a.generate(self.context, f)?;
         }
         AsmBuilder::new(f).show_func(&self.label)?;
         self.context.as_mut().call_prologue_event();
@@ -703,4 +717,30 @@ impl Func {
         self.blocks.iter().for_each(|bb| out += bb.insts.len());
         return out;
     }
+    // 获取指令数量
+    pub fn num_insts(&self)->usize {
+        let mut out = 0;
+        self.blocks.iter().for_each(|bb| out += bb.insts.len());
+        return out;
+    }
+
+    // 获取寄存器数量
+    pub fn num_regs(&self)->usize{
+        let mut passed:Bitmap=Bitmap::with_cap(1000);
+        let mut out = 0;
+        self.blocks.iter().for_each(|bb|{
+            bb.insts.iter().for_each(|inst|{
+                for reg in inst.get_reg_def() {
+                    let id=reg.get_id()<<1|match reg.get_type() {
+                        ScalarType::Float=>0,ScalarType::Int=>1,_=>panic!("unleagal")
+                    };
+                    if passed.contains(id as usize) {continue;}
+                    passed.insert(id as usize);
+                    out+=1;
+                }
+            })
+        });
+        return out;
+    }
+
 }

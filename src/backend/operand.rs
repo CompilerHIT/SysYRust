@@ -1,14 +1,14 @@
 use std::fmt::{format, Display};
-
-use crate::utility::ScalarType;
 use crate::log;
+use crate::utility::ScalarType;
+
+use super::block::FLOAT_BASE;
 pub const REG_COUNT: i32 = 32;
 pub const ARG_REG_COUNT: i32 = 8;
 pub const REG_SP: i32 = 2;
 pub const IMM_12_Bs: i32 = 2047;
 pub const IMM_20_Bs: i32 = 524287;
-pub static mut I_REG_ID: i32 = 32;
-pub static mut F_REG_ID: i32 = 32;
+pub static mut REG_ID: i32 = 32;
 
 #[derive(Clone, Copy, PartialEq, Hash, Eq, Debug)]
 pub struct Reg {
@@ -16,15 +16,13 @@ pub struct Reg {
     r_type: ScalarType,
 }
 
-impl  Display for Reg {
+impl Display for Reg {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let id=self.get_id();
-        if id>32 {return write!(f,"v{}",id);}
         match self.get_type() {
-            ScalarType::Float=> write!(f,"f{}",id),
-            ScalarType::Int=>write!(f,"i{}",id),
-            ScalarType::Void=>write!(f,"void{}",id),
-            _=>write!(f,"u{}",id),
+            ScalarType::Float => write!(f, "f{}", id),
+            ScalarType::Int => write!(f, "i{}", id),
+            ScalarType::Void => write!(f, "void{}", id),
         }
     }
 }
@@ -76,7 +74,7 @@ impl ToString for IImm {
 
 impl ToString for FImm {
     fn to_string(&self) -> String {
-        unsafe {format!("{:x}", *(&self.data as *const f32 as *const i32))}
+        unsafe { format!("{}", *(&self.data as *const f32 as *const i32)) }
     }
 }
 
@@ -84,23 +82,12 @@ impl Reg {
     pub fn new(id: i32, r_type: ScalarType) -> Self {
         Self { id, r_type }
     }
+
     pub fn init(r_type: ScalarType) -> Self {
-        match r_type {
-            ScalarType::Int => unsafe {
-                let mut id = I_REG_ID;
-                I_REG_ID += 1;
-                while id >= 0 && id <= 4 || id == 10 {
-                    id = I_REG_ID;
-                    I_REG_ID += 1;
-                }
-                Self { id, r_type }
-            },
-            ScalarType::Float => unsafe {
-                let id = F_REG_ID;
-                F_REG_ID += 1;
-                Self { id, r_type }
-            },
-            _ => panic!("Wrong Type"),
+        unsafe {
+            let id = REG_ID;
+            REG_ID += 1;
+            Self { id, r_type }
         }
     }
     pub fn to_string(&self, is_row: bool) -> String {
@@ -121,19 +108,21 @@ impl Reg {
                 28..=31 => format!("t{}", self.id - 25),
                 _ => {
                     // 使用虚拟寄存器
-                    format!("v{}",self.id)
+                    format!("v{}", self.id)
                     // log!("id: {}", self.id);
                     // panic!("Invalid Physic Integer Register Id")
                 }
             }
         } else {
-            match self.id {
-                0..=7 => format!("ft{}", self.id),
-                8..=9 => format!("fs{}", self.id),
-                10..=11 => format!("fa{}", self.id),
-                12..=17 => format!("fs{}", self.id - 10),
-                18..=27 => format!("fs{}", self.id - 16),
-                28..=31 => format!("ft{}", self.id - 20),
+            let id = self.id - FLOAT_BASE;
+            assert!(id >= 0);
+            match id {
+                0..=7 => format!("ft{}", id),
+                8..=9 => format!("fs{}", id),
+                10..=11 => format!("fa{}", id),
+                12..=17 => format!("fs{}", id - 10),
+                18..=27 => format!("fs{}", id - 16),
+                28..=31 => format!("ft{}", id - 20),
                 _ => panic!("Invalid Physic Float Register Id"),
             }
         }
@@ -155,9 +144,10 @@ impl Reg {
                     || (self.id >= 28 && self.id <= 31)
             }
             ScalarType::Float => {
-                (self.id >= 0 && self.id <= 7)
-                    || (self.id >= 10 && self.id <= 17)
-                    || (self.id >= 28 && self.id <= 31)
+                let id = self.id - FLOAT_BASE;
+                log!("id: {}", id);
+                assert!(id >= 0);
+                (id >= 0 && id <= 7) || (id >= 10 && id <= 17) || (id >= 28 && id <= 31)
             }
             _ => panic!("Wrong Type"),
         }
@@ -170,7 +160,11 @@ impl Reg {
             ScalarType::Int => {
                 self.id == 2 || self.id == 8 || self.id == 9 || (self.id >= 18 && self.id <= 27)
             }
-            ScalarType::Float => (self.id >= 8 && self.id <= 9) || (self.id >= 18 && self.id <= 27),
+            ScalarType::Float => {
+                let id = self.id - FLOAT_BASE;
+                assert!(id >= 0);
+                (id >= 8 && id <= 9) || (id >= 18 && id <= 27)
+            }
             _ => panic!("Wrong Type"),
         }
     }
@@ -209,5 +203,16 @@ impl Reg {
     pub fn get_type(&self) -> ScalarType {
         assert!(self.r_type != ScalarType::Void);
         self.r_type
+    }
+}
+
+
+impl Reg {
+    pub fn get_color(&self)->i32 {
+        match self.get_type() {
+            ScalarType::Float=>self.get_id()+32,
+            ScalarType::Int=>self.get_id(),
+            _=>panic!("gg"),
+        }
     }
 }

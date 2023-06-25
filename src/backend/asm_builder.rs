@@ -18,8 +18,6 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::io::Result;
 
-use super::block::NUM_SIZE;
-
 /// Assembly builder.
 pub struct AsmBuilder<'f> {
     f: &'f File,
@@ -37,23 +35,43 @@ impl<'f> AsmBuilder<'f> {
 
     pub fn op2(&mut self, op: &str, dest: &str, lhs: &str, rhs: &str, is_imm: bool, is_double: bool) -> Result<()> {
         //FIXME: mul使用w是否有超过32位的用例
-        if is_imm {
-            if op == "or" || op == "xor" || op == "and" || op == "slt" || is_double {
-                writeln!(self.f, "    {op}i {dest}, {lhs}, {rhs}")
-            } else {
-                writeln!(self.f, "    {op}iw {dest}, {lhs}, {rhs}")
-            }
-        } else {
-            if op == "or" || op == "xor" || op == "and" || op == "slt" || op == "mulhs" || is_double {
-                writeln!(self.f, "    {op} {dest}, {lhs}, {rhs}")
-            } else {
-                writeln!(self.f, "    {op}w {dest}, {lhs}, {rhs}")
+        match op {
+            "fne.s" => {
+                writeln!(self.f, "    feq.s {dest}, {lhs}, {rhs}")?;
+                writeln!(self.f, "    xori {dest}, 1")
+            },
+            "fgt.s" => {
+                writeln!(self.f, "    flt.s {dest}, {lhs}, {rhs}")?;
+                writeln!(self.f, "    xori {dest}, 1")
+            },
+            "fge.s" => {
+                writeln!(self.f, "    flt.s {dest}, {rhs}, {lhs}")?;
+                writeln!(self.f, "    xori {dest}, 1")
+            },
+            _ => {
+                if is_imm {
+                    if op == "or" || op == "xor" || op == "and" || op == "slt" || is_double {
+                        writeln!(self.f, "    {op}i {dest}, {lhs}, {rhs}")
+                    } else {
+                        writeln!(self.f, "    {op}iw {dest}, {lhs}, {rhs}")
+                    }
+                } else {
+                    if op == "or" || op == "xor" || op == "and" || op == "slt" || op == "mulhs" || is_double {
+                        writeln!(self.f, "    {op} {dest}, {lhs}, {rhs}")
+                    } else {
+                        writeln!(self.f, "    {op}w {dest}, {lhs}, {rhs}")
+                    }
+                }
             }
         }
     }
 
     pub fn op1(&mut self, op: &str, dest: &str, src: &str) -> Result<()> {
-        writeln!(self.f, "    {op} {dest}, {src}")
+        if op == "addiw" {
+            writeln!(self.f, "    addiw {dest}, zero, {src}")
+        } else {
+            writeln!(self.f, "    {op} {dest}, {src}")
+        }
     }
 
     pub fn addi(&mut self, dest: &str, opr: &str, imm: i32) -> Result<()> {
@@ -197,6 +215,19 @@ impl<'f> AsmBuilder<'f> {
     // }
 
     pub fn print_array(&mut self, array: &Vec<i32>, name: String, size: i32) -> Result<()> {
+        writeln!(self.f, "{name}:")?;
+        if array.len() == 0 {
+            for i in 0..size {
+                writeln!(self.f, "	.word	0")?;
+            }
+        }
+        for i in array {
+            writeln!(self.f, "	.word	{i}")?;
+        }
+        Ok(())
+    }
+
+    pub fn print_farray(&mut self, array: &Vec<f32>, name: String, size: i32) -> Result<()> {
         writeln!(self.f, "{name}:")?;
         if array.len() == 0 {
             for i in 0..size {
