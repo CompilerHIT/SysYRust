@@ -52,7 +52,7 @@ impl Allocator {
 
     // 判断两个虚拟寄存器是否是通用寄存器分配冲突
     // 建立虚拟寄存器之间的冲突图
-    fn build_interference_graph(&mut self, func: &Func) {
+    pub fn build_interference_graph(&mut self, func: &Func) {
         self.ends_index_bb=regalloc::ends_index_bb(func);
         let ends_index_bb=& self.ends_index_bb;
         self.interference_graph=regalloc::build_intereference(func,&ends_index_bb);
@@ -73,13 +73,13 @@ impl Allocator {
 
 
     // 对每个虚拟寄存器的spill代价估计
-    fn count_spill_costs(&mut self, func: &Func) {
+    pub fn count_spill_costs(&mut self, func: &Func) {
         self.costs_reg = regalloc::count_spill_cost(func);
         log_file!("reg_spill_costs.txt","{:?}",self.costs_reg);
     }
 
     // 寻找最小度寄存器进行着色,作色成功返回true,着色失败返回false
-    fn color(&mut self) -> bool {
+    pub fn color(&mut self) -> bool {
         // 开始着色,着色直到无法再找到可着色的点为止,如果全部点都可以着色,返回true,否则返回false
         let mut out = true;
         // 对通用虚拟寄存器进行着色 (已经着色的点不用着色)
@@ -104,7 +104,7 @@ impl Allocator {
     }
     
     // 简化成功返回true,简化失败返回falses
-    fn simplify(&mut self) -> bool {
+    pub fn simplify(&mut self) -> bool {
         // 简化方式
         // 处理产生冲突的寄存器
         // 方式,周围的寄存器变换颜色,直到该寄存器有不冲突颜色
@@ -132,7 +132,7 @@ impl Allocator {
 
 
     // 简化失败后执行溢出操作,选择一个节点进行溢出,然后对已经作色节点进行重新分配
-    fn spill(&mut self) {
+    pub fn spill(&mut self) {
         
         // 溢出寄存器之后更新节点周围节点颜色
         while !self.regs.is_empty() {
@@ -151,7 +151,7 @@ impl Allocator {
 
 
     // 返回分配结果
-    fn alloc_register(&mut self) -> (HashSet<i32>, HashMap<i32, i32>) {
+    pub fn alloc_register(&mut self) -> (HashSet<i32>, HashMap<i32, i32>) {
         let mut dstr: HashMap<i32, i32> = HashMap::new();
         // 返回分配结果,根据当前着色结果,
         for (vreg, color) in self.colors.iter() {
@@ -161,7 +161,7 @@ impl Allocator {
         (self.spillings.iter().cloned().collect(), dstr)
     }
 
-    fn color_one(&mut self,reg:Reg)->bool {
+    pub fn color_one(&mut self,reg:Reg)->bool {
         let (colors,availables,interference_graph)=
             (&mut self.colors,&mut self.availables,&self.interference_graph);
         if !reg.is_virtual() {panic!("try to color un virtual reg");}
@@ -185,7 +185,7 @@ impl Allocator {
     }
 
     // 移除一个节点的颜色
-    fn decolor_one(&mut self,reg:Reg)->bool {
+    pub fn decolor_one(&mut self,reg:Reg)->bool {
         if !reg.is_virtual() {panic!("try to color un virtual reg");}
         if self.spillings.contains(&reg.get_id()) {panic!("try to color spilling v reg");}
         let color=*self.colors.get(&reg.get_id()).unwrap();
@@ -206,7 +206,7 @@ impl Allocator {
     }
 
     // 返回最终spill的寄存器
-    fn spill_one(&mut self,reg:Reg){
+    pub fn spill_one(&mut self,reg:Reg){
         // 选择冲突寄存器或者是周围寄存器中的一个进行溢出,
         // 溢出的选择贪心: f=cost/degree.
         // 选择使得贪心函数最小的一个
@@ -245,7 +245,7 @@ impl Allocator {
         self.spillings.insert(tospill.get_id());
     }
 
-    fn simplify_one(&mut self,target_reg:&Reg)->bool{    
+    pub fn simplify_one(&mut self,target_reg:&Reg)->bool{    
         let (colors,interference_graph)=(&mut self.colors,&self.interference_graph);
         let mut out=false;
         // 遍历目标寄存器的周围寄存器
@@ -279,7 +279,7 @@ impl Allocator {
         out
     }
 
-    fn debug(kind:&'static str,regs:Vec<&Reg>){
+    pub fn debug(kind:&'static str,regs:Vec<&Reg>){
         let color_spill_path="color_spill.txt";
         match kind {
             "interef"=>log_file!(color_spill_path,"inter:{}",regs.get(0).unwrap()),

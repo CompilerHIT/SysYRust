@@ -14,7 +14,7 @@ use crate::backend::instrs::{LIRInst, Operand};
 use crate::backend::module::AsmModule;
 use crate::backend::operand::{Reg, ARG_REG_COUNT};
 use crate::backend::regalloc::regalloc;
-use crate::backend::{block::*, operand};
+use crate::backend::{block::*, operand, func};
 // use crate::backend::regalloc::simulate_assign;
 use crate::backend::regalloc::{
     easy_ls_alloc::Allocator, regalloc::Regalloc, structs::FuncAllocStat,
@@ -414,6 +414,11 @@ impl Func {
         let mut allocator=crate::backend::regalloc::opt_gc_alloc::Allocator::new();
         // let mut allocator = crate::backend::regalloc::base_alloc::Allocator::new();
         let mut alloc_stat = allocator.alloc(self);
+
+        // 评价估计结果
+        log_file!("000_eval_alloc","func:{},alloc_cost:{}",self.label,regalloc::eval_alloc(self,& alloc_stat.dstr, &alloc_stat.spillings));
+
+
 
         log_file!(
             "calout.txt",

@@ -114,6 +114,7 @@ pub fn build_intereference(
     ends_index_bb: &HashMap<(i32, ObjPtr<BB>), HashSet<Reg>>,
 ) -> HashMap<Reg, HashSet<Reg>> {
     let mut interference_graph: HashMap<Reg, HashSet<Reg>> = HashMap::new();
+    let tmp_set=HashSet::new();
     let process =
         |cur_bb: ObjPtr<BB>, interef_graph: &mut HashMap<Reg, HashSet<Reg>>, kind: ScalarType| {
             let mut livenow: HashSet<Reg> = HashSet::new();
@@ -136,10 +137,9 @@ pub fn build_intereference(
             });
             for (index, inst) in cur_bb.insts.iter().enumerate() {
                 // 先与reg use冲突,然后消去终结的,然后与reg def冲突,并加上新的reg def
-                if let Some(finishes) = ends_index_bb.get(&(index as i32, cur_bb)) {
-                    for finish in finishes {
-                        livenow.remove(finish);
-                    }
+                let finishes=ends_index_bb.get(&(index as i32,cur_bb)).unwrap_or(&tmp_set);
+                for finish in finishes {
+                    livenow.remove(finish);
                 }
                 for reg in inst.get_reg_def() {
                     if reg.get_type() != kind {
@@ -155,9 +155,10 @@ pub fn build_intereference(
                         interef_graph.get_mut(live).unwrap().insert(reg);
                         interef_graph.get_mut(&reg).unwrap().insert(*live);
                     }
+                    if finishes.contains(&reg) {continue;}      //fixme,修复增加这里的bug
                     livenow.insert(reg);
                 }
-            
+                
             }
         };
     // 遍历所有块，分析冲突关系
@@ -438,6 +439,7 @@ pub fn check_alloc(
 ) -> Vec<(i32, i32, i32, String)> {
     let mut out: Vec<(i32, i32, i32, String)> = Vec::new();
     let ends_index_bb = ends_index_bb(func);
+    let tmp_set=HashSet::new();
     let mut check_alloc_one =
         |reg: &Reg,
          index: i32,
@@ -489,8 +491,45 @@ pub fn check_alloc(
             .for_each(|reg| check_alloc_one(reg, -1, *bb, &mut reg_use_stat, &mut livenow));
         for (index, inst) in bb.insts.iter().enumerate() {
             // 先處理生命周期結束的寄存器
-            if let Some(end_regs) = ends_index_bb.get(&(index as i32, *bb)) {
-                for reg in end_regs {
+            let end_regs=ends_index_bb.get(&(index as i32, *bb)).unwrap_or(&tmp_set);
+            for reg in end_regs {
+                if spillings.contains(&reg.get_id()) {
+                    continue;
+                }
+                if !reg.is_virtual() {
+                    continue;
+                }
+                println!("{}", reg.get_id());
+                let color = dstr.get(&reg.get_id());
+                // if color.is_none() {return  out;}   //FIXME
+                let color = color.unwrap();
+                livenow.get_mut(color).unwrap().remove(&reg.get_id());
+                if livenow.get(color).unwrap().is_empty() {
+                    reg_use_stat.release_reg(*color);
+                }
+            }
+            // if let Some(end_regs) = ends_index_bb.get(&(index as i32, *bb)) {
+            //     for reg in end_regs {
+            //         if spillings.contains(&reg.get_id()) {
+            //             continue;
+            //         }
+            //         if !reg.is_virtual() {
+            //             continue;
+            //         }
+            //         println!("{}", reg.get_id());
+            //         let color = dstr.get(&reg.get_id());
+            //         // if color.is_none() {return  out;}   //FIXME
+            //         let color = color.unwrap();
+            //         livenow.get_mut(color).unwrap().remove(&reg.get_id());
+            //         if livenow.get(color).unwrap().is_empty() {
+            //             reg_use_stat.release_reg(*color);
+            //         }
+            //     }
+            // }
+
+            for reg in inst.get_reg_def() {
+                check_alloc_one(&reg, index as i32, *bb, &mut reg_use_stat, &mut livenow);
+                if end_regs.contains(&reg) {
                     if spillings.contains(&reg.get_id()) {
                         continue;
                     }
@@ -507,41 +546,16 @@ pub fn check_alloc(
                 }
             }
 
-            let mut end_def_regs=HashSet::new();
-            for reg in inst.get_reg_def() {
-                end_def_regs.insert(reg);
-                check_alloc_one(&reg, index as i32, *bb, &mut reg_use_stat, &mut livenow);
-            }
-
-            // 再处理结束的寄存器
-            // if let Some(end_regs) = ends_index_bb.get(&(index as i32, *bb)) {
-            //     for reg in end_regs {
-            //         if spillings.contains(&reg.get_id()) {
-            //             continue;
-            //         }
-            //         if !reg.is_virtual() {
-            //             continue;
-            //         }
-            //         if !end_def_regs.contains(reg) {continue;}
-            //         println!("{}", reg.get_id());
-            //         let color = dstr.get(&reg.get_id());
-            //         // if color.is_none() {return  out;}   //FIXME
-            //         let color = color.unwrap();
-            //         livenow.get_mut(color).unwrap().remove(&reg.get_id());
-            //         if livenow.get(color).unwrap().is_empty() {
-            //             reg_use_stat.release_reg(*color);
-            //         }
-            //     }
-            // }
+            
         }
     }
     out
 }
 
 // 对分配结果的评估
-pub fn eval_alloc(func: &Func, dstr: &mut HashMap<i32, i32>, spillings: &HashSet<i32>) {
+pub fn eval_alloc(func: &Func, dstr: & HashMap<i32, i32>, spillings: &HashSet<i32>)->i32{
     //
-    let mut cost = 0;
+    let mut cost:i32 = 0;
     let counts = count_spill_cost(func);
     counts.iter().for_each(|(reg, v)| {
         if reg.is_virtual() {
@@ -550,5 +564,5 @@ pub fn eval_alloc(func: &Func, dstr: &mut HashMap<i32, i32>, spillings: &HashSet
             }
         }
     });
-    cost;
+    cost
 }
