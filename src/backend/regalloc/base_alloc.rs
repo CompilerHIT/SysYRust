@@ -21,16 +21,6 @@ impl RegUsedStat {
         }
     }
 
-    pub fn get_color(reg:&Reg)->i32 {
-        if reg.get_id()>=32 {panic!("get color from virtual reg!")}
-        match reg.get_type() {
-            ScalarType::Float=>reg.get_id()+32,
-            ScalarType::Int=>reg.get_id(),
-            _=>panic!("tocolor:unlegal type reg")
-        }
-    }
-
-    
 
     pub fn is_available_ireg(&self, ireg: i32) -> bool {
         let mut unusable:HashSet<i32>= HashSet::from([0]); //保存x0

@@ -163,7 +163,7 @@ impl Allocator {
 
     fn color_one(&mut self,reg:Reg)->bool {
         let (colors,availables,interference_graph)=
-            (&mut self.colors,&mut self.availables,&mut self.interference_graph);
+            (&mut self.colors,&mut self.availables,&self.interference_graph);
         if !reg.is_virtual() {panic!("try to color un virtual reg");}
         if self.spillings.contains(&reg.get_id()) {panic!("try to color spilling v reg");}
         let available = availables.get(&reg).unwrap();
@@ -212,7 +212,7 @@ impl Allocator {
         // 选择使得贪心函数最小的一个
         let spillings=&mut self.spillings;
         let colors=&mut self.colors;
-        let interference_graph=&mut self.interference_graph;
+        let interference_graph=&self.interference_graph;
         let cost =|reg: &Reg| {
             return *self.costs_reg.get(reg).unwrap() as f32
                 /interference_graph.get(reg).unwrap_or(&HashSet::new()).len() as f32;
@@ -246,7 +246,7 @@ impl Allocator {
     }
 
     fn simplify_one(&mut self,target_reg:&Reg)->bool{    
-        let (colors,interference_graph)=(&mut self.colors,&mut self.interference_graph);
+        let (colors,interference_graph)=(&mut self.colors,&self.interference_graph);
         let mut out=false;
         // 遍历目标寄存器的周围寄存器
         let neighbors = interference_graph.get(&target_reg).unwrap();

@@ -322,8 +322,7 @@ pub fn merge_alloc(
                 continue;
             }
             //不处理两个spilling的寄存器合并且 // 不处理两个相同颜色的寄存器合并
-            if (dst_reg.is_virtual() && spillings.contains(&dst_reg.get_id()))
-                && (src_reg.is_virtual() && spillings.contains(&src_reg.get_id()))
+            if dst_reg.is_virtual() && src_reg.is_virtual()
             {   
                 if spillings.contains(&dst_reg.get_id())&&spillings.contains(&src_reg.get_id()) 
                 {
@@ -334,12 +333,83 @@ pub fn merge_alloc(
                     // 不处理同色寄存器合并
                     continue;
                 }
-                println!("{}", src_reg.get_id());
-                let src_available = nexttos.get_mut(&src_reg.get_id()).unwrap();
-                if src_available.contains_key(&dst_reg.get_id())
-                    && *src_available.get(&dst_reg.get_id()).unwrap() == 1
-                {
-                    dstr.insert(src_reg.get_id(), *dstr.get(&dst_reg.get_id()).unwrap());
+            }
+            
+            // TODO ,fix bug
+
+
+            if interference_graph.get(&dst_reg).unwrap_or(&tmp_set).contains(&src_reg) {
+                continue;
+            }
+
+            let available_src=availables.get(&src_reg).unwrap();
+            let available_dst=availables.get(&dst_reg).unwrap();
+            let mut tomerge:Option<Reg>=None;
+            let mut merge_color:Option<i32>=None;
+
+            if dst_reg.is_physic() {
+                if available_src.is_available_reg(dst_reg.get_color()) {
+                    if spillings.contains(&src_reg.get_id()) {
+                        tomerge=Some(src_reg);
+                        merge_color=Some(dst_reg.get_color());
+                    }else{  
+                        // TODO,分析这里的情况是否需要合并
+                    }
+                }
+            }else if src_reg.is_physic(){
+                if available_dst.is_available_reg(src_reg.get_color()) {
+                    if spillings.contains(&dst_reg.get_id()) {
+                        tomerge=Some(dst_reg);
+                        merge_color=Some(src_reg.get_color());
+                    }else{  
+                        // TODO,分析这里的情况是否需要合并
+                    }
+                }
+            }else {
+                // 必然其中一个有颜色或者两个有颜色
+                let num_inter_dst=interference_graph.get(&dst_reg).unwrap_or(&tmp_set).len();
+                let num_inter_src=interference_graph.get(&src_reg).unwrap_or(&tmp_set).len();
+                let mut base_inter:usize=0;
+                if dstr.contains_key(&src_reg.get_id())&&available_dst.is_available_reg(*dstr.get(&src_reg.get_id()).unwrap()) {
+                    if num_inter_dst>base_inter {
+                        base_inter=num_inter_dst;
+                        tomerge=Some(dst_reg);
+                        merge_color=Some(*dstr.get(&src_reg.get_id()).unwrap());
+                    }
+                }
+                if dstr.contains_key(&dst_reg.get_id())&& available_src.is_available_reg(*dstr.get(&dst_reg.get_id()).unwrap()){
+                    if num_inter_src>base_inter {
+                        tomerge=Some(src_reg);
+                        merge_color=Some(*dstr.get(&dst_reg.get_id()).unwrap());
+                    }
+                }
+
+            }
+            
+            // TODO,选择好合并对象之后进行合并
+            if let Some(reg)=tomerge {
+                spillings.remove(&reg.get_id());
+                log_file!("color_spill.txt","inst:{:?},src:{},dst:{}",inst.get_type(),src_reg,dst_reg);
+                log_file!("color_spill.txt","availables:\nsrc:{}\ndst{}",available_src,available_dst);
+                log_file!("color_spill.txt","merge:{}({}) index:{},bb:{}",reg,merge_color.unwrap(),index,bb.label.clone());
+                let merge_color=merge_color.unwrap();
+                let neighbors=interference_graph.get(&reg).unwrap();
+                if dstr.contains_key(&reg.get_id()) {
+                    let old_color=dstr.get(&reg.get_id()).unwrap();
+                    for neighbor in neighbors {
+                        let nums_neighbor_color=nums_neighbor_color.get_mut(neighbor).unwrap();
+                        let new_num=nums_neighbor_color.get(old_color).unwrap_or(&1)-1;
+                        nums_neighbor_color.insert(*old_color,new_num);
+                        if new_num==0 {
+                            availables.get_mut(neighbor).unwrap().release_reg(*old_color);
+                        }
+                    }
+                }
+                dstr.insert(reg.get_id(), merge_color);
+                for neighbor in neighbors {
+                    let nums_neighbor_color=nums_neighbor_color.get_mut(neighbor).unwrap();
+                    nums_neighbor_color.insert(merge_color,nums_neighbor_color.get(&merge_color).unwrap_or(&0)+1);
+                    availables.get_mut(neighbor).unwrap().use_reg(merge_color);
                 }
             }
         
@@ -444,25 +514,25 @@ pub fn check_alloc(
             }
 
             // 再处理结束的寄存器
-            if let Some(end_regs) = ends_index_bb.get(&(index as i32, *bb)) {
-                for reg in end_regs {
-                    if spillings.contains(&reg.get_id()) {
-                        continue;
-                    }
-                    if !reg.is_virtual() {
-                        continue;
-                    }
-                    if !end_def_regs.contains(reg) {continue;}
-                    println!("{}", reg.get_id());
-                    let color = dstr.get(&reg.get_id());
-                    // if color.is_none() {return  out;}   //FIXME
-                    let color = color.unwrap();
-                    livenow.get_mut(color).unwrap().remove(&reg.get_id());
-                    if livenow.get(color).unwrap().is_empty() {
-                        reg_use_stat.release_reg(*color);
-                    }
-                }
-            }
+            // if let Some(end_regs) = ends_index_bb.get(&(index as i32, *bb)) {
+            //     for reg in end_regs {
+            //         if spillings.contains(&reg.get_id()) {
+            //             continue;
+            //         }
+            //         if !reg.is_virtual() {
+            //             continue;
+            //         }
+            //         if !end_def_regs.contains(reg) {continue;}
+            //         println!("{}", reg.get_id());
+            //         let color = dstr.get(&reg.get_id());
+            //         // if color.is_none() {return  out;}   //FIXME
+            //         let color = color.unwrap();
+            //         livenow.get_mut(color).unwrap().remove(&reg.get_id());
+            //         if livenow.get(color).unwrap().is_empty() {
+            //             reg_use_stat.release_reg(*color);
+            //         }
+            //     }
+            // }
         }
     }
     out
@@ -475,7 +545,9 @@ pub fn eval_alloc(func: &Func, dstr: &mut HashMap<i32, i32>, spillings: &HashSet
     let counts = count_spill_cost(func);
     counts.iter().for_each(|(reg, v)| {
         if reg.is_virtual() {
-            cost += v
+            if spillings.contains(&reg.get_id()) {
+                cost+=v;
+            }
         }
     });
     cost;

@@ -19,7 +19,6 @@ pub struct Reg {
 impl Display for Reg {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let id=self.get_id();
-        if id>=32 {return write!(f,"v{}",id);}
         match self.get_type() {
             ScalarType::Float => write!(f, "f{}", id),
             ScalarType::Int => write!(f, "i{}", id),

@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::collections::HashSet;
+use std::fmt::Display;
 use std::ops::Range;
 
 use crate::backend::block::BB;
@@ -12,6 +13,7 @@ pub struct RegUsedStat {
     iregs_used: u32,
     fregs_used: u32,
 }
+
 
 // 对于regusedstat来说，通用寄存器映射到0-31，浮点寄存器映射到32-63
 impl RegUsedStat {
@@ -50,7 +52,7 @@ impl RegUsedStat {
     }
     pub fn is_available_freg(&self, freg: i32) -> bool {
         let freg=freg-32;
-        let mut unusable=HashSet::from([18, 19, 20]);
+        let mut unusable:HashSet<i32>=HashSet::from([]);
         if unusable.contains(&freg) {return  false;}
         if (1 << freg & self.fregs_used) == 0 {
             return true;
@@ -109,7 +111,7 @@ impl RegUsedStat {
     // 获取剩余的可用通用寄存器
     pub fn get_rest_iregs(&self)->Vec<i32>{
         let mut out=Vec::new();
-        for i in 1..=31 {
+        for i in 0..=31 {
             if self.is_available_ireg(i){
                 out.push(i);
             }
@@ -164,6 +166,13 @@ impl RegUsedStat {
     }
 }
 
+impl Display for RegUsedStat {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f,"i:{:?},f:{:?}",self.get_rest_iregs(),self.get_rest_fregs())
+    }
+}
+
+
 #[derive(Clone)]
 pub struct FuncAllocStat {
     pub stack_size: usize,
@@ -214,6 +223,9 @@ mod test_regusestat{
     fn test_num(){
         // TODO
         let a=RegUsedStat::new();
-        assert_eq!(a.num_available_fregs(),31);
+        assert_eq!(a.num_available_fregs(),32);
+        assert_eq!(a.num_avialable_iregs(),23);   //保留t0-t2三个临时寄存器,sp,a0,tp,x0,gp五个个特殊寄存器,保留a0用作返回值
+        assert_eq!(a.num_available_regs(crate::utility::ScalarType::Float),32);
+        assert_eq!(a.num_available_regs(crate::utility::ScalarType::Int),23);
     }
 }
