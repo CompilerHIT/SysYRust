@@ -1,2 +1,2 @@
 ./mcl.sh
-cargo run a.sy -S -o a.s
+nohup time cargo run a.sy -S -o a.s &

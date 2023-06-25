@@ -67,44 +67,44 @@ pub fn countStackSize(
     (spillings.len() * 8, bb_stack_sizes)
 }
 
-// 计算某个寄存器spill可能造成的冲突代价
+// 估计某个寄存器spill可能造成的冲突代价
 // 它作为某个指令的def的时候冲突代价为2
 // 作为某个指令的def以及use的时候冲突代价为2
 // 只作为某个指令的use的时候冲突代价为1
-pub fn count_spill_cost(func: &Func) -> HashMap<Reg, i32> {
-    let mut out: HashMap<Reg, i32> = HashMap::new();
+pub fn estimate_spill_cost(func: &Func) -> HashMap<Reg, f32> {
+    let mut out: HashMap<Reg, f32> = HashMap::new();
+    // 选择一个合适的参数
+    let (use_coe,def_coe,def_use_coe):(f32,f32,f32)=(1.0,1.0,1.0);
+    let (use_cost,def_cost,def_use_cost)=(use_coe*3.0,def_coe*3.0,def_use_coe*4.0);
     //
     for bb in func.blocks.iter() {
+        let mut has_defined:HashSet<Reg>=HashSet::new();
         for inst in bb.insts.iter() {
-            let dst_reg = match inst.get_reg_def().get(0) {
-                Some(reg) => Some(*reg),
-                None => None,
-            };
             // FIXME,使用跟精确的统计方法，针对具体指令类型
-            let mut is_use = false;
+            let mut in_use:HashSet<Reg>=HashSet::new();
+            let mut in_def:HashSet<Reg>=HashSet::new();
+            let mut regs:HashSet<Reg>=HashSet::with_capacity(3);
             for reg in inst.get_reg_use() {
-                if !reg.is_virtual() {
-                    continue;
-                }
-                if let Some(treg) = dst_reg {
-                    if treg == reg {
-                        is_use = true
-                    }
-                }
-                out.insert(reg, out.get(&reg).unwrap_or(&0) + 1);
+                in_use.insert(reg);
+                regs.insert(reg);
             }
             for reg in inst.get_reg_def() {
-                if !reg.is_virtual() {
-                    continue;
-                }
-                if is_use {
-                    out.insert(reg, out.get(&reg).unwrap_or(&0) + 1);
-                } else {
-                    out.insert(reg, out.get(&reg).unwrap_or(&0) + 2);
+                in_def.insert(reg);
+                regs.insert(reg);
+            }
+            for reg in regs {
+                if in_use.contains(&reg)&&in_def.contains(&reg) {
+                    out.insert(reg, out.get(&reg).unwrap_or(&0.0)+def_use_cost);
+                }else if in_use.contains(&reg){
+                    out.insert(reg, out.get(&reg).unwrap_or(&0.0)+use_cost);
+                }else{
+                    out.insert(reg, out.get(&reg).unwrap_or(&0.0)+def_cost);
                 }
             }
+
         }
     }
+    
     out
 }
 
@@ -292,10 +292,11 @@ pub fn merge_alloc(
     nums_neighbor_color: &mut HashMap<Reg, HashMap<i32, i32>>,
     availables: &mut HashMap<Reg, RegUsedStat>,
     interference_graph: &HashMap<Reg, HashSet<Reg>>,
-) {
+)->bool {
     // 合并条件,如果一个mv x55 x66指令， 后面 x66指令不再使用了,
     // 则x55(color1),x66(color2)可以进行合并，
-    let merge = |bb: ObjPtr<BB>,
+    let mut if_merge=false;
+    let mut merge = |bb: ObjPtr<BB>,
                  dstr: &mut HashMap<i32, i32>,
                  spillings: &mut HashSet<i32>,
                  ends_index_bb: &HashMap<(i32, ObjPtr<BB>), HashSet<Reg>>,
@@ -314,8 +315,10 @@ pub fn merge_alloc(
             }
             // 不处理特殊寄存器的合并
             if dst_reg.is_special() || src_reg.is_special() {
+                // TODO,处理特殊寄存器的合并
                 continue;
             }
+
             let tmp_set=HashSet::with_capacity(0);
             //不处理物理寄存器的寄存器合并
             if dst_reg.is_physic() && src_reg.is_physic() {
@@ -336,8 +339,6 @@ pub fn merge_alloc(
                 }
             }
             
-            // TODO ,fix bug
-
 
             if interference_graph.get(&dst_reg).unwrap_or(&tmp_set).contains(&src_reg) {
                 continue;
@@ -389,10 +390,11 @@ pub fn merge_alloc(
             
             // TODO,选择好合并对象之后进行合并
             if let Some(reg)=tomerge {
+                if_merge=true;
                 spillings.remove(&reg.get_id());
-                log_file!("color_spill.txt","inst:{:?},src:{},dst:{}",inst.get_type(),src_reg,dst_reg);
-                log_file!("color_spill.txt","availables:\nsrc:{}\ndst{}",available_src,available_dst);
-                log_file!("color_spill.txt","merge:{}({}) index:{},bb:{}",reg,merge_color.unwrap(),index,bb.label.clone());
+                // log_file!("color_spill.txt","inst:{:?},src:{},dst:{}",inst.get_type(),src_reg,dst_reg);
+                // log_file!("color_spill.txt","availables:\nsrc:{}\ndst{}",available_src,available_dst);
+                // log_file!("color_spill.txt","merge:{}({}) index:{},bb:{}",reg,merge_color.unwrap(),index,bb.label.clone());
                 let merge_color=merge_color.unwrap();
                 let neighbors=interference_graph.get(&reg).unwrap();
                 if dstr.contains_key(&reg.get_id()) {
@@ -428,7 +430,11 @@ pub fn merge_alloc(
             interference_graph,
         );
     }
+    if_merge
 }
+
+// 分配spilling
+
 
 // 通用寄存器分配结果检查,判断是否仍然存在冲突情况,若存在,返回冲突的寄存器集合以及所在的指令编号，块标识符)
 // (old_reg,cur_reg,inst index,block label)
@@ -457,7 +463,7 @@ pub fn check_alloc(
                 }
                 return;
             }
-            println!("g?{}", reg.get_id());
+            // println!("g?{}", reg.get_id());
             let color = dstr.get(&reg.get_id());
             // fix me
             // if color.is_none() {
@@ -499,7 +505,7 @@ pub fn check_alloc(
                 if !reg.is_virtual() {
                     continue;
                 }
-                println!("{}", reg.get_id());
+                // println!("{}", reg.get_id());
                 let color = dstr.get(&reg.get_id());
                 // if color.is_none() {return  out;}   //FIXME
                 let color = color.unwrap();
@@ -508,25 +514,7 @@ pub fn check_alloc(
                     reg_use_stat.release_reg(*color);
                 }
             }
-            // if let Some(end_regs) = ends_index_bb.get(&(index as i32, *bb)) {
-            //     for reg in end_regs {
-            //         if spillings.contains(&reg.get_id()) {
-            //             continue;
-            //         }
-            //         if !reg.is_virtual() {
-            //             continue;
-            //         }
-            //         println!("{}", reg.get_id());
-            //         let color = dstr.get(&reg.get_id());
-            //         // if color.is_none() {return  out;}   //FIXME
-            //         let color = color.unwrap();
-            //         livenow.get_mut(color).unwrap().remove(&reg.get_id());
-            //         if livenow.get(color).unwrap().is_empty() {
-            //             reg_use_stat.release_reg(*color);
-            //         }
-            //     }
-            // }
-
+            
             for reg in inst.get_reg_def() {
                 check_alloc_one(&reg, index as i32, *bb, &mut reg_use_stat, &mut livenow);
                 if end_regs.contains(&reg) {
@@ -546,23 +534,28 @@ pub fn check_alloc(
                 }
             }
 
-            
         }
     }
     out
 }
 
+
+
 // 对分配结果的评估
 pub fn eval_alloc(func: &Func, dstr: & HashMap<i32, i32>, spillings: &HashSet<i32>)->i32{
     //
     let mut cost:i32 = 0;
-    let counts = count_spill_cost(func);
+    let mut fcost:f32=0.0;
+    // TODO
+    let counts = estimate_spill_cost(func);
     counts.iter().for_each(|(reg, v)| {
         if reg.is_virtual() {
             if spillings.contains(&reg.get_id()) {
-                cost+=v;
+                fcost+=v;
+                // cost+=v;
             }
         }
     });
+    cost=fcost as i32;
     cost
 }

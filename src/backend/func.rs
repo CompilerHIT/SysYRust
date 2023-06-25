@@ -410,13 +410,13 @@ impl Func {
         // 函数返回地址保存在ra中
         self.calc_live();
         // let mut allocator = crate::backend::regalloc::easy_ls_alloc::Allocator::new();
-        // let mut allocator =crate::backend::regalloc::easy_gc_alloc::Allocator::new();
-        let mut allocator=crate::backend::regalloc::opt_gc_alloc::Allocator::new();
+        let mut allocator =crate::backend::regalloc::easy_gc_alloc::Allocator::new();
+        // let mut allocator=crate::backend::regalloc::opt_gc_alloc::Allocator::new();
         // let mut allocator = crate::backend::regalloc::base_alloc::Allocator::new();
         let mut alloc_stat = allocator.alloc(self);
 
         // 评价估计结果
-        log_file!("000_eval_alloc","func:{},alloc_cost:{}",self.label,regalloc::eval_alloc(self,& alloc_stat.dstr, &alloc_stat.spillings));
+        log_file!("000_eval_alloc.txt","func:{},alloc_cost:{}",self.label,regalloc::eval_alloc(self,& alloc_stat.dstr, &alloc_stat.spillings));
 
 
 

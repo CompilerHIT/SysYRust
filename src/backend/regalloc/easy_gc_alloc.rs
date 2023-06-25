@@ -24,7 +24,7 @@ use super::{
 pub struct Allocator {
     pub regs: LinkedList<Reg>,                   //所有虚拟寄存器的列表
     pub colors: HashMap<i32, i32>,                // 保存着色结果
-    pub costs_reg: HashMap<Reg, i32>,              //记录虚拟寄存器的使用次数(作为代价)
+    pub costs_reg: HashMap<Reg, f32>,              //记录虚拟寄存器的使用次数(作为代价)
     pub availables: HashMap<Reg, RegUsedStat>, // 保存每个点的可用寄存器集合
     pub nums_neighbor_color:HashMap<Reg,HashMap<i32,i32>>,
     pub ends_index_bb:HashMap<(i32,ObjPtr<BB>),HashSet<Reg>>,
@@ -74,8 +74,15 @@ impl Allocator {
 
     // 对每个虚拟寄存器的spill代价估计
     pub fn count_spill_costs(&mut self, func: &Func) {
-        self.costs_reg = regalloc::count_spill_cost(func);
-        log_file!("reg_spill_costs.txt","{:?}",self.costs_reg);
+        self.costs_reg = regalloc::estimate_spill_cost(func);
+        let path="reg_spill_costs.txt";
+        log_file!(path,"func:{}",func.label);
+        let mut i=0;
+        let reline=20;
+        self.costs_reg.iter().for_each(|(reg,cost)|{
+            if i%reline==19 {log_file!(path,"");}
+            log_file_uln!(path,"{}:{},",reg,cost);
+        });
     }
 
     // 寻找最小度寄存器进行着色,作色成功返回true,着色失败返回false
@@ -205,7 +212,7 @@ impl Allocator {
         true
     }
 
-    // 返回最终spill的寄存器
+    // 
     pub fn spill_one(&mut self,reg:Reg){
         // 选择冲突寄存器或者是周围寄存器中的一个进行溢出,
         // 溢出的选择贪心: f=cost/degree.
@@ -214,7 +221,7 @@ impl Allocator {
         let colors=&mut self.colors;
         let interference_graph=&self.interference_graph;
         let cost =|reg: &Reg| {
-            return *self.costs_reg.get(reg).unwrap() as f32
+            return *self.costs_reg.get(reg).unwrap() 
                 /interference_graph.get(reg).unwrap_or(&HashSet::new()).len() as f32;
         };
         let mut tospill:Reg = reg;
@@ -278,6 +285,7 @@ impl Allocator {
         }
         out
     }
+
 
     pub fn debug(kind:&'static str,regs:Vec<&Reg>){
         let color_spill_path="color_spill.txt";

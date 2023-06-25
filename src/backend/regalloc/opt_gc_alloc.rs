@@ -21,6 +21,15 @@ impl Allocator {
     pub fn new()->Allocator {
         Allocator { easy_gc_allocator: easy_gc_alloc::Allocator::new() }
     }
+    
+    pub fn opt_spill_one() {
+
+    }
+
+    pub fn opt_simplify_one(){
+        
+    }
+
 }
 impl Regalloc for Allocator {
     fn alloc(&mut self, func: &crate::backend::instrs::Func) -> FuncAllocStat {
@@ -30,10 +39,21 @@ impl Regalloc for Allocator {
         log_file!(path,"func:{}\ndstr:{:?}\n\nspillings:{:?}",func.label,out.dstr,out.spillings);
 
         // 寄存器合并
-        regalloc::merge_alloc(func, &mut out.dstr, &mut out.spillings, 
-            & self.easy_gc_allocator.ends_index_bb, &mut self.easy_gc_allocator.nums_neighbor_color, &mut self.easy_gc_allocator.availables, &mut self.easy_gc_allocator.interference_graph);
+        let max_times=1000;
+        for i in 0..max_times {
+            let ok=regalloc::merge_alloc(func, &mut out.dstr, &mut out.spillings, 
+                & self.easy_gc_allocator.ends_index_bb, &mut self.easy_gc_allocator.nums_neighbor_color, &mut self.easy_gc_allocator.availables, &mut self.easy_gc_allocator.interference_graph);
+            if !ok {
+                log_file!("merge_times.txt","func:{},merge times:{}",func.label,i+1);
+                break;
+            }
+            if i==max_times-1 {
+                log_file!("merge_times.txt","unend!func:{},merge times:{}",func.label,i+1);
+            }
+        }
+        // regalloc::merge_alloc(func, &mut out.dstr, &mut out.spillings, 
+        //     & self.easy_gc_allocator.ends_index_bb, &mut self.easy_gc_allocator.nums_neighbor_color, &mut self.easy_gc_allocator.availables, &mut self.easy_gc_allocator.interference_graph);
 
-        
         out
     }
 }
