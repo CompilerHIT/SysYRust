@@ -2446,7 +2446,7 @@ impl Process for Number {
 
                 match input {
                     Type::ConstInt | Type::Int => {
-                        unreachable!("这里有问题,但是不可能到这");
+                        // unreachable!("这里有问题,但是不可能到这");
                         let f = *f as i32;
                         if let Some(inst) = kit_mut.context_mut.get_const_int(f) {
                             // // println!("找到：{:?}", f);
