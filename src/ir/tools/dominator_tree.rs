@@ -39,15 +39,15 @@ pub fn calculate_dominator(head_bb: ObjPtr<BasicBlock>) -> DominatorTree {
         all_set.insert(bb);
     });
     all_set.iter().for_each(|bb| {
-        dominatee.insert(bb.clone(), HashSet::new());
+        dominatee.insert(bb.clone(), all_set.clone());
     });
-    dominatee.insert(head_bb.clone(), [head_bb.clone()].iter().cloned().collect());
+    dominatee.insert(head_bb.clone(), vec![head_bb].iter().cloned().collect());
 
     loop {
         let mut changed = false;
         bfs_bb_proceess(head_bb, |bb| {
             if !bb.is_entry() {
-                let mut new_dominatee = dominatee.get(&bb.get_up_bb()[0]).unwrap().clone();
+                let mut new_dominatee = dominatee.get(&bb.get_up_bb()[0]).cloned().unwrap();
                 bb.get_up_bb().iter().for_each(|bb| {
                     new_dominatee = new_dominatee
                         .intersection(dominatee.get(bb).unwrap())
@@ -67,27 +67,9 @@ pub fn calculate_dominator(head_bb: ObjPtr<BasicBlock>) -> DominatorTree {
         }
     }
 
-    DominatorTree::new(dominatee)
-}
-
-#[test]
-fn dominator_test() {
-    let mut bb_v = Vec::new();
-    for i in 0..=7 {
-        let bb = BasicBlock::new(i.to_string());
-        bb_v.push(ObjPtr::new(&bb));
+    for (k, v) in dominatee.iter_mut() {
+        v.remove(k);
     }
 
-    bb_v[0].add_next_bb(bb_v[1].clone());
-    bb_v[0].add_next_bb(bb_v[2].clone());
-    bb_v[1].add_next_bb(bb_v[3].clone());
-    bb_v[2].add_next_bb(bb_v[1].clone());
-    bb_v[2].add_next_bb(bb_v[4].clone());
-    bb_v[3].add_next_bb(bb_v[2].clone());
-    bb_v[3].add_next_bb(bb_v[5].clone());
-    bb_v[4].add_next_bb(bb_v[6].clone());
-    bb_v[5].add_next_bb(bb_v[6].clone());
-
-    let dom_tree = calculate_dominator(bb_v[0].clone());
-    crate::log!("dom tree: {:?}", dom_tree);
+    DominatorTree::new(dominatee)
 }
