@@ -5,7 +5,6 @@ use crate::utility::ObjPool;
 
 mod dead_code_eliminate;
 mod func_inline;
-mod gvn_pre;
 mod phi_optimizer;
 mod simplify_cfg;
 
