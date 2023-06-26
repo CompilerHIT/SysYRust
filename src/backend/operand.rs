@@ -145,7 +145,6 @@ impl Reg {
             }
             ScalarType::Float => {
                 let id = self.id - FLOAT_BASE;
-                log!("id: {}", id);
                 assert!(id >= 0);
                 (id >= 0 && id <= 7) || (id >= 10 && id <= 17) || (id >= 28 && id <= 31)
             }
@@ -184,7 +183,7 @@ impl Reg {
 
     // if virtual reg
     pub fn is_virtual(&self) -> bool {
-        self.id > 31
+        self.id > 63
     }
 
     // if physic reg

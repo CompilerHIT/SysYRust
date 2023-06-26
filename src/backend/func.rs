@@ -422,9 +422,9 @@ impl Func {
             }
         }
         // let mut allocator = crate::backend::regalloc::easy_ls_alloc::Allocator::new();
-        let mut allocator = crate::backend::regalloc::easy_gc_alloc::Allocator::new();
+        // let mut allocator = crate::backend::regalloc::easy_gc_alloc::Allocator::new();
         // let mut allocator=crate::backend::regalloc::opt_gc_alloc::Allocator::new();
-        // let mut allocator = crate::backend::regalloc::base_alloc::Allocator::new();
+        let mut allocator = crate::backend::regalloc::base_alloc::Allocator::new();
         let mut alloc_stat = allocator.alloc(self);
 
         // 评价估计结果
