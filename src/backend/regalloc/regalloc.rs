@@ -1,4 +1,5 @@
 use std::collections::{HashMap, HashSet, VecDeque};
+use std::path::Iter;
 
 use crate::backend::func::Func;
 use crate::backend::instrs::{InstrsType, BB};
@@ -252,6 +253,77 @@ pub fn build_availables(
     return availables;
 }
 
+pub fn build_nums_neighbor_color(
+    func: &Func,
+    ends_index_bb: &HashMap<(i32, ObjPtr<BB>), HashSet<Reg>>,
+) -> HashMap<Reg, HashMap<i32, i32>> {
+    let mut nums_neighbor_color = HashMap::new();
+    let process_one = |livenow: &HashSet<Reg>,
+                       nums_neighbor_color: &mut HashMap<Reg, HashMap<i32, i32>>,
+                       reg: Reg,
+                       kind: ScalarType| {
+        if reg.get_type() != kind {
+            return;
+        }
+        if reg.is_physic() {
+            // 跟live now内部有冲突
+            let color = reg.get_color();
+            for live in livenow.iter() {
+                let nnc = nums_neighbor_color.get_mut(live).unwrap();
+                nnc.insert(color, nnc.get(&color).unwrap_or(&0) + 1);
+            }
+        }
+        if !nums_neighbor_color.contains_key(&reg) {
+            nums_neighbor_color.insert(reg, HashMap::with_capacity(32));
+        }
+        let nnc = nums_neighbor_color.get_mut(&reg).unwrap();
+        for live in livenow.iter() {
+            if live.is_physic() {
+                let live_color = live.get_color();
+                nnc.insert(live_color, nnc.get(&live_color).unwrap_or(&0) + 1);
+            }
+        }
+    };
+
+    let process = |cur_bb: ObjPtr<BB>,
+                   nums_neighbor_color: &mut HashMap<Reg, HashMap<i32, i32>>,
+                   kind: ScalarType| {
+        let mut livenow: HashSet<Reg> = HashSet::new();
+        let tmp_set = HashSet::new();
+        // 冲突分析
+        cur_bb
+            .live_in
+            .iter()
+            .for_each(|reg| process_one(&mut livenow, nums_neighbor_color, *reg, kind));
+        for (index, inst) in cur_bb.insts.iter().enumerate() {
+            // 先与reg use冲突,然后消去终结的,然后与reg def冲突,并加上新的reg def
+            let finishes = ends_index_bb
+                .get(&(index as i32, cur_bb))
+                .unwrap_or(&tmp_set);
+            for finish in finishes {
+                livenow.remove(finish);
+            }
+            for reg in inst.get_reg_def() {
+                process_one(&mut livenow, nums_neighbor_color, reg, kind);
+                if tmp_set.contains(&reg) {
+                    continue;
+                }
+                livenow.insert(reg);
+            }
+        }
+    };
+    // 遍历所有块，分析冲突关系
+    for cur_bb in func.blocks.iter() {
+        let cur_bb = *cur_bb;
+        // 把不同类型寄存器统计加入表中
+        //分别处理浮点寄存器的情况和通用寄存器的情况
+        process(cur_bb, &mut nums_neighbor_color, ScalarType::Float);
+        process(cur_bb, &mut nums_neighbor_color, ScalarType::Int);
+        // 加入还没有处理过的bb
+    }
+    nums_neighbor_color
+}
+
 // 获取 （下标,块)->失效寄存器集合  表
 pub fn ends_index_bb(func: &Func) -> HashMap<(i32, ObjPtr<BB>), HashSet<Reg>> {
     // 获取reg
@@ -438,7 +510,13 @@ pub fn merge_alloc(
     if_merge
 }
 
-// 分配spilling
+// 判断
+
+//TODO 判断剩余寄存器是否构成了悬图
+// pub fn is_k_graph(regs: Iter<Reg>) -> bool {
+//     let mut ok = false;
+//     ok
+// }
 
 // 通用寄存器分配结果检查,判断是否仍然存在冲突情况,若存在,返回冲突的寄存器集合以及所在的指令编号，块标识符)
 // (old_reg,cur_reg,inst index,block label)

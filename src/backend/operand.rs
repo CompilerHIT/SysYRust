@@ -216,4 +216,13 @@ impl Reg {
             _ => panic!("gg"),
         }
     }
+    // 用来给bitmap唯一标识用
+    pub fn bit_code(&self) -> i32 {
+        (self.get_id() << 1)
+            | match self.get_type() {
+                ScalarType::Float => 1,
+                ScalarType::Int => 0,
+                _ => panic!("unreachable"),
+            }
+    }
 }

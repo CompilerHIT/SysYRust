@@ -319,7 +319,7 @@ impl LIRInst {
     }
 
     pub fn get_regs(&self) -> Vec<Reg> {
-        let mut out = Vec::new();
+        let mut out = Vec::with_capacity(3);
         let mut used = HashSet::new();
         self.get_reg_def().iter().for_each(|e| {
             if used.contains(&e.get_id()) {
