@@ -410,9 +410,9 @@ impl Func {
         // 函数返回地址保存在ra中
         self.calc_live();
         // let mut allocator = crate::backend::regalloc::easy_ls_alloc::Allocator::new();
-        let mut allocator = crate::backend::regalloc::easy_gc_alloc::Allocator::new();
+        // let mut allocator = crate::backend::regalloc::easy_gc_alloc::Allocator::new();
         // let mut allocator=crate::backend::regalloc::opt_gc_alloc::Allocator::new();
-        // let mut allocator = crate::backend::regalloc::base_alloc::Allocator::new();
+        let mut allocator = crate::backend::regalloc::base_alloc::Allocator::new();
         let mut alloc_stat = allocator.alloc(self);
 
         // 评价估计结果
@@ -600,8 +600,9 @@ impl Func {
                 );
                 if !is_main {
                     for (reg, slot) in map.iter() {
+                        let is_float = reg.get_type() == ScalarType::Float;
                         let of = stack_size - ADDR_SIZE - slot.get_pos();
-                        builder.s(&reg.to_string(false), "sp", of, false, true);
+                        builder.s(&reg.to_string(false), "sp", of, is_float, true);
                     }
                 }
             } else {
@@ -614,10 +615,11 @@ impl Func {
                 let mut start = 0;
                 if !is_main {
                     for (reg, slot) in map.iter() {
+                        let is_float = reg.get_type() == ScalarType::Float;
                         if operand::is_imm_12bs(slot.get_pos()) {
-                            builder.s(&reg.to_string(false), "gp", -(slot.get_pos()), false, true);
+                            builder.s(&reg.to_string(false), "gp", -(slot.get_pos()), is_float, true);
                         } else if operand::is_imm_12bs(stack_size - slot.get_pos()) {
-                            builder.s(&reg.to_string(false), "sp", slot.get_pos(), false, true);
+                            builder.s(&reg.to_string(false), "sp", slot.get_pos(), is_float, true);
                         } else {
                             if first {
                                 let offset = stack_size - slot.get_pos();
@@ -625,7 +627,7 @@ impl Func {
                                 builder.op2("add", "gp", "gp", "sp", false, true);
                                 first = false;
                             }
-                            builder.s(&reg.to_string(false), "gp", -start, false, true);
+                            builder.s(&reg.to_string(false), "gp", -start, is_float, true);
                             start += ADDR_SIZE;
                         }
                     }
@@ -639,8 +641,9 @@ impl Func {
             if operand::is_imm_12bs(stack_size) {
                 if !is_main {
                     for (reg, slot) in map_clone.iter() {
+                        let is_float = reg.get_type() == ScalarType::Float;
                         let of = stack_size - ADDR_SIZE - slot.get_pos();
-                        builder.l(&reg.to_string(false), "sp", of, false, true);
+                        builder.l(&reg.to_string(false), "sp", of, is_float, true);
                     }
                 }
                 builder.l(
@@ -660,10 +663,11 @@ impl Func {
                 let mut start = 0;
                 if !is_main {
                     for (reg, slot) in map_clone.iter() {
+                        let is_float = reg.get_type() == ScalarType::Float;
                         if operand::is_imm_12bs(slot.get_pos()) {
-                            builder.l(&reg.to_string(false), "gp", -(slot.get_pos()), false, true);
+                            builder.l(&reg.to_string(false), "gp", -(slot.get_pos()), is_float, true);
                         } else if operand::is_imm_12bs(stack_size - slot.get_pos()) {
-                            builder.l(&reg.to_string(false), "sp", slot.get_pos(), false, true);
+                            builder.l(&reg.to_string(false), "sp", slot.get_pos(), is_float, true);
                         } else {
                             if first {
                                 let offset = stack_size - slot.get_pos();
@@ -671,7 +675,7 @@ impl Func {
                                 builder.op2("add", "gp", "gp", "sp", false, true);
                                 first = false;
                             }
-                            builder.l(&reg.to_string(false), "sp", -start, false, true);
+                            builder.l(&reg.to_string(false), "sp", -start, is_float, true);
                             start += ADDR_SIZE;
                         }
                     }
