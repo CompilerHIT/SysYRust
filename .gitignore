@@ -6,6 +6,7 @@ data/
 *.txt
 *.s
 /data
+/logs
 .c
 *.sy
 log
@@ -16,3 +17,5 @@ dump*.ll
 row_asm.log
 *.log
 *.c
+*.out
+*.sh

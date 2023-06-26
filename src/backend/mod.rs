@@ -61,14 +61,14 @@ impl BackendPool {
 pub fn generate_asm(in_path: &str, path: &str, row_path: &str, module: &mut AsmModule) {
     let mut file = match File::create(path) {
         Ok(f) => f,
-        Err(e) => panic!("Create output path error: {}", e),
+        Err(e) => panic!("Create    output path error: {}", e),
     };
     writeln!(file, "	.file	\"{}\"", in_path);
     writeln!(file, "	.option pic");
     writeln!(file, "    .text");
     let mut pool = BackendPool::new();
-    let mut file2 = File::create("row_asm.log").unwrap();
-    module.generator(&mut file, &mut file2, &mut pool);
+    let mut file2 = File::create(row_path).unwrap();
+    module.generate(&mut file, &mut file2, &mut pool);
 
     pool.free_all();
 

@@ -14,7 +14,7 @@ use crate::backend::instrs::{LIRInst, Operand};
 use crate::backend::module::AsmModule;
 use crate::backend::operand::{Reg, ARG_REG_COUNT};
 use crate::backend::regalloc::regalloc;
-use crate::backend::{block::*, operand, func};
+use crate::backend::{block::*, func, operand};
 // use crate::backend::regalloc::simulate_assign;
 use crate::backend::regalloc::{
     easy_ls_alloc::Allocator, regalloc::Regalloc, structs::FuncAllocStat,
@@ -409,16 +409,31 @@ impl Func {
     pub fn allocate_reg(&mut self) {
         // 函数返回地址保存在ra中
         self.calc_live();
+        for bb in self.blocks.iter() {
+            if self.label != "float_eq" {
+                continue;
+            }
+            for inst in bb.insts.iter() {
+                inst.get_regs().iter().for_each(|r| {
+                    log!("{:?}", inst);
+                    log!("{}", inst.as_ref());
+                    log!("{}", r);
+                })
+            }
+        }
         // let mut allocator = crate::backend::regalloc::easy_ls_alloc::Allocator::new();
-        // let mut allocator =crate::backend::regalloc::easy_gc_alloc::Allocator::new();
-        let mut allocator=crate::backend::regalloc::opt_gc_alloc::Allocator::new();
+        let mut allocator = crate::backend::regalloc::easy_gc_alloc::Allocator::new();
+        // let mut allocator=crate::backend::regalloc::opt_gc_alloc::Allocator::new();
         // let mut allocator = crate::backend::regalloc::base_alloc::Allocator::new();
         let mut alloc_stat = allocator.alloc(self);
 
         // 评价估计结果
-        log_file!("000_eval_alloc","func:{},alloc_cost:{}",self.label,regalloc::eval_alloc(self,& alloc_stat.dstr, &alloc_stat.spillings));
-
-
+        log_file!(
+            "000_eval_alloc.txt",
+            "func:{},alloc_cost:{}",
+            self.label,
+            regalloc::eval_alloc(self, &alloc_stat.dstr, &alloc_stat.spillings)
+        );
 
         log_file!(
             "calout.txt",
@@ -460,7 +475,8 @@ impl Func {
                 }
                 let dst = inst.get_dst();
                 let src = inst.get_lhs();
-                if inst.get_type() == InstrsType::OpReg(super::instrs::SingleOp::IMv) && dst == src {
+                if inst.get_type() == InstrsType::OpReg(super::instrs::SingleOp::IMv) && dst == src
+                {
                     bb.as_mut().insts.remove(index);
                 } else {
                     index += 1;
@@ -468,6 +484,7 @@ impl Func {
             }
         }
     }
+
     fn handle_parameters(&mut self, ir_func: &Function) {
         let mut iparam: Vec<_> = ir_func
             .get_parameter_list()
@@ -595,8 +612,9 @@ impl Func {
                 );
                 if !is_main {
                     for (reg, slot) in map.iter() {
+                        let is_float = reg.get_type() == ScalarType::Float;
                         let of = stack_size - ADDR_SIZE - slot.get_pos();
-                        builder.s(&reg.to_string(false), "sp", of, false, true);
+                        builder.s(&reg.to_string(false), "sp", of, is_float, true);
                     }
                 }
             } else {
@@ -605,9 +623,31 @@ impl Func {
                 builder.op2("add", "gp", "gp", "sp", false, true);
                 builder.s(&ra.to_string(false), "gp", -ADDR_SIZE, false, true);
 
+                let mut first = true;
+                let mut start = 0;
                 if !is_main {
                     for (reg, slot) in map.iter() {
-                        builder.s(&reg.to_string(false), "gp", -(slot.get_pos()), false, true);
+                        let is_float = reg.get_type() == ScalarType::Float;
+                        if operand::is_imm_12bs(slot.get_pos()) {
+                            builder.s(
+                                &reg.to_string(false),
+                                "gp",
+                                -(slot.get_pos()),
+                                is_float,
+                                true,
+                            );
+                        } else if operand::is_imm_12bs(stack_size - slot.get_pos()) {
+                            builder.s(&reg.to_string(false), "sp", slot.get_pos(), is_float, true);
+                        } else {
+                            if first {
+                                let offset = stack_size - slot.get_pos();
+                                builder.op1("li", "gp", &offset.to_string());
+                                builder.op2("add", "gp", "gp", "sp", false, true);
+                                first = false;
+                            }
+                            builder.s(&reg.to_string(false), "gp", -start, is_float, true);
+                            start += ADDR_SIZE;
+                        }
                     }
                 }
             }
@@ -619,8 +659,9 @@ impl Func {
             if operand::is_imm_12bs(stack_size) {
                 if !is_main {
                     for (reg, slot) in map_clone.iter() {
+                        let is_float = reg.get_type() == ScalarType::Float;
                         let of = stack_size - ADDR_SIZE - slot.get_pos();
-                        builder.l(&reg.to_string(false), "sp", of, false, true);
+                        builder.l(&reg.to_string(false), "sp", of, is_float, true);
                     }
                 }
                 builder.l(
@@ -636,9 +677,31 @@ impl Func {
                 builder.op2("add", "sp", "sp", "gp", false, true);
                 builder.l(&ra.to_string(false), "sp", -ADDR_SIZE, false, true);
 
+                let mut first = true;
+                let mut start = 0;
                 if !is_main {
                     for (reg, slot) in map_clone.iter() {
-                        builder.l(&reg.to_string(false), "sp", -(slot.get_pos()), false, true);
+                        let is_float = reg.get_type() == ScalarType::Float;
+                        if operand::is_imm_12bs(slot.get_pos()) {
+                            builder.l(
+                                &reg.to_string(false),
+                                "gp",
+                                -(slot.get_pos()),
+                                is_float,
+                                true,
+                            );
+                        } else if operand::is_imm_12bs(stack_size - slot.get_pos()) {
+                            builder.l(&reg.to_string(false), "sp", slot.get_pos(), is_float, true);
+                        } else {
+                            if first {
+                                let offset = stack_size - slot.get_pos();
+                                builder.op1("li", "gp", &offset.to_string());
+                                builder.op2("add", "gp", "gp", "sp", false, true);
+                                first = false;
+                            }
+                            builder.l(&reg.to_string(false), "sp", -start, is_float, true);
+                            start += ADDR_SIZE;
+                        }
                     }
                 }
             }
@@ -718,29 +781,33 @@ impl Func {
         return out;
     }
     // 获取指令数量
-    pub fn num_insts(&self)->usize {
+    pub fn num_insts(&self) -> usize {
         let mut out = 0;
         self.blocks.iter().for_each(|bb| out += bb.insts.len());
         return out;
     }
 
     // 获取寄存器数量
-    pub fn num_regs(&self)->usize{
-        let mut passed:Bitmap=Bitmap::with_cap(1000);
+    pub fn num_regs(&self) -> usize {
+        let mut passed: Bitmap = Bitmap::with_cap(1000);
         let mut out = 0;
-        self.blocks.iter().for_each(|bb|{
-            bb.insts.iter().for_each(|inst|{
+        self.blocks.iter().for_each(|bb| {
+            bb.insts.iter().for_each(|inst| {
                 for reg in inst.get_reg_def() {
-                    let id=reg.get_id()<<1|match reg.get_type() {
-                        ScalarType::Float=>0,ScalarType::Int=>1,_=>panic!("unleagal")
-                    };
-                    if passed.contains(id as usize) {continue;}
+                    let id = reg.get_id() << 1
+                        | match reg.get_type() {
+                            ScalarType::Float => 0,
+                            ScalarType::Int => 1,
+                            _ => panic!("unleagal"),
+                        };
+                    if passed.contains(id as usize) {
+                        continue;
+                    }
                     passed.insert(id as usize);
-                    out+=1;
+                    out += 1;
                 }
             })
         });
         return out;
     }
-
 }

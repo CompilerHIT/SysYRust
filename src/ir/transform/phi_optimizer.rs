@@ -7,6 +7,7 @@ use crate::{
 ///! 对于phi的优化主要针对以下几个方面：
 ///! 1. phi的参数只有一个时，直接替换为该参数;
 ///! 2. phi的多个参数相同时，也可以将其消去。
+///! 3. phi的参数中多个参数相同，剩下的都指向自己，也可以将其消去。
 
 pub fn phi_run(module: &mut Module) {
     loop {
@@ -26,10 +27,16 @@ pub fn phi_run(module: &mut Module) {
 fn phi_optimize(mut inst: ObjPtr<Inst>) -> bool {
     let mut changed = false;
     if let InstKind::Phi = inst.get_kind() {
+        let not_self = inst
+            .get_operands()
+            .iter()
+            .find(|&&x| x != inst)
+            .unwrap()
+            .clone();
         if inst
             .get_operands()
             .iter()
-            .all(|&x| x == inst.get_operands()[0])
+            .all(|&x| x == inst || x == not_self)
         {
             changed = true;
             // 将其user中所有当前phi的操作数替换为第一个参数

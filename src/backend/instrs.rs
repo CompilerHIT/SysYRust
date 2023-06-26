@@ -8,6 +8,7 @@ pub use crate::backend::block::BB;
 pub use crate::backend::func::Func;
 use crate::backend::operand::*;
 pub use crate::backend::structs::{Context, GenerateAsm};
+use crate::log_file;
 pub use crate::utility::{ObjPtr, ScalarType};
 
 use super::block::FLOAT_BASE;
@@ -259,6 +260,7 @@ impl LIRInst {
             }
             match self.operands[index] {
                 Operand::Reg(ref mut reg) => {
+                    log_file!("tmp.txt", "{}", reg);
                     if !reg.is_physic() {
                         if let Some(new) = map.get(&reg.get_id()) {
                             self.operands[index] = Operand::Reg(Reg::new(*new, reg.get_type()));
@@ -318,14 +320,18 @@ impl LIRInst {
 
     pub fn get_regs(&self) -> Vec<Reg> {
         let mut out = Vec::new();
-        let mut used=HashSet::new();
+        let mut used = HashSet::new();
         self.get_reg_def().iter().for_each(|e| {
-            if used.contains(&e.get_id()) { return;}
+            if used.contains(&e.get_id()) {
+                return;
+            }
             used.insert(e.get_id());
             out.push(*e);
         });
         self.get_reg_use().iter().for_each(|e| {
-            if used.contains(&e.get_id()) {return;}
+            if used.contains(&e.get_id()) {
+                return;
+            }
             used.insert(e.get_id());
             out.push(*e);
         });
@@ -393,22 +399,18 @@ impl LIRInst {
                         continue;
                     }
                     match operand {
-                        Operand::Reg(reg) => {
-                            res.push(*reg)
-                        },
+                        Operand::Reg(reg) => res.push(*reg),
                         _ => {}
                     }
                 }
                 res
-            },
+            }
             InstrsType::Store | InstrsType::StoreParamToStack | InstrsType::StoreToStack => {
                 let mut regs = self.operands.clone();
                 let mut res = Vec::new();
                 while let Some(operand) = regs.pop() {
                     match operand {
-                        Operand::Reg(reg) => {
-                            res.push(reg)
-                        },
+                        Operand::Reg(reg) => res.push(reg),
                         _ => {}
                     }
                 }

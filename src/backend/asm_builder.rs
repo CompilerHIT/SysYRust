@@ -33,21 +33,29 @@ impl<'f> AsmBuilder<'f> {
         writeln!(self.f, "    ret")
     }
 
-    pub fn op2(&mut self, op: &str, dest: &str, lhs: &str, rhs: &str, is_imm: bool, is_double: bool) -> Result<()> {
+    pub fn op2(
+        &mut self,
+        op: &str,
+        dest: &str,
+        lhs: &str,
+        rhs: &str,
+        is_imm: bool,
+        is_double: bool,
+    ) -> Result<()> {
         //FIXME: mul使用w是否有超过32位的用例
         match op {
             "fne.s" => {
                 writeln!(self.f, "    feq.s {dest}, {lhs}, {rhs}")?;
-                writeln!(self.f, "    xori {dest}, 1")
-            },
+                writeln!(self.f, "    xori {dest}, {dest}, 1")
+            }
             "fgt.s" => {
                 writeln!(self.f, "    flt.s {dest}, {lhs}, {rhs}")?;
-                writeln!(self.f, "    xori {dest}, 1")
-            },
+                writeln!(self.f, "    xori {dest}, {dest}, 1")
+            }
             "fge.s" => {
                 writeln!(self.f, "    flt.s {dest}, {rhs}, {lhs}")?;
-                writeln!(self.f, "    xori {dest}, 1")
-            },
+                writeln!(self.f, "    xori {dest}, {dest}, 1")
+            }
             _ => {
                 if is_imm {
                     if op == "or" || op == "xor" || op == "and" || op == "slt" || is_double {
@@ -56,7 +64,13 @@ impl<'f> AsmBuilder<'f> {
                         writeln!(self.f, "    {op}iw {dest}, {lhs}, {rhs}")
                     }
                 } else {
-                    if op == "or" || op == "xor" || op == "and" || op == "slt" || op == "mulhs" || is_double {
+                    if op == "or"
+                        || op == "xor"
+                        || op == "and"
+                        || op == "slt"
+                        || op == "mulhs"
+                        || is_double
+                    {
                         writeln!(self.f, "    {op} {dest}, {lhs}, {rhs}")
                     } else {
                         writeln!(self.f, "    {op}w {dest}, {lhs}, {rhs}")
@@ -142,15 +156,11 @@ impl<'f> AsmBuilder<'f> {
         is_float: bool,
         is_double: bool,
     ) -> Result<()> {
-        if !is_double {
-            if is_float {
-                writeln!(self.f, "	fsw {src}, {offset}({addr})")
-            } else {
-                writeln!(self.f, "	sw {src}, {offset}({addr})")
-            }
+        if is_float {
+            writeln!(self.f, "	fsw {src}, {offset}({addr})")
         } else {
-            if is_float {
-                writeln!(self.f, "	fsd {src}, {offset}({addr})")
+            if !is_double {
+                writeln!(self.f, "	sw {src}, {offset}({addr})")
             } else {
                 writeln!(self.f, "	sd {src}, {offset}({addr})")
             }
@@ -165,15 +175,11 @@ impl<'f> AsmBuilder<'f> {
         is_float: bool,
         is_double: bool,
     ) -> Result<()> {
-        if !is_double {
-            if is_float {
-                writeln!(self.f, "	flw {dest}, {offset}({addr})")
-            } else {
-                writeln!(self.f, "	lw {dest}, {offset}({addr})")
-            }
+        if is_float {
+            writeln!(self.f, "	flw {dest}, {offset}({addr})")
         } else {
-            if is_float {
-                writeln!(self.f, "	fld {dest}, {offset}({addr})")
+            if !is_double {
+                writeln!(self.f, "	lw {dest}, {offset}({addr})")
             } else {
                 writeln!(self.f, "	ld {dest}, {offset}({addr})")
             }

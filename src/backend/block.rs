@@ -676,19 +676,6 @@ impl BB {
                             if bz {
                                 let src_reg =
                                     self.resolve_operand(func, cond_ref, true, map_info, pool);
-                                let src_register = match src_reg {
-                                    Operand::Reg(reg) => reg,
-                                    _ => unreachable!()
-                                };
-                                if src_register.get_type() == ScalarType::Float {
-                                    self.insts.push(pool.put_inst(LIRInst::new(
-                                        InstrsType::Binary(BinaryOp::FCmp(CmpOp::Ne)),
-                                        vec![
-                                            src_reg.clone(),
-                                            Operand::Reg(Reg::new(0, ScalarType::Int)),
-                                        ],
-                                    )));
-                                }
                                 self.insts.push(pool.put_inst(LIRInst::new(
                                     inst_kind,
                                     vec![
