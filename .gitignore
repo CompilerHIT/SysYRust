@@ -6,6 +6,7 @@ data/
 *.txt
 *.s
 /data
+/logs
 .c
 *.sy
 log

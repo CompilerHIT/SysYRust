@@ -36,7 +36,7 @@ fn run_main() {
     // 生成汇编的标志
     let s_option = matches.is_present("S");
     // 输出文件名
-    let output = matches.value_of("o").unwrap_or("testcase.s");
+    let output = matches.value_of("o").unwrap_or("logs/testcase.s");
 
     // 是否使用优化
     let o1_option = matches.is_present("O1");
@@ -77,9 +77,9 @@ fn run_main() {
     //);
 
     // ir打印
-    sysylib::ir::dump_now(&module, "dump.ll");
+    sysylib::ir::dump_now(&module, "logs/dump.ll");
 
-    let output2 = matches.value_of("o").unwrap_or("row_asm.log");
+    let output2 = matches.value_of("o").unwrap_or("logs/row_asm.log");
     // 后端解析
     generate_asm(filename, output, output2, &mut AsmModule::new(&module));
 }

@@ -265,7 +265,7 @@ impl Func {
     }
 
     pub fn calc_live(&mut self) {
-        let calc_live_file = "./data/callive.txt";
+        let calc_live_file = "./logs/callive.txt";
         // fs::remove_file(calc_live_file);
         log_file!(
             calc_live_file,
@@ -417,14 +417,14 @@ impl Func {
 
         // 评价估计结果
         log_file!(
-            "./data/000_eval_alloc.txt",
+            "./logs/000_eval_alloc.txt",
             "func:{},alloc_cost:{}",
             self.label,
             regalloc::eval_alloc(self, &alloc_stat.dstr, &alloc_stat.spillings)
         );
 
         log_file!(
-            "./data/calout.txt",
+            "./logs/calout.txt",
             "{:?},\n{:?}",
             alloc_stat.dstr,
             alloc_stat.spillings
