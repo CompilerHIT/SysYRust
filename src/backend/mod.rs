@@ -67,7 +67,7 @@ pub fn generate_asm(in_path: &str, path: &str, row_path: &str, module: &mut AsmM
     writeln!(file, "	.option pic");
     writeln!(file, "    .text");
     let mut pool = BackendPool::new();
-    let mut file2 = File::create("row_asm.log").unwrap();
+    let mut file2 = File::create(row_path).unwrap();
     module.generate(&mut file, &mut file2, &mut pool);
 
     pool.free_all();
