@@ -199,7 +199,7 @@ pub fn build_availables(
                 }
                 if reg.is_physic() {
                     livenow.iter().for_each(|live| {
-                        availables.get_mut(live).unwrap().use_reg(live.get_color());
+                        availables.get_mut(live).unwrap().use_reg(reg.get_color());
                     });
                 }
                 for live in livenow.iter() {
@@ -225,7 +225,7 @@ pub fn build_availables(
                     }
                     if reg.is_physic() {
                         livenow.iter().for_each(|live| {
-                            availables.get_mut(&live).unwrap().use_reg(live.get_color());
+                            availables.get_mut(&live).unwrap().use_reg(reg.get_color());
                         });
                     }
                     for live in livenow.iter() {
