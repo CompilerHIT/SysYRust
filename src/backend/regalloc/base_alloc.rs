@@ -187,7 +187,7 @@ impl Allocator {
 }
 impl Regalloc for Allocator {
     fn alloc(&mut self, func: &crate::backend::instrs::Func) -> super::structs::FuncAllocStat {
-        let calout = "./logs/calout.txt";
+        let calout = "calout.txt";
         // fs::remove_file(calout);
         let mut dstr: HashMap<i32, i32> = HashMap::new();
         let mut spillings: HashSet<i32> = HashSet::new();

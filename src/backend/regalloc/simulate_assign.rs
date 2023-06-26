@@ -14,7 +14,7 @@ pub struct Simulator {}
 impl Simulator {
     // 模拟
     pub fn simulate(func: &Func, alloc_stat: &FuncAllocStat) {
-        let file = "./logs/simulate.txt";
+        let file = "simulate.txt";
         // 遍历func
         for block in func.blocks.iter() {
             log_file!(file, "\n{}", block.label);

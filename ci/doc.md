@@ -52,7 +52,7 @@ docker run --name ci -d -p 50051:50051 -v <your_data_path>:/test/data <latest-ci
 如:
 
 ```
-docker run --name ci -d -p 50051:50051 -v ./logs:/test/data 10.249.12.83:5000/compilerhit/sysy-rv64-cpci:3.2
+docker run --name ci -d -p 50051:50051 -v ./data:/test/data 10.249.12.83:5000/compilerhit/sysy-rv64-cpci:3.2
 ```
 
 6\.在宿主机安装需要的python的grpc模块:

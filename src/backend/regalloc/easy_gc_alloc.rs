@@ -73,7 +73,7 @@ impl Allocator {
     // 对每个虚拟寄存器的spill代价估计
     pub fn count_spill_costs(&mut self, func: &Func) {
         self.costs_reg = regalloc::estimate_spill_cost(func);
-        let path = "./logs/reg_spill_costs.txt";
+        let path = "reg_spill_costs.txt";
         log_file!(path, "func:{}", func.label);
         let mut i = 0;
         let reline = 20;
@@ -330,7 +330,7 @@ impl Allocator {
     }
 
     pub fn debug(kind: &'static str, regs: Vec<&Reg>) {
-        let color_spill_path = "./logs/color_spill.txt";
+        let color_spill_path = "color_spill.txt";
         match kind {
             "interef" => log_file!(color_spill_path, "inter:{}", regs.get(0).unwrap()),
             "spill" => log_file!(color_spill_path, "tospill:{}", regs.get(0).unwrap()),
@@ -364,7 +364,7 @@ impl Regalloc for Allocator {
         self.build_interference_graph(func);
         self.count_spill_costs(func);
         // 打印冲突图
-        let intereref_path = "./logs/interference_graph.txt";
+        let intereref_path = "interference_graph.txt";
         self.interference_graph.iter().for_each(|(reg, neighbors)| {
             log_file_uln!(intereref_path, "node {reg}\n{{");
             neighbors

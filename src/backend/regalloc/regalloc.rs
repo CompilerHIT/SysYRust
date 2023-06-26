@@ -392,9 +392,9 @@ pub fn merge_alloc(
             if let Some(reg) = tomerge {
                 if_merge = true;
                 spillings.remove(&reg.get_id());
-                // log_file!("./logs/color_spill.txt","inst:{:?},src:{},dst:{}",inst.get_type(),src_reg,dst_reg);
-                // log_file!("./logs/color_spill.txt","availables:\nsrc:{}\ndst{}",available_src,available_dst);
-                // log_file!("./logs/color_spill.txt","merge:{}({}) index:{},bb:{}",reg,merge_color.unwrap(),index,bb.label.clone());
+                // log_file!("color_spill.txt","inst:{:?},src:{},dst:{}",inst.get_type(),src_reg,dst_reg);
+                // log_file!("color_spill.txt","availables:\nsrc:{}\ndst{}",available_src,available_dst);
+                // log_file!("color_spill.txt","merge:{}({}) index:{},bb:{}",reg,merge_color.unwrap(),index,bb.label.clone());
                 let merge_color = merge_color.unwrap();
                 let neighbors = interference_graph.get(&reg).unwrap();
                 if dstr.contains_key(&reg.get_id()) {
