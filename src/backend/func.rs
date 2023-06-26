@@ -409,10 +409,22 @@ impl Func {
     pub fn allocate_reg(&mut self) {
         // 函数返回地址保存在ra中
         self.calc_live();
+        for bb in self.blocks.iter() {
+            if self.label != "float_eq" {
+                continue;
+            }
+            for inst in bb.insts.iter() {
+                inst.get_regs().iter().for_each(|r| {
+                    log!("{:?}", inst);
+                    log!("{}", inst.as_ref());
+                    log!("{}", r);
+                })
+            }
+        }
         // let mut allocator = crate::backend::regalloc::easy_ls_alloc::Allocator::new();
-        // let mut allocator = crate::backend::regalloc::easy_gc_alloc::Allocator::new();
+        let mut allocator = crate::backend::regalloc::easy_gc_alloc::Allocator::new();
         // let mut allocator=crate::backend::regalloc::opt_gc_alloc::Allocator::new();
-        let mut allocator = crate::backend::regalloc::base_alloc::Allocator::new();
+        // let mut allocator = crate::backend::regalloc::base_alloc::Allocator::new();
         let mut alloc_stat = allocator.alloc(self);
 
         // 评价估计结果
@@ -429,7 +441,7 @@ impl Func {
             alloc_stat.dstr,
             alloc_stat.spillings
         );
-        let check_alloc_path = "./data/check_alloc.txt";
+        let check_alloc_path = "./logs/check_alloc.txt";
         log_file!(check_alloc_path, "{:?}", self.label);
         log_file!(
             check_alloc_path,
@@ -617,7 +629,13 @@ impl Func {
                     for (reg, slot) in map.iter() {
                         let is_float = reg.get_type() == ScalarType::Float;
                         if operand::is_imm_12bs(slot.get_pos()) {
-                            builder.s(&reg.to_string(false), "gp", -(slot.get_pos()), is_float, true);
+                            builder.s(
+                                &reg.to_string(false),
+                                "gp",
+                                -(slot.get_pos()),
+                                is_float,
+                                true,
+                            );
                         } else if operand::is_imm_12bs(stack_size - slot.get_pos()) {
                             builder.s(&reg.to_string(false), "sp", slot.get_pos(), is_float, true);
                         } else {
@@ -665,7 +683,13 @@ impl Func {
                     for (reg, slot) in map_clone.iter() {
                         let is_float = reg.get_type() == ScalarType::Float;
                         if operand::is_imm_12bs(slot.get_pos()) {
-                            builder.l(&reg.to_string(false), "gp", -(slot.get_pos()), is_float, true);
+                            builder.l(
+                                &reg.to_string(false),
+                                "gp",
+                                -(slot.get_pos()),
+                                is_float,
+                                true,
+                            );
                         } else if operand::is_imm_12bs(stack_size - slot.get_pos()) {
                             builder.l(&reg.to_string(false), "sp", slot.get_pos(), is_float, true);
                         } else {

@@ -1,6 +1,6 @@
-use std::fmt::{format, Display};
 use crate::log;
 use crate::utility::ScalarType;
+use std::fmt::{format, Display};
 
 use super::block::FLOAT_BASE;
 pub const REG_COUNT: i32 = 32;
@@ -8,7 +8,7 @@ pub const ARG_REG_COUNT: i32 = 8;
 pub const REG_SP: i32 = 2;
 pub const IMM_12_Bs: i32 = 2047;
 pub const IMM_20_Bs: i32 = 524287;
-pub static mut REG_ID: i32 = 32;
+pub static mut REG_ID: i32 = 64;
 
 #[derive(Clone, Copy, PartialEq, Hash, Eq, Debug)]
 pub struct Reg {
@@ -18,7 +18,7 @@ pub struct Reg {
 
 impl Display for Reg {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let id=self.get_id();
+        let id = self.get_id();
         match self.get_type() {
             ScalarType::Float => write!(f, "f{}", id),
             ScalarType::Int => write!(f, "i{}", id),
@@ -189,7 +189,7 @@ impl Reg {
 
     // if physic reg
     pub fn is_physic(&self) -> bool {
-        self.id <= 31
+        self.id <= 63
     }
 
     // if mistake
@@ -206,13 +206,15 @@ impl Reg {
     }
 }
 
-
 impl Reg {
-    pub fn get_color(&self)->i32 {
+    pub fn get_color(&self) -> i32 {
+        if !self.is_physic() {
+            panic!("unreachab{self}");
+        }
         match self.get_type() {
-            ScalarType::Float=>self.get_id()+32,
-            ScalarType::Int=>self.get_id(),
-            _=>panic!("gg"),
+            ScalarType::Float => self.get_id(),
+            ScalarType::Int => self.get_id(),
+            _ => panic!("gg"),
         }
     }
 }

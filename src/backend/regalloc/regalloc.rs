@@ -118,21 +118,23 @@ pub fn build_intereference(
         |cur_bb: ObjPtr<BB>, interef_graph: &mut HashMap<Reg, HashSet<Reg>>, kind: ScalarType| {
             let mut livenow: HashSet<Reg> = HashSet::new();
             // 冲突分析
-            cur_bb.live_in.iter().for_each(|e| {
-                if e.get_type() != kind {
+            cur_bb.live_in.iter().for_each(|reg| {
+                if reg.get_type() != kind {
                     return;
                 }
-                if let None = interef_graph.get(e) {
-                    interef_graph.insert(*e, HashSet::new());
+                if let None = interef_graph.get(reg) {
+                    interef_graph.insert(*reg, HashSet::new());
                 }
                 for live in livenow.iter() {
-                    if live == e {
+                    log_file!("tmp2.txt", "pre {} {}.", live, reg);
+                    if live == reg {
                         continue;
                     }
-                    interef_graph.get_mut(live).unwrap().insert(*e);
-                    interef_graph.get_mut(e).unwrap().insert(*live);
+                    log_file!("tmp2.txt", "suf {} {}.", live, reg);
+                    interef_graph.get_mut(live).unwrap().insert(*reg);
+                    interef_graph.get_mut(reg).unwrap().insert(*live);
                 }
-                livenow.insert(*e);
+                livenow.insert(*reg);
             });
             for (index, inst) in cur_bb.insts.iter().enumerate() {
                 // 先与reg use冲突,然后消去终结的,然后与reg def冲突,并加上新的reg def
@@ -150,9 +152,11 @@ pub fn build_intereference(
                         interef_graph.insert(reg, HashSet::new());
                     }
                     for live in livenow.iter() {
+                        log_file!("tmp2.txt", "pre {} {}.", live, reg);
                         if *live == reg {
                             continue;
                         }
+                        log_file!("tmp2.txt", "suf {} {}.", live, reg);
                         interef_graph.get_mut(live).unwrap().insert(reg);
                         interef_graph.get_mut(&reg).unwrap().insert(*live);
                     }
@@ -195,18 +199,12 @@ pub fn build_availables(
                 }
                 if reg.is_physic() {
                     livenow.iter().for_each(|live| {
-                        availables
-                            .get_mut(live)
-                            .unwrap()
-                            .use_reg(RegUsedStat::get_color(reg));
+                        availables.get_mut(live).unwrap().use_reg(live.get_color());
                     });
                 }
                 for live in livenow.iter() {
                     if live.is_physic() {
-                        availables
-                            .get_mut(reg)
-                            .unwrap()
-                            .use_reg(RegUsedStat::get_color(live));
+                        availables.get_mut(reg).unwrap().use_reg(live.get_color());
                     }
                 }
                 livenow.insert(*reg);
@@ -227,10 +225,7 @@ pub fn build_availables(
                     }
                     if reg.is_physic() {
                         livenow.iter().for_each(|live| {
-                            availables
-                                .get_mut(&live)
-                                .unwrap()
-                                .use_reg(RegUsedStat::get_color(&reg));
+                            availables.get_mut(&live).unwrap().use_reg(live.get_color());
                         });
                     }
                     for live in livenow.iter() {
@@ -238,10 +233,7 @@ pub fn build_availables(
                             continue;
                         }
                         if live.is_physic() {
-                            availables
-                                .get_mut(&reg)
-                                .unwrap()
-                                .use_reg(RegUsedStat::get_color(live));
+                            availables.get_mut(&reg).unwrap().use_reg(live.get_color());
                         }
                     }
                     livenow.insert(reg);
@@ -400,9 +392,9 @@ pub fn merge_alloc(
             if let Some(reg) = tomerge {
                 if_merge = true;
                 spillings.remove(&reg.get_id());
-                // log_file!("./data/color_spill.txt","inst:{:?},src:{},dst:{}",inst.get_type(),src_reg,dst_reg);
-                // log_file!("./data/color_spill.txt","availables:\nsrc:{}\ndst{}",available_src,available_dst);
-                // log_file!("./data/color_spill.txt","merge:{}({}) index:{},bb:{}",reg,merge_color.unwrap(),index,bb.label.clone());
+                // log_file!("./logs/color_spill.txt","inst:{:?},src:{},dst:{}",inst.get_type(),src_reg,dst_reg);
+                // log_file!("./logs/color_spill.txt","availables:\nsrc:{}\ndst{}",available_src,available_dst);
+                // log_file!("./logs/color_spill.txt","merge:{}({}) index:{},bb:{}",reg,merge_color.unwrap(),index,bb.label.clone());
                 let merge_color = merge_color.unwrap();
                 let neighbors = interference_graph.get(&reg).unwrap();
                 if dstr.contains_key(&reg.get_id()) {

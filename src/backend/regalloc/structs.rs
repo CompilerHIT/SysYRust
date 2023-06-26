@@ -14,7 +14,6 @@ pub struct RegUsedStat {
     fregs_used: u32,
 }
 
-
 // 对于regusedstat来说，通用寄存器映射到0-31，浮点寄存器映射到32-63
 impl RegUsedStat {
     pub fn new() -> RegUsedStat {
@@ -24,57 +23,53 @@ impl RegUsedStat {
         }
     }
 
-    pub fn get_color(reg:&Reg)->i32 {
-        if reg.get_id()>=32 {panic!("get color from virtual reg!")}
-        match reg.get_type() {
-            ScalarType::Float=>reg.get_id()+32,
-            ScalarType::Int=>reg.get_id(),
-            _=>panic!("tocolor:unlegal type reg")
-        }
-    }
-
-    
-
     pub fn is_available_ireg(&self, ireg: i32) -> bool {
-        let mut unusable:HashSet<i32>= HashSet::from([0]); //保存x0
+        let mut unusable: HashSet<i32> = HashSet::from([0]); //保存x0
         unusable.insert(2); //保留sp
         unusable.insert(1); //保留ra
         unusable.insert(3); //保留gp
         unusable.insert(4); //保留tp寄存器
-        unusable.extend(5..=7);//三个临时寄存器用来处理spill逻辑
-        unusable.insert(10);        //保留a0
-        // unusable.extend(11..=17);   //保留a1-a7
-        if unusable.contains(&ireg) {return  false;}
+        unusable.extend(5..=7); //三个临时寄存器用来处理spill逻辑
+        unusable.insert(10); //保留a0
+                             // unusable.extend(11..=17);   //保留a1-a7
+        if unusable.contains(&ireg) {
+            return false;
+        }
         if (1 << ireg & self.iregs_used) == 0 {
             return true;
         }
         return false;
     }
     pub fn is_available_freg(&self, freg: i32) -> bool {
-        let freg=freg-32;
-        let mut unusable:HashSet<i32>=HashSet::from([]);
-        if unusable.contains(&freg) {return  false;}
+        let freg = freg - 32;
+        let mut unusable: HashSet<i32> = HashSet::from([18, 19, 20]);
+        if unusable.contains(&freg) {
+            return false;
+        }
         if (1 << freg & self.fregs_used) == 0 {
             return true;
         }
         return false;
     }
 
-
     // 获取可用寄存器数量
-    pub fn num_available_regs(&self,kind:ScalarType)->usize {
+    pub fn num_available_regs(&self, kind: ScalarType) -> usize {
         match kind {
-            ScalarType::Float=>self.num_available_fregs(),
-            ScalarType::Int=>self.num_avialable_iregs(),
-            _=>panic!("{:?}",kind),
+            ScalarType::Float => self.num_available_fregs(),
+            ScalarType::Int => self.num_avialable_iregs(),
+            _ => panic!("{:?}", kind),
         }
     }
-    pub fn num_avialable_iregs(&self)->usize{
-        (0..=31).filter(|ireg|self.is_available_ireg(*ireg)).count()
+    pub fn num_avialable_iregs(&self) -> usize {
+        (0..=31)
+            .filter(|ireg| self.is_available_ireg(*ireg))
+            .count()
     }
-    pub fn num_available_fregs(&self)->usize{
-        let m:Range<i32>;
-        (32..=63).filter(|freg|self.is_available_freg(*freg)).count()
+    pub fn num_available_fregs(&self) -> usize {
+        let m: Range<i32>;
+        (32..=63)
+            .filter(|freg| self.is_available_freg(*freg))
+            .count()
     }
 
     // 获取一个可用的整数寄存器
@@ -83,7 +78,7 @@ impl RegUsedStat {
         // x10-x17用来传递函数参数
         for i in 0..=31 {
             if self.is_available_ireg(i) {
-                return  Some(i);
+                return Some(i);
             }
         }
         None
@@ -93,26 +88,26 @@ impl RegUsedStat {
     pub fn get_available_freg(&self) -> Option<i32> {
         // f0作为特殊浮点寄存器保持0
         for i in 32..=63 {
-           if self.is_available_freg(i) {
-            return  Some(i);
-           }
+            if self.is_available_freg(i) {
+                return Some(i);
+            }
         }
         None
     }
 
-    pub fn get_available_reg(&self,kind:ScalarType) ->Option<i32>{
+    pub fn get_available_reg(&self, kind: ScalarType) -> Option<i32> {
         match kind {
-            ScalarType::Float=>self.get_available_freg(),
-            ScalarType::Int=>self.get_available_ireg(),
-            _=>panic!("{:?}",kind),
+            ScalarType::Float => self.get_available_freg(),
+            ScalarType::Int => self.get_available_ireg(),
+            _ => panic!("{:?}", kind),
         }
     }
 
     // 获取剩余的可用通用寄存器
-    pub fn get_rest_iregs(&self)->Vec<i32>{
-        let mut out=Vec::new();
+    pub fn get_rest_iregs(&self) -> Vec<i32> {
+        let mut out = Vec::new();
         for i in 0..=31 {
-            if self.is_available_ireg(i){
+            if self.is_available_ireg(i) {
                 out.push(i);
             }
         }
@@ -120,30 +115,39 @@ impl RegUsedStat {
     }
 
     // 获取剩余的可用浮点寄存器
-    pub fn get_rest_fregs(&self)->Vec<i32>{
-        let mut out=Vec::new();
+    pub fn get_rest_fregs(&self) -> Vec<i32> {
+        let mut out = Vec::new();
         for i in 32..=63 {
-            if self.is_available_freg(i){
+            if self.is_available_freg(i) {
                 out.push(i);
             }
         }
         out
     }
 
+    pub fn release_reg(&mut self, reg: i32) {
+        if reg >= 0 && reg < 32 {
+            self.release_ireg(reg);
+        } else if reg >= 32 && reg <= 63 {
+            self.release_freg(reg);
+        }
+    }
+    pub fn use_reg(&mut self, reg: i32) {
+        if reg >= 0 && reg < 32 {
+            self.use_ireg(reg);
+        } else if reg >= 32 && reg <= 63 {
+            self.use_freg(reg);
+        }
+    }
 
-    pub fn release_reg(&mut self,reg:i32){
-        if reg>=0&&reg<32 {self.release_ireg(reg);}
-        else if reg>=32&&reg<=63 {self.release_freg(reg);}
-    }
-    pub fn use_reg(&mut self,reg:i32){
-        if reg>=0&&reg<32 {self.use_ireg(reg);}
-        else if reg>=32&&reg<=63 {self.use_freg(reg);}
-    }
-    
-    pub fn is_available_reg(&self,reg:i32)->bool {
-        if reg>=0&&reg<32 {self.is_available_ireg(reg)}
-        else if reg>=32&&reg<=63 {self.is_available_freg(reg)}
-        else {  panic!("not legal reg") }
+    pub fn is_available_reg(&self, reg: i32) -> bool {
+        if reg >= 0 && reg < 32 {
+            self.is_available_ireg(reg)
+        } else if reg >= 32 && reg <= 63 {
+            self.is_available_freg(reg)
+        } else {
+            panic!("not legal reg")
+        }
     }
 
     // 释放一个通用寄存器
@@ -161,17 +165,21 @@ impl RegUsedStat {
     }
     // 占有一个浮点寄存器
     pub fn use_freg(&mut self, reg: i32) {
-        let reg=reg-32;
+        let reg = reg - 32;
         self.fregs_used |= 1 << reg;
     }
 }
 
 impl Display for RegUsedStat {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f,"i:{:?},f:{:?}",self.get_rest_iregs(),self.get_rest_fregs())
+        write!(
+            f,
+            "i:{:?},f:{:?}",
+            self.get_rest_iregs(),
+            self.get_rest_fregs()
+        )
     }
 }
-
 
 #[derive(Clone)]
 pub struct FuncAllocStat {
@@ -182,7 +190,6 @@ pub struct FuncAllocStat {
 }
 
 impl FuncAllocStat {
-
     pub fn new() -> FuncAllocStat {
         let mut out = FuncAllocStat {
             spillings: HashSet::new(),
@@ -211,21 +218,19 @@ impl BlockAllocStat {
     }
 }
 
-
-
 #[cfg(test)]
-mod test_regusestat{
+mod test_regusestat {
     use crate::backend::regalloc::regalloc::Regalloc;
 
     use super::RegUsedStat;
 
     #[test]
-    fn test_num(){
+    fn test_num() {
         // TODO
-        let a=RegUsedStat::new();
-        assert_eq!(a.num_available_fregs(),32);
-        assert_eq!(a.num_avialable_iregs(),23);   //保留t0-t2三个临时寄存器,sp,a0,tp,x0,gp五个个特殊寄存器,保留a0用作返回值
-        assert_eq!(a.num_available_regs(crate::utility::ScalarType::Float),32);
-        assert_eq!(a.num_available_regs(crate::utility::ScalarType::Int),23);
+        let a = RegUsedStat::new();
+        assert_eq!(a.num_available_fregs(), 32);
+        assert_eq!(a.num_avialable_iregs(), 23); //保留t0-t2三个临时寄存器,sp,a0,tp,x0,gp五个个特殊寄存器,保留a0用作返回值
+        assert_eq!(a.num_available_regs(crate::utility::ScalarType::Float), 32);
+        assert_eq!(a.num_available_regs(crate::utility::ScalarType::Int), 23);
     }
 }
