@@ -260,7 +260,6 @@ impl LIRInst {
             }
             match self.operands[index] {
                 Operand::Reg(ref mut reg) => {
-                    log_file!("tmp.txt", "{}", reg);
                     if !reg.is_physic() {
                         if let Some(new) = map.get(&reg.get_id()) {
                             self.operands[index] = Operand::Reg(Reg::new(*new, reg.get_type()));

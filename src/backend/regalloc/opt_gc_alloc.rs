@@ -15,6 +15,7 @@ use crate::{
     container::bitmap::Bitmap,
     log_file,
 };
+use core::panic;
 use std::{
     collections::{HashMap, HashSet, LinkedList},
     fs,
@@ -25,7 +26,8 @@ use super::regalloc::{self, Regalloc};
 pub struct Allocator {
     easy_gc_allocator: easy_gc_alloc::Allocator,
     k_graph: (LinkedList<Reg>, Bitmap), //用来实现弦图优化
-                                        // real_interference_graph: HashSet<Reg, HashSet<Reg>>, //真冲突图,
+    // real_interference_graph: HashSet<Reg, HashSet<Reg>>, //真冲突图,
+    tosave_regs: LinkedList<Reg>,
 }
 
 impl Allocator {
@@ -33,6 +35,7 @@ impl Allocator {
         Allocator {
             easy_gc_allocator: easy_gc_alloc::Allocator::new(),
             k_graph: (LinkedList::new(), Bitmap::new()),
+            tosave_regs: LinkedList::new(),
         }
     }
 
@@ -42,47 +45,105 @@ impl Allocator {
     // 更新弦图,从待作色寄存器中取出悬点
     pub fn refresh_k_graph(&mut self) {
         // TODO
-        let old_regs = &mut self.easy_gc_allocator.regs;
-        let new_regs: LinkedList<Reg> = LinkedList::new();
-
-        let k_graph = &mut self.k_graph;
-        while !old_regs.is_empty() {
+        let mut new_regs: LinkedList<Reg> = LinkedList::new();
+        while !self.easy_gc_allocator.regs.is_empty() {
+            let reg = self.easy_gc_allocator.regs.pop_front().unwrap();
             // 判断这个点是否是悬点,如果是,放到悬图中
+            if self.is_k_graph_node(&reg) {
+                let k_graph = &mut self.k_graph;
+                k_graph.0.push_back(reg);
+                k_graph.1.insert(reg.bit_code() as usize);
+            } else {
+                new_regs.push_back(reg);
+            }
         }
+        self.easy_gc_allocator.regs = new_regs;
+    }
+
+    pub fn is_k_graph_node(&mut self, reg: &Reg) -> bool {
+        let tmp_set = HashSet::new();
+        self.easy_gc_allocator
+            .interference_graph
+            .get(&reg)
+            .unwrap_or(&tmp_set)
+            .len()
+            < self
+                .easy_gc_allocator
+                .availables
+                .get(&reg)
+                .unwrap()
+                .num_available_regs(reg.get_type())
     }
 
     // 最终着色剩余悬点
-    pub fn color_k_graph(&mut self) {}
-
-    pub fn opt_color(&mut self) {
-        // // 开始着色,着色直到无法再找到可着色的点为止,如果全部点都可以着色,返回true,否则返回false
-        // // 如果一个点是spill或者是悬点或者是dstr,则取出待着色列表
-        // let mut out = true;
-        // while !self.regs.is_empty() {
-        //     let reg = *self.regs.front().unwrap();
-        //     if !reg.is_virtual()
-        //         || self.spillings.contains(&reg.get_id())
-        //         || self.colors.contains_key(&reg.get_id())
-        //     {
-        //         self.regs.pop_front();
-        //         continue;
-        //     }
-        //     let ok = self.color_one(reg);
-        //     if ok {
-        //         self.regs.pop_front();
-        //     } else {
-        //         out = false;
-        //         Allocator::debug("interef", [&reg].into_iter().collect());
-        //         self.interference_regs.insert(reg);
-        //         break;
-        //     }
-        // }
-
-        // out
+    pub fn color_k_graph(&mut self) {
+        // 对于悬点的作色可以任意着色,如果着色完成
+        while !self.k_graph.0.is_empty() {
+            let reg = self.k_graph.0.pop_front().unwrap();
+            let available = self.easy_gc_allocator.availables.get(&reg).unwrap();
+            let color = available.get_available_reg(reg.get_type()).unwrap();
+            self.k_graph.1.remove(reg.bit_code() as usize);
+            self.color_one_with_certain_color(reg, color);
+        }
     }
 
+    // 试图拯救spilling的寄存器
+
+    pub fn color_one_with_certain_color(&mut self, reg: Reg, color: i32) {
+        if self.easy_gc_allocator.spillings.contains(&reg.get_id()) {
+            panic!("gg");
+        }
+        self.easy_gc_allocator.colors.insert(reg.get_id(), color);
+        if let Some(neighbors) = self.easy_gc_allocator.interference_graph.get(&reg) {
+            for neighbor in neighbors {
+                self.easy_gc_allocator
+                    .availables
+                    .get_mut(&neighbor)
+                    .unwrap()
+                    .use_reg(color);
+                let nums_neighbor_color = self
+                    .easy_gc_allocator
+                    .nums_neighbor_color
+                    .get_mut(neighbor)
+                    .unwrap();
+                nums_neighbor_color
+                    .insert(color, nums_neighbor_color.get(&color).unwrap_or(&0) + 1);
+            }
+        }
+    }
+
+    // TODO,选择最小度节点color
+    pub fn opt_color(&mut self) -> bool {
+        // 开始着色,着色直到无法再找到可着色的点为止,如果全部点都可以着色,返回true,否则返回false
+        // 如果一个点是spill或者是悬点或者是dstr,则取出待着色列表
+        let mut new_to_colors = LinkedList::new();
+        let mut out = true;
+        while !self.easy_gc_allocator.regs.is_empty() {
+            let old_to_colors = &mut self.easy_gc_allocator.regs;
+            let reg = old_to_colors.pop_front().unwrap();
+            if reg.is_physic() || self.easy_gc_allocator.colors.contains_key(&reg.get_id()) {
+                continue;
+            }
+            // 把它加入tosave
+            if self.easy_gc_allocator.spillings.contains(&reg.get_id()) {
+                self.tosave_regs.push_back(reg);
+                continue;
+            }
+            // 首先试图color,color失败加入到new_to_colors中
+            if !self.easy_gc_allocator.color_one(reg) {
+                new_to_colors.push_back(reg);
+            } else {
+                out = false
+            }
+        }
+        self.easy_gc_allocator.regs = new_to_colors;
+        out
+    }
+
+    // 选择一个价值最大节点spill
     pub fn opt_spill_one(&mut self) {}
 
+    // 改变节点颜色
     pub fn opt_simplify_one(&mut self) {}
 }
 impl Regalloc for Allocator {
@@ -90,6 +151,7 @@ impl Regalloc for Allocator {
         self.easy_gc_allocator.build_interference_graph(func);
 
         self.easy_gc_allocator.count_spill_costs(func);
+        self.refresh_k_graph();
 
         // TODO,加入化简后单步合并检查 以及 分配完成后合并检查
         while !self.easy_gc_allocator.color() {
@@ -98,6 +160,8 @@ impl Regalloc for Allocator {
             }
             self.easy_gc_allocator.spill();
         }
+
+        self.color_k_graph();
 
         let (spillings, dstr) = self.easy_gc_allocator.alloc_register();
         let (func_stack_size, bb_sizes) = regalloc::countStackSize(func, &spillings);
@@ -119,7 +183,7 @@ impl Regalloc for Allocator {
         );
 
         // 寄存器合并
-        let max_times = 4;
+        let max_times = 3;
         for i in 0..max_times {
             let ok = regalloc::merge_alloc(
                 func,
@@ -128,6 +192,7 @@ impl Regalloc for Allocator {
                 &self.easy_gc_allocator.ends_index_bb,
                 &mut self.easy_gc_allocator.nums_neighbor_color,
                 &mut self.easy_gc_allocator.availables,
+                &self.easy_gc_allocator.costs_reg,
                 &mut self.easy_gc_allocator.interference_graph,
             );
             if !ok {
