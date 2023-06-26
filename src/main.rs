@@ -79,7 +79,7 @@ fn run_main() {
     // ir打印
     sysylib::ir::dump_now(&module, "dump.ll");
 
-    let output2 = matches.value_of("o").unwrap_or("row_asm.log");
+    let output2 = "row_asm.log";
     // 后端解析
     generate_asm(filename, output, output2, &mut AsmModule::new(&module));
 }

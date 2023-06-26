@@ -236,7 +236,6 @@ impl Mapping {
     }
 }
 
-
 #[derive(Clone)]
 pub struct IntArray {
     pub name: String,
