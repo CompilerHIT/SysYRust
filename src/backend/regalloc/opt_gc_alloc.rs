@@ -25,6 +25,7 @@ use super::regalloc::{self, Regalloc};
 pub struct Allocator {
     easy_gc_allocator: easy_gc_alloc::Allocator,
     k_graph: (LinkedList<Reg>, Bitmap), //用来实现弦图优化
+                                        // real_interference_graph: HashSet<Reg, HashSet<Reg>>, //真冲突图,
 }
 
 impl Allocator {
@@ -38,10 +39,19 @@ impl Allocator {
     // 根据当前已分配情况优化地计算分配代价
     pub fn opt_count_spill_cost(&self) {}
 
-    // 初始化弦图
-    pub fn refresh_k_graph(&mut self) {}
+    // 更新弦图,从待作色寄存器中取出悬点
+    pub fn refresh_k_graph(&mut self) {
+        // TODO
+        let old_regs = &mut self.easy_gc_allocator.regs;
+        let new_regs: LinkedList<Reg> = LinkedList::new();
 
-    // 最终着色弦图
+        let k_graph = &mut self.k_graph;
+        while !old_regs.is_empty() {
+            // 判断这个点是否是悬点,如果是,放到悬图中
+        }
+    }
+
+    // 最终着色剩余悬点
     pub fn color_k_graph(&mut self) {}
 
     pub fn opt_color(&mut self) {
