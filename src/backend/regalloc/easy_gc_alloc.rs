@@ -204,16 +204,32 @@ impl Allocator {
                 .into_iter()
                 .collect(),
         );
-        colors.insert(reg.get_id(), color);
-        if let Some(neighbors) = interference_graph.get(&reg) {
+        self.color_one_with_certain_color(reg, color);
+        // colors.insert(reg.get_id(), color);
+        // if let Some(neighbors) = interference_graph.get(&reg) {
+        //     for neighbor in neighbors {
+        //         availables.get_mut(&neighbor).unwrap().use_reg(color);
+        //         let nums_neighbor_color = self.nums_neighbor_color.get_mut(neighbor).unwrap();
+        //         nums_neighbor_color
+        //             .insert(color, nums_neighbor_color.get(&color).unwrap_or(&0) + 1);
+        //     }
+        // }
+        return true;
+    }
+
+    pub fn color_one_with_certain_color(&mut self, reg: Reg, color: i32) {
+        if self.spillings.contains(&reg.get_id()) {
+            panic!("gg");
+        }
+        self.colors.insert(reg.get_id(), color);
+        if let Some(neighbors) = self.interference_graph.get(&reg) {
             for neighbor in neighbors {
-                availables.get_mut(&neighbor).unwrap().use_reg(color);
+                self.availables.get_mut(&neighbor).unwrap().use_reg(color);
                 let nums_neighbor_color = self.nums_neighbor_color.get_mut(neighbor).unwrap();
                 nums_neighbor_color
                     .insert(color, nums_neighbor_color.get(&color).unwrap_or(&0) + 1);
             }
         }
-        return true;
     }
 
     // 移除一个节点的颜色

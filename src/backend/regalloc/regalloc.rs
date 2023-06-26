@@ -7,6 +7,7 @@ use crate::backend::func::Func;
 use crate::backend::instrs::{InstrsType, BB};
 use crate::backend::operand::Reg;
 use crate::backend::regalloc::structs::FuncAllocStat;
+use crate::container::bitmap::Bitmap;
 use crate::log_file;
 use crate::utility::{ObjPtr, ScalarType};
 
@@ -361,21 +362,22 @@ pub fn ends_index_bb(func: &Func) -> HashMap<(i32, ObjPtr<BB>), HashSet<Reg>> {
 }
 
 //
-// pub fn merge_alloc_total(
-//     func: &Func,
-//     dstr: &mut HashMap<i32, i32>,
-//     spillings: &mut HashSet<i32>,
-//     ends_index_bb: &HashMap<(i32, ObjPtr<BB>), HashSet<Reg>>,
-//     nums_neighbor_color: &mut HashMap<Reg, HashMap<i32, i32>>,
-//     availables: &mut HashMap<Reg, RegUsedStat>,
-//     spill_cost: &HashMap<Reg, f32>,
-//     interference_graph: &HashMap<Reg, HashSet<Reg>>,
-// ) -> bool {
-//     let mut map: HashMap<(Reg, i32), i32> = HashMap::new();
-//     pub trait DD {}
-//     // 首先
-//     false //合并结束不可能存在新的合并了
-// }
+pub fn merge_alloc_total(
+    func: &Func,
+    dstr: &mut HashMap<i32, i32>,
+    spillings: &mut HashSet<i32>,
+    ends_index_bb: &HashMap<(i32, ObjPtr<BB>), HashSet<Reg>>,
+    nums_neighbor_color: &mut HashMap<Reg, HashMap<i32, i32>>,
+    availables: &mut HashMap<Reg, RegUsedStat>,
+    spill_cost: &HashMap<Reg, f32>,
+    interference_graph: &HashMap<Reg, HashSet<Reg>>,
+) -> bool {
+    //
+    let mut color_regs: HashMap<i32, Bitmap> = HashMap::new();
+    let mut map: HashMap<(Reg, i32), i32> = HashMap::new();
+
+    false //合并结束不可能存在新的合并了
+}
 
 // 通用寄存器合并
 pub fn merge_alloc(
@@ -403,6 +405,7 @@ pub fn merge_alloc(
         let out = interference_graph.get(reg).unwrap_or(&tmp_set).len();
         out as f32
     };
+
     let mut only_virtual_merge_val = |reg: &Reg,
                                       dstr: &HashMap<i32, i32>,
                                       other_color: i32,

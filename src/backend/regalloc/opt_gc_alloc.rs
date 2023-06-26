@@ -17,17 +17,24 @@ use crate::{
 };
 use core::panic;
 use std::{
-    collections::{HashMap, HashSet, LinkedList},
+    collections::{HashMap, HashSet, LinkedList, VecDeque},
     fs,
 };
 
 use super::regalloc::{self, Regalloc};
 
+// 保存用于分配加速的信息
+struct RegInfo {
+    reg: Reg,          //寄存器本身,
+    num_neighbor: i32, //与之冲突的邻居虚拟节点数量
+}
+
 pub struct Allocator {
     easy_gc_allocator: easy_gc_alloc::Allocator,
+
     k_graph: (LinkedList<Reg>, Bitmap), //用来实现弦图优化
-    // real_interference_graph: HashSet<Reg, HashSet<Reg>>, //真冲突图,
-    tosave_regs: LinkedList<Reg>,
+    interference_graph_lst: HashMap<Reg, LinkedList<Reg>>, //遍历节点的冲突用
+    tosave_regs: LinkedList<Reg>,       //保存等待拯救的寄存器,或者说save寄存器
 }
 
 impl Allocator {
@@ -36,6 +43,7 @@ impl Allocator {
             easy_gc_allocator: easy_gc_alloc::Allocator::new(),
             k_graph: (LinkedList::new(), Bitmap::new()),
             tosave_regs: LinkedList::new(),
+            interference_graph_lst: HashMap::new(),
         }
     }
 
@@ -44,7 +52,6 @@ impl Allocator {
 
     // 更新弦图,从待作色寄存器中取出悬点
     pub fn refresh_k_graph(&mut self) {
-        // TODO
         let mut new_regs: LinkedList<Reg> = LinkedList::new();
         while !self.easy_gc_allocator.regs.is_empty() {
             let reg = self.easy_gc_allocator.regs.pop_front().unwrap();
@@ -80,36 +87,18 @@ impl Allocator {
         // 对于悬点的作色可以任意着色,如果着色完成
         while !self.k_graph.0.is_empty() {
             let reg = self.k_graph.0.pop_front().unwrap();
+            if !self.is_k_graph_node(&reg) {}
             let available = self.easy_gc_allocator.availables.get(&reg).unwrap();
             let color = available.get_available_reg(reg.get_type()).unwrap();
             self.k_graph.1.remove(reg.bit_code() as usize);
-            self.color_one_with_certain_color(reg, color);
+            self.easy_gc_allocator
+                .color_one_with_certain_color(reg, color);
         }
     }
 
-    // 试图拯救spilling的寄存器
-
-    pub fn color_one_with_certain_color(&mut self, reg: Reg, color: i32) {
-        if self.easy_gc_allocator.spillings.contains(&reg.get_id()) {
-            panic!("gg");
-        }
-        self.easy_gc_allocator.colors.insert(reg.get_id(), color);
-        if let Some(neighbors) = self.easy_gc_allocator.interference_graph.get(&reg) {
-            for neighbor in neighbors {
-                self.easy_gc_allocator
-                    .availables
-                    .get_mut(&neighbor)
-                    .unwrap()
-                    .use_reg(color);
-                let nums_neighbor_color = self
-                    .easy_gc_allocator
-                    .nums_neighbor_color
-                    .get_mut(neighbor)
-                    .unwrap();
-                nums_neighbor_color
-                    .insert(color, nums_neighbor_color.get(&color).unwrap_or(&0) + 1);
-            }
-        }
+    // 试图拯救spilling的寄存器,如果拯救成功任何一个,返回true,如果一个都拯救不了返回false
+    pub fn try_save(&mut self) -> bool {
+        false
     }
 
     // TODO,选择最小度节点color
@@ -141,7 +130,7 @@ impl Allocator {
     }
 
     // 选择一个价值最大节点spill
-    pub fn opt_spill_one(&mut self) {}
+    pub fn opt_spill_one(&mut self, reg: Reg) {}
 
     // 改变节点颜色
     pub fn opt_simplify_one(&mut self) {}
@@ -151,7 +140,7 @@ impl Regalloc for Allocator {
         self.easy_gc_allocator.build_interference_graph(func);
 
         self.easy_gc_allocator.count_spill_costs(func);
-        self.refresh_k_graph();
+        // self.refresh_k_graph();
 
         // TODO,加入化简后单步合并检查 以及 分配完成后合并检查
         while !self.easy_gc_allocator.color() {
@@ -161,7 +150,7 @@ impl Regalloc for Allocator {
             self.easy_gc_allocator.spill();
         }
 
-        self.color_k_graph();
+        // self.color_k_graph();
 
         let (spillings, dstr) = self.easy_gc_allocator.alloc_register();
         let (func_stack_size, bb_sizes) = regalloc::countStackSize(func, &spillings);
