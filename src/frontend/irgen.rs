@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::num;
 
 use super::context::Type;
 use super::kit::Kit;
@@ -245,7 +246,7 @@ impl Process for ConstDecl {
                         //非数组
                         let (mut inst_ptr, mut val, _) = def
                             .const_init_val
-                            .process((Type::ConstInt, vec![]), kit_mut)
+                            .process((Type::ConstInt, vec![], 0, 1), kit_mut)
                             .unwrap();
 
                         let mut bond = 0;
@@ -328,7 +329,7 @@ impl Process for ConstDecl {
 
                         let (mut inst_ptr, mut val, init_vec) = def
                             .const_init_val
-                            .process((Type::ConstInt, dimension_vec_in.clone()), kit_mut)
+                            .process((Type::ConstInt, dimension_vec_in.clone(), 0, 1), kit_mut)
                             .unwrap(); //获得初始值
                         match init_vec {
                             RetInitVec::Float(fvec) => {
@@ -375,7 +376,7 @@ impl Process for ConstDecl {
                     if def.const_exp_vec.is_empty() {
                         let (mut inst_ptr, mut val, _) = def
                             .const_init_val
-                            .process((Type::ConstFloat, vec![]), kit_mut)
+                            .process((Type::ConstFloat, vec![], 0, 1), kit_mut)
                             .unwrap();
 
                         let mut bond = 0.0;
@@ -457,7 +458,7 @@ impl Process for ConstDecl {
 
                         let (mut inst_ptr, mut val, init_vec) = def
                             .const_init_val
-                            .process((Type::ConstFloat, dimension_vec_in.clone()), kit_mut)
+                            .process((Type::ConstFloat, dimension_vec_in.clone(), 0, 1), kit_mut)
                             .unwrap(); //获得初始值
                         match init_vec {
                             RetInitVec::Float(fvec) => {
@@ -510,7 +511,7 @@ impl Process for ConstDecl {
 
 impl Process for ConstInitVal {
     type Ret = (ObjPtr<Inst>, ExpValue, RetInitVec);
-    type Message = (Type, Vec<i32>);
+    type Message = (Type, Vec<i32>, i32, i32);
     fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
         match self {
             ConstInitVal::ConstExp(constexp) => {
@@ -533,31 +534,44 @@ impl Process for ConstInitVal {
                 // Ok((inst,value,RetInitVec::Int(Vec::new())))
             }
             ConstInitVal::ConstInitValVec(constvalvec) => {
-                let dimension_vec = input.1;
-                let tp = input.0;
+                // let dimension_vec = input.1;
+                let (tp, dimension_vec, mut num_pre, layer_now) = input;
+                let num_pre_tmp = num_pre;
+                // let tp = input.0;
                 let mut vec_ret_float = vec![];
                 let mut vec_ret_int = vec![];
-                let mut dimension_next = vec![];
-                let mut index = 0;
-                for i in &dimension_vec {
-                    //构造下一级的维度vec
-                    if index == 0 {
-                        index = index + 1;
-                        continue;
-                    }
-                    index = index + 1;
-                    dimension_next.push(*i);
+                let mut total = 1;
+                // let mut dimension_next = vec![];
+                // let mut index = 0;
+                // for i in &dimension_vec {
+                //     //构造下一级的维度vec
+                //     if index == 0 {
+                //         index = index + 1;
+                //         continue;
+                //     }
+                //     index = index + 1;
+                //     dimension_next.push(*i);
+                // }
+                let mut vec_ttt = vec![];
+                for i in (layer_now as usize - 1)..dimension_vec.len() {
+                    vec_ttt.push(dimension_vec[i]);
                 }
+                for i in 0..dimension_vec.len() {
+                    total = total * dimension_vec[i];
+                }
+                let after = dimension_vec[dimension_vec.len() - 1];
                 // // println!("dimension:{:?}",dimension_vec.len());
                 // // println!("dimension_next:{:?}",dimension_next.len());
 
                 for val in constvalvec {
-                    let (_, _, vec_temp) =
-                        val.process((tp, dimension_next.clone()), kit_mut).unwrap(); //子init_vec生成vec
+                    let (_, _, vec_temp) = val
+                        .process((tp, dimension_vec.clone(), num_pre, layer_now + 1), kit_mut)
+                        .unwrap(); //子init_vec生成vec
                     match vec_temp {
                         //将子vec中值放到当前vec中
                         RetInitVec::Float(vec_float) => match tp {
                             Type::Float | Type::ConstFloat => {
+                                num_pre = num_pre + vec_float.len() as i32;
                                 for val_son in vec_float {
                                     vec_ret_float.push(val_son);
                                 }
@@ -568,6 +582,7 @@ impl Process for ConstInitVal {
                         },
                         RetInitVec::Int(vec_int) => match tp {
                             Type::Int | Type::ConstInt => {
+                                num_pre = num_pre + vec_int.len() as i32;
                                 for val_son in vec_int {
                                     vec_ret_int.push(val_son);
                                 }
@@ -581,7 +596,12 @@ impl Process for ConstInitVal {
 
                 match tp {
                     Type::Float | Type::ConstFloat => {
-                        // init_padding_float(&mut vec_ret_float, dimension_vec.clone());
+                        // if layer_now == 1 {
+                        init_padding_float(&mut vec_ret_float, vec_ttt, num_pre_tmp, total);
+                        // } else {
+                        // let t_vec = vec![after];
+                        // init_padding_float(&mut vec_ret_float, t_vec, num_pre_tmp, total);
+                        // }
                         return Ok((
                             kit_mut.pool_inst_mut.make_int_const(-1),
                             ExpValue::None,
@@ -590,6 +610,16 @@ impl Process for ConstInitVal {
                     }
                     Type::Int | Type::ConstInt => {
                         // init_padding_int(&mut vec_ret_int, dimension_vec.clone());//这里
+                        // if layer_now == 1 {
+                        //     println!("now_layer==1");
+                        //     for i in &dimension_vec {
+                        //         println!("i:{:?}", i);
+                        //     }
+                        init_padding_int(&mut vec_ret_int, vec_ttt, num_pre_tmp, total);
+                        // } else {
+                        // let t_vec = vec![after];
+                        // init_padding_int(&mut vec_ret_int, t_vec, num_pre_tmp, total);
+                        // }
                         return Ok((
                             kit_mut.pool_inst_mut.make_int_const(-1),
                             ExpValue::None,
@@ -1190,6 +1220,7 @@ impl Process for InitVal {
                                 .unwrap();
                             match vec_val_temp {
                                 RetInitVec::Float(vec_f) => {
+                                    index = index + vec_f.len() as i32;
                                     for val in vec_f {
                                         vec_val_f.push(val);
                                     }
@@ -1200,6 +1231,7 @@ impl Process for InitVal {
                                     }
                                 }
                                 RetInitVec::Int(vec_i) => {
+                                    index = index + vec_i.len() as i32;
                                     for val in vec_i {
                                         vec_val_i.push(val);
                                     }
@@ -1210,7 +1242,7 @@ impl Process for InitVal {
                                     }
                                 }
                             }
-                            index = index + after; //init为vec,相对偏移加after
+                            // index = index + after; //init为vec,相对偏移加after
                         }
                     }
                 }
@@ -1226,12 +1258,17 @@ impl Process for InitVal {
                         //     let vec_temp = vec![after];
                         //     init_padding_float(&mut vec_val_f, vec_temp);
                         // }
+                        // if layer_now == 1 {
                         init_padding_float(
                             &mut vec_val_f,
                             vec_dimension_now,
                             num_precessor,
                             ttotal,
                         );
+                        // } else {
+                        //     let vec_temp = vec![after];
+                        //     init_padding_float(&mut vec_val_f, vec_temp, num_precessor, ttotal);
+                        // }
 
                         Ok((RetInitVec::Float(vec_val_f), vec_inst_init))
                     }
@@ -1244,7 +1281,14 @@ impl Process for InitVal {
                         //     // for i in vec_val_f
                         //     init_padding_int(&mut vec_val_i, vec_temp);
                         // }
+                        // init_padding_int(&mut vec_val_i, vec_dimension_now, num_precessor, ttotal);
+
+                        // if layer_now == 1 {
                         init_padding_int(&mut vec_val_i, vec_dimension_now, num_precessor, ttotal);
+                        // } else {
+                        //     let vec_temp = vec![after];
+                        //     init_padding_int(&mut vec_val_i, vec_temp, num_precessor, ttotal);
+                        // }
 
                         Ok((RetInitVec::Int(vec_val_i), vec_inst_init))
                     }
