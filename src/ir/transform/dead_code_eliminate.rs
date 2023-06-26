@@ -8,22 +8,28 @@
 //! 4. br指令
 //! 5. Head指令
 
+use std::collections::HashSet;
+
 use super::*;
 use crate::{
-    ir::{instruction::InstKind, module::Module},
+    ir::{analysis::call_optimize::call_optimize, instruction::InstKind, module::Module},
     utility::ObjPtr,
 };
 
-pub fn dead_code_eliminate(module: &mut Module, more_than_once: bool) {
+pub fn dead_code_eliminate(module: &mut Module, func_call_eliminate: bool) {
+    let mut func_optimize = HashSet::new();
+    if func_call_eliminate {
+        func_optimize = call_optimize(module);
+    }
     loop {
         let mut changed = false;
         func_process(module, |_, func| {
             bfs_inst_process(func.get_head(), |inst| {
-                changed |= eliminate_inst(inst);
+                changed |= eliminate_inst(inst, func_call_eliminate, &func_optimize);
             })
         });
 
-        if !more_than_once || !changed {
+        if !changed {
             break;
         }
     }
@@ -43,11 +49,21 @@ pub fn global_eliminate(module: &mut Module) {
     }
 }
 
-fn eliminate_inst(mut inst: ObjPtr<Inst>) -> bool {
+fn eliminate_inst(
+    mut inst: ObjPtr<Inst>,
+    func_call_eliminate: bool,
+    func_optimize: &HashSet<String>,
+) -> bool {
     let mut changed = false;
     if inst.get_use_list().len() == 0 {
         match inst.get_kind() {
-            InstKind::Call(_) | InstKind::Store | InstKind::Return | InstKind::Branch => {}
+            InstKind::Call(callee) => {
+                if func_call_eliminate && func_optimize.contains(&callee) {
+                    changed = true;
+                    inst.remove_self();
+                }
+            }
+            InstKind::Store | InstKind::Return | InstKind::Branch => {}
             _ => {
                 changed = true;
                 inst.remove_self();
