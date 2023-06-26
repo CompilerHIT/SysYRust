@@ -1276,7 +1276,7 @@ impl Process for InitVal {
                         // if layer_now == 1 {
                         //     init_padding_int(&mut vec_val_i, vec_dimension_now);
                         // } else {
-                        println!("after:{:?}", after);
+                        // println!("after:{:?}", after);
                         //     let vec_temp = vec![after];
                         //     // for i in vec_val_f
                         //     init_padding_int(&mut vec_val_i, vec_temp);
@@ -3387,11 +3387,11 @@ impl Process for EqExp {
                     }
                     _ => {}
                 } //这里可以进一步优化,计算cond是否恒为真或假
-                println!(
-                    "left{:?}right{:?}",
-                    inst_left.get_kind(),
-                    inst_right.get_kind()
-                );
+                  // println!(
+                  //     "left{:?}right{:?}",
+                  //     inst_left.get_kind(),
+                  //     inst_right.get_kind()
+                  // );
                 let mut inst_ne = kit_mut.pool_inst_mut.make_ne(inst_left, inst_right);
                 let mut result = -1;
                 if fflag == 1 {
