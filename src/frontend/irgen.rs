@@ -3429,7 +3429,7 @@ impl Process for LAndExp {
                         match inst_ret.get_ir_type() {
                             IrType::Float => {
                                 let inst_zero = kit_mut.pool_inst_mut.make_float_const(0.0);
-                                inst_ret = kit_mut.pool_inst_mut.make_eq(inst_ret, inst_zero);
+                                inst_ret = kit_mut.pool_inst_mut.make_ne(inst_ret, inst_zero);
                                 kit_mut.context_mut.push_inst_bb(inst_ret);
                                 kit_mut.context_mut.push_inst_bb(inst_zero);
                             }
@@ -3485,7 +3485,7 @@ impl Process for LAndExp {
                 match inst_right.get_ir_type() {
                     IrType::Float => {
                         let inst_zero = kit_mut.pool_inst_mut.make_float_const(0.0);
-                        inst_right = kit_mut.pool_inst_mut.make_eq(inst_right, inst_zero);
+                        inst_right = kit_mut.pool_inst_mut.make_ne(inst_right, inst_zero);
                         kit_mut.context_mut.push_inst_bb(inst_right);
                         kit_mut.context_mut.push_inst_bb(inst_zero);
                     }
