@@ -14,7 +14,7 @@ use crate::backend::instrs::{LIRInst, Operand};
 use crate::backend::module::AsmModule;
 use crate::backend::operand::{Reg, ARG_REG_COUNT};
 use crate::backend::regalloc::regalloc;
-use crate::backend::{block::*, operand, func};
+use crate::backend::{block::*, func, operand};
 // use crate::backend::regalloc::simulate_assign;
 use crate::backend::regalloc::{
     easy_ls_alloc::Allocator, regalloc::Regalloc, structs::FuncAllocStat,
@@ -265,7 +265,7 @@ impl Func {
     }
 
     pub fn calc_live(&mut self) {
-        let calc_live_file = "callive.txt";
+        let calc_live_file = "./data/callive.txt";
         // fs::remove_file(calc_live_file);
         log_file!(
             calc_live_file,
@@ -410,23 +410,26 @@ impl Func {
         // 函数返回地址保存在ra中
         self.calc_live();
         // let mut allocator = crate::backend::regalloc::easy_ls_alloc::Allocator::new();
-        let mut allocator =crate::backend::regalloc::easy_gc_alloc::Allocator::new();
+        let mut allocator = crate::backend::regalloc::easy_gc_alloc::Allocator::new();
         // let mut allocator=crate::backend::regalloc::opt_gc_alloc::Allocator::new();
         // let mut allocator = crate::backend::regalloc::base_alloc::Allocator::new();
         let mut alloc_stat = allocator.alloc(self);
 
         // 评价估计结果
-        log_file!("000_eval_alloc.txt","func:{},alloc_cost:{}",self.label,regalloc::eval_alloc(self,& alloc_stat.dstr, &alloc_stat.spillings));
-
-
+        log_file!(
+            "./data/000_eval_alloc.txt",
+            "func:{},alloc_cost:{}",
+            self.label,
+            regalloc::eval_alloc(self, &alloc_stat.dstr, &alloc_stat.spillings)
+        );
 
         log_file!(
-            "calout.txt",
+            "./data/calout.txt",
             "{:?},\n{:?}",
             alloc_stat.dstr,
             alloc_stat.spillings
         );
-        let check_alloc_path = "check_alloc.txt";
+        let check_alloc_path = "./data/check_alloc.txt";
         log_file!(check_alloc_path, "{:?}", self.label);
         log_file!(
             check_alloc_path,
@@ -460,7 +463,8 @@ impl Func {
                 }
                 let dst = inst.get_dst();
                 let src = inst.get_lhs();
-                if inst.get_type() == InstrsType::OpReg(super::instrs::SingleOp::IMv) && dst == src {
+                if inst.get_type() == InstrsType::OpReg(super::instrs::SingleOp::IMv) && dst == src
+                {
                     bb.as_mut().insts.remove(index);
                 } else {
                     index += 1;
@@ -468,7 +472,7 @@ impl Func {
             }
         }
     }
-    
+
     fn handle_parameters(&mut self, ir_func: &Function) {
         let mut iparam: Vec<_> = ir_func
             .get_parameter_list()
@@ -719,29 +723,33 @@ impl Func {
         return out;
     }
     // 获取指令数量
-    pub fn num_insts(&self)->usize {
+    pub fn num_insts(&self) -> usize {
         let mut out = 0;
         self.blocks.iter().for_each(|bb| out += bb.insts.len());
         return out;
     }
 
     // 获取寄存器数量
-    pub fn num_regs(&self)->usize{
-        let mut passed:Bitmap=Bitmap::with_cap(1000);
+    pub fn num_regs(&self) -> usize {
+        let mut passed: Bitmap = Bitmap::with_cap(1000);
         let mut out = 0;
-        self.blocks.iter().for_each(|bb|{
-            bb.insts.iter().for_each(|inst|{
+        self.blocks.iter().for_each(|bb| {
+            bb.insts.iter().for_each(|inst| {
                 for reg in inst.get_reg_def() {
-                    let id=reg.get_id()<<1|match reg.get_type() {
-                        ScalarType::Float=>0,ScalarType::Int=>1,_=>panic!("unleagal")
-                    };
-                    if passed.contains(id as usize) {continue;}
+                    let id = reg.get_id() << 1
+                        | match reg.get_type() {
+                            ScalarType::Float => 0,
+                            ScalarType::Int => 1,
+                            _ => panic!("unleagal"),
+                        };
+                    if passed.contains(id as usize) {
+                        continue;
+                    }
                     passed.insert(id as usize);
-                    out+=1;
+                    out += 1;
                 }
             })
         });
         return out;
     }
-
 }
