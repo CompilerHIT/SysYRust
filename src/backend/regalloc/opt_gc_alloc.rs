@@ -37,7 +37,7 @@ impl Regalloc for Allocator {
     fn alloc(&mut self, func: &crate::backend::instrs::Func) -> FuncAllocStat {
         let mut out = self.easy_gc_allocator.alloc(func);
         // 检查下分配前的分配结果
-        let path = "./data/befor_gc_opt.txt";
+        let path = "./logs/befor_gc_opt.txt";
         log_file!(
             path,
             "func:{}\ndstr:{:?}\n\nspillings:{:?}",
@@ -60,7 +60,7 @@ impl Regalloc for Allocator {
             );
             if !ok {
                 log_file!(
-                    "./data/merge_times.txt",
+                    "./logs/merge_times.txt",
                     "func:{},merge times:{}",
                     func.label,
                     i + 1
@@ -69,7 +69,7 @@ impl Regalloc for Allocator {
             }
             if i == max_times - 1 {
                 log_file!(
-                    "./data/merge_times.txt",
+                    "./logs/merge_times.txt",
                     "unend!func:{},merge times:{}",
                     func.label,
                     i + 1

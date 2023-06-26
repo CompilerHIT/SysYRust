@@ -38,15 +38,15 @@ impl<'f> AsmBuilder<'f> {
         match op {
             "fne.s" => {
                 writeln!(self.f, "    feq.s {dest}, {lhs}, {rhs}")?;
-                writeln!(self.f, "    xori {dest}, 1")
+                writeln!(self.f, "    xori {dest}, {dest}, 1")
             },
             "fgt.s" => {
                 writeln!(self.f, "    flt.s {dest}, {lhs}, {rhs}")?;
-                writeln!(self.f, "    xori {dest}, 1")
+                writeln!(self.f, "    xori {dest}, {dest}, 1")
             },
             "fge.s" => {
                 writeln!(self.f, "    flt.s {dest}, {rhs}, {lhs}")?;
-                writeln!(self.f, "    xori {dest}, 1")
+                writeln!(self.f, "    xori {dest}, {dest}, 1")
             },
             _ => {
                 if is_imm {

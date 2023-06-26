@@ -69,7 +69,7 @@ fn run_main() {
 
     // ir优化
     // sysylib::ir::optimizer_run(&mut module, (&mut pool_bb, &mut pool_inst), o1_option); //o1_option);
-    //sysylib::log_file!(
+    //sysylib:://log_file!(
     //"call_map",
     //"file {}:\n{}\n",
     //filename,

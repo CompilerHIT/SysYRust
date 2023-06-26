@@ -1,6 +1,6 @@
 #!/bin/bash
 
-source_folder="./data/functional/"
+source_folder="./logs/functional/"
 
 source_files=$(ls "${source_folder}" | grep '^[0-9].*\.sy$')
 

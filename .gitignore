@@ -16,3 +16,4 @@ dump*.ll
 row_asm.log
 *.log
 *.c
+*.out

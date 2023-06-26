@@ -1,5 +1,5 @@
 # 测试
-sudo rm ./data/log
-sudo rm ./data/fail.log
+sudo rm ./logs/log
+sudo rm ./logs/fail.log
 ./test -u -p functional
 

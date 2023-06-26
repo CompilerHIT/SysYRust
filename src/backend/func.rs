@@ -610,9 +610,24 @@ impl Func {
                 builder.op2("add", "gp", "gp", "sp", false, true);
                 builder.s(&ra.to_string(false), "gp", -ADDR_SIZE, false, true);
 
+                let mut first = true;
+                let mut start = 0;
                 if !is_main {
                     for (reg, slot) in map.iter() {
-                        builder.s(&reg.to_string(false), "gp", -(slot.get_pos()), false, true);
+                        if operand::is_imm_12bs(slot.get_pos()) {
+                            builder.s(&reg.to_string(false), "gp", -(slot.get_pos()), false, true);
+                        } else if operand::is_imm_12bs(stack_size - slot.get_pos()) {
+                            builder.s(&reg.to_string(false), "sp", slot.get_pos(), false, true);
+                        } else {
+                            if first {
+                                let offset = stack_size - slot.get_pos();
+                                builder.op1("li", "gp", &offset.to_string());
+                                builder.op2("add", "gp", "gp", "sp", false, true);
+                                first = false;
+                            }
+                            builder.s(&reg.to_string(false), "gp", -start, false, true);
+                            start += ADDR_SIZE;
+                        }
                     }
                 }
             }
@@ -641,9 +656,24 @@ impl Func {
                 builder.op2("add", "sp", "sp", "gp", false, true);
                 builder.l(&ra.to_string(false), "sp", -ADDR_SIZE, false, true);
 
+                let mut first = true;
+                let mut start = 0;
                 if !is_main {
                     for (reg, slot) in map_clone.iter() {
-                        builder.l(&reg.to_string(false), "sp", -(slot.get_pos()), false, true);
+                        if operand::is_imm_12bs(slot.get_pos()) {
+                            builder.l(&reg.to_string(false), "gp", -(slot.get_pos()), false, true);
+                        } else if operand::is_imm_12bs(stack_size - slot.get_pos()) {
+                            builder.l(&reg.to_string(false), "sp", slot.get_pos(), false, true);
+                        } else {
+                            if first {
+                                let offset = stack_size - slot.get_pos();
+                                builder.op1("li", "gp", &offset.to_string());
+                                builder.op2("add", "gp", "gp", "sp", false, true);
+                                first = false;
+                            }
+                            builder.l(&reg.to_string(false), "sp", -start, false, true);
+                            start += ADDR_SIZE;
+                        }
                     }
                 }
             }
