@@ -1,5 +1,5 @@
 use sysylib::frontend::ast::*;
-use hexponent::FloatLiteral;
+use hexf_parse::parse_hexf32;
 
 
 
@@ -489,8 +489,9 @@ HexadecimalFloat:FloatConst = {
         //     }
         // }
         // -1129.0
-        let float_repr: FloatLiteral = head.parse().unwrap();
-        float_repr.convert::<f32>().inner()
+        //let float_repr: FloatLiteral = head.parse().unwrap();
+        //float_repr.convert::<f32>().inner()
+        parse_hexf32(head, false).unwrap()
     },
 
     <head:r"0[xX][0-9a-fA-F]+\.[0-9a-fA-F]+[pP][-+]?[0-9]+"> =>{
@@ -509,8 +510,10 @@ HexadecimalFloat:FloatConst = {
         //     }
         // }
         // -1129.0
-        let float_repr: FloatLiteral = head.parse().unwrap();
-        float_repr.convert::<f32>().inner()
+        
+        //let float_repr: FloatLiteral = head.parse().unwrap();
+        //float_repr.convert::<f32>().inner()
+        parse_hexf32(head, false).unwrap()
     },
 
     <mut head:r"0[xX]\.[0-9a-fA-F]+[pP][-+]?[0-9]+"> =>{
@@ -523,8 +526,9 @@ HexadecimalFloat:FloatConst = {
         //     }
         // }
         // -1129.0
-        let float_repr: FloatLiteral = head.parse().unwrap();
-        float_repr.convert::<f32>().inner()
+        //let float_repr: FloatLiteral = head.parse().unwrap();
+        //float_repr.convert::<f32>().inner()
+        parse_hexf32(head, false).unwrap()
     },
 
     <head:r"0[xX][0-9a-fA-F]+\.[pP][-+]?[0-9]+"> =>{
@@ -539,9 +543,9 @@ HexadecimalFloat:FloatConst = {
         //     }
         
         // -1129.0
-        let float_repr: FloatLiteral = head.parse().unwrap();
-        float_repr.convert::<f32>().inner()
-        
+        //let float_repr: FloatLiteral = head.parse().unwrap();
+        //float_repr.convert::<f32>().inner()
+        parse_hexf32(head, false).unwrap()
     },
 
     // <head:HexadecimalConst>  <exp:r"[pP][-+]?[0-9]+"> =>{
