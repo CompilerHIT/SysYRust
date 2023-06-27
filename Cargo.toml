@@ -19,7 +19,6 @@ regex = "1"
 clap = "2.33"
 
 rand = "0.8.5"
-biheap = { path = "./biheap" }
 hexf-parse = "0.2.1"
 
 [build-dependencies]

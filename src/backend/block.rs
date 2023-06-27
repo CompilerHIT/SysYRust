@@ -1290,7 +1290,6 @@ impl BB {
                             && op.get_id() - 10 - FLOAT_BASE < fcnt
                             && op.get_id() >= 10 + FLOAT_BASE
                         {
-                            assert!(false);
                             continue;
                         }
                         caller_regs.insert(*reg);
