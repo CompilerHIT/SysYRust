@@ -29,19 +29,6 @@ where
     });
 }
 
-/// 从head开始，深度优先遍历每一个基本块，并对基本块中的指令进行处理
-/// # Arguments
-/// * `head` - 深度优先遍历的起始点
-/// * `predicate` - 对每一个基本块进行处理的闭包，这个闭包接受一个参数，类型为inst,并对inst进行处理
-pub fn dfs_inst_process<F>(head: ObjPtr<BasicBlock>, mut predicate: F)
-where
-    F: FnMut(ObjPtr<Inst>),
-{
-    dfs_bb_process(head, |bb| {
-        inst_process_in_bb(bb.get_head_inst(), &mut predicate)
-    });
-}
-
 /// 从head开始，广度优先遍历每一个基本块，并对基本块进行处理
 /// # Arguments
 /// * `head` - 广度优先遍历的起始点
@@ -68,11 +55,11 @@ where
     }
 }
 
-/// 从head开始，深度优先遍历每一个基本块，并对基本块进行处理
+/// 从head开始，深度优先先序遍历每一个基本块，并对基本块进行处理
 /// # Arguments
 /// * `head` - 深度优先遍历的起始点
 /// * `predicate` - 对每一个基本块进行处理的闭包，这个闭包接受一个参数，类型为bb,并对bb进行处理
-pub fn dfs_bb_process<F>(head: ObjPtr<BasicBlock>, mut predicate: F)
+pub fn dfs_pre_order_bb_process<F>(head: ObjPtr<BasicBlock>, mut predicate: F)
 where
     F: FnMut(ObjPtr<BasicBlock>),
 {
@@ -89,6 +76,32 @@ where
             stack.push(next_bb.clone());
         }
         predicate(bb);
+    }
+}
+
+/// 从head开始，深度优先后序遍历每一个基本块，并对基本块进行处理
+/// # Arguments
+/// * `head` - 深度优先遍历的起始点
+/// * `predicate` - 对每一个基本块进行处理的闭包，这个闭包接受一个参数，类型为bb,并对bb进行处理
+pub fn dfs_post_order_bb_process<F>(head: ObjPtr<BasicBlock>, mut predicate: F)
+where
+    F: FnMut(ObjPtr<BasicBlock>),
+{
+    let mut visited = HashSet::new();
+    let mut stack = Vec::new();
+    stack.push(head);
+    while let Some(bb) = stack.pop() {
+        if bb.get_next_bb().is_empty() || bb.get_next_bb().iter().all(|x| visited.contains(x)) {
+            visited.insert(bb);
+            predicate(bb);
+        } else {
+            stack.push(bb);
+            for next_bb in bb.get_next_bb().iter() {
+                if !visited.contains(next_bb) {
+                    stack.push(next_bb.clone());
+                }
+            }
+        }
     }
 }
 
