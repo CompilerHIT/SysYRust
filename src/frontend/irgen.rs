@@ -1727,6 +1727,10 @@ impl Process for Assign {
                     Type::ConstInt | Type::Int => {
                         let ptr = kit_mut.pool_inst_mut.make_global_int_array_load(array_inst);
                         kit_mut.context_mut.push_inst_bb(ptr);
+                        let inst_offset = offset_calculate(&lval.id, &mut lval.exp_vec, kit_mut);
+                        let inst_ptr = kit_mut.pool_inst_mut.make_gep(ptr, inst_offset);
+                        // kit_mut.context_mut.push_inst_bb(inst_offset); //这里需要吗  不需要
+                        kit_mut.context_mut.push_inst_bb(inst_ptr);
                         let inst_store = kit_mut.pool_inst_mut.make_int_store(ptr, inst_r);
                         kit_mut.context_mut.push_inst_bb(inst_store);
                     }
