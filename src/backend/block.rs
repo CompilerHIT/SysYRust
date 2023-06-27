@@ -1153,11 +1153,7 @@ impl BB {
                     self.phis
                         .push(pool.put_inst(LIRInst::new(inst_kind, vec![phi_reg, temp.clone()])));
 
-                    let mut op_list: HashSet<ObjPtr<Inst>> = HashSet::new();
                     for (index, op) in ir_block_inst.get_operands().iter().enumerate() {
-                        if !op_list.insert(*op) {
-                            continue;
-                        }
                         // log!("op: {:?}", op.get_kind());
                         let src_reg = match op.get_kind() {
                             InstKind::ConstInt(iimm) | InstKind::GlobalConstInt(iimm) => {
