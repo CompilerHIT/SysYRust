@@ -68,7 +68,6 @@ pub fn call_optimize(module: &mut Module) -> HashSet<String> {
         .cloned()
         .collect();
 
-    crate::log_file!("func_log", "function can be optimized: {:?}", optimizable);
     optimizable
 }
 
@@ -109,7 +108,6 @@ fn call_removable_test_in_inst(
                 | InstKind::Parameter
                 | InstKind::Load => {
                     // 全局变量和全局数组和外部数组的指针
-                    crate::log_file!("func_log", "unoptimizable: {}", name);
                     unoptimizable.insert(format!("{}", name));
                     *flag = false;
                 }

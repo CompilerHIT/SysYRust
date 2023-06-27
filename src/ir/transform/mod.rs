@@ -16,20 +16,17 @@ pub fn optimizer_run(
     functional_optimizer(module);
 
     if optimize_flag {
-        // 死代码删除
-        dead_code_eliminate::dead_code_eliminate(module, true);
-
         // 函数内联
         func_inline::inline_run(module, &mut pools);
 
         // 死代码删除
-        dead_code_eliminate::dead_code_eliminate(module, true);
+        //dead_code_eliminate::dead_code_eliminate(module, true);
 
         // 简化cfg
-        simplify_cfg::simplify_cfg_run(module, &mut pools);
+        //simplify_cfg::simplify_cfg_run(module, &mut pools);
 
         // phi优化
-        phi_optimizer::phi_run(module);
+        //phi_optimizer::phi_run(module);
         // TODO: 性能优化
     }
 }
@@ -42,5 +39,5 @@ fn functional_optimizer(module: &mut Module) {
     phi_optimizer::phi_run(module);
 
     // 全局死代码删除
-    //dead_code_eliminate::global_eliminate(module);
+    dead_code_eliminate::global_eliminate(module);
 }
