@@ -920,13 +920,13 @@ impl Process for VarDecl {
                                 if flag>1{
                                     tp = Type::Float;
                                 }
-                                println!("func:{:?},tp{:?}",kit_mut.context_mut.func_now,tp);
+                                // println!("func:{:?},tp{:?}",kit_mut.context_mut.func_now,tp);
                                 let (mut inst_ptr, mut val) =
                                     exp.process(tp, kit_mut).unwrap();
                                 let mut flag_trans = false;
                                 if flag<=1{
                                     flag_trans = true;
-                                    inst_ptr = kit_mut.pool_inst_mut.make_float_to_int(inst_ptr);
+                                    inst_ptr = kit_mut.pool_inst_mut.make_int_to_float(inst_ptr);
                                 }
                                 // let (mut inst_ptr, val) =
                                 //     exp.process(Type::Float, kit_mut).unwrap();
@@ -2350,7 +2350,7 @@ impl Process for LVal {
             Type::ConstFloat | Type::Float => {
                 match symbol.tp {
                     Type::Int | Type::ConstInt => {
-                        println!("id:{:?}",self.id);
+                        // println!("id:{:?}",self.id);
                         let inst_trans = kit_mut.pool_inst_mut.make_int_to_float(var);
                         // let mut val = var.as_ref().get_float_bond();
                         // let mut val_ret = ExpValue::Int(val as i32);
@@ -2432,7 +2432,7 @@ impl Process for LVal {
                 match symbol.tp {
                     Type::Float | Type::ConstFloat => {
                         let inst_trans = kit_mut.pool_inst_mut.make_float_to_int(var);
-                        println!("float2int{:?},func{:?}",self.id,kit_mut.context_mut.func_now);
+                        // println!("float2int{:?},func{:?}",self.id,kit_mut.context_mut.func_now);
                         // let mut val = var.as_ref().get_float_bond();
                         // let mut val_ret = ExpValue::Int(val as i32);
                         match var.as_ref().get_kind() {
@@ -2974,7 +2974,7 @@ impl Process for MulExp {
             MulExp::MulExp((mulexp, unaryexp)) => {
                 let (inst_left, lval) = mulexp.as_mut().process(input, kit_mut).unwrap();
                 let (inst_right, rval) = unaryexp.process(input, kit_mut).unwrap();
-                println!("func:{:?}make_mul:left:{:?},right:{:?}",kit_mut.context_mut.func_now,inst_left.get_kind(),inst_right.get_kind());
+                // println!("func:{:?}make_mul:left:{:?},right:{:?}",kit_mut.context_mut.func_now,inst_left.get_kind(),inst_right.get_kind());
                 let mut inst = kit_mut.pool_inst_mut.make_mul(inst_left, inst_right);
 
                 let mut val_ret = lval;
