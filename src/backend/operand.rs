@@ -225,4 +225,11 @@ impl Reg {
                 _ => panic!("unreachable"),
             }
     }
+    pub fn from_bit_code(bit_code: i32) -> Reg {
+        if bit_code % 2 == 1 {
+            Reg::new(bit_code >> 1, ScalarType::Float)
+        } else {
+            Reg::new(bit_code >> 1, ScalarType::Int)
+        }
+    }
 }
