@@ -707,6 +707,13 @@ impl Process for VarDecl {
                                     }
                                 } else {
                                     if flag_trans {
+                                        match val {
+                                            ExpValue::Float(f) => {
+                                                inst_ptr =
+                                                    kit_mut.pool_inst_mut.make_int_const(f as i32);
+                                            }
+                                            _ => {}
+                                        }
                                         kit_mut.context_mut.push_inst_bb(inst_ptr);
                                     }
 
@@ -969,6 +976,14 @@ impl Process for VarDecl {
                                     }
                                 } else {
                                     if flag_trans {
+                                        match val {
+                                            ExpValue::Int(i) => {
+                                                inst_ptr = kit_mut
+                                                    .pool_inst_mut
+                                                    .make_float_const(i as f32);
+                                            }
+                                            _ => {}
+                                        }
                                         kit_mut.context_mut.push_inst_bb(inst_ptr);
                                     }
                                     if !kit_mut.context_mut.add_var(
