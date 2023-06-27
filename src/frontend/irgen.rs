@@ -1687,20 +1687,38 @@ impl Process for Assign {
         if flag > 1 {
             tp = Type::Float;
         }
-        let (mut inst_r, _) = self.exp.process(tp, kit_mut).unwrap();
+        let (mut inst_r, val) = self.exp.process(tp, kit_mut).unwrap();
         match symbol.tp {
             Type::ConstFloat | Type::Float => {
                 if flag <= 1 {
                     //inst_r是int，要求是float
-                    inst_r = kit_mut.pool_inst_mut.make_int_to_float(inst_r);
-                    kit_mut.context_mut.push_inst_bb(inst_r);
+                    match val {
+                        ExpValue::Int(i) => {
+                            //需转型且值确定,直接转
+                            inst_r = kit_mut.pool_inst_mut.make_float_const(i as f32);
+                            kit_mut.context_mut.push_inst_bb(inst_r);
+                        }
+                        _ => {
+                            inst_r = kit_mut.pool_inst_mut.make_int_to_float(inst_r);
+                            kit_mut.context_mut.push_inst_bb(inst_r);
+                        }
+                    }
                 }
             }
             Type::ConstInt | Type::Int => {
                 if flag > 1 {
                     //inst_r是float，要求是int
-                    inst_r = kit_mut.pool_inst_mut.make_float_to_int(inst_r);
-                    kit_mut.context_mut.push_inst_bb(inst_r);
+                    match val {
+                        ExpValue::Float(f) => {
+                            //需转型且值确定,直接转
+                            inst_r = kit_mut.pool_inst_mut.make_int_const(f as i32);
+                            kit_mut.context_mut.push_inst_bb(inst_r);
+                        }
+                        _ => {
+                            inst_r = kit_mut.pool_inst_mut.make_float_to_int(inst_r);
+                            kit_mut.context_mut.push_inst_bb(inst_r);
+                        }
+                    }
                 }
             }
             _ => {
@@ -1711,6 +1729,7 @@ impl Process for Assign {
         if let Some(array_inst) = symbol.array_inst {
             //如果是数组
             if symbol.layer < 0 {
+                // println!("全局数组");
                 match symbol.tp {
                     Type::ConstFloat | Type::Float => {
                         let ptr = kit_mut
@@ -1731,7 +1750,7 @@ impl Process for Assign {
                         let inst_ptr = kit_mut.pool_inst_mut.make_gep(ptr, inst_offset);
                         // kit_mut.context_mut.push_inst_bb(inst_offset); //这里需要吗  不需要
                         kit_mut.context_mut.push_inst_bb(inst_ptr);
-                        let inst_store = kit_mut.pool_inst_mut.make_int_store(ptr, inst_r);
+                        let inst_store = kit_mut.pool_inst_mut.make_int_store(inst_ptr, inst_r);
                         kit_mut.context_mut.push_inst_bb(inst_store);
                     }
                     _ => {
