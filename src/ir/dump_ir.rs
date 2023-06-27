@@ -256,7 +256,6 @@ fn dump_block(
     local_map: &mut HashMap<ObjPtr<Inst>, String>,
     mut name_index: i32,
 ) -> (i32, String) {
-    crate::log!("dump block {}", block.get_name());
     let mut text = String::new();
     let mut inst = block.get_head_inst();
     while !inst.is_tail() {
