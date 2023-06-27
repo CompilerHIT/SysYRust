@@ -21,7 +21,7 @@ impl Inst {
     pub fn get_float_to_int_value(&self) -> ObjPtr<Inst> {
         // 正确性检查
         if let InstKind::FtoI = self.get_kind() {
-            debug_assert_eq!(self.get_use_list().len(), 1);
+            debug_assert_eq!(self.user.get_operands().len(), 1);
             if self.get_ir_type() == IrType::Int {
                 self.user.get_operand(0)
             } else {
@@ -36,7 +36,7 @@ impl Inst {
     pub fn set_float_to_int_value(&mut self, value: ObjPtr<Inst>) {
         // 正确性检查
         if let InstKind::FtoI = self.get_kind() {
-            debug_assert_eq!(self.get_use_list().len(), 1);
+            debug_assert_eq!(self.user.get_operands().len(), 1);
             if self.get_ir_type() == IrType::Int {
                 self.user.get_operand(0).as_mut().remove_user(self);
                 value.as_mut().add_user(self);
