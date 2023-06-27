@@ -785,15 +785,19 @@ impl BB {
                     let float_param_cnt = fcnt;
                     let reg_cnt = min(icnt, ARG_REG_COUNT);
                     func.as_mut().max_params = max(reg_cnt, func.max_params);
-                    
-                    for arg in arg_list.iter().rev() {
+                    let mut final_args : Vec<_> = arg_list.iter().filter(|arg| arg.get_ir_type() != IrType::Float).collect();
+                    final_args.append(&mut arg_list.iter().filter(|arg| arg.get_ir_type() == IrType::Float).collect());
+                    for arg in final_args.iter().rev() {
+                        if func.label == "params_f40_i24" {
+                            log!("args type: {:?}", arg.get_ir_type());
+                        }
                         match arg.as_ref().get_param_type() {
                             IrType::Int | IrType::IntPtr | IrType::FloatPtr => {
                                 icnt -= 1;
                                 if icnt >= ARG_REG_COUNT {
                                     let src_reg = match arg.get_param_type() {
                                         IrType::Int => {
-                                            self.resolve_operand(func, *arg, true, map_info, pool)
+                                            self.resolve_operand(func, **arg, true, map_info, pool)
                                         }
                                         IrType::IntPtr | IrType::FloatPtr => {
                                             let src_reg = self.resolve_operand(
@@ -811,7 +815,7 @@ impl BB {
                                                 pool,
                                             );
                                             let dst_reg = self
-                                                .resolve_operand(func, *arg, true, map_info, pool);
+                                                .resolve_operand(func, **arg, true, map_info, pool);
                                             self.insts.push(pool.put_inst(LIRInst::new(
                                                 InstrsType::Binary(BinaryOp::Shl),
                                                 vec![
@@ -864,7 +868,7 @@ impl BB {
                                                 pool,
                                             );
                                             let dst_reg = self
-                                                .resolve_operand(func, *arg, true, map_info, pool);
+                                                .resolve_operand(func, **arg, true, map_info, pool);
                                             self.insts.push(pool.put_inst(LIRInst::new(
                                                 InstrsType::Binary(BinaryOp::Shl),
                                                 vec![
@@ -881,7 +885,7 @@ impl BB {
                                             self.insts.push(pool.put_inst(add));
                                             dst_reg
                                         }
-                                        _ => self.resolve_operand(func, *arg, true, map_info, pool),
+                                        _ => self.resolve_operand(func, **arg, true, map_info, pool),
                                     };
 
                                     let stack_addr = &func.as_ref().stack_addr;
@@ -915,7 +919,7 @@ impl BB {
                                 fcnt -= 1;
                                 if fcnt >= ARG_REG_COUNT {
                                     let src_reg =
-                                        self.resolve_operand(func, *arg, true, map_info, pool);
+                                        self.resolve_operand(func, **arg, true, map_info, pool);
                                     // 最后一个溢出参数在最下方（最远离sp位置）
                                     let offset = Operand::IImm(IImm::new(
                                         -(max(0, icnt - ARG_REG_COUNT)
@@ -952,7 +956,7 @@ impl BB {
                                                 pool,
                                             );
                                             let dst_reg = self
-                                                .resolve_operand(func, *arg, true, map_info, pool);
+                                                .resolve_operand(func, **arg, true, map_info, pool);
                                             self.insts.push(pool.put_inst(LIRInst::new(
                                                 InstrsType::Binary(BinaryOp::Shl),
                                                 vec![
@@ -969,7 +973,7 @@ impl BB {
                                             self.insts.push(pool.put_inst(add));
                                             dst_reg
                                         }
-                                        _ => self.resolve_operand(func, *arg, true, map_info, pool),
+                                        _ => self.resolve_operand(func, **arg, true, map_info, pool),
                                     };
 
                                     let stack_addr = &func.as_ref().stack_addr;

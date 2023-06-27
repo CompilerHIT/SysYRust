@@ -44,7 +44,6 @@ fn delete_one_jump_bb(head: ObjPtr<BasicBlock>) {
             }
 
             if let InstKind::Branch = bb.get_head_inst().get_kind() {
-                println!("delete one jump bb: {}", bb.get_name());
                 debug_assert_eq!(bb.get_head_inst().is_jmp(), true);
                 changed = true;
 

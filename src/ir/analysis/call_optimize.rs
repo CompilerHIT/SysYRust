@@ -48,9 +48,10 @@ pub fn call_optimize(module: &mut Module) -> HashSet<String> {
         let mut to_remove = Vec::new();
         for (name, uncertain_set) in uncertain.iter() {
             let intersection: Vec<_> = uncertain_set.intersection(&unoptimizable).collect();
-            if intersection.len() != 0 {
+            if intersection.len() != 0 || unoptimizable.contains(name) {
                 changed = true;
                 to_remove.push(name.clone());
+                unoptimizable.insert(name.clone());
             }
         }
 
@@ -62,11 +63,13 @@ pub fn call_optimize(module: &mut Module) -> HashSet<String> {
             break;
         }
     }
-
-    optimizable
+    let optimizable = optimizable
         .union(&uncertain.keys().cloned().collect())
         .cloned()
-        .collect()
+        .collect();
+
+    crate::log_file!("func_log", "function can be optimized: {:?}", optimizable);
+    optimizable
 }
 
 fn get_gep_ptr(inst: ObjPtr<Inst>) -> ObjPtr<Inst> {
@@ -106,6 +109,7 @@ fn call_removable_test_in_inst(
                 | InstKind::Parameter
                 | InstKind::Load => {
                     // 全局变量和全局数组和外部数组的指针
+                    crate::log_file!("func_log", "unoptimizable: {}", name);
                     unoptimizable.insert(format!("{}", name));
                     *flag = false;
                 }

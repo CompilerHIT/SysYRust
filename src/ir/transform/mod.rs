@@ -39,7 +39,7 @@ fn functional_optimizer(module: &mut Module) {
     dead_code_eliminate::dead_code_eliminate(module, true);
 
     // phi优化
-    //phi_optimizer::phi_run(module);
+    phi_optimizer::phi_run(module);
 
     // 全局死代码删除
     //dead_code_eliminate::global_eliminate(module);
