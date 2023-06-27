@@ -81,10 +81,15 @@ impl<'f> AsmBuilder<'f> {
     }
 
     pub fn op1(&mut self, op: &str, dest: &str, src: &str) -> Result<()> {
-        if op == "addiw" {
-            writeln!(self.f, "    addiw {dest}, zero, {src}")
+        //FIXME: 为何一定使用rtz？
+        if op == "fcvt.w.s" {
+            writeln!(self.f, "    {op} {dest}, {src}, rtz")
         } else {
-            writeln!(self.f, "    {op} {dest}, {src}")
+            if op == "addiw" {
+                writeln!(self.f, "    addiw {dest}, zero, {src}")
+            } else {
+                writeln!(self.f, "    {op} {dest}, {src}")
+            }
         }
     }
 

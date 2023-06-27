@@ -4,7 +4,6 @@ use std::fmt::Display;
 use std::ops::Range;
 
 use crate::backend::block::BB;
-use crate::backend::operand::Reg;
 use crate::utility::ObjPtr;
 use crate::utility::ScalarType;
 

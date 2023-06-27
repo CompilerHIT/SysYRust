@@ -2,6 +2,7 @@ use std::cmp::max;
 use std::collections::LinkedList;
 pub use std::collections::{HashSet, VecDeque};
 pub use std::fs::File;
+use std::fs::OpenOptions;
 pub use std::hash::{Hash, Hasher};
 pub use std::io::Result;
 use std::io::Write;
@@ -409,21 +410,21 @@ impl Func {
     pub fn allocate_reg(&mut self) {
         // 函数返回地址保存在ra中
         self.calc_live();
-        for bb in self.blocks.iter() {
-            if self.label != "float_eq" {
-                continue;
-            }
-            for inst in bb.insts.iter() {
-                inst.get_regs().iter().for_each(|r| {
-                    log!("{:?}", inst);
-                    log!("{}", inst.as_ref());
-                    log!("{}", r);
-                })
-            }
-        }
+        // for bb in self.blocks.iter() {
+        //     if self.label != "float_eq" {
+        //         continue;
+        //     }
+        //     for inst in bb.insts.iter() {
+        //         inst.get_regs().iter().for_each(|r| {
+        //             log!("{:?}", inst);
+        //             log!("{}", inst.as_ref());
+        //             log!("{}", r);
+        //         })
+        //     }
+        // }
         // let mut allocator = crate::backend::regalloc::easy_ls_alloc::Allocator::new();
-        let mut allocator = crate::backend::regalloc::easy_gc_alloc::Allocator::new();
-        // let mut allocator=crate::backend::regalloc::opt_gc_alloc::Allocator::new();
+        // let mut allocator = crate::backend::regalloc::easy_gc_alloc::Allocator::new();
+        let mut allocator = crate::backend::regalloc::opt_gc_alloc::Allocator::new();
         // let mut allocator = crate::backend::regalloc::base_alloc::Allocator::new();
         let mut alloc_stat = allocator.alloc(self);
 

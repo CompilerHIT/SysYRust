@@ -5,6 +5,7 @@ use crate::{
         instrs::{Func, BB},
         operand::Reg,
     },
+    container::bitmap::{self, Bitmap},
     log_file, log_file_uln,
     utility::{ObjPool, ObjPtr, ScalarType},
 };
@@ -12,6 +13,7 @@ use core::panic;
 use std::{
     collections::{HashMap, HashSet, LinkedList, VecDeque},
     fmt::{self, format},
+    hash::Hash,
 };
 
 use super::{
@@ -53,17 +55,20 @@ impl Allocator {
         let ends_index_bb = &self.ends_index_bb;
         self.interference_graph = regalloc::build_intereference(func, &ends_index_bb);
         self.availables = regalloc::build_availables(func, &ends_index_bb);
-        // 初始化虚拟寄存器的剩余可用物理寄存器表
+        self.nums_neighbor_color = regalloc::build_nums_neighbor_color(func, ends_index_bb);
+        let mut bitmap: Bitmap = Bitmap::with_cap(5000);
+        let tmp_set: HashSet<Reg> = HashSet::new();
+        // 建立待分配寄存器图 和 并统计悬挂点
         for cur_bb in func.blocks.iter() {
             for inst in cur_bb.insts.iter() {
                 // 统计所有出现过的寄存器，包括物理寄存器和虚拟寄存器,初始化它们的可用表
                 for reg in inst.get_regs() {
-                    if self.nums_neighbor_color.contains_key(&reg) {
+                    let bit_code = reg.bit_code();
+                    if bitmap.contains(bit_code as usize) {
                         continue;
                     }
+                    bitmap.insert(bit_code as usize);
                     self.regs.push_back(reg);
-                    self.nums_neighbor_color
-                        .insert(reg, HashMap::with_capacity(32));
                 }
             }
         }
@@ -110,6 +115,7 @@ impl Allocator {
                 break;
             }
         }
+
         out
     }
 
@@ -198,16 +204,32 @@ impl Allocator {
                 .into_iter()
                 .collect(),
         );
-        colors.insert(reg.get_id(), color);
-        if let Some(neighbors) = interference_graph.get(&reg) {
+        self.color_one_with_certain_color(reg, color);
+        // colors.insert(reg.get_id(), color);
+        // if let Some(neighbors) = interference_graph.get(&reg) {
+        //     for neighbor in neighbors {
+        //         availables.get_mut(&neighbor).unwrap().use_reg(color);
+        //         let nums_neighbor_color = self.nums_neighbor_color.get_mut(neighbor).unwrap();
+        //         nums_neighbor_color
+        //             .insert(color, nums_neighbor_color.get(&color).unwrap_or(&0) + 1);
+        //     }
+        // }
+        return true;
+    }
+
+    pub fn color_one_with_certain_color(&mut self, reg: Reg, color: i32) {
+        if self.spillings.contains(&reg.get_id()) {
+            panic!("gg");
+        }
+        self.colors.insert(reg.get_id(), color);
+        if let Some(neighbors) = self.interference_graph.get(&reg) {
             for neighbor in neighbors {
-                availables.get_mut(&neighbor).unwrap().use_reg(color);
+                self.availables.get_mut(&neighbor).unwrap().use_reg(color);
                 let nums_neighbor_color = self.nums_neighbor_color.get_mut(neighbor).unwrap();
                 nums_neighbor_color
                     .insert(color, nums_neighbor_color.get(&color).unwrap_or(&0) + 1);
             }
         }
-        return true;
     }
 
     // 移除一个节点的颜色
@@ -380,6 +402,7 @@ impl Regalloc for Allocator {
             }
             self.spill();
         }
+
         let (spillings, dstr) = self.alloc_register();
         let (func_stack_size, bb_sizes) = regalloc::countStackSize(func, &spillings);
 

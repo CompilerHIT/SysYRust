@@ -14,43 +14,41 @@ use std::{
 macro_rules! log {
     ($($arg:tt)*) => {
         crate::log_file!("log", $($arg)*);
-         };
+    };
 }
 
 #[macro_export]
 macro_rules! log_file {
-    ($file:expr, $($arg:tt)*) => {
-        {
-            use std::fs::OpenOptions;
-            use std::io::Write;
+    ($file:expr, $($arg:tt)*) => {{
+        use std::fs::OpenOptions;
+        use std::io::Write;
 
-            let mut file = OpenOptions::new()
-                .create(true)
-                .append(true)
-                .open($file)
-                .expect("Failed to open log file");
+        let mut file = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open($file)
+            .expect("Failed to open log file");
 
-            writeln!(file, $($arg)*).expect("Failed to write to log file");
-        }
-    };
+        writeln!(file, $($arg)*).expect("Failed to write to log file");
+    }};
 }
 
 // 该宏用来进行不换行的文件log
 #[macro_export]
 macro_rules! log_file_uln {
-    ($file:expr, $($arg:tt)*) => {
-        {
-            use std::fs::OpenOptions;
-            use std::io::Write;
+    ($file:expr, $($arg:tt)*) => {{
 
-            let mut file = OpenOptions::new()
-                .create(true)
-                .append(true)
-                .open($file)
-                .expect("Failed to open log file");
-            write!(file, $($arg)*).expect("Failed to write to log file");
-        }
-    };
+
+        use std::fs::OpenOptions;
+        use std::io::Write;
+
+        let mut file = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open($file)
+            .expect("Failed to open log file");
+        write!(file, $($arg)*).expect("Failed to write to log file");
+    }};
 }
 
 #[derive(Clone, Copy, PartialEq, Hash, Eq, Debug)]

@@ -27,35 +27,35 @@ pub enum RetInitVec {
     Int(Vec<i32>),
 }
 
-pub fn init_padding_int(vec: &mut Vec<i32>, dimension_now: Vec<i32>,pre_num:i32,max_num:i32) {
+pub fn init_padding_int(vec: &mut Vec<i32>, dimension_now: Vec<i32>, pre_num: i32, max_num: i32) {
     let mut total = 1;
     let now = vec.len();
     for dm in dimension_now {
         total = total * dm;
     }
-    let remain = max_num-pre_num-now as i32;
-    if remain<total{
+    let remain = max_num - pre_num;
+    if remain < total {
         total = remain;
     }
     // // println!("total:{:?},now{:?}",total,now);
+    // println!("total{:?}now{:?}", total, now);
     let need = total as usize - now;
     for i in 0..need {
         vec.push(0);
     }
 }
 
-pub fn init_padding_float(vec: &mut Vec<f32>, dimension_now: Vec<i32>,pre_num:i32,max_num:i32) {
+pub fn init_padding_float(vec: &mut Vec<f32>, dimension_now: Vec<i32>, pre_num: i32, max_num: i32) {
     let mut total = 1;
     let now = vec.len();
     for dm in dimension_now {
         total = total * dm;
     }
 
-    let remain = max_num-pre_num-now as i32;
-    if remain<total{
+    let remain = max_num - pre_num;
+    if remain < total {
         total = remain;
     }
-
 
     let need = total as usize - now;
     for i in 0..need {

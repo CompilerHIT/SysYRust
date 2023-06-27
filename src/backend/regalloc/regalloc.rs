@@ -1,9 +1,13 @@
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{HashMap, HashSet, LinkedList, VecDeque};
+use std::hash::Hash;
+use std::num;
+use std::path::Iter;
 
 use crate::backend::func::Func;
 use crate::backend::instrs::{InstrsType, BB};
 use crate::backend::operand::Reg;
 use crate::backend::regalloc::structs::FuncAllocStat;
+use crate::container::bitmap::Bitmap;
 use crate::log_file;
 use crate::utility::{ObjPtr, ScalarType};
 
@@ -236,6 +240,7 @@ pub fn build_availables(
                             availables.get_mut(&reg).unwrap().use_reg(live.get_color());
                         }
                     }
+
                     livenow.insert(reg);
                 }
             }
@@ -250,6 +255,85 @@ pub fn build_availables(
         // 加入还没有处理过的bb
     }
     return availables;
+}
+
+pub fn build_nums_neighbor_color(
+    func: &Func,
+    ends_index_bb: &HashMap<(i32, ObjPtr<BB>), HashSet<Reg>>,
+) -> HashMap<Reg, HashMap<i32, i32>> {
+    let mut nums_neighbor_color = HashMap::new();
+    let process_one = |livenow: &HashSet<Reg>,
+                       nums_neighbor_color: &mut HashMap<Reg, HashMap<i32, i32>>,
+                       reg: Reg,
+                       kind: ScalarType| {
+        log_file!("tmp.txt", "{reg}");
+        if reg.get_type() != kind {
+            return;
+        }
+        if reg.is_physic() {
+            // 跟live now内部有冲突
+            let color = reg.get_color();
+            for live in livenow.iter() {
+                let nnc = nums_neighbor_color.get_mut(live);
+                if nnc.is_none() {
+                    panic!("gg{}", live);
+                }
+                let nnc = nnc.unwrap();
+                nnc.insert(color, nnc.get(&color).unwrap_or(&0) + 1);
+            }
+        }
+        if !nums_neighbor_color.contains_key(&reg) {
+            nums_neighbor_color.insert(reg, HashMap::with_capacity(32));
+        }
+        let nnc = nums_neighbor_color.get_mut(&reg).unwrap();
+        for live in livenow.iter() {
+            if live.is_physic() {
+                let live_color = live.get_color();
+                nnc.insert(live_color, nnc.get(&live_color).unwrap_or(&0) + 1);
+            }
+        }
+    };
+
+    let process = |cur_bb: ObjPtr<BB>,
+                   nums_neighbor_color: &mut HashMap<Reg, HashMap<i32, i32>>,
+                   kind: ScalarType| {
+        let mut livenow: HashSet<Reg> = HashSet::new();
+        let tmp_set = HashSet::new();
+        log_file!("tmp.txt", "{},kind:{:?}", cur_bb.label, kind);
+        // 冲突分析
+        cur_bb.live_in.iter().for_each(|reg| {
+            process_one(&mut livenow, nums_neighbor_color, *reg, kind);
+            if reg.get_type() == kind {
+                livenow.insert(*reg);
+            }
+        });
+        for (index, inst) in cur_bb.insts.iter().enumerate() {
+            // 先与reg use冲突,然后消去终结的,然后与reg def冲突,并加上新的reg def
+            let finishes = ends_index_bb
+                .get(&(index as i32, cur_bb))
+                .unwrap_or(&tmp_set);
+            for finish in finishes {
+                livenow.remove(finish);
+            }
+            for reg in inst.get_reg_def() {
+                process_one(&mut livenow, nums_neighbor_color, reg, kind);
+                if finishes.contains(&reg) || reg.get_type() != kind {
+                    continue;
+                }
+                livenow.insert(reg);
+            }
+        }
+    };
+    // 遍历所有块，分析冲突关系
+    for cur_bb in func.blocks.iter() {
+        let cur_bb = *cur_bb;
+        // 把不同类型寄存器统计加入表中
+        //分别处理浮点寄存器的情况和通用寄存器的情况
+        process(cur_bb, &mut nums_neighbor_color, ScalarType::Float);
+        process(cur_bb, &mut nums_neighbor_color, ScalarType::Int);
+        // 加入还没有处理过的bb
+    }
+    nums_neighbor_color
 }
 
 // 获取 （下标,块)->失效寄存器集合  表
@@ -277,6 +361,24 @@ pub fn ends_index_bb(func: &Func) -> HashMap<(i32, ObjPtr<BB>), HashSet<Reg>> {
     out
 }
 
+//
+pub fn merge_alloc_total(
+    func: &Func,
+    dstr: &mut HashMap<i32, i32>,
+    spillings: &mut HashSet<i32>,
+    ends_index_bb: &HashMap<(i32, ObjPtr<BB>), HashSet<Reg>>,
+    nums_neighbor_color: &mut HashMap<Reg, HashMap<i32, i32>>,
+    availables: &mut HashMap<Reg, RegUsedStat>,
+    spill_cost: &HashMap<Reg, f32>,
+    interference_graph: &HashMap<Reg, HashSet<Reg>>,
+) -> bool {
+    //
+    let mut color_regs: HashMap<i32, Bitmap> = HashMap::new();
+    let mut map: HashMap<(Reg, i32), i32> = HashMap::new();
+
+    false //合并结束不可能存在新的合并了
+}
+
 // 通用寄存器合并
 pub fn merge_alloc(
     func: &Func,
@@ -285,10 +387,100 @@ pub fn merge_alloc(
     ends_index_bb: &HashMap<(i32, ObjPtr<BB>), HashSet<Reg>>,
     nums_neighbor_color: &mut HashMap<Reg, HashMap<i32, i32>>,
     availables: &mut HashMap<Reg, RegUsedStat>,
+    spill_cost: &HashMap<Reg, f32>,
     interference_graph: &HashMap<Reg, HashSet<Reg>>,
 ) -> bool {
     // 合并条件,如果一个mv x55 x66指令， 后面 x66指令不再使用了,
     // 则x55(color1),x66(color2)可以进行合并，
+
+    let tmp_set = HashSet::new();
+    // 计算价值函数,统计一个指令的价值
+    let mut base_count_merge_val = |reg: &Reg,
+                                    dstr: &HashMap<i32, i32>,
+                                    other_color: i32,
+                                    spillings: &HashSet<i32>,
+                                    nums_neighbor_color: &mut HashMap<Reg, HashMap<i32, i32>>,
+                                    interference_graph: &HashMap<Reg, HashSet<Reg>>|
+     -> f32 {
+        let out = interference_graph.get(reg).unwrap_or(&tmp_set).len();
+        out as f32
+    };
+
+    let mut only_virtual_merge_val = |reg: &Reg,
+                                      dstr: &HashMap<i32, i32>,
+                                      other_color: i32,
+                                      spillings: &HashSet<i32>,
+                                      nums_neighbor_color: &mut HashMap<Reg, HashMap<i32, i32>>,
+                                      interference_graph: &HashMap<Reg, HashSet<Reg>>|
+     -> f32 {
+        let mut out = 0;
+        interference_graph
+            .get(&reg)
+            .unwrap_or(&tmp_set)
+            .iter()
+            .for_each(|reg| {
+                if reg.is_physic() {
+                    return;
+                }
+                out += 1;
+            });
+        out as f32
+    };
+    let mut real_affect_merge_val0 = |reg: &Reg,
+                                      dstr: &HashMap<i32, i32>,
+                                      other_color: i32,
+                                      spillings: &HashSet<i32>,
+                                      nums_neighbor_color: &mut HashMap<Reg, HashMap<i32, i32>>,
+                                      interference_graph: &HashMap<Reg, HashSet<Reg>>|
+     -> f32 {
+        let n = interference_graph.get(reg).unwrap_or(&tmp_set).len() as f32;
+        let self_color = dstr.get(&reg.get_id()).unwrap();
+        let mut out = 1.0;
+        if spillings.contains(&reg.get_id()) {
+            out += spill_cost.get(reg).unwrap();
+        }
+        interference_graph
+            .get(reg)
+            .unwrap_or(&tmp_set)
+            .iter()
+            .for_each(|reg| {
+                if reg.is_physic() {
+                    return;
+                }
+
+                let nums_neighbor_color = nums_neighbor_color.get(reg).unwrap();
+                if spillings.contains(&reg.get_id()) {
+                    let num = nums_neighbor_color.get(&other_color).unwrap_or(&0);
+                    if *num == 0 {
+                        out -= 1 as f32 * spill_cost.get(reg).unwrap();
+                    } else {
+                        // out -= 1 as f32
+                        //     / (*num as f32 + 1.0)
+                        //     / (*num as f32 + 1.0)
+                        //     / (*num as f32 + 1.0)
+                        //     / (*num as f32 + 1.0)
+                        //     * spill_cost.get(reg).unwrap();
+                    }
+                    let num = nums_neighbor_color.get(&self_color).unwrap_or(&0);
+                    if *num == 1 {
+                        out += 1 as f32 * spill_cost.get(reg).unwrap();
+                    } else if *num > 1 {
+                        // out += 1 as f32
+                        //     / (*num as f32)
+                        //     / (*num as f32)
+                        //     / (*num as f32)
+                        //     / (*num as f32)
+                        //     * spill_cost.get(reg).unwrap();
+                    }
+                } else {
+                }
+            });
+        out
+    };
+
+    // 统计每个寄存器辅助减少的指令数
+    let mut vals: HashMap<Reg, i32> = HashMap::new();
+    let mut m: LinkedList<i32> = LinkedList::new();
     let mut if_merge = false;
     let mut merge = |bb: ObjPtr<BB>,
                      dstr: &mut HashMap<i32, i32>,
@@ -312,8 +504,6 @@ pub fn merge_alloc(
                 // TODO,处理特殊寄存器的合并
                 continue;
             }
-
-            let tmp_set = HashSet::with_capacity(0);
             //不处理物理寄存器的寄存器合并
             if dst_reg.is_physic() && src_reg.is_physic() {
                 //TODO,暂时不考虑物理寄存器的合并，分配器不应该修改函数或者指令的内容
@@ -366,12 +556,20 @@ pub fn merge_alloc(
                 }
             } else {
                 // 必然其中一个有颜色或者两个有颜色
-                let num_inter_dst = interference_graph.get(&dst_reg).unwrap_or(&tmp_set).len();
-                let num_inter_src = interference_graph.get(&src_reg).unwrap_or(&tmp_set).len();
-                let mut base_inter: usize = 0;
+                let count_merge_val = base_count_merge_val;
+                let mut base_inter: f32 = 0.0;
                 if dstr.contains_key(&src_reg.get_id())
                     && available_dst.is_available_reg(*dstr.get(&src_reg.get_id()).unwrap())
                 {
+                    let src_color = dstr.get(&src_reg.get_id()).unwrap();
+                    let num_inter_dst = count_merge_val(
+                        &dst_reg,
+                        &dstr,
+                        *src_color,
+                        spillings,
+                        nums_neighbor_color,
+                        interference_graph,
+                    );
                     if num_inter_dst > base_inter {
                         base_inter = num_inter_dst;
                         tomerge = Some(dst_reg);
@@ -381,6 +579,15 @@ pub fn merge_alloc(
                 if dstr.contains_key(&dst_reg.get_id())
                     && available_src.is_available_reg(*dstr.get(&dst_reg.get_id()).unwrap())
                 {
+                    let dst_color = dstr.get(&dst_reg.get_id()).unwrap();
+                    let num_inter_src = count_merge_val(
+                        &src_reg,
+                        &dstr,
+                        *dst_color,
+                        spillings,
+                        nums_neighbor_color,
+                        interference_graph,
+                    );
                     if num_inter_src > base_inter {
                         tomerge = Some(src_reg);
                         merge_color = Some(*dstr.get(&dst_reg.get_id()).unwrap());
@@ -398,7 +605,8 @@ pub fn merge_alloc(
                 let merge_color = merge_color.unwrap();
                 let neighbors = interference_graph.get(&reg).unwrap();
                 if dstr.contains_key(&reg.get_id()) {
-                    let old_color = dstr.get(&reg.get_id()).unwrap();
+                    let old_color = *dstr.get(&reg.get_id()).unwrap();
+                    let old_color = &old_color;
                     for neighbor in neighbors {
                         let nums_neighbor_color = nums_neighbor_color.get_mut(neighbor).unwrap();
                         let new_num = nums_neighbor_color.get(old_color).unwrap_or(&1) - 1;
@@ -408,6 +616,10 @@ pub fn merge_alloc(
                                 .get_mut(neighbor)
                                 .unwrap()
                                 .release_reg(*old_color);
+                            if spillings.contains(&neighbor.get_id()) {
+                                spillings.remove(&neighbor.get_id());
+                                dstr.insert(neighbor.get_id(), *old_color);
+                            }
                         }
                     }
                 }
@@ -438,7 +650,7 @@ pub fn merge_alloc(
     if_merge
 }
 
-// 分配spilling
+// 判断
 
 // 通用寄存器分配结果检查,判断是否仍然存在冲突情况,若存在,返回冲突的寄存器集合以及所在的指令编号，块标识符)
 // (old_reg,cur_reg,inst index,block label)

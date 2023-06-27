@@ -781,11 +781,11 @@ impl BB {
                             unreachable!("call arg type not match, either be int or float")
                         }
                     }
+                    let int_param_cnt = icnt;
+                    let float_param_cnt = fcnt;
                     let reg_cnt = min(icnt, ARG_REG_COUNT);
                     func.as_mut().max_params = max(reg_cnt, func.max_params);
-                    // for arg in arg_list.iter() {
-                    //     log!("call arg: {:?}", arg.get_param_type());
-                    // }
+                    
                     for arg in arg_list.iter().rev() {
                         match arg.as_ref().get_param_type() {
                             IrType::Int | IrType::IntPtr | IrType::FloatPtr => {
@@ -912,6 +912,7 @@ impl BB {
                                 }
                             }
                             IrType::Float => {
+                                log!("call {func_label}");
                                 fcnt -= 1;
                                 if fcnt >= ARG_REG_COUNT {
                                     let src_reg =
@@ -986,6 +987,7 @@ impl BB {
                                         InstrsType::StoreParamToStack,
                                         vec![dst_reg.clone(), Operand::IImm(IImm::new(pos))],
                                     );
+                                    log!("{func_label} is called by {}, {:?}", func.label, inst);
                                     inst.set_double();
                                     //避免覆盖
                                     self.insts.push(pool.put_inst(inst));
@@ -1007,38 +1009,8 @@ impl BB {
                         InstrsType::Call,
                         vec![Operand::Addr(func_label.to_string())],
                     );
-                    lir_inst.set_param_cnts(icnt, fcnt);
+                    lir_inst.set_param_cnts(int_param_cnt, float_param_cnt);
                     self.insts.push(pool.put_inst(lir_inst));
-
-                    // restore stack slot
-                    let mut i = 1;
-                    while i < ARG_REG_COUNT {
-                        let iarg = Reg::new(i + 10, ScalarType::Int);
-                        let farg = Reg::new(FLOAT_BASE + i + 10, ScalarType::Float);
-                        if let Some(slot) = func.as_ref().spill_stack_map.get(&iarg) {
-                            let mut inst = LIRInst::new(
-                                InstrsType::LoadParamFromStack,
-                                vec![
-                                    Operand::Reg(Reg::new(i + 10, ScalarType::Int)),
-                                    Operand::IImm(IImm::new(slot.get_pos())),
-                                ],
-                            );
-                            inst.set_double();
-                            self.insts.push(pool.put_inst(inst));
-                        }
-                        if let Some(slot) = func.as_ref().spill_stack_map.get(&farg) {
-                            let mut inst = LIRInst::new(
-                                InstrsType::LoadParamFromStack,
-                                vec![
-                                    Operand::Reg(Reg::new(FLOAT_BASE + i + 10, ScalarType::Float)),
-                                    Operand::IImm(IImm::new(slot.get_pos())),
-                                ],
-                            );
-                            inst.set_double();
-                            self.insts.push(pool.put_inst(inst));
-                        }
-                        i += 1;
-                    }
 
                     match inst_ref.get_ir_type() {
                         IrType::Int => {
@@ -1063,6 +1035,39 @@ impl BB {
                         IrType::Void => {}
                         _ => unreachable!("call return type not match, must be int, float or void"),
                     }
+
+                    // restore stack slot
+                    let mut i = 0;
+                    while i < ARG_REG_COUNT {
+                        let iarg = Reg::new(i + 10, ScalarType::Int);
+                        let farg = Reg::new(FLOAT_BASE + i + 10, ScalarType::Float);
+                        if let Some(slot) = func.as_ref().spill_stack_map.get(&iarg) {
+                            let mut inst = LIRInst::new(
+                                InstrsType::LoadParamFromStack,
+                                vec![
+                                    Operand::Reg(Reg::new(i + 10, ScalarType::Int)),
+                                    Operand::IImm(IImm::new(slot.get_pos())),
+                                ],
+                            );
+                            inst.set_double();
+                            self.insts.push(pool.put_inst(inst));
+                        }
+                        if let Some(slot) = func.as_ref().spill_stack_map.get(&farg) {
+                            let mut inst = LIRInst::new(
+                                InstrsType::LoadParamFromStack,
+                                vec![
+                                    Operand::Reg(Reg::new(FLOAT_BASE + i + 10, ScalarType::Float)),
+                                    Operand::IImm(IImm::new(slot.get_pos())),
+                                    ],
+                                );
+                            log!("{} call {func_label}, {:?}", func.label, inst);
+                            inst.set_double();
+                            self.insts.push(pool.put_inst(inst));
+                        }
+                        i += 1;
+                    }
+
+                    
                 }
                 InstKind::Return => match inst_ref.get_ir_type() {
                     IrType::Void => self.insts.push(
@@ -1811,7 +1816,7 @@ impl BB {
                                     vec![
                                         reg.clone(),
                                         Operand::Reg(Reg::new(
-                                            FLOAT_BASE + inum + 10,
+                                            FLOAT_BASE + fnum + 10,
                                             ScalarType::Float,
                                         )),
                                     ],
