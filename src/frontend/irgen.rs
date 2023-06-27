@@ -654,8 +654,20 @@ impl Process for VarDecl {
                     match def {
                         VarDef::NonArrayInit((id, val)) => match val {
                             InitVal::Exp(exp) => {
+                                let flag = exp.type_process(1, kit_mut).unwrap();
+                                let mut tp = Type::Int;
+                                if flag>1{
+                                    tp = Type::Float;
+                                }
                                 let (mut inst_ptr, mut val) =
-                                    exp.process(Type::Int, kit_mut).unwrap();
+                                    exp.process(tp, kit_mut).unwrap();
+                                let mut flag_trans = false;
+                                if flag>1{
+                                    flag_trans = true;
+                                    inst_ptr = kit_mut.pool_inst_mut.make_float_to_int(inst_ptr);
+                                }
+                                // let (mut inst_ptr, mut val) =
+                                //     exp.process(Type::Int, kit_mut).unwrap();
 
                                 if kit_mut.context_mut.get_layer() < 0 {
                                     //设计相关(全局变量指令与局部变量不同)，全局变量得在这额外判断，放到module里
@@ -675,11 +687,29 @@ impl Process for VarDecl {
                                             }
                                             //这里
                                         }
+                                        ExpValue::Float(f) =>{
+                                            inst_ptr = kit_mut.pool_inst_mut.make_global_int(f as i32);
+                                            if !kit_mut.context_mut.add_var(
+                                                id,
+                                                Type::Int,
+                                                false,
+                                                false,
+                                                None,
+                                                Some(inst_ptr),
+                                                Vec::new(),
+                                            ) {
+                                                return Err(Error::MultipleDeclaration);
+                                            }
+                                        }
                                         _ => {
                                             unreachable!()
                                         }
                                     }
                                 } else {
+                                    if flag_trans{
+                                        kit_mut.context_mut.push_inst_bb(inst_ptr);
+                                    }
+                                    
                                     if !kit_mut.context_mut.add_var(
                                         id,
                                         Type::Int,
@@ -885,8 +915,21 @@ impl Process for VarDecl {
                     match def {
                         VarDef::NonArrayInit((id, val)) => match val {
                             InitVal::Exp(exp) => {
-                                let (mut inst_ptr, val) =
-                                    exp.process(Type::Float, kit_mut).unwrap();
+                                let flag = exp.type_process(1, kit_mut).unwrap();
+                                let mut tp = Type::Int;
+                                if flag>1{
+                                    tp = Type::Float;
+                                }
+                                println!("func:{:?},tp{:?}",kit_mut.context_mut.func_now,tp);
+                                let (mut inst_ptr, mut val) =
+                                    exp.process(tp, kit_mut).unwrap();
+                                let mut flag_trans = false;
+                                if flag<=1{
+                                    flag_trans = true;
+                                    inst_ptr = kit_mut.pool_inst_mut.make_float_to_int(inst_ptr);
+                                }
+                                // let (mut inst_ptr, val) =
+                                //     exp.process(Type::Float, kit_mut).unwrap();
 
                                 if kit_mut.context_mut.get_layer() < 0 {
                                     //设计相关(全局变量指令与局部变量不同)，全局变量得在这额外判断，放到module里
@@ -906,22 +949,41 @@ impl Process for VarDecl {
                                             }
                                             //这里
                                         }
+                                        ExpValue::Int(i) =>{
+                                            inst_ptr = kit_mut.pool_inst_mut.make_global_float(i as f32);
+                                            if !kit_mut.context_mut.add_var(
+                                                id,
+                                                Type::Float,
+                                                false,
+                                                false,
+                                                None,
+                                                Some(inst_ptr),
+                                                Vec::new(),
+                                            ) {
+                                                return Err(Error::MultipleDeclaration);
+                                            }
+                                        }
                                         _ => {
                                             unreachable!()
                                         }
                                     }
+                                }else{
+                                    if flag_trans{
+                                        kit_mut.context_mut.push_inst_bb(inst_ptr);
+                                    }
+                                    if !kit_mut.context_mut.add_var(
+                                        id,
+                                        Type::Float,
+                                        false,
+                                        false,
+                                        None,
+                                        None,
+                                        Vec::new(),
+                                    ) {
+                                        return Err(Error::MultipleDeclaration);
+                                    }
                                 }
-                                if !kit_mut.context_mut.add_var(
-                                    id,
-                                    Type::Float,
-                                    false,
-                                    false,
-                                    None,
-                                    None,
-                                    Vec::new(),
-                                ) {
-                                    return Err(Error::MultipleDeclaration);
-                                }
+                                
                                 kit_mut.context_mut.update_var_scope_now(id, inst_ptr);
                             }
                             InitVal::InitValVec(val_vec) => {
@@ -1622,27 +1684,36 @@ impl Process for Assign {
         let symbol = kit_mut.get_var_symbol(&lval.id).unwrap();
         // let (_,symbol) = kit_mut.get_var(&lval.id).unwrap();
         // // println!("assign stmt");
-        let mut mes = Type::Int;
+        
+
+        // // println!("zhe");
+        let flag = self.exp.type_process(1, kit_mut).unwrap();
+        let mut tp = Type::Int;
+        if flag>1{
+            tp = Type::Float;
+        }
+        // println!("func:{:?},tp{:?}",kit_mut.context_mut.func_now,tp);
+        let (mut inst_r, _) = self.exp.process(tp, kit_mut).unwrap();
+
+        // let mut mes = Type::Int;
         match symbol.tp {
-            Type::ConstFloat => {
-                mes = Type::Float;
+            Type::ConstFloat |Type::Float => {
+                // mes = Type::Float;
+                if flag<=1{//inst_r是int，要求是float
+                    inst_r = kit_mut.pool_inst_mut.make_int_to_float(inst_r);
+                    kit_mut.context_mut.push_inst_bb(inst_r);
+                }
             }
-            Type::ConstInt => {
-                mes = Type::Int;
-            }
-            Type::Float => {
-                mes = Type::Float;
-            }
-            Type::Int => {
-                mes = Type::Int;
+            Type::ConstInt |Type::Int => {
+                if flag>1{//inst_r是float，要求是int
+                    inst_r = kit_mut.pool_inst_mut.make_float_to_int(inst_r);
+                    kit_mut.context_mut.push_inst_bb(inst_r);
+                }
             }
             _ => {
                 todo!()
             }
         }
-
-        // // println!("zhe");
-        let (inst_r, _) = self.exp.process(mes, kit_mut).unwrap();
         // if symbol.is_param {
         //     kit_mut.param_used(&lval.id);
         //     kit_mut
@@ -1990,34 +2061,44 @@ impl Process for Return {
             }
         }
         if let Some(exp) = &mut self.exp {
-            let mut ret_tp = Type::Int;
+
+            let flag = exp.type_process(1, kit_mut).unwrap();
+            let mut tp = Type::Int;
+            if flag>1{
+                tp = Type::Float;
+            }
+            let mut flag_trans = false;
+            // println!("func{:?},rettp{:?}",kit_mut.context_mut.func_now,tp);
+            let (mut inst, val) = exp.process(tp, kit_mut).unwrap(); //这里可能有问题
+            // let mut ret_tp = Type::Int;
             match kit_mut.context_mut.ret_tp {
                 Type::Int => {
-                    ret_tp = Type::Int;
-                    // println!(
-                    //     "函数{:?}返回类型{:?}",
-                    //     kit_mut.context_mut.func_now, kit_mut.context_mut.ret_tp
-                    // );
+                    if flag>1{
+                        // println!("func{:?},rettp{:?}",kit_mut.context_mut.func_now,tp);
+                        flag_trans = true;
+                        inst = kit_mut.pool_inst_mut.make_float_to_int(inst);
+                        // println!("inst:ir_type:{:?}",inst.get_ir_type());
+                        // kit_mut.context_mut.push_inst_bb(inst);
+                    }
                 }
                 Type::Float => {
-                    ret_tp = Type::Float;
-                    // println!(
-                    //     "函数{:?}返回类型{:?}",
-                    //     kit_mut.context_mut.func_now, kit_mut.context_mut.ret_tp
-                    // );
+                    if flag<=1{
+                        flag_trans = true;
+                        inst = kit_mut.pool_inst_mut.make_int_to_float(inst);
+                        // kit_mut.context_mut.push_inst_bb(inst);
+                    }
                 }
                 _ => {
-                    // println!(
-                    //     "函数{:?}返回类型{:?}",
-                    //     kit_mut.context_mut.func_now, kit_mut.context_mut.ret_tp
-                    // );
-                    // unreachable!()
                 }
             }
-            let (inst, val) = exp.process(ret_tp, kit_mut).unwrap(); //这里可能有问题
+            
             match val {
                 ExpValue::Float(f) => {
-                    let inst_float = kit_mut.pool_inst_mut.make_float_const(f);
+
+                    let mut inst_float = kit_mut.pool_inst_mut.make_float_const(f);
+                    if flag_trans{
+                        inst_float = kit_mut.pool_inst_mut.make_int_const(f as i32);
+                    }
                     let ret_inst = kit_mut.pool_inst_mut.make_return(inst_float);
                     kit_mut.context_mut.push_inst_bb(inst_float);
                     kit_mut.context_mut.push_inst_bb(ret_inst);
@@ -2035,7 +2116,10 @@ impl Process for Return {
                     }
                 }
                 ExpValue::Int(i) => {
-                    let inst_int = kit_mut.pool_inst_mut.make_int_const(i);
+                    let mut inst_int = kit_mut.pool_inst_mut.make_int_const(i);
+                    if flag_trans{
+                        inst_int = kit_mut.pool_inst_mut.make_float_const(i as f32);
+                    }
                     let ret_inst = kit_mut.pool_inst_mut.make_return(inst_int);
                     kit_mut.context_mut.push_inst_bb(inst_int);
                     kit_mut.context_mut.push_inst_bb(ret_inst);
@@ -2053,6 +2137,9 @@ impl Process for Return {
                     }
                 }
                 ExpValue::None => {
+                    if flag_trans{
+                        kit_mut.context_mut.push_inst_bb(inst);
+                    }
                     let ret_inst = kit_mut.pool_inst_mut.make_return(inst);
                     kit_mut.context_mut.push_inst_bb(ret_inst);
                     match kit_mut.context_mut.bb_now_mut {
@@ -2072,6 +2159,24 @@ impl Process for Return {
                     unreachable!()
                 }
             }
+
+            // if flag_trans{
+            //     kit_mut.context_mut.push_inst_bb(inst);
+            // }
+            // let ret_inst = kit_mut.pool_inst_mut.make_return(inst);
+            // kit_mut.context_mut.push_inst_bb(ret_inst);
+            // match kit_mut.context_mut.bb_now_mut {
+            //     InfuncChoice::InFunc(bb_now) => {
+            //         let func_now = &kit_mut.context_mut.func_now;
+            //         if let Some(vec) = kit_mut.context_mut.terminated_map.get_mut(func_now)
+            //         {
+            //             vec.push((bb_now, inst));
+            //         }
+            //     }
+            //     _ => {
+            //         unreachable!()
+            //     }
+            // }
             // let ret_inst = kit_mut.pool_inst_mut.make_return(inst);
             // kit_mut.context_mut.push_inst_bb(ret_inst);
             Ok(1)
@@ -2245,6 +2350,7 @@ impl Process for LVal {
             Type::ConstFloat | Type::Float => {
                 match symbol.tp {
                     Type::Int | Type::ConstInt => {
+                        println!("id:{:?}",self.id);
                         let inst_trans = kit_mut.pool_inst_mut.make_int_to_float(var);
                         // let mut val = var.as_ref().get_float_bond();
                         // let mut val_ret = ExpValue::Int(val as i32);
@@ -2326,6 +2432,7 @@ impl Process for LVal {
                 match symbol.tp {
                     Type::Float | Type::ConstFloat => {
                         let inst_trans = kit_mut.pool_inst_mut.make_float_to_int(var);
+                        println!("float2int{:?},func{:?}",self.id,kit_mut.context_mut.func_now);
                         // let mut val = var.as_ref().get_float_bond();
                         // let mut val_ret = ExpValue::Int(val as i32);
                         match var.as_ref().get_kind() {
@@ -2749,6 +2856,7 @@ impl Process for UnaryExp {
                         match input {
                             Type::ConstInt | Type::Int => {
                                 inst = kit_mut.pool_inst_mut.make_float_to_int(inst);
+                                // println!("float2intfunccall{:?}",inst.get_kind());
                                 kit_mut.context_mut.push_inst_bb(inst);
                             }
                             _ => {}
@@ -2828,7 +2936,28 @@ impl Process for FuncRParams {
         let mut vec = vec![];
         let mut index = 0;
         for i in &mut self.exp_vec {
-            let (inst, _) = i.process(input[index], kit_mut).unwrap();
+            let flag = i.type_process(1, kit_mut).unwrap();
+            let mut tp = Type::Int;
+            if flag>1{
+                tp = Type::Float;
+            }
+            let (mut inst, _) = i.process(tp, kit_mut).unwrap();
+            // let (inst, _) = i.process(input[index], kit_mut).unwrap();
+            match input[index] {
+                Type::Float |Type::ConstFloat =>{
+                    if flag <=1{
+                        inst = kit_mut.pool_inst_mut.make_int_to_float(inst);
+                        kit_mut.context_mut.push_inst_bb(inst);
+                    }
+                }
+                Type::ConstInt |Type::Int =>{
+                    if flag>1{
+                        inst = kit_mut.pool_inst_mut.make_float_to_int(inst);
+                        kit_mut.context_mut.push_inst_bb(inst);
+                    }
+                }
+                _=>{}
+            }
             vec.push(inst);
             index = index + 1;
         }
@@ -2845,6 +2974,7 @@ impl Process for MulExp {
             MulExp::MulExp((mulexp, unaryexp)) => {
                 let (inst_left, lval) = mulexp.as_mut().process(input, kit_mut).unwrap();
                 let (inst_right, rval) = unaryexp.process(input, kit_mut).unwrap();
+                println!("func:{:?}make_mul:left:{:?},right:{:?}",kit_mut.context_mut.func_now,inst_left.get_kind(),inst_right.get_kind());
                 let mut inst = kit_mut.pool_inst_mut.make_mul(inst_left, inst_right);
 
                 let mut val_ret = lval;
