@@ -119,8 +119,7 @@ impl Reg {
             match id {
                 0..=7 => format!("ft{}", id),
                 8..=9 => format!("fs{}", id),
-                10..=11 => format!("fa{}", id - 10),
-                12..=17 => format!("fs{}", id - 10),
+                10..=17 => format!("fa{}", id - 10),
                 18..=27 => format!("fs{}", id - 16),
                 28..=31 => format!("ft{}", id - 20),
                 _ => panic!("Invalid Physic Float Register Id"),

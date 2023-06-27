@@ -912,7 +912,6 @@ impl BB {
                                 }
                             }
                             IrType::Float => {
-                                log!("call {func_label}");
                                 fcnt -= 1;
                                 if fcnt >= ARG_REG_COUNT {
                                     let src_reg =
@@ -987,7 +986,6 @@ impl BB {
                                         InstrsType::StoreParamToStack,
                                         vec![dst_reg.clone(), Operand::IImm(IImm::new(pos))],
                                     );
-                                    log!("{func_label} is called by {}, {:?}", func.label, inst);
                                     inst.set_double();
                                     //避免覆盖
                                     self.insts.push(pool.put_inst(inst));
@@ -1060,7 +1058,6 @@ impl BB {
                                     Operand::IImm(IImm::new(slot.get_pos())),
                                     ],
                                 );
-                            log!("{} call {func_label}, {:?}", func.label, inst);
                             inst.set_double();
                             self.insts.push(pool.put_inst(inst));
                         }
@@ -1810,6 +1807,7 @@ impl BB {
                     }
                     IrType::Float => {
                         if src == *p {
+                            log!("func: {} fnum: {}", func.label ,fnum);
                             if fnum < ARG_REG_COUNT {
                                 let inst = LIRInst::new(
                                     InstrsType::OpReg(SingleOp::FMv),
@@ -1821,6 +1819,7 @@ impl BB {
                                         )),
                                     ],
                                 );
+                                log!("insert param save inst: {:?}", inst);
                                 func.as_mut()
                                     .get_first_block()
                                     .as_mut()

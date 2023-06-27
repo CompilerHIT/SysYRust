@@ -13,7 +13,7 @@ use crate::{
         regalloc::{easy_gc_alloc, structs::FuncAllocStat},
     },
     container::bitmap::Bitmap,
-    log_file,
+    log_file, log_file_uln,
 };
 use core::panic;
 use std::{
@@ -138,6 +138,18 @@ impl Allocator {
 impl Regalloc for Allocator {
     fn alloc(&mut self, func: &crate::backend::instrs::Func) -> FuncAllocStat {
         self.easy_gc_allocator.build_interference_graph(func);
+
+        let intereref_path = "interference_graph.txt";
+        self.easy_gc_allocator
+            .interference_graph
+            .iter()
+            .for_each(|(reg, neighbors)| {
+                log_file_uln!(intereref_path, "node {reg}\n{{");
+                neighbors
+                    .iter()
+                    .for_each(|neighbor| log_file_uln!(intereref_path, "({},{})", reg, neighbor));
+                log_file!(intereref_path, "}}\n");
+            });
 
         self.easy_gc_allocator.count_spill_costs(func);
         // self.refresh_k_graph();
