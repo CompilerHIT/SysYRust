@@ -14,7 +14,7 @@ name="sysylib"
 
 [dependencies]
 lazy_static = "1.4"
-biheap={path="./biheap"}
+biheap={path="./dep/biheap"}
 lalrpop-util = {version = "0.19.9", features = ["lexer"]}
 regex = "1"
 clap = "2.33"
