@@ -664,6 +664,7 @@ impl Process for VarDecl {
                                 if flag > 1 {
                                     flag_trans = true;
                                     inst_ptr = kit_mut.pool_inst_mut.make_float_to_int(inst_ptr);
+                                    kit_mut.context_mut.push_inst_bb(inst_ptr); //先放进去,不管是否冗余
                                 }
                                 // let (mut inst_ptr, mut val) =
                                 //     exp.process(Type::Int, kit_mut).unwrap();
@@ -933,6 +934,7 @@ impl Process for VarDecl {
                                 if flag <= 1 {
                                     flag_trans = true;
                                     inst_ptr = kit_mut.pool_inst_mut.make_int_to_float(inst_ptr);
+                                    kit_mut.context_mut.push_inst_bb(inst_ptr);
                                 }
                                 // let (mut inst_ptr, val) =
                                 //     exp.process(Type::Float, kit_mut).unwrap();
@@ -2134,14 +2136,14 @@ impl Process for Return {
                         flag_trans = true;
                         inst = kit_mut.pool_inst_mut.make_float_to_int(inst);
                         // println!("inst:ir_type:{:?}",inst.get_ir_type());
-                        // kit_mut.context_mut.push_inst_bb(inst);
+                        kit_mut.context_mut.push_inst_bb(inst); //不管是否冗余先放进去
                     }
                 }
                 Type::Float => {
                     if flag <= 1 {
                         flag_trans = true;
                         inst = kit_mut.pool_inst_mut.make_int_to_float(inst);
-                        // kit_mut.context_mut.push_inst_bb(inst);
+                        kit_mut.context_mut.push_inst_bb(inst);
                     }
                 }
                 _ => {}
@@ -2191,9 +2193,9 @@ impl Process for Return {
                     }
                 }
                 ExpValue::None => {
-                    if flag_trans {
-                        kit_mut.context_mut.push_inst_bb(inst);
-                    }
+                    // if flag_trans {
+                    //     kit_mut.context_mut.push_inst_bb(inst);
+                    // }
                     let ret_inst = kit_mut.pool_inst_mut.make_return(inst);
                     kit_mut.context_mut.push_inst_bb(ret_inst);
                     match kit_mut.context_mut.bb_now_mut {
@@ -2393,6 +2395,7 @@ impl Process for LVal {
 
             // (var, symbol) = kit_mut.get_var(&self.id, Some(inst_offset)).unwrap();
             if sym_tmp.dimension.len() > self.exp_vec.len() {
+                //获得指针
                 (var, symbol) = kit_mut.get_var(&self.id, Some(inst_offset), true).unwrap();
             } else {
                 (var, symbol) = kit_mut.get_var(&self.id, Some(inst_offset), false).unwrap();
@@ -3029,7 +3032,7 @@ impl Process for MulExp {
                 let (inst_left, lval) = mulexp.as_mut().process(input, kit_mut).unwrap();
                 let (inst_right, rval) = unaryexp.process(input, kit_mut).unwrap();
                 // println!("func:{:?}make_mul:left:{:?},right:{:?}",kit_mut.context_mut.func_now,inst_left.get_kind(),inst_right.get_kind());
-                let mut inst = kit_mut.pool_inst_mut.make_mul(inst_left, inst_right);
+                let mut inst = kit_mut.pool_inst_mut.make_int_const(-1129);
 
                 let mut val_ret = lval;
                 match lval {
@@ -3039,6 +3042,7 @@ impl Process for MulExp {
                             inst = kit_mut.pool_inst_mut.make_float_const(f1 * f2);
                         }
                         _ => {
+                            inst = kit_mut.pool_inst_mut.make_mul(inst_left, inst_right);
                             val_ret = ExpValue::None;
                         }
                     },
@@ -3048,10 +3052,12 @@ impl Process for MulExp {
                             inst = kit_mut.pool_inst_mut.make_int_const(i1 * i2);
                         }
                         _ => {
+                            inst = kit_mut.pool_inst_mut.make_mul(inst_left, inst_right);
                             val_ret = ExpValue::None;
                         }
                     },
                     _ => {
+                        inst = kit_mut.pool_inst_mut.make_mul(inst_left, inst_right);
                         val_ret = ExpValue::None;
                     }
                 }
@@ -3062,7 +3068,7 @@ impl Process for MulExp {
                 let (inst_left, lval) = mulexp.as_mut().process(input, kit_mut).unwrap();
                 let (inst_right, rval) = unaryexp.process(input, kit_mut).unwrap();
                 // println!("left:{:?}right:{:?}",inst_left.get_kind(),inst_right.get_kind());
-                let mut inst = kit_mut.pool_inst_mut.make_div(inst_left, inst_right);
+                let mut inst = kit_mut.pool_inst_mut.make_int_const(-1129);
 
                 let mut val_ret = lval;
                 match lval {
@@ -3072,6 +3078,7 @@ impl Process for MulExp {
                             inst = kit_mut.pool_inst_mut.make_float_const(f1 / f2);
                         }
                         _ => {
+                            inst = kit_mut.pool_inst_mut.make_div(inst_left, inst_right);
                             val_ret = ExpValue::None;
                         }
                     },
@@ -3081,10 +3088,12 @@ impl Process for MulExp {
                             inst = kit_mut.pool_inst_mut.make_int_const(i1 / i2);
                         }
                         _ => {
+                            inst = kit_mut.pool_inst_mut.make_div(inst_left, inst_right);
                             val_ret = ExpValue::None;
                         }
                     },
                     _ => {
+                        inst = kit_mut.pool_inst_mut.make_div(inst_left, inst_right);
                         val_ret = ExpValue::None;
                     }
                 }
@@ -3094,7 +3103,7 @@ impl Process for MulExp {
             MulExp::ModExp((mulexp, unaryexp)) => {
                 let (inst_left, lval) = mulexp.as_mut().process(input, kit_mut).unwrap();
                 let (inst_right, rval) = unaryexp.process(input, kit_mut).unwrap();
-                let mut inst = kit_mut.pool_inst_mut.make_rem(inst_left, inst_right);
+                let mut inst = kit_mut.pool_inst_mut.make_int_const(-1129);
 
                 let mut val_ret = lval;
                 match lval {
@@ -3105,6 +3114,7 @@ impl Process for MulExp {
                             unreachable!("浮点数求余")
                         }
                         _ => {
+                            inst = kit_mut.pool_inst_mut.make_rem(inst_left, inst_right);
                             val_ret = ExpValue::None;
                         }
                     },
@@ -3114,10 +3124,12 @@ impl Process for MulExp {
                             inst = kit_mut.pool_inst_mut.make_int_const(i1 % i2);
                         }
                         _ => {
+                            inst = kit_mut.pool_inst_mut.make_rem(inst_left, inst_right);
                             val_ret = ExpValue::None;
                         }
                     },
                     _ => {
+                        inst = kit_mut.pool_inst_mut.make_rem(inst_left, inst_right);
                         val_ret = ExpValue::None;
                     }
                 }
@@ -3146,7 +3158,7 @@ impl Process for AddExp {
                     let (inst_left, lval) = opexp.process(input, kit_mut).unwrap();
                     let (inst_right, rval) = mulexp.process(input, kit_mut).unwrap();
                     // // println!("lvar:{:?},type:{:?},rvar:{:?},type:{:?}",inst_left.as_ref().get_kind(),inst_left.as_ref().get_ir_type(),inst_right.as_ref().get_kind(),inst_right.as_ref().get_ir_type());
-                    let mut inst = kit_mut.pool_inst_mut.make_add(inst_left, inst_right);
+                    let mut inst = kit_mut.pool_inst_mut.make_int_const(-1129);
 
                     let mut val_ret = lval;
                     match lval {
@@ -3156,6 +3168,7 @@ impl Process for AddExp {
                                 inst = kit_mut.pool_inst_mut.make_float_const(f1 + f2);
                             }
                             _ => {
+                                inst = kit_mut.pool_inst_mut.make_add(inst_left, inst_right);
                                 val_ret = ExpValue::None;
                             }
                         },
@@ -3165,10 +3178,12 @@ impl Process for AddExp {
                                 inst = kit_mut.pool_inst_mut.make_int_const(i1 + i2);
                             }
                             _ => {
+                                inst = kit_mut.pool_inst_mut.make_add(inst_left, inst_right);
                                 val_ret = ExpValue::None;
                             }
                         },
                         _ => {
+                            inst = kit_mut.pool_inst_mut.make_add(inst_left, inst_right);
                             val_ret = ExpValue::None;
                         }
                     }
@@ -3179,7 +3194,7 @@ impl Process for AddExp {
                     let (inst_left, lval) = opexp.process(input, kit_mut).unwrap();
                     let (inst_right, rval) = mulexp.process(input, kit_mut).unwrap();
                     // let inst_right_neg = kit_mut.pool_inst_mut.make_neg(inst_right);
-                    let mut inst = kit_mut.pool_inst_mut.make_sub(inst_left, inst_right);
+                    let mut inst = kit_mut.pool_inst_mut.make_int_const(-1129);
                     // kit_mut.context_mut.push_inst_bb(inst_right);
 
                     let mut val_ret = lval;
@@ -3190,6 +3205,7 @@ impl Process for AddExp {
                                 inst = kit_mut.pool_inst_mut.make_float_const(f1 - f2);
                             }
                             _ => {
+                                inst = kit_mut.pool_inst_mut.make_sub(inst_left, inst_right);
                                 val_ret = ExpValue::None;
                             }
                         },
@@ -3199,10 +3215,12 @@ impl Process for AddExp {
                                 inst = kit_mut.pool_inst_mut.make_int_const(i1 - i2);
                             }
                             _ => {
+                                inst = kit_mut.pool_inst_mut.make_sub(inst_left, inst_right);
                                 val_ret = ExpValue::None;
                             }
                         },
                         _ => {
+                            inst = kit_mut.pool_inst_mut.make_sub(inst_left, inst_right);
                             val_ret = ExpValue::None;
                         }
                     }
@@ -3481,7 +3499,7 @@ impl Process for EqExp {
                     }
                     _ => {}
                 } //这里可以进一步优化,计算cond是否恒为真或假
-                let mut inst_eq = kit_mut.pool_inst_mut.make_eq(inst_left, inst_right);
+                let mut inst_eq = kit_mut.pool_inst_mut.make_int_const(-1129); //不管是否冗余
                 let mut result = -1;
                 if fflag == 1 {
                     if fvec[0] == fvec[1] {
@@ -3499,6 +3517,8 @@ impl Process for EqExp {
                         inst_eq = kit_mut.pool_inst_mut.make_int_const(0);
                         result = 0;
                     }
+                } else {
+                    inst_eq = kit_mut.pool_inst_mut.make_eq(inst_left, inst_right);
                 }
                 // kit_mut.context_mut.push_inst_bb(inst_eq);
                 match input {
@@ -3576,7 +3596,7 @@ impl Process for EqExp {
                   //     inst_left.get_kind(),
                   //     inst_right.get_kind()
                   // );
-                let mut inst_ne = kit_mut.pool_inst_mut.make_ne(inst_left, inst_right);
+                let mut inst_ne = kit_mut.pool_inst_mut.make_int_const(-1129);
                 let mut result = -1;
                 if fflag == 1 {
                     if fvec[0] != fvec[1] {
@@ -3594,6 +3614,8 @@ impl Process for EqExp {
                         inst_ne = kit_mut.pool_inst_mut.make_int_const(0);
                         result = 0;
                     }
+                } else {
+                    inst_ne = kit_mut.pool_inst_mut.make_ne(inst_left, inst_right);
                 }
                 // kit_mut.context_mut.push_inst_bb(inst_ne);
                 match input {
@@ -3714,8 +3736,8 @@ impl Process for LAndExp {
                     IrType::Float => {
                         let inst_zero = kit_mut.pool_inst_mut.make_float_const(0.0);
                         inst_right = kit_mut.pool_inst_mut.make_ne(inst_right, inst_zero);
-                        kit_mut.context_mut.push_inst_bb(inst_right);
                         kit_mut.context_mut.push_inst_bb(inst_zero);
+                        kit_mut.context_mut.push_inst_bb(inst_right);
                     }
                     IrType::Int => {}
                     _ => {
