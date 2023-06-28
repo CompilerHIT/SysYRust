@@ -22,6 +22,16 @@ impl RegUsedStat {
         }
     }
 
+    // 判断是否有多余的寄存器
+    pub fn is_available(&self, kind: ScalarType) -> bool {
+        // TODO,使用位运算加速过程
+        match kind {
+            ScalarType::Float => self.num_available_fregs() != 0,
+            ScalarType::Int => self.num_avialable_iregs() != 0,
+            _ => false,
+        }
+    }
+
     pub fn is_available_ireg(&self, ireg: i32) -> bool {
         let mut unusable: HashSet<i32> = HashSet::from([0]); //保存x0
         unusable.insert(2); //保留sp
@@ -29,8 +39,8 @@ impl RegUsedStat {
         unusable.insert(3); //保留gp
         unusable.insert(4); //保留tp寄存器
         unusable.extend(5..=7); //三个临时寄存器用来处理spill逻辑
-        unusable.insert(10); //保留a0
-                             // unusable.extend(11..=17);   //保留a1-a7
+                                // unusable.insert(10); //保留a0
+                                // unusable.extend(11..=17);   //保留a1-a7
         if unusable.contains(&ireg) {
             return false;
         }
@@ -59,13 +69,13 @@ impl RegUsedStat {
             _ => panic!("{:?}", kind),
         }
     }
+
     pub fn num_avialable_iregs(&self) -> usize {
         (0..=31)
             .filter(|ireg| self.is_available_ireg(*ireg))
             .count()
     }
     pub fn num_available_fregs(&self) -> usize {
-        let m: Range<i32>;
         (32..=63)
             .filter(|freg| self.is_available_freg(*freg))
             .count()
@@ -231,5 +241,15 @@ mod test_regusestat {
         assert_eq!(a.num_avialable_iregs(), 23); //保留t0-t2三个临时寄存器,sp,a0,tp,x0,gp五个个特殊寄存器,保留a0用作返回值
         assert_eq!(a.num_available_regs(crate::utility::ScalarType::Float), 32);
         assert_eq!(a.num_available_regs(crate::utility::ScalarType::Int), 23);
+    }
+
+    #[test]
+    fn test_base() {
+        let mut m = RegUsedStat::new();
+        for i in 0..=31 {
+            m.use_ireg(i);
+        }
+        assert!(m.iregs_used == 0x_FFFF_FFFF);
+        assert_eq!(m.iregs_used, 0b_1111_1111_1111_1111_1111_1111_1111_1111)
     }
 }
