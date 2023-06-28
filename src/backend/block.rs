@@ -351,7 +351,6 @@ impl BB {
                             let mut src_reg;
                             let index = addr.as_ref().get_gep_ptr();
                             if let Some(head) = map_info.array_slot_map.get(&index) {
-                                //TODO:判断地址合法
                                 src_reg = Operand::Reg(Reg::init(ScalarType::Int));
                                 let mut load = LIRInst::new(
                                     InstrsType::LoadParamFromStack,
@@ -452,7 +451,7 @@ impl BB {
                                     self.insts.push(pool.put_inst(load));
                                 }
                             } else {
-                                // 找不到，认为是全局数组或者参数
+                                // 找不到，认为是全局数组或者参数或嵌套的gep
                                 addr_reg = self.resolve_operand(
                                     func,
                                     addr.get_gep_ptr(),
@@ -1188,12 +1187,12 @@ impl BB {
                         if is_float {
                             let tmp2 = Operand::Reg(Reg::init(ScalarType::Int));
                             insert_insts.push(pool.put_inst(LIRInst::new(
-                                inst_kind,
-                                vec![tmp2.clone(), src_reg.clone()],
-                            )));
-                            insert_insts.push(pool.put_inst(LIRInst::new(
                                 InstrsType::OpReg(SingleOp::LoadFImm),
                                 vec![temp.clone(), tmp2.clone()],
+                            )));
+                            insert_insts.push(pool.put_inst(LIRInst::new(
+                                inst_kind,
+                                vec![tmp2.clone(), src_reg.clone()],
                             )));
                         } else {
                             insert_insts.push(pool.put_inst(LIRInst::new(
@@ -1213,13 +1212,13 @@ impl BB {
                         if let Some(insts) = map_info.phis_to_block.get_mut(&incoming_block) {
                             // log!("insert phi inst: {:?}", obj_inst);
                             for obj_inst in insert_insts {
-                                insts.insert(obj_inst);
+                                insts.push(obj_inst);
                             }
                         } else {
                             // log!("insert phi inst: {:?}", obj_inst);
-                            let mut set = HashSet::new();
+                            let mut set = Vec::new();
                             for obj_inst in insert_insts {
-                                set.insert(obj_inst);
+                                set.push(obj_inst);
                             }
                             map_info.phis_to_block.insert(incoming_block, set);
                         }
