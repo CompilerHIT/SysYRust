@@ -112,7 +112,7 @@ pub fn estimate_spill_cost(func: &Func) -> HashMap<Reg, f32> {
 }
 
 // 获取冲突表
-pub fn build_intereference(
+pub fn build_interference(
     func: &Func,
     ends_index_bb: &HashMap<(i32, ObjPtr<BB>), HashSet<Reg>>,
 ) -> HashMap<Reg, HashSet<Reg>> {
@@ -171,6 +171,95 @@ pub fn build_intereference(
                 }
             }
         };
+    // 遍历所有块，分析冲突关系
+    for cur_bb in func.blocks.iter() {
+        let cur_bb = *cur_bb;
+        // 把不同类型寄存器统计加入表中
+        //分别处理浮点寄存器的情况和通用寄存器的情况
+        process(cur_bb, &mut interference_graph, ScalarType::Float);
+        process(cur_bb, &mut interference_graph, ScalarType::Int);
+        // 加入还没有处理过的bb
+    }
+    interference_graph
+}
+
+pub fn build_interference_into_lst(
+    func: &Func,
+    ends_index_bb: &HashMap<(i32, ObjPtr<BB>), HashSet<Reg>>,
+) -> HashMap<Reg, LinkedList<Reg>> {
+    let mut interference_graph: HashMap<Reg, LinkedList<Reg>> = HashMap::new();
+    let mut if_passed: HashSet<(i32, i32)> = HashSet::new();
+    let tmp_set = HashSet::new();
+    let mut process = |cur_bb: ObjPtr<BB>,
+                       interef_graph: &mut HashMap<Reg, LinkedList<Reg>>,
+                       kind: ScalarType| {
+        let mut livenow: HashSet<Reg> = HashSet::new();
+        // 冲突分析
+        cur_bb.live_in.iter().for_each(|reg| {
+            if reg.get_type() != kind {
+                return;
+            }
+            if let None = interef_graph.get(reg) {
+                interef_graph.insert(*reg, LinkedList::new());
+            }
+            for live in livenow.iter() {
+                // log_file!("tmp2.txt", "pre {} {}.", live, reg);
+                if live == reg {
+                    continue;
+                }
+                // log_file!("tmp2.txt", "suf {} {}.", live, reg);
+                // TODO:检查避免重复加入是否成功
+                if if_passed.contains(&(live.bit_code(), reg.bit_code()))
+                    || if_passed.contains(&(reg.bit_code(), live.bit_code()))
+                {
+                    continue;
+                }
+                if_passed.insert((live.bit_code(), reg.bit_code()));
+                if_passed.insert((reg.bit_code(), live.bit_code()));
+                interef_graph.get_mut(live).unwrap().push_back(*reg);
+                interef_graph.get_mut(reg).unwrap().push_back(*live);
+            }
+            livenow.insert(*reg);
+        });
+        for (index, inst) in cur_bb.insts.iter().enumerate() {
+            // 先与reg use冲突,然后消去终结的,然后与reg def冲突,并加上新的reg def
+            let finishes = ends_index_bb
+                .get(&(index as i32, cur_bb))
+                .unwrap_or(&tmp_set);
+            for finish in finishes {
+                livenow.remove(finish);
+            }
+            for reg in inst.get_reg_def() {
+                if reg.get_type() != kind {
+                    continue;
+                }
+                if let None = interef_graph.get(&reg) {
+                    interef_graph.insert(reg, LinkedList::new());
+                }
+                for live in livenow.iter() {
+                    // log_file!("tmp2.txt", "pre {} {}.", live, reg);
+                    if *live == reg {
+                        continue;
+                    }
+                    // log_file!("tmp2.txt", "suf {} {}.", live, reg);
+                    // TOTO :检查避免重复加入是否成功
+                    if if_passed.contains(&(live.bit_code(), reg.bit_code()))
+                        || if_passed.contains(&(reg.bit_code(), live.bit_code()))
+                    {
+                        continue;
+                    }
+                    if_passed.insert((live.bit_code(), reg.bit_code()));
+                    if_passed.insert((reg.bit_code(), live.bit_code()));
+                    interef_graph.get_mut(live).unwrap().push_back(reg);
+                    interef_graph.get_mut(&reg).unwrap().push_back(*live);
+                }
+                if finishes.contains(&reg) {
+                    continue;
+                } //fixme,修复增加这里的bug
+                livenow.insert(reg);
+            }
+        }
+    };
     // 遍历所有块，分析冲突关系
     for cur_bb in func.blocks.iter() {
         let cur_bb = *cur_bb;

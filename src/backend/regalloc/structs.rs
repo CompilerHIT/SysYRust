@@ -7,7 +7,7 @@ use crate::backend::block::BB;
 use crate::utility::ObjPtr;
 use crate::utility::ScalarType;
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub struct RegUsedStat {
     iregs_used: u32,
     fregs_used: u32,
