@@ -39,8 +39,8 @@ impl RegUsedStat {
         unusable.insert(3); //保留gp
         unusable.insert(4); //保留tp寄存器
         unusable.extend(5..=7); //三个临时寄存器用来处理spill逻辑
-                                // unusable.insert(10); //保留a0
-                                // unusable.extend(11..=17);   //保留a1-a7
+        unusable.insert(10); //保留a0
+                             // unusable.extend(11..=17);   //保留a1-a7
         if unusable.contains(&ireg) {
             return false;
         }
