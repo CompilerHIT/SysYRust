@@ -29,7 +29,13 @@ pub fn copy_func(
 
     // 映射bb
     for bb in copy_bb_list.iter() {
-        map_bb(bb.clone(), &mut bb_map, &mut inst_map, &arg_list);
+        map_bb(
+            bb.clone(),
+            &mut bb_map,
+            &mut inst_map,
+            &arg_list,
+            &global_var,
+        );
     }
 
     (
@@ -43,6 +49,7 @@ fn map_bb(
     bb_map: &mut HashMap<ObjPtr<BasicBlock>, ObjPtr<BasicBlock>>,
     inst_map: &mut HashMap<ObjPtr<Inst>, ObjPtr<Inst>>,
     arg_list: &Vec<ObjPtr<Inst>>,
+    global_var: &Vec<(&String, ObjPtr<Inst>)>,
 ) {
     bb.as_mut().set_up_bb(
         bb.get_up_bb()
@@ -58,7 +65,7 @@ fn map_bb(
             .collect(),
     );
 
-    map_inst_in_bb(bb.get_head_inst(), inst_map, arg_list);
+    map_inst_in_bb(bb.get_head_inst(), inst_map, arg_list, global_var);
 }
 
 fn copy_bb(
@@ -90,6 +97,7 @@ fn map_inst_in_bb(
     inst: ObjPtr<Inst>,
     inst_map: &mut HashMap<ObjPtr<Inst>, ObjPtr<Inst>>,
     arg_list: &Vec<ObjPtr<Inst>>,
+    global_var: &Vec<(&String, ObjPtr<Inst>)>,
 ) {
     let inst_map_op = |inst_list: &Vec<ObjPtr<Inst>>| {
         inst_list
@@ -99,11 +107,12 @@ fn map_inst_in_bb(
     };
     inst_process_in_bb(inst, |x| {
         x.as_mut().set_operands(inst_map_op(x.get_operands()));
-        let user_list = x.get_use_list().clone();
         x.as_mut().set_users(inst_map_op(x.get_use_list()));
         x.get_operands().iter().for_each(|used| {
             if let Some(index) = arg_list.iter().position(|x| x == used) {
                 arg_list[index].as_mut().add_user(x.as_ref());
+            } else if let Some(index) = global_var.iter().position(|(_, x)| x == used) {
+                global_var[index].1.as_mut().add_user(x.as_ref());
             }
         })
     });

@@ -30,7 +30,7 @@ pub fn optimizer_run(
         simplify_cfg::simplify_cfg_run(module, &mut pools);
 
         // phi优化
-        //phi_optimizer::phi_run(module);
+        phi_optimizer::phi_run(module);
         // TODO: 性能优化
     }
 }

@@ -1,4 +1,4 @@
-use super::instrs::*;
+use super::{instrs::*, operand::is_imm_12bs};
 use crate::backend::operand::ToString;
 use std::fs::File;
 impl GenerateAsm for LIRInst {
@@ -20,7 +20,6 @@ impl GenerateAsm for LIRInst {
                     BinaryOp::Shl => "sll",
                     BinaryOp::Shr => "srl",
                     BinaryOp::Sar => "sra",
-                    BinaryOp::Mulhs => "mulhs",
                     BinaryOp::FCmp(cmp) => {
                         match cmp {
                             CmpOp::Eq => "eq",
@@ -74,9 +73,8 @@ impl GenerateAsm for LIRInst {
                 Ok(())
             }
             InstrsType::OpReg(op) => {
-                let op = match op {
+                let mut op = match op {
                     SingleOp::Li => "li",
-                    // SingleOp::Lui => "lui",
                     SingleOp::IMv => "mv",
                     SingleOp::FMv => "fmv.s",
                     SingleOp::INeg => "neg",
@@ -84,9 +82,9 @@ impl GenerateAsm for LIRInst {
                     SingleOp::I2F => "fcvt.s.w",
                     SingleOp::F2I => "fcvt.w.s",
                     SingleOp::LoadAddr => "la",
+                    SingleOp::Abs => "abs",
                     SingleOp::Seqz => "seqz",
                     SingleOp::Snez => "snez",
-                    SingleOp::LoadImm => "addiw",
                     SingleOp::LoadFImm => "fmv.w.x",
                 };
                 let dst = match self.get_dst() {
@@ -95,7 +93,12 @@ impl GenerateAsm for LIRInst {
                 };
                 let src = match self.get_lhs() {
                     Operand::Reg(reg) => reg.to_string(row),
-                    Operand::IImm(iimm) => iimm.to_string(),
+                    Operand::IImm(iimm) => {
+                        if is_imm_12bs(iimm.get_data()) && op == "li" {
+                            op = "addiw";
+                        }
+                        iimm.to_string()
+                    },
                     Operand::FImm(fimm) => fimm.to_string(),
                     Operand::Addr(addr) => addr.to_string(),
                 };

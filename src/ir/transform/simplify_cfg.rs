@@ -32,10 +32,11 @@ pub fn simplify_cfg_run(
 }
 
 fn merge_one_line_bb(head: ObjPtr<BasicBlock>) {
-    let bb_list = get_bb_list(head);
+    let mut bb_list = get_bb_list(head);
 
     loop {
         let mut changed = false;
+        let mut delete_bb = None;
         for bb in bb_list.iter() {
             // 不考虑尾
             if bb.is_exit() {
@@ -44,8 +45,16 @@ fn merge_one_line_bb(head: ObjPtr<BasicBlock>) {
 
             if bb_has_jump(bb.clone()) && bb.get_next_bb()[0].get_up_bb().len() == 1 {
                 changed = true;
+                delete_bb = Some(bb.get_next_bb()[0].clone());
                 merge_bb(bb.clone());
+                break;
             }
+        }
+
+        // 删除已经合并的block
+        if let Some(bb) = delete_bb {
+            let index = bb_list.iter().position(|x| x.clone() == bb).unwrap();
+            bb_list.remove(index);
         }
 
         if !changed {
@@ -75,6 +84,7 @@ fn merge_bb(mut bb: ObjPtr<BasicBlock>) {
     // 移动剩下的指令
     bb.get_tail_inst().remove_self();
     inst_process_in_bb(next_bb.get_head_inst(), |inst| {
+        inst.as_mut().move_self();
         bb.push_back(inst);
     });
 }
@@ -96,11 +106,11 @@ fn remove_unreachable_bb(
             }
 
             // 如果没有前继或者前继都在deleted集里，那么当前bb是无法到达的
-            if bb.get_up_bb().is_empty() || bb.get_up_bb().iter().all(|bb| deleted.contains(bb)) {
-                if !deleted.contains(bb) {
-                    deleted.insert(bb);
-                    changed = true;
-                }
+            if (bb.get_up_bb().is_empty() || bb.get_up_bb().iter().all(|bb| deleted.contains(bb)))
+                && !deleted.contains(bb)
+            {
+                deleted.insert(bb);
+                changed = true;
             }
 
             // jump指令不检查
@@ -127,13 +137,14 @@ fn remove_unreachable_bb(
 
     // 删除掉这些不可达的bb
     for &bb in deleted.iter() {
-        let should_be_deleted: Vec<&ObjPtr<BasicBlock>> = bb
+        let should_be_deleted: Vec<ObjPtr<BasicBlock>> = bb
             .get_next_bb()
             .iter()
             .filter(|x| !deleted.contains(x))
+            .cloned()
             .collect();
 
-        for &next_bb in should_be_deleted.iter() {
+        for next_bb in should_be_deleted.iter() {
             bb.as_mut().remove_next_bb(next_bb.clone());
         }
 
@@ -145,16 +156,10 @@ fn remove_bb_self(bb: ObjPtr<BasicBlock>) {
     if bb.is_empty() {
         return;
     }
-    let mut inst = bb.get_head_inst();
-    loop {
-        let next = inst.get_next();
-        inst.remove_self();
-        inst = next;
-        if inst.is_tail() {
-            inst.remove_self();
-            break;
-        }
-    }
+    let inst = bb.get_head_inst();
+    inst_process_in_bb(inst, |x| {
+        x.as_mut().remove_self();
+    });
 }
 
 /// 检查分支是否无法到达
