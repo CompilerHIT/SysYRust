@@ -6,7 +6,6 @@ use crate::{
         operand::Reg,
     },
     container::bitmap::{self, Bitmap},
-    frontend::InfuncChoice,
     log_file, log_file_uln,
     utility::{ObjPool, ObjPtr, ScalarType},
 };
@@ -15,6 +14,7 @@ use core::panic;
 use std::{
     collections::{hash_map::Iter, HashMap, HashSet, LinkedList, VecDeque},
     fmt::{self, format},
+    panic::PanicInfo,
 };
 
 use super::{
@@ -67,6 +67,7 @@ pub struct AllocatorInfo {
     pub spill_cost: HashMap<Reg, f32>,       //节点溢出代价 (用来启发寻找溢出代价最小的节点溢出)
     pub all_neighbors: HashMap<Reg, LinkedList<Reg>>, //所有邻居,在恢复节点的时候考虑,该表初始化后就不改变
     pub all_live_neighbors: HashMap<Reg, LinkedList<Reg>>, //还活着的邻居,在着色的时候动态考虑
+    pub all_live_neigbhors_bitmap: HashMap<Reg, Bitmap>, //记录还活着的邻居 TODO,
     pub nums_neighbor_color: HashMap<Reg, HashMap<i32, i32>>, //周围节点颜色数量
     pub availables: HashMap<Reg, RegUsedStat>,        //节点可着色资源
     pub colors: HashMap<i32, i32>,                    //着色情况
@@ -96,6 +97,7 @@ impl Allocator {
         let mut availables = regalloc::build_availables(func, &ends_index_bb);
         let mut spill_cost = regalloc::estimate_spill_cost(func);
         let mut all_live_neigbhors: HashMap<Reg, LinkedList<Reg>> = HashMap::new();
+        let mut all_live_neighbors_bitmap: HashMap<Reg, Bitmap> = HashMap::new();
         let mut last_colors: HashSet<Reg> = HashSet::new();
         let mut to_color: BiHeap<OperItem> = BiHeap::new();
         // 对live neighbor的更新,以及对tocolor的更新
@@ -126,6 +128,7 @@ impl Allocator {
                 continue;
             }
             let mut live_neighbors = LinkedList::new();
+            let mut live_neigbhors_bitmap = Bitmap::with_cap(10);
             for reg in neighbors {
                 if reg.is_physic() {
                     continue;
@@ -134,12 +137,14 @@ impl Allocator {
                     continue;
                 }
                 live_neighbors.push_back(*reg);
+                live_neigbhors_bitmap.insert(reg.bit_code() as usize);
             }
             to_color.push(OperItem::new(
                 reg,
                 &(*spill_cost.get(reg).unwrap() / (live_neighbors.len() as f32)),
             ));
             all_live_neigbhors.insert(*reg, live_neighbors);
+            all_live_neighbors_bitmap.insert(*reg, live_neigbhors_bitmap);
         }
 
         let info = AllocatorInfo {
@@ -155,6 +160,7 @@ impl Allocator {
             spillings: HashSet::new(),
             all_live_neighbors: all_live_neigbhors,
             last_colors: last_colors,
+            all_live_neigbhors_bitmap: all_live_neighbors_bitmap,
         };
         self.info = Some(info);
     }
@@ -305,6 +311,7 @@ impl Allocator {
         (dstr, spillings)
     }
 
+    ///对寄存器进行操作
     #[inline]
     pub fn color_one(&mut self, reg: &Reg) -> bool {
         // TODO,选择最合适的颜色
@@ -319,12 +326,13 @@ impl Allocator {
 
     #[inline]
     pub fn simpilfy_one(&mut self, reg: Reg) -> bool {
-        // 简化成功,该实例可以使用颜色,
+        //简化成功,该实例可以使用颜色,则化简成功,否则化简失败(但是化简失败也可能让别的spill能够恢复可着色状态)
         todo!()
     }
 
     #[inline]
     pub fn choose_spill(&self, reg: &Reg) -> Reg {
+        //
         todo!()
     }
 
@@ -336,30 +344,137 @@ impl Allocator {
         if self.if_has_been_spilled(&reg) {
             panic!("u");
         }
-        let mut out = false;
-        if self.if_has_been_colored(&reg) {
-            if self.decolor_one(&reg) {
-                out = true;
+        let mut out = true;
+        self.info.as_mut().unwrap().spillings.insert(reg.get_id());
+        //从它的所有周围节点中去除该spill
+        let info = self.info.as_mut().unwrap();
+        let mut live_neighbors = info.all_live_neighbors.remove(&reg).unwrap().to_owned();
+        let mut new_liveneighbors: LinkedList<Reg> = LinkedList::new();
+        loop {
+            if live_neighbors.is_empty() {
+                break;
             }
         }
-        self.info.as_mut().unwrap().spillings.insert(reg.get_id());
+        self.info
+            .as_mut()
+            .unwrap()
+            .all_live_neighbors
+            .insert(reg, new_liveneighbors);
         out
     }
 
     #[inline]
     pub fn de_spill_one(&mut self, reg: &Reg) {
         // 从spill中取东西回来要把东西加回live negibhores中
-        // TODO
+        // 需要修改live_neigbhors,用到allneighbors,spillings,
+        if !self.if_has_been_spilled(reg) || self.if_has_been_colored(reg) {
+            panic!("gg");
+        }
+        //刷新available和 nums_neighbor_color
+        let (available, nnc) = self.draw_available_and_num_neigbhor_color(reg);
+        self.info
+            .as_mut()
+            .unwrap()
+            .availables
+            .insert(*reg, available);
+        self.info
+            .as_mut()
+            .unwrap()
+            .nums_neighbor_color
+            .insert(*reg, nnc);
+        // 首先从spill移除
+        self.info.as_mut().unwrap().spillings.remove(&reg.get_id());
+
+        // 恢复该spill reg的 live_neigbhor和 live_neighbor_bitmap,
+        // 并且刷新neighbor对该spill的感知
+        let mut num_all_neigbhors = self
+            .info
+            .as_ref()
+            .unwrap()
+            .all_neighbors
+            .get(reg)
+            .unwrap()
+            .len();
+        let mut new_live_neighbors: LinkedList<Reg> = LinkedList::new();
+        let mut new_live_bitmap = Bitmap::with_cap(num_all_neigbhors / 2 / 8 + 1);
+        while num_all_neigbhors > 0 {
+            num_all_neigbhors -= 1;
+            let neighbors = self
+                .info
+                .as_mut()
+                .unwrap()
+                .all_neighbors
+                .get_mut(reg)
+                .unwrap();
+            let neighbor = neighbors.pop_front().unwrap();
+            neighbors.push_back(neighbor);
+            if neighbor.is_physic() {
+                continue;
+            }
+            if self
+                .info
+                .as_mut()
+                .unwrap()
+                .spillings
+                .contains(&neighbor.get_id())
+            {
+                continue;
+            }
+            new_live_neighbors.push_back(neighbor);
+            new_live_bitmap.insert(neighbor.bit_code() as usize);
+
+            if let Some(nn_live_bitmap) = self
+                .info
+                .as_mut()
+                .unwrap()
+                .all_live_neigbhors_bitmap
+                .get_mut(&neighbor)
+            {
+                if nn_live_bitmap.contains(reg.bit_code() as usize) {
+                    continue;
+                }
+                nn_live_bitmap.insert(reg.bit_code() as usize);
+                self.info
+                    .as_mut()
+                    .unwrap()
+                    .all_live_neighbors
+                    .get_mut(&neighbor)
+                    .unwrap()
+                    .push_back(*reg);
+            } else {
+                panic!("g");
+            }
+        }
+        self.info
+            .as_mut()
+            .unwrap()
+            .all_live_neigbhors_bitmap
+            .insert(*reg, new_live_bitmap);
+        self.info
+            .as_mut()
+            .unwrap()
+            .all_live_neighbors
+            .insert(*reg, new_live_neighbors);
     }
 
     #[inline]
-    pub fn swap_color(&mut self, reg1: Reg, reg2: Reg) {}
+    pub fn swap_color(&mut self, reg1: Reg, reg2: Reg) {
+        let info = self.info.as_ref().unwrap();
+        let color1 = *info.colors.get(&reg1.get_id()).unwrap();
+        let color2 = *info.colors.get(&reg1.get_id()).unwrap();
+        self.decolor_one(&reg1);
+        self.decolor_one(&reg2);
+        self.color_one_with_certain_color(&reg1, color2);
+        self.color_one_with_certain_color(&reg2, color1);
+    }
 
     #[inline]
     pub fn decolor_one(&mut self, reg: &Reg) -> bool {
         if self.if_has_been_spilled(reg) || !self.if_has_been_colored(reg) {
             panic!("unreachable!");
         }
+
+        // 移除着色并且取出颜色
         let color = self
             .info
             .as_mut()
@@ -369,15 +484,31 @@ impl Allocator {
             .unwrap();
         // 对all liveneigbhors做操作
         // 对于
+
         let mut out = false;
-        let neighbors = self
-            .info
-            .as_mut()
-            .unwrap()
-            .all_neighbors
-            .remove(reg)
-            .unwrap();
-        for neighbor in &neighbors {
+
+        let mut new_neighbors = LinkedList::new();
+        let mut to_despill = LinkedList::new();
+        loop {
+            let neighbors = self
+                .info
+                .as_mut()
+                .unwrap()
+                .all_neighbors
+                .get_mut(reg)
+                .unwrap();
+            if neighbors.is_empty() {
+                break;
+            }
+            let neighbor = neighbors.pop_front().unwrap();
+            new_neighbors.push_back(neighbor);
+            if neighbor.is_physic() {
+                continue;
+            }
+            if self.if_has_been_spilled(reg) {
+                continue;
+            }
+
             self.info
                 .as_mut()
                 .unwrap()
@@ -403,14 +534,18 @@ impl Allocator {
                     .contains(&neighbor.get_id())
             {
                 out = true;
-                self.de_spill_one(reg);
+                to_despill.push_back(neighbor);
             }
         }
         self.info
             .as_mut()
             .unwrap()
             .all_neighbors
-            .insert(*reg, neighbors);
+            .insert(*reg, new_neighbors);
+        while !to_despill.is_empty() {
+            let to_despill_one = to_despill.pop_front().unwrap();
+            self.de_spill_one(&to_despill_one);
+        }
         out
     }
 
@@ -420,18 +555,31 @@ impl Allocator {
             panic!("un reachable");
         }
         let info = self.info.as_mut().unwrap();
+        if !info.availables.get(reg).unwrap().is_available_reg(color) {
+            panic!("g");
+        }
         info.colors.insert(reg.get_id(), color);
-
-        if let Some(neighbors) = info.all_live_neighbors.get(&reg) {
-            for neighbor in neighbors {
-                info.availables.get_mut(&neighbor).unwrap().use_reg(color);
-                let nums_neighbor_color = info.nums_neighbor_color.get_mut(neighbor).unwrap();
-                let val = nums_neighbor_color
-                    .insert(color, nums_neighbor_color.get(&color).unwrap_or(&0) + 1);
+        let mut num = info.all_neighbors.get(reg).unwrap().len();
+        while num > 0 {
+            num -= 1;
+            let live_neighbors = info.all_live_neighbors.get_mut(reg).unwrap();
+            let neighbor = live_neighbors.pop_front().unwrap();
+            let live_neigbhors_bitmap = info.all_live_neigbhors_bitmap.get(reg).unwrap();
+            if !live_neigbhors_bitmap.contains(neighbor.bit_code() as usize) {
+                continue;
             }
+            live_neighbors.push_back(neighbor);
+            info.availables.get_mut(&neighbor).unwrap().use_reg(color);
+            let nums_neighbor_color = info.nums_neighbor_color.get_mut(&neighbor).unwrap();
+            nums_neighbor_color.insert(color, nums_neighbor_color.get(&color).unwrap_or(&0) + 1);
         }
     }
 
+    ///获取寄存器的一些属性
+    /// * 周围已有的各色物理寄存器数量
+    /// * 自身剩余可着色空间
+    /// * 自身是否已经着色
+    /// * 自身是否已经spill
     #[inline]
     pub fn get_spill_cost_div_nn(&self, reg: &Reg) {
         todo!()
@@ -456,10 +604,37 @@ impl Allocator {
             .colors
             .contains_key(&reg.get_id())
     }
+
+    #[inline]
+    pub fn draw_available_and_num_neigbhor_color(
+        &self,
+        reg: &Reg,
+    ) -> (RegUsedStat, HashMap<i32, i32>) {
+        let mut available = RegUsedStat::new();
+        let mut nnc = HashMap::with_capacity(32);
+        todo!();
+
+        (available, nnc)
+    }
+
+    #[inline]
+    pub fn draw_color(&self, reg: &Reg) -> i32 {
+        if reg.is_physic() {
+            panic!("gg");
+        }
+        *self
+            .info
+            .as_ref()
+            .unwrap()
+            .colors
+            .get(&reg.get_id())
+            .unwrap()
+    }
     #[inline]
     fn get_available(&self, reg: &Reg) -> RegUsedStat {
         *self.info.as_ref().unwrap().availables.get(reg).unwrap()
     }
+    #[inline]
     fn get_num_of_live_neighbors(&self, reg: &Reg) -> i32 {
         self.info
             .as_ref()
@@ -487,14 +662,17 @@ impl Regalloc for Allocator {
     fn alloc(&mut self, func: &crate::backend::func::Func) -> super::structs::FuncAllocStat {
         self.init(func);
         while !(self.color() == ActionResult::Finish)
+            || self.simpilfy() != ActionResult::Finish
+            || self.spill() != ActionResult::Finish
             || self.check_k_graph() != ActionResult::Success
         {
-            if self.simpilfy() == ActionResult::Success {
-                // self.rescue();
-                continue;
+            match self.simpilfy() {
+                ActionResult::Success => continue,
+                _ => (),
             }
-            if self.spill() == ActionResult::Success {
-                // self.rescue();
+            match self.spill() {
+                _ => (),
+                // ActionResult::Success=>
             }
         }
         self.color_k_graph();
