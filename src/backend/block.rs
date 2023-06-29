@@ -2100,8 +2100,8 @@ impl BB {
                     }
                     let bits = log2(opt_abs);
                     let combine_inst_kind = match do_add {
-                        true => InstrsType::Binary(BinaryOp::Add),
-                        false => InstrsType::Binary(BinaryOp::Sub),
+                        true => InstrsType::Binary(BinaryOp::Sub),
+                        false => InstrsType::Binary(BinaryOp::Add),
                     };
                     self.insts.push(pool.put_inst(LIRInst::new(
                         InstrsType::Binary(BinaryOp::Shl),
