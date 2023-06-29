@@ -55,20 +55,17 @@ impl<'a> AsmModule<'a> {
     }
 
     // 寄存器分配和使用后 移除无用指令(比如移除多余的缓存指令)
-    fn remove_unuse_inst_suf_alloc(&mut self) {
+    fn remove_unuse_inst_suf_alloc(&mut self) {}
 
-    }
-    
-    
     pub fn generate(&mut self, f: &mut File, f2: &mut File, pool: &mut BackendPool) {
         self.build_lir(pool);
         // TOCHECK 寄存器分配和handlespill前无用指令删除,比如删除mv指令方便寄存器分配
         self.remove_unuse_inst_pre_alloc(); //fixme: to imporve
-        self.generate_row_asm(f2, pool); //注释
+                                            //self.generate_row_asm(f2, pool); //注释
         self.allocate_reg();
-        self.handle_spill(pool, f);         //yjh: i am going to adjust
+        self.handle_spill(pool, f); //yjh: i am going to adjust
         self.remove_unuse_inst_suf_alloc(); //yjh:i am going to do
-        
+
         // 检查地址溢出，插入间接寻址
         self.handle_overflow(pool);
         self.generate_global_var(f);

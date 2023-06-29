@@ -23,7 +23,7 @@ pub fn optimizer_run(
         dead_code_eliminate::dead_code_eliminate(module, true);
 
         // 简化cfg
-        simplify_cfg::simplify_cfg_run(module, &mut pools);
+        //simplify_cfg::simplify_cfg_run(module, &mut pools);
 
         // phi优化
         //phi_optimizer::phi_run(module);

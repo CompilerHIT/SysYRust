@@ -1,7 +1,5 @@
-
-
-use std::env;
 use lalrpop_util::lalrpop_mod;
+use std::env;
 use sysylib::backend::module::AsmModule;
 use sysylib::frontend::irgen::irgen;
 use sysylib::ir::instruction::Inst;
@@ -13,7 +11,6 @@ lalrpop_mod! {
 fn main() {
     run_main();
 }
-
 
 fn run_main() {
     // let m=LinkedList::new();
@@ -68,17 +65,7 @@ fn run_main() {
     drop(compunit);
 
     // ir优化
-    // sysylib::ir::optimizer_run(&mut module, (&mut pool_bb, &mut pool_inst), o1_option); //o1_option);
-    //sysylib:://log_file!(
-    //"call_map",
-    //"file {}:\n{}\n",
-    //filename,
-    //sysylib::ir::call_map_gen(&mut module)
-    //);
-
-    // ir打印
-    sysylib::ir::dump_now(&module, "dump.ll");
-
+    sysylib::ir::optimizer_run(&mut module, (&mut pool_bb, &mut pool_inst), o1_option); //o1_option);
     let output2 = "row_asm.log";
     // 后端解析
     generate_asm(filename, output, output2, &mut AsmModule::new(&module));

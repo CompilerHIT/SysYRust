@@ -62,7 +62,7 @@ fn merge_bb(mut bb: ObjPtr<BasicBlock>) {
         bb.replace_next_bb(next_bb, next_bb.get_next_bb()[0].clone());
 
         if !bb_has_jump(next_bb) {
-            bb.add_next_bb(next_bb);
+            bb.add_next_bb(next_bb.get_next_bb()[1].clone());
             bb.replace_next_bb(next_bb, next_bb.get_next_bb()[1].clone());
         }
     }
@@ -96,11 +96,11 @@ fn remove_unreachable_bb(
             }
 
             // 如果没有前继或者前继都在deleted集里，那么当前bb是无法到达的
-            if bb.get_up_bb().is_empty() || bb.get_up_bb().iter().all(|bb| deleted.contains(bb)) {
-                if !deleted.contains(bb) {
-                    deleted.insert(bb);
-                    changed = true;
-                }
+            if (bb.get_up_bb().is_empty() || bb.get_up_bb().iter().all(|bb| deleted.contains(bb)))
+                && !deleted.contains(bb)
+            {
+                deleted.insert(bb);
+                changed = true;
             }
 
             // jump指令不检查
@@ -127,13 +127,14 @@ fn remove_unreachable_bb(
 
     // 删除掉这些不可达的bb
     for &bb in deleted.iter() {
-        let should_be_deleted: Vec<&ObjPtr<BasicBlock>> = bb
+        let should_be_deleted: Vec<ObjPtr<BasicBlock>> = bb
             .get_next_bb()
             .iter()
             .filter(|x| !deleted.contains(x))
+            .cloned()
             .collect();
 
-        for &next_bb in should_be_deleted.iter() {
+        for next_bb in should_be_deleted.iter() {
             bb.as_mut().remove_next_bb(next_bb.clone());
         }
 
@@ -145,16 +146,10 @@ fn remove_bb_self(bb: ObjPtr<BasicBlock>) {
     if bb.is_empty() {
         return;
     }
-    let mut inst = bb.get_head_inst();
-    loop {
-        let next = inst.get_next();
-        inst.remove_self();
-        inst = next;
-        if inst.is_tail() {
-            inst.remove_self();
-            break;
-        }
-    }
+    let inst = bb.get_head_inst();
+    inst_process_in_bb(inst, |x| {
+        x.as_mut().remove_self();
+    });
 }
 
 /// 检查分支是否无法到达
