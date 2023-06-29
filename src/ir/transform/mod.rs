@@ -20,10 +20,10 @@ pub fn optimizer_run(
         func_inline::inline_run(module, &mut pools);
 
         // 死代码删除
-        //dead_code_eliminate::dead_code_eliminate(module, true);
+        dead_code_eliminate::dead_code_eliminate(module, true);
 
         // 简化cfg
-        //simplify_cfg::simplify_cfg_run(module, &mut pools);
+        simplify_cfg::simplify_cfg_run(module, &mut pools);
 
         // phi优化
         //phi_optimizer::phi_run(module);

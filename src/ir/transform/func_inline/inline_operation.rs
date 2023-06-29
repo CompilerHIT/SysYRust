@@ -10,6 +10,7 @@ pub fn inline_func(
         if let InstKind::Call(name) = inst.get_kind() {
             if name == callee_name {
                 let arg_list = inst.get_operands().clone();
+
                 inline_func_with_inst(
                     inst,
                     callee,
@@ -53,7 +54,7 @@ fn inline_func_with_inst(
     if let IrType::Void = caller_inst.get_ir_type() {
     } else {
         let return_value = copyed_end_bb.get_tail_inst().get_return_value();
-        for user in caller_inst.get_use_list().iter() {
+        for user in caller_inst.get_use_list().clone().iter() {
             let index = user.get_operand_index(caller_inst);
             user.as_mut().set_operand(return_value, index);
         }

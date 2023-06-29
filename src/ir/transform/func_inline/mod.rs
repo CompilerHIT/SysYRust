@@ -1,4 +1,4 @@
-use std::collections::{HashMap};
+use std::collections::HashMap;
 
 use crate::{
     ir::{
@@ -8,16 +8,18 @@ use crate::{
         instruction::{Inst, InstKind},
         ir_type::IrType,
         module::Module,
+        tools::func_process,
         CallMap,
     },
     utility::{ObjPool, ObjPtr},
 };
 
 mod copy_func;
+mod get_optimizate;
 mod inline_operation;
 
-use self::inline_operation::inline_func;
 use self::{copy_func::copy_func, inline_operation::delete_uncalled_func};
+use self::{get_optimizate::gep_optimize, inline_operation::inline_func};
 
 use super::{bfs_inst_process, inst_process_in_bb};
 
@@ -29,6 +31,11 @@ pub fn inline_run(module: &mut Module, pools: &mut (&mut ObjPool<BasicBlock>, &m
 
     // 再内联没有调用自己的函数
     inline_no_self_call(module, &mut call_map, pools);
+
+    // 消去嵌套的gep指令
+    func_process(module, |_, func| {
+        gep_optimize(func.get_head(), pools);
+    })
 }
 
 fn inline_no_self_call(

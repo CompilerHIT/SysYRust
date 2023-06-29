@@ -99,6 +99,7 @@ fn map_inst_in_bb(
     };
     inst_process_in_bb(inst, |x| {
         x.as_mut().set_operands(inst_map_op(x.get_operands()));
+        let user_list = x.get_use_list().clone();
         x.as_mut().set_users(inst_map_op(x.get_use_list()));
         x.get_operands().iter().for_each(|used| {
             if let Some(index) = arg_list.iter().position(|x| x == used) {

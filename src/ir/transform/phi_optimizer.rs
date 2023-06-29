@@ -39,11 +39,11 @@ fn phi_optimize(mut inst: ObjPtr<Inst>) -> bool {
             .all(|&x| x == inst || x == not_self)
         {
             changed = true;
-            // 将其user中所有当前phi的操作数替换为第一个参数
+            // 将其user中所有使用当前phi的操作数替换为not_self
             while inst.get_use_list().len() != 0 {
                 let mut user = inst.get_use_list()[0];
                 let index = user.get_operands().iter().position(|x| x == &inst).unwrap();
-                user.set_operand(inst.get_operands()[0], index);
+                user.set_operand(not_self, index);
             }
             inst.remove_self();
         }
