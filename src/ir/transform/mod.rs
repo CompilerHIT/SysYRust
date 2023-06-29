@@ -1,7 +1,9 @@
 use super::tools::*;
 use super::{basicblock::BasicBlock, instruction::Inst, module::Module};
+use crate::ir::transform::constant_folding::constant_folding;
 use crate::utility::ObjPool;
 
+mod constant_folding;
 mod dead_code_eliminate;
 mod func_inline;
 mod phi_optimizer;
@@ -14,6 +16,8 @@ pub fn optimizer_run(
 ) {
     // 在功能点上对phi指令进行优化
     functional_optimizer(module);
+    constant_folding(module, &mut pools);
+    dead_code_eliminate::dead_code_eliminate(module, true);
 
     if optimize_flag {
         // 函数内联
