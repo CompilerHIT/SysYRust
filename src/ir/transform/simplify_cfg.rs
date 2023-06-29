@@ -32,10 +32,11 @@ pub fn simplify_cfg_run(
 }
 
 fn merge_one_line_bb(head: ObjPtr<BasicBlock>) {
-    let bb_list = get_bb_list(head);
+    let mut bb_list = get_bb_list(head);
 
     loop {
         let mut changed = false;
+        let mut delete_bb = None;
         for bb in bb_list.iter() {
             // 不考虑尾
             if bb.is_exit() {
@@ -44,8 +45,16 @@ fn merge_one_line_bb(head: ObjPtr<BasicBlock>) {
 
             if bb_has_jump(bb.clone()) && bb.get_next_bb()[0].get_up_bb().len() == 1 {
                 changed = true;
+                delete_bb = Some(bb.get_next_bb()[0].clone());
                 merge_bb(bb.clone());
+                break;
             }
+        }
+
+        // 删除已经合并的block
+        if let Some(bb) = delete_bb {
+            let index = bb_list.iter().position(|x| x.clone() == bb).unwrap();
+            bb_list.remove(index);
         }
 
         if !changed {
@@ -62,7 +71,7 @@ fn merge_bb(mut bb: ObjPtr<BasicBlock>) {
         bb.replace_next_bb(next_bb, next_bb.get_next_bb()[0].clone());
 
         if !bb_has_jump(next_bb) {
-            bb.add_next_bb(next_bb.get_next_bb()[1].clone());
+            bb.add_next_bb(next_bb);
             bb.replace_next_bb(next_bb, next_bb.get_next_bb()[1].clone());
         }
     }
@@ -75,6 +84,7 @@ fn merge_bb(mut bb: ObjPtr<BasicBlock>) {
     // 移动剩下的指令
     bb.get_tail_inst().remove_self();
     inst_process_in_bb(next_bb.get_head_inst(), |inst| {
+        inst.as_mut().move_self();
         bb.push_back(inst);
     });
 }
