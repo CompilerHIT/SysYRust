@@ -2,6 +2,7 @@ use lalrpop_util::lalrpop_mod;
 use std::env;
 use sysylib::backend::module::AsmModule;
 use sysylib::frontend::irgen::irgen;
+use sysylib::ir::dump_now;
 use sysylib::ir::instruction::Inst;
 use sysylib::{self, backend::generate_asm, ir::module::Module, utility::ObjPool};
 lalrpop_mod! {
@@ -65,7 +66,12 @@ fn run_main() {
     drop(compunit);
 
     // ir优化
-    sysylib::ir::optimizer_run(&mut module, (&mut pool_bb, &mut pool_inst), o1_option); //o1_option);
+    //sysylib::ir::optimizer_run(&mut module, (&mut pool_bb, &mut pool_inst), o1_option);
+    //dump_now(&mut module, "dump.ll");
+
+    sysylib::ir::optimizer_run(&mut module, (&mut pool_bb, &mut pool_inst), true);
+    dump_now(&mut module, "dump_opt.ll");
+
     let output2 = "row_asm.log";
     // 后端解析
     generate_asm(filename, output, output2, &mut AsmModule::new(&module));
