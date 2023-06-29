@@ -288,9 +288,9 @@ fn dump_inst(
                 text += format!("  ; init array begin!!!!\n").as_str();
                 let init = inst.get_int_init();
                 for (i, v) in init.iter().enumerate() {
-                    text += format!("  %var_{} = getelementptr inbounds [{} x i32], [{} x i32]* {}, i32 0, i32 {}\n", name_index, len, len, local_map.get(&inst).unwrap(), i).as_str();
+                    text += format!("  %val_{} = getelementptr inbounds [{} x i32], [{} x i32]* {}, i32 0, i32 {}\n", name_index, len, len, local_map.get(&inst).unwrap(), i).as_str();
                     text +=
-                        format!("  store i32 {}, i32* %var_{}, align 4\n", v, name_index).as_str();
+                        format!("  store i32 {}, i32* %val_{}, align 4\n", v, name_index).as_str();
                     name_index += 1;
                 }
                 text += format!("  ; init array end!!!!\n").as_str();
@@ -731,13 +731,48 @@ fn dump_inst(
                 )
                 .as_str();
             } else {
-                text += format!(
-                    "  br i1 {}, label %{}, label %{}\n",
-                    get_inst_value(inst.get_br_cond(), local_map, global_map),
-                    format!("bb_{}", inst.get_true_bb().get_name()).as_str(),
-                    format!("bb_{}", inst.get_false_bb().get_name()).as_str()
-                )
-                .as_str();
+                match inst.get_br_cond().get_kind() {
+                    InstKind::Binary(BinOp::Ne)
+                    | InstKind::Binary(BinOp::Eq)
+                    | InstKind::Binary(BinOp::Le)
+                    | InstKind::Binary(BinOp::Lt)
+                    | InstKind::Binary(BinOp::Gt)
+                    | InstKind::Binary(BinOp::Ge)
+                    | InstKind::Unary(UnOp::Not) => {
+                        text += format!(
+                            "  br i1 {}, label %{}, label %{}\n",
+                            get_inst_value(inst.get_br_cond(), local_map, global_map),
+                            format!("bb_{}", inst.get_true_bb().get_name()).as_str(),
+                            format!("bb_{}", inst.get_false_bb().get_name()).as_str()
+                        )
+                        .as_str();
+                    }
+                    _ => {
+                        if let IrType::Int = inst.get_br_cond().get_ir_type() {
+                            text += format!(
+                                "  %val_{}_add = icmp ne i32 {}, 0\n",
+                                name_index,
+                                get_inst_value(inst.get_br_cond(), local_map, global_map)
+                            )
+                            .as_str();
+                        } else {
+                            text += format!(
+                                "  %val_{}_add = fcmp one float {}, 0.0\n",
+                                name_index,
+                                get_inst_value(inst.get_br_cond(), local_map, global_map)
+                            )
+                            .as_str();
+                        }
+                        text += format!(
+                            "  br i1 %val_{}_add, label %{}, label %{}\n",
+                            name_index,
+                            format!("bb_{}", inst.get_true_bb().get_name()).as_str(),
+                            format!("bb_{}", inst.get_false_bb().get_name()).as_str()
+                        )
+                        .as_str();
+                        name_index += 1;
+                    }
+                }
             }
         }
         InstKind::Call(callee) => {
@@ -862,7 +897,7 @@ fn put_name(
     if local_map.contains_key(&inst) {
         name_index
     } else {
-        local_map.insert(inst, format!("%var_{}", name_index));
+        local_map.insert(inst, format!("%val_{}", name_index));
         name_index + 1
     }
 }
@@ -891,7 +926,6 @@ fn get_inst_value(
                         NOTFOUND
                     }),
                 );
-                //println!("{}: {:?}", local_map.get(&inst).unwrap(), inst.get_kind());
                 local_map.get(&inst).unwrap().clone()
             }
         }
