@@ -62,7 +62,6 @@ pub enum SingleOp {
     // D2F,
     Seqz,
     Snez,
-    LoadImm,
     LoadFImm,
 }
 
@@ -156,7 +155,6 @@ impl fmt::Display for LIRInst {
                     SingleOp::LoadAddr => "la",
                     SingleOp::Seqz => "seqz",
                     SingleOp::Snez => "snez",
-                    SingleOp::LoadImm => "addi",
                     SingleOp::LoadFImm => "fmv.w.x",
                 };
             }
