@@ -20,7 +20,6 @@ impl GenerateAsm for LIRInst {
                     BinaryOp::Shl => "sll",
                     BinaryOp::Shr => "srl",
                     BinaryOp::Sar => "sra",
-                    BinaryOp::Mulhs => "mulhs",
                     BinaryOp::FCmp(cmp) => {
                         match cmp {
                             CmpOp::Eq => "eq",
@@ -83,6 +82,7 @@ impl GenerateAsm for LIRInst {
                     SingleOp::I2F => "fcvt.s.w",
                     SingleOp::F2I => "fcvt.w.s",
                     SingleOp::LoadAddr => "la",
+                    SingleOp::Abs => "abs",
                     SingleOp::Seqz => "seqz",
                     SingleOp::Snez => "snez",
                     SingleOp::LoadFImm => "fmv.w.x",

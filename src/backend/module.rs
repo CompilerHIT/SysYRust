@@ -64,7 +64,7 @@ impl<'a> AsmModule<'a> {
         self.build_lir(pool);
         // TOCHECK 寄存器分配和handlespill前无用指令删除,比如删除mv指令方便寄存器分配
         self.remove_unuse_inst_pre_alloc(); //fixme: to imporve
-        self.generate_row_asm(f2, pool); //注释
+        // self.generate_row_asm(f2, pool); //注释
         self.allocate_reg();
         self.handle_spill(pool, f);         //yjh: i am going to adjust
         self.remove_unuse_inst_suf_alloc(); //yjh:i am going to do

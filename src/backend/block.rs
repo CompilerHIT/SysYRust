@@ -2160,6 +2160,16 @@ impl BB {
                 }
             }
             _ => {
+                // let tmp0 = Operand::Reg(Reg::init(ScalarType::Int));
+                // self.insts.push(pool.put_inst(LIRInst::new(
+                //     InstrsType::OpReg(SingleOp::Li),
+                //     vec![tmp0.clone(), Operand::IImm(IImm::new(imm))],
+                // )));
+                //                     self.insts.push(pool.put_inst(LIRInst::new(
+                //                         InstrsType::Binary(BinaryOp::Div),
+                //                         vec![dst, src, tmp0],
+                //                     )));
+                //                     return;
                 if is_opt_num(abs) {
                     self.insts.push(pool.put_inst(LIRInst::new(
                         InstrsType::Binary(BinaryOp::Sar),
@@ -2205,41 +2215,53 @@ impl BB {
                         InstrsType::OpReg(SingleOp::Li),
                         vec![tmp.clone(), Operand::IImm(IImm::new(magic))],
                     )));
-                    // q = floor(M * n / 2^32)
-                    self.insts.push(pool.put_inst(LIRInst::new(
-                        InstrsType::Binary(BinaryOp::Mulhs),
-                        vec![tmp.clone(), tmp.clone(), src.clone()],
-                    )));
-                    // q = q + n
-                    self.insts.push(pool.put_inst(LIRInst::new(
-                        InstrsType::Binary(BinaryOp::Add),
-                        vec![tmp.clone(), src.clone(), tmp.clone()],
-                    )));
-                    // q = q >> s
-                    self.insts.push(pool.put_inst(LIRInst::new(
+                    // q = floor(M * an / 2^32)
+                    let mut inst = LIRInst::new(
+                        InstrsType::Binary(BinaryOp::Mul),
+                        vec![dst.clone(), tmp.clone(), src.clone()],
+                    );
+                    inst.set_double();
+                    self.insts.push(pool.put_inst(inst));
+                    
+                    let mut inst = LIRInst::new(
                         InstrsType::Binary(BinaryOp::Shr),
-                        vec![tmp.clone(), tmp.clone(), Operand::IImm(IImm::new(shift))],
+                        vec![dst.clone(), dst.clone(), Operand::IImm(IImm::new(32))],
+                    );
+                    inst.set_double();
+                    self.insts.push(pool.put_inst(inst));
+                    // q = q >> s
+                    // shrsi q, q, s
+                    self.insts.push(pool.put_inst(LIRInst::new(
+                        InstrsType::Binary(BinaryOp::Sar),
+                        vec![dst.clone(), dst.clone(), Operand::IImm(IImm::new(shift))],
                     )));
                     // add 1 to q if n is neg
-                    let tmp2 = Operand::Reg(Reg::init(ScalarType::Int));
+                    // shri t, n, 31
                     self.insts.push(pool.put_inst(LIRInst::new(
                         InstrsType::Binary(BinaryOp::Shr),
-                        vec![tmp2.clone(), src.clone(), Operand::IImm(IImm::new(31))],
+                        vec![tmp.clone(), src.clone(), Operand::IImm(IImm::new(31))],
                     )));
+                    // add q, q, t
                     self.insts.push(pool.put_inst(LIRInst::new(
                         InstrsType::Binary(BinaryOp::Add),
-                        vec![tmp.clone(), tmp2.clone(), tmp.clone()],
+                        vec![dst.clone(), dst.clone(), tmp.clone()],
                     )));
-
-                    // r = n - q * imm
-                    self.insts.push(pool.put_inst(LIRInst::new(
-                        InstrsType::Binary(BinaryOp::Mul),
-                        vec![tmp2.clone(), tmp, Operand::IImm(IImm::new(abs))],
-                    )));
-                    self.insts.push(pool.put_inst(LIRInst::new(
-                        InstrsType::Binary(BinaryOp::Sub),
-                        vec![dst, src, tmp2]
-                    )))
+                    
+                    // 余数
+                    // // r = n - q * imm
+                    // let tmp3 = Operand::Reg(Reg::init(ScalarType::Int));
+                    // self.insts.push(pool.put_inst(LIRInst::new(
+                    //     InstrsType::OpReg(SingleOp::Li),
+                    //     vec![tmp3.clone(), Operand::IImm(IImm::new(abs))],
+                    // )));
+                    // self.insts.push(pool.put_inst(LIRInst::new(
+                    //     InstrsType::Binary(BinaryOp::Mul),
+                    //     vec![tmp2.clone(), tmp, tmp3.clone()],
+                    // )));
+                    // self.insts.push(pool.put_inst(LIRInst::new(
+                    //     InstrsType::Binary(BinaryOp::Sub),
+                    //     vec![dst, src, tmp2]
+                    // )))
                 }
             }
         }

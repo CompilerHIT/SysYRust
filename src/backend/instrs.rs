@@ -41,7 +41,6 @@ pub enum BinaryOp {
     /// Shift right arithmetic.
     Sar,
     /// 执行带符号整数高位乘法操作
-    Mulhs,
     FCmp(CmpOp),
 }
 
@@ -62,6 +61,7 @@ pub enum SingleOp {
     // D2F,
     Seqz,
     Snez,
+    Abs,
     LoadFImm,
 }
 
@@ -137,7 +137,6 @@ impl fmt::Display for LIRInst {
                     BinaryOp::Shl => "sll",
                     BinaryOp::Shr => "srl",
                     BinaryOp::Sar => "sra",
-                    BinaryOp::Mulhs => "mulhs",
                     BinaryOp::Slt => "slt",
                     BinaryOp::FCmp(..) => "fcmp",
                 };
@@ -153,6 +152,7 @@ impl fmt::Display for LIRInst {
                     SingleOp::I2F => "fcvt.s.w",
                     SingleOp::F2I => "fcvt.w.s",
                     SingleOp::LoadAddr => "la",
+                    SingleOp::Abs => "abs",
                     SingleOp::Seqz => "seqz",
                     SingleOp::Snez => "snez",
                     SingleOp::LoadFImm => "fmv.w.x",
