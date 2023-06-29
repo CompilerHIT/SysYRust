@@ -1,6 +1,7 @@
 // 一个简单的bitmap,用来统计spilling情况,用位图
 pub struct Bitmap {
     arr: Vec<u64>,
+    len: usize, //记录元素数量
 }
 
 impl Bitmap {
@@ -23,6 +24,7 @@ impl Bitmap {
         }
     }
 
+    //获取元素数量
     pub fn count(&self) -> usize {
         let mut out = 0;
         for v in &self.arr {
@@ -41,14 +43,24 @@ impl Bitmap {
 // FIXME 编写单元测试检查
 impl Bitmap {
     pub fn new() -> Bitmap {
-        Bitmap { arr: Vec::new() }
+        Bitmap {
+            arr: Vec::new(),
+            len: 0,
+        }
     }
     pub fn with_cap(cap: usize) -> Bitmap {
         Bitmap {
             arr: Vec::with_capacity(cap),
+            len: 0,
         }
     }
+    pub fn len(&self) -> usize {
+        return self.len;
+    }
     pub fn insert(&mut self, i: usize) {
+        if !self.contains(i) {
+            self.len += 1;
+        }
         while i / 64 >= self.arr.len() {
             self.arr.push(0);
         }
@@ -56,6 +68,10 @@ impl Bitmap {
         *v = *v | (1 << (i as u64 % 64))
     }
     pub fn remove(&mut self, i: usize) -> bool {
+        if self.contains(i) {
+            self.len -= 1;
+        }
+
         if i / 64 >= self.arr.len() {
             return false;
         }
@@ -133,6 +149,31 @@ mod test_bitmap {
     }
 
     #[test]
+    fn test_len() {
+        // TODO,检查len
+        for j in 0..=100000 {
+            let n = 100;
+            let mode: usize = 10000;
+            let mut set: HashSet<usize> = HashSet::new();
+            let mut bitmap = Bitmap::new();
+            for i in 0..n {
+                // 获取一个随机数
+                let use_val = rand::random::<usize>() % mode;
+                let insert_or = rand::random::<bool>();
+                let delete_or = rand::random::<bool>();
+                if insert_or {
+                    set.insert(use_val);
+                    bitmap.insert(use_val);
+                }
+                if delete_or {
+                    assert!(set.remove(&use_val) == bitmap.remove(use_val));
+                }
+            }
+            assert_eq!(set.len(), bitmap.len());
+        }
+    }
+
+    #[test]
     fn test_use() {
         // 创建一个bitmap,进行随机插入删除n次
         let n = 1000000;
@@ -152,6 +193,7 @@ mod test_bitmap {
                 assert!(set.remove(&use_val) == bitmap.remove(use_val));
             }
         }
+
         // 然后判断它与HashSet的随机插入删除判断结果是否一致
         for value in set.iter() {
             assert!(bitmap.contains(*value));
