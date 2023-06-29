@@ -180,7 +180,6 @@ impl Allocator {
             if self.if_has_been_spilled(&reg) || self.if_has_been_colored(&reg) {
                 continue;
             }
-
             //TODO,把合适节点加入弦图
             //如果作色成功继续
             let (na, nn) = self.get_num_available_and_num_live_neighbor(&reg);
@@ -244,7 +243,7 @@ impl Allocator {
         if self.if_has_been_colored(&reg) || self.if_has_been_spilled(&reg) {
             return ActionResult::Fail;
         }
-        // 如果重新的spill完成
+        //
         let reg = self.choose_spill(&reg);
         // 这个reg可能是有颜色的
         if self.spill_one(reg) {
@@ -332,8 +331,86 @@ impl Allocator {
 
     #[inline]
     pub fn choose_spill(&self, reg: &Reg) -> Reg {
-        //
-        todo!()
+        //在该节点和该节点的周围节点中选择一个最适合spill的节点
+        // 最适合spill的节点就是spill代价最小的节点
+        // spill代价计算:  活邻居越多,spill代价越小,spill_cost越大,spill代价越大,
+        // 能够救回的节点的代价越大,spiLl代价越小
+        // val[reg]=reg.spill_cost/num_live_neighbor[reg] - sum(rescue.spill_cost/num_live_neighbor[reg])
+        let val = |reg: &Reg,
+                   all_neighbors: &HashMap<Reg, LinkedList<Reg>>,
+                   colors: &HashMap<i32, i32>,
+                   spillings: &HashSet<i32>,
+                   nums_neigbhor_colors: &HashMap<Reg, HashMap<i32, i32>>,
+                   spill_costs: &HashMap<Reg, f32>|
+         -> f32 {
+            // 计算价值,首先,获取当前节点本身的spill cost(简单地使用spill cost来计算节省地内容)
+            let mut out_val = *spill_costs.get(reg).unwrap();
+            // 如果当前节点在colors里面,则spill cost还要减去消去它的颜色后能够救回的spill cost
+            // 对该节点地邻居进行一次遍历(如果该节点有颜色的话)
+            let color = colors.get(&reg.get_id());
+            if color.is_none() {
+                return out_val;
+            }
+            //
+            let color = *color.unwrap();
+            for neighbor in all_neighbors.get(reg).unwrap() {
+                if neighbor.is_physic() || !spillings.contains(&neighbor.get_id()) {
+                    continue;
+                }
+                let nnc = nums_neigbhor_colors.get(neighbor).unwrap();
+                if *nnc.get(&color).unwrap() == 1 {
+                    out_val -= spill_costs.get(neighbor).unwrap();
+                }
+            }
+            out_val
+        };
+        // 遍历节点reg和它周围节点
+        let mut num_live_num_neigbhors = self
+            .info
+            .as_ref()
+            .unwrap()
+            .all_live_neighbors
+            .get(reg)
+            .unwrap()
+            .len();
+        let mut tospill = *reg;
+        let info = self.info.as_ref().unwrap().to_owned();
+        let all_live_neigbhors = &info.all_live_neighbors;
+        let all_neighbors = &info.all_neighbors;
+        let all_live_neigbors_bitmap = &info.all_live_neigbhors_bitmap;
+        let spill_costs = &info.spill_cost;
+        let spillings = &info.spillings;
+        let nums_neighbor_color = &info.nums_neighbor_color;
+        let colors = &info.colors;
+        let mut tospill_val = val(
+            &tospill,
+            all_neighbors,
+            colors,
+            spillings,
+            nums_neighbor_color,
+            spill_costs,
+        );
+        for neighbor in all_live_neigbhors.get(reg).unwrap() {
+            let neigbor = *neighbor;
+            let bitmap = all_live_neigbors_bitmap.get(reg).unwrap();
+            if !bitmap.contains(neigbor.bit_code() as usize) {
+                continue;
+            }
+            // 获取价值
+            let tmp_tospill_val = val(
+                &neigbor,
+                all_neighbors,
+                colors,
+                spillings,
+                nums_neighbor_color,
+                spill_costs,
+            );
+            if tmp_tospill_val < tospill_val {
+                tospill = neigbor;
+                tospill_val = tmp_tospill_val;
+            }
+        }
+        tospill
     }
 
     #[inline]
@@ -344,23 +421,50 @@ impl Allocator {
         if self.if_has_been_spilled(&reg) {
             panic!("u");
         }
-        let mut out = true;
+        if self.if_has_been_colored(&reg) {
+            let out = self.decolor_one(&reg);
+            self.spill_one(reg);
+            return out;
+        }
         self.info.as_mut().unwrap().spillings.insert(reg.get_id());
         //从它的所有周围节点中去除该spill
-        let info = self.info.as_mut().unwrap();
-        let mut live_neighbors = info.all_live_neighbors.remove(&reg).unwrap().to_owned();
-        let mut new_liveneighbors: LinkedList<Reg> = LinkedList::new();
-        loop {
-            if live_neighbors.is_empty() {
-                break;
-            }
-        }
-        self.info
-            .as_mut()
+        let mut num_live_neigbhors = self
+            .info
+            .as_ref()
             .unwrap()
             .all_live_neighbors
-            .insert(reg, new_liveneighbors);
-        out
+            .get(&reg)
+            .unwrap()
+            .len();
+        while num_live_neigbhors > 0 {
+            num_live_neigbhors -= 1;
+            let live_neigbhors = self
+                .info
+                .as_mut()
+                .unwrap()
+                .all_live_neighbors
+                .get_mut(&reg)
+                .unwrap();
+            let neighbor = live_neigbhors.pop_front().unwrap();
+            if self
+                .info
+                .as_ref()
+                .unwrap()
+                .spillings
+                .contains(&neighbor.get_id())
+            {
+                continue;
+            }
+            // 对于邻居非spilling的情况
+            self.info
+                .as_mut()
+                .unwrap()
+                .all_live_neigbhors_bitmap
+                .get_mut(&neighbor)
+                .unwrap()
+                .remove(reg.get_id() as usize);
+        }
+        false
     }
 
     #[inline]
@@ -434,13 +538,14 @@ impl Allocator {
                     continue;
                 }
                 nn_live_bitmap.insert(reg.bit_code() as usize);
-                self.info
+                let nn_live_neighbors = self
+                    .info
                     .as_mut()
                     .unwrap()
                     .all_live_neighbors
                     .get_mut(&neighbor)
-                    .unwrap()
-                    .push_back(*reg);
+                    .unwrap();
+                nn_live_neighbors.push_back(*reg);
             } else {
                 panic!("g");
             }
@@ -581,8 +686,16 @@ impl Allocator {
     /// * 自身是否已经着色
     /// * 自身是否已经spill
     #[inline]
-    pub fn get_spill_cost_div_nn(&self, reg: &Reg) {
-        todo!()
+    pub fn get_spill_cost_div_nn(&self, reg: &Reg) -> f32 {
+        let spill_cost = self.info.as_ref().unwrap().spill_cost.get(reg).unwrap();
+        let nn = self
+            .info
+            .as_ref()
+            .unwrap()
+            .all_live_neigbhors_bitmap
+            .get(reg)
+            .unwrap();
+        spill_cost / nn.len() as f32
     }
     #[inline]
     pub fn get_spill_cost(&self, reg: &Reg) -> f32 {
@@ -606,14 +719,28 @@ impl Allocator {
     }
 
     #[inline]
+    // 根据总冲突图刷新并返回regusestat和num neighbor color
     pub fn draw_available_and_num_neigbhor_color(
         &self,
         reg: &Reg,
     ) -> (RegUsedStat, HashMap<i32, i32>) {
         let mut available = RegUsedStat::new();
         let mut nnc = HashMap::with_capacity(32);
-        todo!();
-
+        // todo!();
+        // 遍历all_neigbhor得到available和nnc
+        let info = self.info.as_ref().unwrap();
+        for neighbor in info.all_neighbors.get(reg).unwrap() {
+            if neighbor.is_physic() {
+                continue;
+            }
+            if info.spillings.contains(&neighbor.get_id()) {
+                continue;
+            }
+            let color = *info.colors.get(&neighbor.get_id()).unwrap();
+            available.use_reg(color);
+            let new_num = nnc.get(&color).unwrap_or(&0) + 1;
+            nnc.insert(color, new_num);
+        }
         (available, nnc)
     }
 
@@ -644,7 +771,7 @@ impl Allocator {
             .unwrap()
             .len() as i32
     }
-    #[inline]
+
     // 获取的可用颜色以及周围的活邻居数量
     fn get_num_available_and_num_live_neighbor(&self, reg: &Reg) -> (i32, i32) {
         let info = self.info.as_ref().unwrap();
@@ -661,18 +788,31 @@ impl Allocator {
 impl Regalloc for Allocator {
     fn alloc(&mut self, func: &crate::backend::func::Func) -> super::structs::FuncAllocStat {
         self.init(func);
-        while !(self.color() == ActionResult::Finish)
-            || self.simpilfy() != ActionResult::Finish
-            || self.spill() != ActionResult::Finish
-            || self.check_k_graph() != ActionResult::Success
-        {
-            match self.simpilfy() {
+        loop {
+            match self.color() {
                 ActionResult::Success => continue,
-                _ => (),
-            }
-            match self.spill() {
-                _ => (),
-                // ActionResult::Success=>
+                ActionResult::Finish => {
+                    if self.check_k_graph() == ActionResult::Success
+                        && self.simpilfy() == ActionResult::Finish
+                        && self.spill() == ActionResult::Finish
+                    {
+                        break;
+                    }
+                    continue;
+                }
+                ActionResult::Fail => {
+                    let stat = self.simpilfy();
+                    match stat {
+                        ActionResult::Success => continue,
+                        _ => {
+                            let stat = self.spill();
+                            match stat {
+                                _ => continue,
+                            }
+                        }
+                    }
+                }
+                _ => panic!("gg"),
             }
         }
         self.color_k_graph();
