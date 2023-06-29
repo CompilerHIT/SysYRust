@@ -686,7 +686,7 @@ impl Func {
                         if operand::is_imm_12bs(slot.get_pos()) {
                             builder.l(
                                 &reg.to_string(false),
-                                "gp",
+                                "sp",
                                 -(slot.get_pos()),
                                 is_float,
                                 true,
