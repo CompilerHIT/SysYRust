@@ -146,41 +146,35 @@ impl BB {
                             )));
                         }
                         BinOp::Mul => {
-                            lhs_reg = self.resolve_operand(func, lhs, true, map_info, pool);
-                            rhs_reg = self.resolve_operand(func, rhs, true, map_info, pool);
-                            self.insts.push(pool.put_inst(LIRInst::new(
-                                InstrsType::Binary(BinaryOp::Mul),
-                                vec![dst_reg, lhs_reg, rhs_reg],
-                            )));
-                            // let mut imm = 0;
-                            // let limm = match lhs.as_ref().get_kind() {
-                            //     InstKind::ConstInt(limm) => {
-                            //         imm = limm;
-                            //         true
-                            //     }
-                            //     _ => false,
-                            // };
-                            // let rimm = match rhs.as_ref().get_kind() {
-                            //     InstKind::ConstInt(rimm) => {
-                            //         imm = rimm;
-                            //         true
-                            //     }
-                            //     _ => false,
-                            // };
-                            // if rimm {
-                            //     let src = self.resolve_operand(func, lhs, true, map_info, pool);
-                            //     self.resolve_opt_mul(dst_reg, src, imm, pool);
-                            // } else if limm {
-                            //     let src = self.resolve_operand(func, rhs, true, map_info, pool);
-                            //     self.resolve_opt_mul(dst_reg, src, imm, pool);
-                            // } else {
-                            //     lhs_reg = self.resolve_operand(func, lhs, true, map_info, pool);
-                            //     rhs_reg = self.resolve_operand(func, rhs, true, map_info, pool);
-                            //     self.insts.push(pool.put_inst(LIRInst::new(
-                            //         InstrsType::Binary(BinaryOp::Mul),
-                            //         vec![dst_reg, lhs_reg, rhs_reg],
-                            //     )));
-                            // }
+                            let mut imm = 0;
+                            let limm = match lhs.as_ref().get_kind() {
+                                InstKind::ConstInt(limm) => {
+                                    imm = limm;
+                                    true
+                                }
+                                _ => false,
+                            };
+                            let rimm = match rhs.as_ref().get_kind() {
+                                InstKind::ConstInt(rimm) => {
+                                    imm = rimm;
+                                    true
+                                }
+                                _ => false,
+                            };
+                            if rimm {
+                                let src = self.resolve_operand(func, lhs, true, map_info, pool);
+                                self.resolve_opt_mul(dst_reg, src, imm, pool);
+                            } else if limm {
+                                let src = self.resolve_operand(func, rhs, true, map_info, pool);
+                                self.resolve_opt_mul(dst_reg, src, imm, pool);
+                            } else {
+                                lhs_reg = self.resolve_operand(func, lhs, true, map_info, pool);
+                                rhs_reg = self.resolve_operand(func, rhs, true, map_info, pool);
+                                self.insts.push(pool.put_inst(LIRInst::new(
+                                    InstrsType::Binary(BinaryOp::Mul),
+                                    vec![dst_reg, lhs_reg, rhs_reg],
+                                )));
+                            }
                         }
                         BinOp::Div => {
                             lhs_reg = self.resolve_operand(func, lhs, true, map_info, pool);
@@ -261,7 +255,7 @@ impl BB {
                             InstKind::ConstInt(imm) => {
                                 let iimm = self.resolve_iimm(-imm, pool);
                                 self.insts.push(pool.put_inst(LIRInst::new(
-                                    InstrsType::OpReg(SingleOp::LoadImm),
+                                    InstrsType::OpReg(SingleOp::Li),
                                     vec![dst_reg, iimm],
                                 )))
                             }
@@ -293,7 +287,7 @@ impl BB {
                                     _ => self.resolve_iimm(0, pool),
                                 };
                                 self.insts.push(pool.put_inst(LIRInst::new(
-                                    InstrsType::OpReg(SingleOp::LoadImm),
+                                    InstrsType::OpReg(SingleOp::Li),
                                     vec![dst_reg, iimm],
                                 )));
                             }
@@ -304,7 +298,7 @@ impl BB {
                                     self.resolve_iimm(0, pool)
                                 };
                                 self.insts.push(pool.put_inst(LIRInst::new(
-                                    InstrsType::OpReg(SingleOp::LoadImm),
+                                    InstrsType::OpReg(SingleOp::Li),
                                     vec![dst_reg, fimm],
                                 )));
                             }
@@ -1170,12 +1164,8 @@ impl BB {
                                 ScalarType::Float => InstrsType::OpReg(SingleOp::FMv),
                                 _ => unreachable!("mv must be int or float"),
                             },
-                            Operand::IImm(iimm) => {
-                                if operand::is_imm_12bs(iimm.get_data()) {
-                                    InstrsType::OpReg(SingleOp::LoadImm)
-                                } else {
-                                    InstrsType::OpReg(SingleOp::Li)
-                                }
+                            Operand::IImm(_) => {
+                                InstrsType::OpReg(SingleOp::Li)
                             }
                             Operand::FImm(_) => {
                                 is_float = true;
@@ -2303,13 +2293,7 @@ impl GenerateAsm for BB {
     }
 }
 
-fn is_opt_mul(imm: i32) -> bool {
-    //FIXME:暂时不使用优化
-    false
-}
-
 fn is_opt_num(imm: i32) -> bool {
-    //FIXME:暂时不使用优化
     (imm & (imm - 1)) == 0
 }
 
