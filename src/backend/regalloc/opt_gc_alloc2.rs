@@ -6,6 +6,7 @@ use crate::{
         operand::Reg,
     },
     container::bitmap::{self, Bitmap},
+    frontend::InfuncChoice,
     log_file, log_file_uln,
     utility::{ObjPool, ObjPtr, ScalarType},
 };
@@ -208,54 +209,42 @@ impl Allocator {
 
     pub fn simpilfy(&mut self) -> ActionResult {
         // 此处的simplify是简化color中color到的颜色
-        let mut out = ActionResult::Success;
         // simpilfy,选择spill cost最大的一个
-        loop {
-            if self.info.as_ref().unwrap().to_simplify.is_empty() {
-                break;
-            }
-            // 试图拯救to_rescue中spill代价最大的节点
-            // 试图simplify来拯救当前节点
-            let item = self.info.as_mut().unwrap().to_simplify.pop_max().unwrap();
-            // 如果化简成功
-            if self.simpilfy_one(item.reg) {
-                self.info.as_mut().unwrap().to_color.push(item);
-                continue;
-            }
-            out = ActionResult::Fail;
-            self.info.as_mut().unwrap().to_spill.push(item);
-            break;
+        if self.info.as_ref().unwrap().to_simplify.is_empty() {
+            return ActionResult::Finish;
         }
-        out
+        // 试图拯救to_rescue中spill代价最大的节点
+        // 试图simplify来拯救当前节点
+        let item = self.info.as_mut().unwrap().to_simplify.pop_max().unwrap();
+        // 如果化简成功
+        if self.simpilfy_one(item.reg) {
+            return ActionResult::Success;
+        }
+        self.info.as_mut().unwrap().to_spill.push(item);
+        return ActionResult::Fail;
     }
 
     pub fn spill(&mut self) -> ActionResult {
-        let mut out = ActionResult::Fail;
         // sill 直到没有tospill或者直到出现新的可color的节点
         // spill先从 spillcost较小的,邻居度较大的开始
-        loop {
-            if self.info.as_ref().unwrap().to_simplify.is_empty() {
-                break;
-            }
-            // 试图拯救to_rescue中spill代价最大的节点
-            // 如果spill后能够出现可以着色的节点,则算spill成功,先结束这次spill
-            let item = self.info.as_mut().unwrap().to_spill.pop_min().unwrap();
-            //判断是否已经被拯救,
-            let reg = item.reg;
-            if self.if_has_been_colored(&reg) || self.if_has_been_spilled(&reg) {
-                continue;
-            }
-            // 如果重新的spill完成
-            let available = self.get_available(&reg);
-            if available.is_available(item.reg.get_type()) {
-                self.info.as_mut().unwrap().to_color.push(item);
-                continue;
-            }
-            if self.spill_one(item.reg) {
-                out = ActionResult::Success;
-            }
+        if self.info.as_ref().unwrap().to_simplify.is_empty() {
+            return ActionResult::Finish;
         }
-        out
+        // 试图拯救to_rescue中spill代价最大的节点
+        // 如果spill后能够出现可以着色的节点,则算spill成功,先结束这次spill
+        let item = self.info.as_mut().unwrap().to_spill.pop_min().unwrap();
+        //判断是否已经被拯救,
+        let reg = item.reg;
+        if self.if_has_been_colored(&reg) || self.if_has_been_spilled(&reg) {
+            return ActionResult::Fail;
+        }
+        // 如果重新的spill完成
+        let reg = self.choose_spill(&reg);
+        // 这个reg可能是有颜色的
+        if self.spill_one(reg) {
+            return ActionResult::Success;
+        }
+        ActionResult::Fail
     }
 
     pub fn color_k_graph(&mut self) -> ActionResult {
@@ -335,20 +324,40 @@ impl Allocator {
     }
 
     #[inline]
-    // 如果spill过程救活了一些节点,则返回true,否则返回false
-    pub fn spill_one(&mut self, reg: Reg) -> bool {
+    pub fn choose_spill(&self, reg: &Reg) -> Reg {
         todo!()
     }
 
     #[inline]
-    pub fn de_spill_one(&mut self, reg: &Reg) {}
+    // 如果spill过程救活了一些节点,则返回true,否则返回false
+    pub fn spill_one(&mut self, reg: Reg) -> bool {
+        // spill reg本身或者周围的某个有色寄存器,选择一个结果好的,判断丢弃寄存器后是否产生新的好处
+        // spill reg本身,
+        if self.if_has_been_spilled(&reg) {
+            panic!("u");
+        }
+        let mut out = false;
+        if self.if_has_been_colored(&reg) {
+            if self.decolor_one(&reg) {
+                out = true;
+            }
+        }
+        self.info.as_mut().unwrap().spillings.insert(reg.get_id());
+        out
+    }
+
+    #[inline]
+    pub fn de_spill_one(&mut self, reg: &Reg) {
+        // 从spill中取东西回来要把东西加回live negibhores中
+        // TODO
+    }
 
     #[inline]
     pub fn swap_color(&mut self, reg1: Reg, reg2: Reg) {}
 
     #[inline]
-    pub fn decolor_one(&mut self, reg: &Reg) {
-        if self.if_has_been_spilled(reg) {
+    pub fn decolor_one(&mut self, reg: &Reg) -> bool {
+        if self.if_has_been_spilled(reg) || !self.if_has_been_colored(reg) {
             panic!("unreachable!");
         }
         let color = self
@@ -358,16 +367,51 @@ impl Allocator {
             .colors
             .remove(&reg.get_id())
             .unwrap();
-        let info = self.info.as_mut().unwrap();
+        // 对all liveneigbhors做操作
         // 对于
-        if let Some(neighbors) = info.all_live_neighbors.get(&reg) {
-            for neighbor in neighbors {
-                info.availables.get_mut(&neighbor).unwrap().use_reg(color);
-                let nums_neighbor_color = info.nums_neighbor_color.get_mut(neighbor).unwrap();
-                nums_neighbor_color
-                    .insert(color, nums_neighbor_color.get(&color).unwrap_or(&0) - 1);
+        let mut out = false;
+        let neighbors = self
+            .info
+            .as_mut()
+            .unwrap()
+            .all_neighbors
+            .remove(reg)
+            .unwrap();
+        for neighbor in &neighbors {
+            self.info
+                .as_mut()
+                .unwrap()
+                .availables
+                .get_mut(&neighbor)
+                .unwrap()
+                .use_reg(color);
+            let nums_neighbor_color = self
+                .info
+                .as_mut()
+                .unwrap()
+                .nums_neighbor_color
+                .get_mut(&neighbor)
+                .unwrap();
+            let new_num = nums_neighbor_color.get(&color).unwrap_or(&0) - 1;
+            nums_neighbor_color.insert(color, new_num);
+            if new_num == 0
+                && self
+                    .info
+                    .as_ref()
+                    .unwrap()
+                    .spillings
+                    .contains(&neighbor.get_id())
+            {
+                out = true;
+                self.de_spill_one(reg);
             }
         }
+        self.info
+            .as_mut()
+            .unwrap()
+            .all_neighbors
+            .insert(*reg, neighbors);
+        out
     }
 
     #[inline]
@@ -382,14 +426,16 @@ impl Allocator {
             for neighbor in neighbors {
                 info.availables.get_mut(&neighbor).unwrap().use_reg(color);
                 let nums_neighbor_color = info.nums_neighbor_color.get_mut(neighbor).unwrap();
-                nums_neighbor_color
+                let val = nums_neighbor_color
                     .insert(color, nums_neighbor_color.get(&color).unwrap_or(&0) + 1);
             }
         }
     }
 
     #[inline]
-    pub fn get_spill_cost_div_nn(&self, reg: &Reg) {}
+    pub fn get_spill_cost_div_nn(&self, reg: &Reg) {
+        todo!()
+    }
     #[inline]
     pub fn get_spill_cost(&self, reg: &Reg) -> f32 {
         *self.info.as_ref().unwrap().spill_cost.get(reg).unwrap()
@@ -411,12 +457,21 @@ impl Allocator {
             .contains_key(&reg.get_id())
     }
     #[inline]
-    pub fn get_available(&self, reg: &Reg) -> RegUsedStat {
+    fn get_available(&self, reg: &Reg) -> RegUsedStat {
         *self.info.as_ref().unwrap().availables.get(reg).unwrap()
+    }
+    fn get_num_of_live_neighbors(&self, reg: &Reg) -> i32 {
+        self.info
+            .as_ref()
+            .unwrap()
+            .all_live_neighbors
+            .get(reg)
+            .unwrap()
+            .len() as i32
     }
     #[inline]
     // 获取的可用颜色以及周围的活邻居数量
-    pub fn get_num_available_and_num_live_neighbor(&self, reg: &Reg) -> (i32, i32) {
+    fn get_num_available_and_num_live_neighbor(&self, reg: &Reg) -> (i32, i32) {
         let info = self.info.as_ref().unwrap();
         let na = info
             .availables
