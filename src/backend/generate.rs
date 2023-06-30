@@ -105,9 +105,9 @@ impl GenerateAsm for LIRInst {
                     Operand::FImm(fimm) => fimm.to_string(),
                     Operand::Addr(addr) => addr.to_string(),
                 };
-
+                let fop = &format!("f{}.s", op);
                 if is_float && (op == "mv" || op == "neg") {
-                    op = &format!("f{}.s", op)
+                    op = fop
                 }
                 builder.op1(op, &dst, &src)?;
                 Ok(())
