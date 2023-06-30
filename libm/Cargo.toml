@@ -22,11 +22,7 @@ unstable = []
 # musl libc.
 musl-reference-tests = ['rand']
 
-[workspace]
-members = [
-  "crates/compiler-builtins-smoke-test",
-  "crates/libm-bench",
-]
+
 
 [dev-dependencies]
 #no-panic = "0.1.8"
