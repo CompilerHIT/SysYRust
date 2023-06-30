@@ -1,5 +1,6 @@
 use std::collections::{HashMap, VecDeque};
 
+extern crate biheap;
 use biheap::BiHeap;
 
 // 根据nnc指定的(item,coe)的权重关系,来对items进行排序,并且把排序结果保存到out_come_order中

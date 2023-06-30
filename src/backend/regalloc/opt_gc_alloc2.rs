@@ -9,6 +9,7 @@ use crate::{
     log_file, log_file_uln,
     utility::{ObjPool, ObjPtr, ScalarType},
 };
+extern crate biheap;
 use biheap::core::BiHeap;
 use core::{panic, time};
 use std::{
