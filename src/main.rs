@@ -69,10 +69,10 @@ fn run_main() {
     drop(compunit);
 
     // ir优化
-    //sysylib::ir::optimizer_run(&mut module, (&mut pool_bb, &mut pool_inst), o1_option);
+    sysylib::ir::optimizer_run(&mut module, (&mut pool_bb, &mut pool_inst), o1_option);
     //dump_now(&mut module, "dump.ll");
 
-    sysylib::ir::optimizer_run(&mut module, (&mut pool_bb, &mut pool_inst), true);
+    // sysylib::ir::optimizer_run(&mut module, (&mut pool_bb, &mut pool_inst), true);
     // dump_now(&mut module, "dump_opt.ll");
 
     let output2 = "row_asm.log";
