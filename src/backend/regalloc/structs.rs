@@ -22,6 +22,32 @@ impl RegUsedStat {
         }
     }
 
+    // 产生i专用的初始使用情况
+    pub fn init_for_i() -> RegUsedStat {
+        let mut out = RegUsedStat::new();
+        for reg in out.get_rest_fregs() {
+            out.use_reg(reg);
+        }
+        out
+    }
+
+    // 产生f专用的初始使用情况
+    pub fn init_for_f() -> RegUsedStat {
+        let mut out = RegUsedStat::new();
+        for reg in out.get_rest_iregs() {
+            out.use_reg(reg);
+        }
+        out
+    }
+
+    pub fn init_for_reg(kind: ScalarType) -> RegUsedStat {
+        match kind {
+            ScalarType::Float => RegUsedStat::init_for_f(),
+            ScalarType::Int => RegUsedStat::init_for_i(),
+            _ => panic!(),
+        }
+    }
+
     // 判断是否有多余的寄存器
     pub fn is_available(&self, kind: ScalarType) -> bool {
         // TODO,使用位运算加速过程

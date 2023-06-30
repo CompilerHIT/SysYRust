@@ -86,7 +86,12 @@ mod test_biheap {
         m.push(222);
         m.push(333);
         m.push(111);
+        m.push(111);
         assert_eq!(111, *m.peek_min().unwrap());
-        assert_eq!(333, *m.peek_max().unwrap())
+        m.pop_min();
+        assert_eq!(111, *m.peek_min().unwrap());
+        m.pop_min();
+        assert_eq!(222, *m.peek_min().unwrap());
+        assert_eq!(333, *m.peek_max().unwrap());
     }
 }
