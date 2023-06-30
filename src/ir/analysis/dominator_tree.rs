@@ -106,17 +106,22 @@ impl DominatorTree {
 
     /// 深度后序遍历支配树
     pub fn iter_post_order(&self, mut predicate: impl FnMut(ObjPtr<BasicBlock>)) {
-        let mut queue = vec![&self.head_node];
+        let mut stack = vec![&self.head_node];
         let mut visited = HashSet::new();
-        while let Some(node) = queue.pop() {
+        while let Some(node) = stack.pop() {
             if node.dominatee.is_empty() || node.dominatee.iter().all(|x| visited.contains(x)) {
                 predicate(node.bb);
                 visited.insert(node);
             } else {
-                queue.push(node);
-                queue.extend(&node.dominatee);
+                stack.push(node);
+                stack.extend(&node.dominatee);
             }
         }
+    }
+
+    /// 销毁支配树
+    pub fn destroy(mut self) {
+        self.pool.free_all();
     }
 }
 
