@@ -9,3 +9,4 @@ pub mod opt_ls_alloc;
 pub mod regalloc;
 pub mod simulate_assign;
 pub mod structs;
+pub mod tests;
