@@ -15,6 +15,7 @@ use std::{
     collections::{hash_map::Iter, HashMap, HashSet, LinkedList, VecDeque},
     fmt::{self, format},
     panic::PanicInfo,
+    ptr::addr_of_mut,
 };
 
 use super::{
@@ -22,7 +23,7 @@ use super::{
     structs::{FuncAllocStat, RegUsedStat},
 };
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Clone, Copy)]
 pub struct OperItem {
     reg: Reg,
     cost: f32, //对于color过程,该cost是邻接度(小优先),对于rescue过程,是spillcost的值(大优先,先拯救spill代价大的东西),
@@ -190,6 +191,7 @@ impl Allocator {
                     .k_graph
                     .1
                     .insert(reg.bit_code() as usize);
+                // todo,修改k_color_neigbhor中节点衡量的方法
                 self.info.as_mut().unwrap().k_graph.0.push(item);
                 continue;
             }
@@ -206,10 +208,39 @@ impl Allocator {
         out
     }
 
+    // 检查是否当前k_graph中的节点都已经是合理的节点
     pub fn check_k_graph(&mut self) -> ActionResult {
         // 检查是否k_graph里面的值全部为真
-
-        todo!()
+        let mut out = ActionResult::Finish;
+        let mut new_biheap: BiHeap<OperItem> = BiHeap::new();
+        loop {
+            if self.info.as_ref().unwrap().k_graph.0.len() == 0 {
+                break;
+            }
+            let item = self.info.as_mut().unwrap().k_graph.0.pop_min().unwrap();
+            let map = &self.info.as_ref().unwrap().k_graph.1;
+            if !map.contains(item.reg.bit_code() as usize) {
+                // 如果不在k graph中了,则继续
+                continue;
+            }
+            let reg = item.reg;
+            if !self.is_k_graph_node(&reg) {
+                out = ActionResult::Unfinish;
+                let new_item = self.draw_spill_div_nlc_item(&reg);
+                self.info.as_mut().unwrap().to_color.push(new_item);
+                continue;
+            }
+            let new_item = self.draw_spill_div_nlc_item(&reg);
+            new_biheap.push(new_item);
+        }
+        if self.info.as_ref().unwrap().k_graph.0.len() == 0 {
+            self.info.as_mut().unwrap().k_graph.0 = new_biheap;
+        } else {
+            new_biheap.iter().for_each(|item| {
+                self.info.as_mut().unwrap().k_graph.0.push(*item);
+            });
+        }
+        out
     }
 
     pub fn simpilfy(&mut self) -> ActionResult {
@@ -244,9 +275,13 @@ impl Allocator {
             return ActionResult::Fail;
         }
         //
-        let reg = self.choose_spill(&reg);
+        let tospill = self.choose_spill(&reg);
+        if tospill != reg {
+            let item = self.draw_spill_div_nlc_item(&reg);
+            self.info.as_mut().unwrap().to_color.push(item);
+        }
         // 这个reg可能是有颜色的
-        if self.spill_one(reg) {
+        if self.spill_one(tospill) {
             return ActionResult::Success;
         }
         ActionResult::Fail
@@ -255,13 +290,25 @@ impl Allocator {
     /// 在color_k_graph之前应该check k graph<br>
     ///  给剩余地悬点进行着色  (悬点并未进入spilling中,所以仍然获取到周围地颜色)
     pub fn color_k_graph(&mut self) -> ActionResult {
-        todo!()
+        // 对最后的k个节点进行着色
+        loop {
+            let k_graph = &mut self.info.as_mut().unwrap().k_graph;
+            if k_graph.0.is_empty() {
+                break;
+            }
+            let item = k_graph.0.pop_min().unwrap();
+            let reg = item.reg;
+            let available = self.draw_available_and_num_neigbhor_color(&reg);
+        }
+
+        ActionResult::Success
     }
 
     // 判断某个就节点是否是悬点
     #[inline]
-    pub fn is_k_graph_node(&mut self) -> bool {
-        todo!()
+    pub fn is_k_graph_node(&mut self, reg: &Reg) -> bool {
+        self.get_available(reg).num_available_regs(reg.get_type())
+            > self.get_num_of_live_neighbors(reg)
     }
 
     pub fn merge(&mut self) -> ActionResult {
@@ -328,6 +375,12 @@ impl Allocator {
 
     #[inline]
     pub fn simpilfy_one(&mut self, reg: Reg) -> bool {
+        if self.if_has_been_colored(&reg) || self.if_has_been_spilled(&reg) {
+            //
+            panic!("");
+            return false;
+        }
+
         //简化成功,该实例可以使用颜色,则化简成功,否则化简失败(但是化简失败也可能让别的spill能够恢复可着色状态)
         // 首先获取其nnc,从颜色最少的节点开始尝试,判断是否周围的节点能够与其他的地方交换颜色从而化简
         let nnc = self
@@ -339,6 +392,9 @@ impl Allocator {
             .unwrap();
         // 对nnc进行堆排序找到一个可以开始的节点,并对节点进行尝试
         let mut order: Vec<i32> = Vec::with_capacity(32);
+        // 获取颜色排序
+        let sort = crate::backend::regalloc::utils::sort;
+        sort(nnc, &mut order); //按照颜色在邻居节点出现数量数量从小到大升序排序
         let tmp_regusestat = RegUsedStat::init_for_reg(reg.get_type());
         // 判断是否能够化简成功,如果能够化简成功,返回交换队列以及产生的代价,以及是否能够成功 (如果化简失败回回退自己的化简操作)
         let try_simplify =
@@ -491,7 +547,10 @@ impl Allocator {
             //
             let color = *color.unwrap();
             for neighbor in all_neighbors.get(reg).unwrap() {
-                if neighbor.is_physic() || !spillings.contains(&neighbor.get_id()) {
+                if neighbor.is_physic()
+                    || !spillings.contains(&neighbor.get_id())
+                    || self.is_last_colored(neighbor)
+                {
                     continue;
                 }
                 let nnc = nums_neigbhor_colors.get(neighbor).unwrap();
@@ -645,7 +704,7 @@ impl Allocator {
                 .unwrap();
             let neighbor = neighbors.pop_front().unwrap();
             neighbors.push_back(neighbor);
-            if neighbor.is_physic() {
+            if neighbor.is_physic() || self.is_last_colored(&neighbor) {
                 continue;
             }
             if self
@@ -698,15 +757,146 @@ impl Allocator {
     // 给某个虚拟寄存器挑选可以用来作色的颜色
     #[inline]
     pub fn choose_color(&mut self, reg: &Reg) -> Option<i32> {
-        let mut out = None;
-        todo!();
-        out
+        // TOCHECK
+        // TODO, improve,加入贪心,根据所在的指令类型，以及周围已经分配的颜色的情况选择颜色
+        // 比如,获取周围的周围的颜色,按照它们的周围的颜色的数量进行排序
+        // 找到color所在的地方
+        let available = self.get_available(reg).get_rest_regs_for(reg.get_type());
+        let mut colors_weights = HashMap::new();
+        for color in available.iter() {
+            colors_weights.insert(*color, 0);
+        }
+        // 遍历邻居节点的所有活节点
+        let mut passed_regs = Bitmap::new();
+        for neighbor in self
+            .info
+            .as_ref()
+            .unwrap()
+            .all_live_neighbors
+            .get(reg)
+            .unwrap()
+        {
+            for nn in self
+                .info
+                .as_ref()
+                .unwrap()
+                .all_live_neighbors
+                .get(neighbor)
+                .unwrap()
+            {
+                if !self.if_has_been_colored(nn) {
+                    continue;
+                }
+                if passed_regs.contains(nn.bit_code() as usize) {
+                    continue;
+                }
+                passed_regs.insert(nn.bit_code() as usize);
+                let color = self.get_color(reg);
+                if !colors_weights.contains_key(&color) {
+                    continue;
+                }
+                *colors_weights.get_mut(&color).unwrap() += 1;
+            }
+        }
+
+        let sort = crate::backend::regalloc::utils::sort;
+        let mut order = Vec::new();
+        sort(&colors_weights, &mut order);
+        match order.get(0) {
+            None => None,
+            Some(color) => Some(*color),
+        }
     }
 
     #[inline]
     pub fn eval_swap(&mut self, reg1: &Reg, reg2: &Reg) -> f32 {
-        //
-        todo!()
+        //衡量交换的价值
+        let color1 = self.get_color(reg1);
+        let color2 = self.get_color(reg2);
+        if color1 == color2 {
+            panic!("理论上不处理相同颜色之间的swap操作");
+            return 0.0;
+        }
+        let mut cost = 0.0; //记录能够造成的溢出/节省的溢出
+                            // 集合所有能够从spillings中拯救的寄存器
+        let mut regs = LinkedList::new();
+        let mut map = Bitmap::new();
+
+        for neighbor in self
+            .info
+            .as_ref()
+            .unwrap()
+            .all_neighbors
+            .get(reg1)
+            .unwrap()
+            .iter()
+        {
+            if neighbor.is_physic() || self.is_last_colored(neighbor) {
+                continue;
+            }
+            if map.contains(neighbor.bit_code() as usize) {
+                continue;
+            }
+            map.insert(neighbor.bit_code() as usize);
+            regs.push_back(*neighbor);
+        }
+        while !regs.is_empty() {
+            let reg = regs.pop_front().unwrap();
+            let live_bitmap = self
+                .info
+                .as_ref()
+                .unwrap()
+                .all_live_neigbhors_bitmap
+                .get(&reg)
+                .unwrap();
+            let nnc = self
+                .info
+                .as_ref()
+                .unwrap()
+                .nums_neighbor_color
+                .get(&reg)
+                .unwrap();
+            if live_bitmap.contains(reg1.bit_code() as usize)
+                && live_bitmap.contains(reg2.bit_code() as usize)
+            {
+                continue;
+            }
+            let mut regusestat = *self.info.as_ref().unwrap().availables.get(&reg).unwrap();
+            let mut tmp_d_cost = 0.0;
+            if live_bitmap.contains(reg1.bit_code() as usize) {
+                if nnc.get(&color1).unwrap_or(&0) == &1 {
+                    tmp_d_cost -= self.get_spill_cost_div_lnn2(&reg);
+                    regusestat.release_reg(color1);
+                }
+                if nnc.get(&color2).unwrap_or(&0) == &0 {
+                    tmp_d_cost += self.get_spill_cost_div_lnn2(&reg);
+                }
+                regusestat.use_reg(color2);
+            } else if live_bitmap.contains(reg2.bit_code() as usize) {
+                if nnc.get(&color2).unwrap_or(&0) == &1 {
+                    tmp_d_cost -= self.get_spill_cost_div_lnn2(&reg);
+                    regusestat.release_freg(color2);
+                }
+                if nnc.get(&color1).unwrap_or(&0) == &0 {
+                    tmp_d_cost += self.get_spill_cost_div_lnn2(&reg);
+                }
+                regusestat.use_reg(color1);
+            } else {
+                panic!("un reachable!");
+            }
+            if self.if_has_been_spilled(&reg) && regusestat.is_available(reg.get_type()) {
+                // 拯救了一个寄存器
+                cost -= self.get_spill_cost_div_lnn(&reg);
+            } else if !self.if_has_been_spilled(&reg) && !regusestat.is_available(reg.get_type()) {
+                // 抛弃了一个虚拟寄存器
+                cost += self.get_spill_cost_div_lnn(&reg);
+            } else {
+                // 否则就是
+                cost += tmp_d_cost;
+            }
+        }
+        // 遍历reg2的寄存器
+        cost
     }
 
     #[inline]
@@ -725,7 +915,6 @@ impl Allocator {
         if self.if_has_been_spilled(reg) || !self.if_has_been_colored(reg) {
             panic!("unreachable!");
         }
-
         // 移除着色并且取出颜色
         let color = self
             .info
@@ -734,14 +923,21 @@ impl Allocator {
             .colors
             .remove(&reg.get_id())
             .unwrap();
-        // 对all liveneigbhors做操作
-        // 对于
-
         let mut out = false;
 
-        let mut new_neighbors = LinkedList::new();
-        let mut to_despill = LinkedList::new();
-        loop {
+        let mut to_despill = LinkedList::new(); //暂存decolor过程中发现的能够拯救回来的寄存器
+                                                // todo
+        let mut num_all_neighbors = self
+            .info
+            .as_ref()
+            .unwrap()
+            .all_neighbors
+            .get(reg)
+            .unwrap()
+            .len();
+
+        while num_all_neighbors > 0 {
+            num_all_neighbors -= 1;
             let neighbors = self
                 .info
                 .as_mut()
@@ -753,21 +949,10 @@ impl Allocator {
                 break;
             }
             let neighbor = neighbors.pop_front().unwrap();
-            new_neighbors.push_back(neighbor);
-            if neighbor.is_physic() {
+            neighbors.push_back(neighbor);
+            if neighbor.is_physic() || self.is_last_colored(&neighbor) {
                 continue;
             }
-            if self.if_has_been_spilled(reg) {
-                continue;
-            }
-
-            self.info
-                .as_mut()
-                .unwrap()
-                .availables
-                .get_mut(&neighbor)
-                .unwrap()
-                .use_reg(color);
             let nums_neighbor_color = self
                 .info
                 .as_mut()
@@ -777,23 +962,17 @@ impl Allocator {
                 .unwrap();
             let new_num = nums_neighbor_color.get(&color).unwrap_or(&0) - 1;
             nums_neighbor_color.insert(color, new_num);
-            if new_num == 0
-                && self
-                    .info
-                    .as_ref()
-                    .unwrap()
-                    .spillings
-                    .contains(&neighbor.get_id())
-            {
-                out = true;
-                to_despill.push_back(neighbor);
+            if new_num == 0 {
+                // self.in
+                self.get_mut_available(&neighbor).release_reg(color);
+                if self.if_has_been_spilled(&neighbor) {
+                    out = true;
+                    to_despill.push_back(neighbor);
+                }
+            } else if new_num < 0 {
+                panic!("gg");
             }
         }
-        self.info
-            .as_mut()
-            .unwrap()
-            .all_neighbors
-            .insert(*reg, new_neighbors);
         while !to_despill.is_empty() {
             let to_despill_one = to_despill.pop_front().unwrap();
             self.de_spill_one(&to_despill_one);
@@ -833,7 +1012,7 @@ impl Allocator {
     /// * 自身是否已经着色
     /// * 自身是否已经spill
     #[inline]
-    pub fn get_spill_cost_div_nn2(&self, reg: &Reg) -> f32 {
+    pub fn get_spill_cost_div_lnn2(&self, reg: &Reg) -> f32 {
         let spill_cost = self.info.as_ref().unwrap().spill_cost.get(reg).unwrap();
         let nn = self
             .info
@@ -845,7 +1024,7 @@ impl Allocator {
         spill_cost / (nn.len() * nn.len()) as f32
     }
     #[inline]
-    pub fn get_spill_cost_div_nn(&self, reg: &Reg) -> f32 {
+    pub fn get_spill_cost_div_lnn(&self, reg: &Reg) -> f32 {
         let spill_cost = self.info.as_ref().unwrap().spill_cost.get(reg).unwrap();
         let nn = self
             .info
@@ -856,6 +1035,7 @@ impl Allocator {
             .unwrap();
         spill_cost / nn.len() as f32
     }
+
     #[inline]
     pub fn get_spill_cost(&self, reg: &Reg) -> f32 {
         *self.info.as_ref().unwrap().spill_cost.get(reg).unwrap()
@@ -880,20 +1060,36 @@ impl Allocator {
     pub fn if_swapable_for_color(&self, reg1: &Reg, reg2: &Reg) -> bool {
         // 判断两个寄存器的颜色是否能够发生交换
         if !self.if_has_been_colored(reg1) || !self.if_has_been_colored(reg2) {
-            panic!("un reachable");
+            return false;
         }
         // 判断
-        let colors = &self.info.as_ref().unwrap().colors;
-        let color1 = *colors.get(&reg1.get_id()).unwrap();
-        let color2 = *colors.get(&reg2.get_id()).unwrap();
-
+        let color1 = self.get_color(reg1);
+        let color2 = self.get_color(reg2);
         let nncs = &self.info.as_ref().unwrap().nums_neighbor_color;
-        if nncs.get(reg1).unwrap().get(&color2).unwrap() == &1
-            && nncs.get(reg2).unwrap().get(&color1).unwrap() == &1
+        let color2_times_around_reg1 = nncs.get(reg1).unwrap().get(&color2).unwrap_or(&0);
+        let color1_times_arount_reg2 = nncs.get(reg2).unwrap().get(&color1).unwrap_or(&0);
+        if self
+            .info
+            .as_ref()
+            .unwrap()
+            .all_live_neigbhors_bitmap
+            .get(reg1)
+            .unwrap()
+            .contains(reg2.bit_code() as usize)
         {
+            if *color2_times_around_reg1 == 1 && *color1_times_arount_reg2 == 1 {
+                return true;
+            }
+            return false;
+        }
+        if color1_times_arount_reg2 == &0 || color2_times_around_reg1 == &0 {
             return true;
         }
         false
+    }
+    #[inline]
+    pub fn is_last_colored(&self, reg: &Reg) -> bool {
+        self.info.as_ref().unwrap().last_colors.contains(reg)
     }
 
     #[inline]
@@ -908,7 +1104,7 @@ impl Allocator {
         // 遍历all_neigbhor得到available和nnc
         let info = self.info.as_ref().unwrap();
         for neighbor in info.all_neighbors.get(reg).unwrap() {
-            if neighbor.is_physic() {
+            if neighbor.is_physic() || self.is_last_colored(neighbor) {
                 continue;
             }
             if info.spillings.contains(&neighbor.get_id()) {
@@ -959,14 +1155,19 @@ impl Allocator {
         *self.info.as_ref().unwrap().availables.get(reg).unwrap()
     }
     #[inline]
-    fn get_num_of_live_neighbors(&self, reg: &Reg) -> i32 {
+    fn get_mut_available(&mut self, reg: &Reg) -> &mut RegUsedStat {
+        self.info.as_mut().unwrap().availables.get_mut(reg).unwrap()
+    }
+
+    #[inline]
+    fn get_num_of_live_neighbors(&self, reg: &Reg) -> usize {
         self.info
             .as_ref()
             .unwrap()
             .all_live_neighbors
             .get(reg)
             .unwrap()
-            .len() as i32
+            .len()
     }
 
     // 获取的可用颜色以及周围的活邻居数量
@@ -985,37 +1186,53 @@ impl Allocator {
 impl Regalloc for Allocator {
     fn alloc(&mut self, func: &crate::backend::func::Func) -> super::structs::FuncAllocStat {
         self.init(func);
+
         loop {
-            match self.color() {
-                ActionResult::Success => continue,
-                ActionResult::Finish => {
-                    if self.check_k_graph() == ActionResult::Success
-                        && self.simpilfy() == ActionResult::Finish
-                        && self.spill() == ActionResult::Finish
-                    {
-                        break;
+            loop {
+                let mut stat = self.color();
+                if stat == ActionResult::Fail {
+                    stat = self.simpilfy();
+                    if stat == ActionResult::Success {
+                        continue;
                     }
-                    continue;
+                    stat = self.spill();
+                } else if stat == ActionResult::Finish {
+                    break;
                 }
-                ActionResult::Fail => {
-                    let stat = self.simpilfy();
-                    match stat {
-                        ActionResult::Success => continue,
-                        _ => {
-                            let stat = self.spill();
-                            match stat {
-                                _ => continue,
-                            }
-                        }
-                    }
+            }
+            let mut stat = ActionResult::Finish;
+            loop {
+                stat = self.simpilfy();
+                if stat == ActionResult::Finish {
+                    break;
                 }
-                _ => panic!("gg"),
+                if stat == ActionResult::Success {
+                    break;
+                }
+            }
+            if stat == ActionResult::Success {
+                continue;
+            }
+            loop {
+                stat = self.spill();
+                if stat == ActionResult::Finish || stat == ActionResult::Success {
+                    break;
+                }
+            }
+            if stat == ActionResult::Success {
+                continue;
+            }
+            let mut stat = self.check_k_graph();
+            if stat == ActionResult::Success {
+                break;
+            } else {
+                continue;
             }
         }
         self.color_k_graph();
-        while self.merge() == ActionResult::Success {
-            self.rescue();
-        }
+        // while self.merge() == ActionResult::Success {
+        //     self.rescue();
+        // }
         self.color_last();
         let (dstr, spillings) = self.draw_dstr_spillings();
         let (func_stack_size, bb_sizes) = regalloc::countStackSize(func, &spillings);
