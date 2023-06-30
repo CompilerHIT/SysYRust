@@ -77,6 +77,7 @@ where
 mod test_biheap {
     use std::collections::VecDeque;
 
+    extern crate biheap;
     use biheap::core::BiHeap;
     #[test]
     fn test_biheap() {

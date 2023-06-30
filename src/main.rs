@@ -1,4 +1,7 @@
 use lalrpop_util::lalrpop_mod;
+extern crate biheap;
+extern crate hexf_parse;
+extern crate libm;
 use std::env;
 use sysylib::backend::module::AsmModule;
 use sysylib::frontend::irgen::irgen;
@@ -66,11 +69,11 @@ fn run_main() {
     drop(compunit);
 
     // ir优化
-    //sysylib::ir::optimizer_run(&mut module, (&mut pool_bb, &mut pool_inst), o1_option);
+    sysylib::ir::optimizer_run(&mut module, (&mut pool_bb, &mut pool_inst), o1_option);
     //dump_now(&mut module, "dump.ll");
 
-    sysylib::ir::optimizer_run(&mut module, (&mut pool_bb, &mut pool_inst), true);
-    dump_now(&mut module, "dump_opt.ll");
+    // sysylib::ir::optimizer_run(&mut module, (&mut pool_bb, &mut pool_inst), true);
+    // dump_now(&mut module, "dump_opt.ll");
 
     let output2 = "row_asm.log";
     // 后端解析

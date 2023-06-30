@@ -47,10 +47,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d468802bab17cbc0cc575e9b053f41e72aa36bfa6b7f55e3529ffa43161b97fa"
 
 [[package]]
-name = "biheap"
-version = "0.5.1"
-
-[[package]]
 name = "bit-set"
 version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -102,9 +98,7 @@ dependencies = [
 name = "compiler"
 version = "0.1.0"
 dependencies = [
- "biheap",
  "clap",
- "hexf-parse",
  "lalrpop",
  "lalrpop-util",
  "lazy_static",
@@ -220,13 +214,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fed44880c466736ef9a5c5b5facefb5ed0785676d0c02d612db14e54f0d84286"
 
 [[package]]
-name = "hexf-parse"
-version = "0.2.1"
-dependencies = [
- "libm",
-]
-
-[[package]]
 name = "indexmap"
 version = "1.9.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -311,10 +298,6 @@ name = "libc"
 version = "0.2.141"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3304a64d199bb964be99741b7a14d26972741915b3649639149b2479bb46f4b5"
-
-[[package]]
-name = "libm"
-version = "0.2.7"
 
 [[package]]
 name = "linux-raw-sys"
