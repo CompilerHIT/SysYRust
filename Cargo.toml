@@ -25,9 +25,3 @@ rand = "0.8.5"
 [build-dependencies]
 lalrpop = "0.19.9"
 
-[workspace]
-members=[
-    "libm",
-    "biheap",
-    "hexf-parse"
-]
