@@ -476,7 +476,7 @@ impl Func {
                 }
                 let dst = inst.get_dst();
                 let src = inst.get_lhs();
-                if inst.get_type() == InstrsType::OpReg(super::instrs::SingleOp::IMv) && dst == src
+                if inst.get_type() == InstrsType::OpReg(super::instrs::SingleOp::Mv) && dst == src
                 {
                     bb.as_mut().insts.remove(index);
                 } else {

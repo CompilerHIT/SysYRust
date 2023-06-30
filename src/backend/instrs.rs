@@ -49,11 +49,9 @@ pub enum BinaryOp {
 pub enum SingleOp {
     Li,
     // Lui,
-    IMv,
-    FMv,
-    INeg,
+    Mv,
+    Neg,
     //FIXME: whether fnot exist
-    FNeg,
     I2F,
     F2I,
     LoadAddr,
@@ -61,7 +59,6 @@ pub enum SingleOp {
     // D2F,
     Seqz,
     Snez,
-    Abs,
     LoadFImm,
 }
 
@@ -145,14 +142,11 @@ impl fmt::Display for LIRInst {
                 kind = match op {
                     SingleOp::Li => "li",
                     // SingleOp::Lui => "lui",
-                    SingleOp::IMv => "mv",
-                    SingleOp::FMv => "fmv",
-                    SingleOp::INeg => "neg",
-                    SingleOp::FNeg => "fneg",
+                    SingleOp::Mv => "mv",
+                    SingleOp::Neg => "neg",
                     SingleOp::I2F => "fcvt.s.w",
                     SingleOp::F2I => "fcvt.w.s",
                     SingleOp::LoadAddr => "la",
-                    SingleOp::Abs => "abs",
                     SingleOp::Seqz => "seqz",
                     SingleOp::Snez => "snez",
                     SingleOp::LoadFImm => "fmv.w.x",

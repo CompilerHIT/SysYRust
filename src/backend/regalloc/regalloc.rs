@@ -491,7 +491,7 @@ pub fn merge_alloc(
                      interference_graph: &HashMap<Reg, HashSet<Reg>>| {
         // 首先定位到可能出现merge的指令，比如mv
         for (index, inst) in bb.insts.iter().enumerate() {
-            if inst.get_type() != InstrsType::OpReg(crate::backend::instrs::SingleOp::IMv) {
+            if inst.get_type() != InstrsType::OpReg(crate::backend::instrs::SingleOp::Mv) {
                 continue;
             }
             let dst_reg = *inst.get_reg_def().get(0).unwrap();
