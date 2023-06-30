@@ -99,6 +99,7 @@ fn inline_func_with_inst(
         new_bb.set_next_bb(source_bb.get_next_bb().clone());
     }
     source_bb.set_next_bb(vec![copyed_head_bb]);
+    copyed_head_bb.as_mut().set_up_bb(vec![source_bb.clone()]);
 
     // 将copyed_end_bb的后继改为new_bb
     copyed_end_bb.get_tail_inst().remove_self();

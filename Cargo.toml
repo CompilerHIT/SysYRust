@@ -14,13 +14,13 @@ name="sysylib"
 
 [dependencies]
 lazy_static = "1.4"
-biheap={path="./dep/biheap"}
 lalrpop-util = {version = "0.19.9", features = ["lexer"]}
 regex = "1"
 clap = "2.33"
-
 rand = "0.8.5"
-hexf-parse = {path="./dep/hexf-parse"}
+
+
 
 [build-dependencies]
 lalrpop = "0.19.9"
+

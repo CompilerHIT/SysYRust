@@ -68,7 +68,6 @@ impl<'f> AsmBuilder<'f> {
                         || op == "xor"
                         || op == "and"
                         || op == "slt"
-                        || op == "mulhs"
                         || is_double
                     {
                         writeln!(self.f, "    {op} {dest}, {lhs}, {rhs}")

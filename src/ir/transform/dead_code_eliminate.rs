@@ -21,18 +21,15 @@ pub fn dead_code_eliminate(module: &mut Module, func_call_eliminate: bool) {
     if func_call_eliminate {
         func_optimize = call_optimize(module);
     }
-    loop {
+    func_process(module, |_, func| loop {
         let mut changed = false;
-        func_process(module, |_, func| {
-            bfs_inst_process(func.get_head(), |inst| {
-                changed |= eliminate_inst(inst, func_call_eliminate, &func_optimize);
-            })
+        bfs_inst_process(func.get_head(), |inst| {
+            changed |= eliminate_inst(inst, func_call_eliminate, &func_optimize);
         });
-
         if !changed {
             break;
         }
-    }
+    });
 }
 
 pub fn global_eliminate(module: &mut Module) {

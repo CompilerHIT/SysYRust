@@ -223,7 +223,7 @@ impl Process for Decl {
 impl Process for ConstDecl {
     type Ret = i32;
     type Message = i32;
-    fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
+    fn process(&mut self, _: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
         match self.btype {
             BType::Int => {
                 for def in &mut self.const_def_vec {
@@ -348,7 +348,7 @@ impl Process for ConstDecl {
             BType::Float => {
                 for def in &mut self.const_def_vec {
                     if def.const_exp_vec.is_empty() {
-                        let (mut inst_ptr, mut val, _) = def
+                        let (mut inst_ptr, val, _) = def
                             .const_init_val
                             .process((Type::ConstFloat, vec![], 0, 1), kit_mut)
                             .unwrap();
@@ -409,7 +409,7 @@ impl Process for ConstDecl {
                             .iter()
                             .map(|x| match x {
                                 ExpValue::Int(i) => *i,
-                                ExpValue::Float(f) => {
+                                ExpValue::Float(_) => {
                                     unreachable!()
                                 }
                                 ExpValue::None => {
@@ -426,7 +426,7 @@ impl Process for ConstDecl {
                             length = length * dm;
                         }
 
-                        let (mut inst_ptr, mut val, init_vec) = def
+                        let (_, _, init_vec) = def
                             .const_init_val
                             .process((Type::ConstFloat, dimension_vec_in.clone(), 0, 1), kit_mut)
                             .unwrap(); //获得初始值
@@ -506,7 +506,7 @@ impl Process for ConstInitVal {
                 for i in 0..dimension_vec.len() {
                     total = total * dimension_vec[i];
                 }
-                let after = dimension_vec[dimension_vec.len() - 1];
+                // let after = dimension_vec[dimension_vec.len() - 1];
                 for val in constvalvec {
                     let (_, _, vec_temp) = val
                         .process((tp, dimension_vec.clone(), num_pre, layer_now + 1), kit_mut)
@@ -567,7 +567,7 @@ impl Process for ConstInitVal {
 impl Process for VarDecl {
     type Ret = i32;
     type Message = i32;
-    fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
+    fn process(&mut self, _: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
         match self.btype {
             BType::Int => {
                 for def in &mut self.var_def_vec {
@@ -579,7 +579,7 @@ impl Process for VarDecl {
                                 if flag > 1 {
                                     tp = Type::Float;
                                 }
-                                let (mut inst_ptr, mut val) = exp.process(tp, kit_mut).unwrap();
+                                let (mut inst_ptr, val) = exp.process(tp, kit_mut).unwrap();
                                 let mut flag_trans = false;
                                 if flag > 1 {
                                     flag_trans = true;
@@ -651,7 +651,7 @@ impl Process for VarDecl {
 
                                 kit_mut.context_mut.update_var_scope_now(id, inst_ptr);
                             }
-                            InitVal::InitValVec(val_vec) => {
+                            InitVal::InitValVec(_) => {
                                 todo!()
                             }
                         },
@@ -698,7 +698,7 @@ impl Process for VarDecl {
                                 .iter()
                                 .map(|x| match x {
                                     ExpValue::Int(i) => *i,
-                                    ExpValue::Float(f) => {
+                                    ExpValue::Float(_) => {
                                         unreachable!()
                                     }
                                     ExpValue::None => {
@@ -714,7 +714,7 @@ impl Process for VarDecl {
                             for dm in &dimension_vec_in {
                                 length = length * dm;
                             }
-                            let (mut init_vec, mut inst_vec) = val
+                            let (init_vec, inst_vec) = val
                                 .process((Type::Int, dimension_vec_in.clone(), 0, 1), kit_mut)
                                 .unwrap(); //获得初始值
                             match init_vec {
@@ -761,7 +761,7 @@ impl Process for VarDecl {
                                 .iter()
                                 .map(|x| match x {
                                     ExpValue::Int(i) => *i,
-                                    ExpValue::Float(f) => {
+                                    ExpValue::Float(_) => {
                                         unreachable!()
                                     }
                                     ExpValue::None => {
@@ -777,7 +777,7 @@ impl Process for VarDecl {
                             for dm in &dimension_vec_in {
                                 length = length * dm;
                             }
-                            let mut ivec = vec![];
+                            let ivec = vec![];
                             let inst = kit_mut.pool_inst_mut.make_int_array(length, ivec);
                             if !kit_mut.context_mut.add_var(
                                 &id,
@@ -807,7 +807,7 @@ impl Process for VarDecl {
                                 if flag > 1 {
                                     tp = Type::Float;
                                 }
-                                let (mut inst_ptr, mut val) = exp.process(tp, kit_mut).unwrap();
+                                let (mut inst_ptr, val) = exp.process(tp, kit_mut).unwrap();
                                 let mut flag_trans = false;
                                 if flag <= 1 {
                                     flag_trans = true;
@@ -878,11 +878,11 @@ impl Process for VarDecl {
 
                                 kit_mut.context_mut.update_var_scope_now(id, inst_ptr);
                             }
-                            InitVal::InitValVec(val_vec) => {
+                            InitVal::InitValVec(_) => {
                                 todo!()
                             }
                         },
-                        VarDef::NonArray((id)) => {
+                        VarDef::NonArray(id) => {
                             if kit_mut.context_mut.get_layer() == -1 {
                                 //设计相关(全局变量指令与局部变量不同)，全局变量得在这额外判断，放到module里
                                 let inst_ptr = kit_mut.pool_inst_mut.make_global_float(0.0);
@@ -925,7 +925,7 @@ impl Process for VarDecl {
                                 .iter()
                                 .map(|x| match x {
                                     ExpValue::Int(i) => *i,
-                                    ExpValue::Float(f) => {
+                                    ExpValue::Float(_) => {
                                         unreachable!()
                                     }
                                     ExpValue::None => {
@@ -940,7 +940,7 @@ impl Process for VarDecl {
                             for dm in &dimension_vec_in {
                                 length = length * dm;
                             }
-                            let (mut init_vec, mut inst_vec) = val
+                            let (init_vec, inst_vec) = val
                                 .process((Type::Float, dimension_vec_in.clone(), 0, 1), kit_mut)
                                 .unwrap(); //获得初始值
                             match init_vec {
@@ -988,7 +988,7 @@ impl Process for VarDecl {
                                 .iter()
                                 .map(|x| match x {
                                     ExpValue::Int(i) => *i,
-                                    ExpValue::Float(f) => {
+                                    ExpValue::Float(_) => {
                                         unreachable!()
                                     }
                                     ExpValue::None => {
@@ -1004,7 +1004,7 @@ impl Process for VarDecl {
                             for dm in &dimension_vec_in {
                                 length = length * dm;
                             }
-                            let mut fvec = vec![];
+                            let fvec = vec![];
                             let inst = kit_mut.pool_inst_mut.make_float_array(length, fvec);
                             if !kit_mut.context_mut.add_var(
                                 &id,
@@ -1020,19 +1020,11 @@ impl Process for VarDecl {
                             kit_mut.context_mut.update_var_scope_now(&id, inst);
                             kit_mut.context_mut.push_inst_bb(inst);
                         }
-                        _ => todo!(),
                     }
                 }
                 Ok(1)
             }
         }
-    }
-}
-impl Process for VarDef {
-    type Ret = i32;
-    type Message = i32;
-    fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
-        todo!();
     }
 }
 
@@ -1042,7 +1034,7 @@ impl Process for InitVal {
     fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
         match self {
             InitVal::Exp(exp) => {
-                let (tp, dimension, num_precessor, layer_now) = input;
+                let (tp, _, num_precessor, _) = input;
                 let (inst, val) = exp.process(tp, kit_mut).unwrap();
                 let mut vecf = vec![];
                 let mut veci = vec![];
@@ -1102,9 +1094,11 @@ impl Process for InitVal {
                     after = after * dimension[i];
                 } //计算当前维度每增1对应多少元素
                   ////这里:!
-                  // if layer_now==1{
-                after = dimension[dimension.len() - 1];
-                // }
+                  // if layer_now==1{\
+
+                // after = dimension[dimension.len() - 1];/////这
+
+                //   }
 
                 let mut vec_dimension_now = vec![];
                 for i in (layer_now - 1)..dimension.len() {
@@ -1114,7 +1108,7 @@ impl Process for InitVal {
                 let mut index = 0; //当前相对位移
                 for init in initvec {
                     match init {
-                        InitVal::Exp(exp) => {
+                        InitVal::Exp(_) => {
                             let (vec_val_temp, vec_inst_temp) = init
                                 .process(
                                     (tp, dimension.clone(), num_precessor + index, layer_now),
@@ -1127,7 +1121,7 @@ impl Process for InitVal {
                                         vec_val_f.push(val);
                                     }
                                     for inst in vec_inst_temp {
-                                        if let Some(inst_list) = inst {
+                                        if let Some(_) = inst {
                                             vec_inst_init.push(inst);
                                         }
                                     }
@@ -1137,7 +1131,7 @@ impl Process for InitVal {
                                         vec_val_i.push(val);
                                     }
                                     for inst in vec_inst_temp {
-                                        if let Some(inst_list) = inst {
+                                        if let Some(_) = inst {
                                             vec_inst_init.push(inst);
                                         }
                                     }
@@ -1146,7 +1140,7 @@ impl Process for InitVal {
 
                             index = index + 1; //init为exp，相对偏移加1
                         }
-                        InitVal::InitValVec(initvec) => {
+                        InitVal::InitValVec(_) => {
                             let (vec_val_temp, vec_inst_temp) = init
                                 .process(
                                     (tp, dimension.clone(), num_precessor + index, layer_now + 1),
@@ -1160,7 +1154,7 @@ impl Process for InitVal {
                                         vec_val_f.push(val);
                                     }
                                     for inst in vec_inst_temp {
-                                        if let Some(inst_list) = inst {
+                                        if let Some(_) = inst {
                                             vec_inst_init.push(inst);
                                         }
                                     }
@@ -1171,7 +1165,7 @@ impl Process for InitVal {
                                         vec_val_i.push(val);
                                     }
                                     for inst in vec_inst_temp {
-                                        if let Some(inst_list) = inst {
+                                        if let Some(_) = inst {
                                             vec_inst_init.push(inst);
                                         }
                                     }
@@ -1210,7 +1204,7 @@ impl Process for InitVal {
 impl Process for FuncDef {
     type Ret = ObjPtr<Function>;
     type Message = bool;
-    fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
+    fn process(&mut self, _: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
         match self {
             Self::NonParameterFuncDef((tp, id, blk)) => {
                 kit_mut.context_mut.set_funcnow(id.to_string());
@@ -1243,7 +1237,7 @@ impl Process for FuncDef {
                 kit_mut
                     .context_mut
                     .push_func_module(id.to_string(), func_ptr);
-                blk.process((None, None), kit_mut);
+                blk.process((None, None), kit_mut).unwrap();
                 kit_mut.context_mut.delete_layer();
                 return Ok(func_ptr);
             }
@@ -1287,7 +1281,7 @@ impl Process for FuncDef {
                     func_mut.set_parameter(name, param); //这里
                 }
 
-                blk.process((None, None), kit_mut);
+                blk.process((None, None), kit_mut).unwrap();
                 kit_mut.context_mut.delete_layer();
                 return Ok(func_ptr);
             }
@@ -1311,7 +1305,7 @@ impl Process for FuncFParams {
 impl Process for FuncFParam {
     type Ret = (String, ObjPtr<Inst>);
     type Message = i32;
-    fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
+    fn process(&mut self, _: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
         match self {
             FuncFParam::Array((tp, id, vec)) => {
                 //vec中存储的是从第二维开始的维度信息，第一维默认存在且为空
@@ -1324,7 +1318,7 @@ impl Process for FuncFParam {
                             dimension_vec.push(exp.process(Type::Int, kit_mut).unwrap());
                         }
                         dimension_vec_in.push(-1);
-                        for (inst, dimension) in dimension_vec {
+                        for (_, dimension) in dimension_vec {
                             match dimension {
                                 ExpValue::Int(i) => {
                                     dimension_vec_in.push(i);
@@ -1354,7 +1348,7 @@ impl Process for FuncFParam {
                             dimension_vec.push(exp.process(Type::Int, kit_mut).unwrap());
                         }
                         dimension_vec_in.push(-1);
-                        for (inst, dimension) in dimension_vec {
+                        for (_, dimension) in dimension_vec {
                             match dimension {
                                 ExpValue::Int(i) => {
                                     dimension_vec_in.push(i);
@@ -1416,7 +1410,7 @@ impl Process for Block {
         } else {
             kit_mut.context_mut.add_layer();
             for item in &mut self.block_vec {
-                item.process(input, kit_mut);
+                item.process(input, kit_mut).unwrap();
             }
             kit_mut.context_mut.delete_layer();
             Ok(1)
@@ -1433,11 +1427,11 @@ impl Process for BlockItem {
         } else {
             match self {
                 BlockItem::Decl(decl) => {
-                    decl.process(1, kit_mut);
+                    decl.process(1, kit_mut).unwrap();
                     return Ok(1);
                 }
                 BlockItem::Stmt(stmt) => {
-                    stmt.process(input, kit_mut);
+                    stmt.process(input, kit_mut).unwrap();
                     return Ok(1);
                 }
             }
@@ -1452,38 +1446,23 @@ impl Process for Stmt {
             Ok(1)
         } else {
             match self {
-                Stmt::Assign(assign) => {
-                    assign.process(input, kit_mut);
-                    Ok(1)
-                }
-                Stmt::ExpStmt(exp_stmt) => {
-                    exp_stmt.process((Type::Int, input.0, input.1), kit_mut); //这里可能有问题
-                    Ok(1)
-                }
-                Stmt::Block(blk) => {
-                    blk.process(input, kit_mut);
-                    Ok(1)
-                }
-                Stmt::If(if_stmt) => {
-                    if_stmt.process(input, kit_mut);
-                    Ok(1)
-                }
-                Stmt::While(while_stmt) => {
-                    while_stmt.process(input, kit_mut);
-                    Ok(1)
-                }
+                Stmt::Assign(assign) => assign.process(input, kit_mut),
+                Stmt::ExpStmt(exp_stmt) => exp_stmt.process((Type::Int, input.0, input.1), kit_mut),
+                Stmt::Block(blk) => blk.process(input, kit_mut),
+                Stmt::If(if_stmt) => if_stmt.process(input, kit_mut),
+                Stmt::While(while_stmt) => while_stmt.process(input, kit_mut),
                 Stmt::Break(break_stmt) => {
-                    break_stmt.process(input, kit_mut);
+                    break_stmt.process(input, kit_mut).unwrap();
                     kit_mut.context_mut.set_stop_genir(true);
                     Ok(1)
                 }
                 Stmt::Continue(continue_stmt) => {
-                    continue_stmt.process(input, kit_mut);
+                    continue_stmt.process(input, kit_mut).unwrap();
                     kit_mut.context_mut.set_stop_genir(true);
                     Ok(1)
                 }
                 Stmt::Return(ret_stmt) => {
-                    ret_stmt.process(input, kit_mut);
+                    ret_stmt.process(input, kit_mut).unwrap();
                     kit_mut.context_mut.set_stop_genir(true);
                     Ok(1)
                 }
@@ -1495,7 +1474,7 @@ impl Process for Stmt {
 impl Process for Assign {
     type Ret = i32;
     type Message = (Option<ObjPtr<BasicBlock>>, Option<ObjPtr<BasicBlock>>);
-    fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
+    fn process(&mut self, _: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
         let lval = &mut self.lval;
         let symbol = kit_mut.get_var_symbol(&lval.id).unwrap();
         let flag = self.exp.type_process(1, kit_mut).unwrap();
@@ -1635,7 +1614,7 @@ impl Process for ExpStmt {
     type Message = (Type, Option<ObjPtr<BasicBlock>>, Option<ObjPtr<BasicBlock>>);
     fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
         if let Some(exp) = &mut self.exp {
-            exp.process(input.0, kit_mut);
+            exp.process(input.0, kit_mut).unwrap();
         }
         Ok(1)
     }
@@ -1653,7 +1632,7 @@ impl Process for If {
             let bb_else_name = kit_mut.context_mut.get_newbb_name();
             let inst_bb_else = kit_mut.pool_bb_mut.new_basic_block(bb_else_name.clone());
 
-            let (inst_cond, val_cond) = self
+            let (_, _) = self
                 .cond
                 .process((Type::Int, Some(inst_bb_if), Some(inst_bb_else)), kit_mut)
                 .unwrap();
@@ -1711,7 +1690,7 @@ impl Process for If {
                 .pool_bb_mut
                 .new_basic_block(bb_successor_name.clone());
 
-            let (inst_cond, val_cond) = self
+            let (_, _) = self
                 .cond
                 .process(
                     (Type::Int, Some(inst_bb_if), Some(inst_bb_successor)),
@@ -1766,7 +1745,7 @@ impl Process for While {
         }
         kit_mut.context_mut.bb_now_set(block_cond);
 
-        let (inst_cond, val_cond) = self
+        let (_, _) = self
             .cond
             .process(
                 (Type::Int, Some(block_while_head), Some(block_false)),
@@ -1779,12 +1758,27 @@ impl Process for While {
             .unwrap(); //在块内生成指令
         match kit_mut.context_mut.bb_now_mut {
             InfuncChoice::InFunc(bb_now) => {
-                if !bb_now.get_up_bb().is_empty() {
+                // if !bb_now.get_up_bb().is_empty() {
+                if !kit_mut.context_mut.stop_genir {
                     //有前继到达汇合点
                     bb_now.as_mut().add_next_bb(block_cond);
+                    // println!(
+                    //     "last_inst:{:?},stopflag{:?}",
+                    //     bb_now.get_tail_inst().get_kind(),
+                    //     kit_mut.context_mut.stop_genir
+                    // );
                     let inst_jmp = kit_mut.pool_inst_mut.make_jmp();
                     kit_mut.context_mut.push_inst_bb(inst_jmp);
                 }
+                //有前继到达汇合点
+                // bb_now.as_mut().add_next_bb(block_cond);
+                // println!(
+                //     "last_inst:{:?},stopflag{:?}",
+                //     bb_now.get_tail_inst().get_kind(),
+                //     kit_mut.context_mut.stop_genir
+                // );
+                // let inst_jmp = kit_mut.pool_inst_mut.make_jmp();
+                // kit_mut.context_mut.push_inst_bb(inst_jmp);
             }
             _ => {
                 unreachable!()
@@ -1852,7 +1846,7 @@ impl Process for Continue {
 impl Process for Return {
     type Ret = i32;
     type Message = (Option<ObjPtr<BasicBlock>>, Option<ObjPtr<BasicBlock>>);
-    fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
+    fn process(&mut self, _input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
         match kit_mut.context_mut.bb_now_mut {
             InfuncChoice::InFunc(bb_now) => {
                 kit_mut
@@ -2015,7 +2009,7 @@ impl Process for LVal {
             if sym_tmp.dimension.len() > self.exp_vec.len() {
                 (var, symbol) = kit_mut.get_var(&self.id, None, true).unwrap();
             } else {
-                let inst_offset_temp = kit_mut.pool_inst_mut.make_int_const(0);
+                // let inst_offset_temp = kit_mut.pool_inst_mut.make_int_const(0);
                 (var, symbol) = kit_mut.get_var(&self.id, None, false).unwrap();
             }
         } else {
@@ -2037,7 +2031,6 @@ impl Process for LVal {
             index = 0;
             for exp in &mut self.exp_vec {
                 let (inst_exp, val) = exp.process(Type::Int, kit_mut).unwrap();
-                ///介里维度
                 match val {
                     ExpValue::Int(i) => {
                         let inst_base_now =
@@ -2052,7 +2045,7 @@ impl Process for LVal {
                         ))
                         //将inst和数push入vec中
                     }
-                    ExpValue::Float(f) => {
+                    ExpValue::Float(_) => {
                         unreachable!()
                     }
                     ExpValue::None => {
@@ -2374,7 +2367,7 @@ impl Process for UnaryExp {
             UnaryExp::OpUnary((unaryop, unaryexp)) => match unaryop {
                 UnaryOp::Add => unaryexp.as_mut().process(input, kit_mut),
                 UnaryOp::Minus => {
-                    let (mut inst_u, mut val) = unaryexp.as_mut().process(input, kit_mut).unwrap();
+                    let (inst_u, val) = unaryexp.as_mut().process(input, kit_mut).unwrap();
                     let mut inst = inst_u;
 
                     let mut val_ret = val;
@@ -2494,7 +2487,7 @@ impl Process for UnaryExp {
                 match inst_func.as_ref().get_return_type() {
                     //根据返回值类型生成call指令
                     IrType::Float => {
-                        let mut args = funcparams.process(fparams_type_vec, kit_mut).unwrap(); //获得实参
+                        let args = funcparams.process(fparams_type_vec, kit_mut).unwrap(); //获得实参
                         let mut fname = " ".to_string();
                         if let Some((funcname_in, _)) = kit_mut
                             .context_mut
@@ -2516,7 +2509,7 @@ impl Process for UnaryExp {
                         Ok((inst, ExpValue::None)) //这里可以进一步对返回值进行分析
                     }
                     IrType::Int => {
-                        let mut args = funcparams.process(fparams_type_vec, kit_mut).unwrap();
+                        let args = funcparams.process(fparams_type_vec, kit_mut).unwrap();
                         let mut fname = " ".to_string();
                         if let Some((funcname_in, _)) = kit_mut
                             .context_mut
@@ -2538,7 +2531,7 @@ impl Process for UnaryExp {
                         Ok((inst, ExpValue::None)) //这里可以进一步对返回值进行分析
                     }
                     IrType::Void => {
-                        let mut args = funcparams.process(fparams_type_vec, kit_mut).unwrap();
+                        let args = funcparams.process(fparams_type_vec, kit_mut).unwrap();
                         let mut fname = " ".to_string();
                         if let Some((funcname_in, _)) = kit_mut
                             .context_mut
@@ -2557,16 +2550,7 @@ impl Process for UnaryExp {
                     }
                 }
             }
-            _ => unreachable!(),
         }
-    }
-}
-
-impl Process for UnaryOp {
-    type Ret = i32;
-    type Message = i32;
-    fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
-        todo!();
     }
 }
 
@@ -2804,13 +2788,6 @@ impl Process for AddExp {
         }
     }
 }
-impl Process for RelOp {
-    type Ret = i32;
-    type Message = i32;
-    fn process(&mut self, input: Self::Message, kit_mut: &mut Kit) -> Result<Self::Ret, Error> {
-        todo!();
-    }
-}
 
 impl Process for RelExp {
     type Ret = (ObjPtr<Inst>, ExpValue);
@@ -3034,8 +3011,8 @@ impl Process for EqExp {
                 let mut iflag = -1;
                 let mut fvec = vec![];
                 let mut ivec = vec![];
-                let (mut inst_left, val_left) = eqexp.process(tp_in, kit_mut).unwrap();
-                let (mut inst_right, val_right) = relexp.process(tp_in, kit_mut).unwrap();
+                let (inst_left, val_left) = eqexp.process(tp_in, kit_mut).unwrap();
+                let (inst_right, val_right) = relexp.process(tp_in, kit_mut).unwrap();
                 match val_left {
                     ExpValue::Float(f) => {
                         fflag = fflag + 1;
@@ -3238,11 +3215,11 @@ impl Process for LAndExp {
             LAndExp::AndExp((landexp, eqexp)) => {
                 let name_bb_cond_right = kit_mut.context_mut.get_newbb_name();
                 let inst_bb_cond_right = kit_mut.pool_bb_mut.new_basic_block(name_bb_cond_right); //创建一个新的bb
-                let (mut inst_left, val_left) = landexp
+                let (_, _) = landexp
                     .process((input.0, Some(inst_bb_cond_right), input.2), kit_mut)
                     .unwrap();
                 kit_mut.context_mut.bb_now_set(inst_bb_cond_right);
-                let (mut inst_right, val_right) = eqexp.process(input.0, kit_mut).unwrap();
+                let (mut inst_right, _) = eqexp.process(input.0, kit_mut).unwrap();
                 kit_mut.context_mut.bb_now_set(inst_bb_cond_right);
                 match kit_mut.context_mut.bb_now_mut {
                     InfuncChoice::InFunc(bb_now) => {
@@ -3296,20 +3273,19 @@ impl Process for LOrExp {
             LOrExp::OrExp((lorexp, landexp)) => {
                 let name_bb_cond_right = kit_mut.context_mut.get_newbb_name();
                 let inst_bb_cond_right = kit_mut.pool_bb_mut.new_basic_block(name_bb_cond_right); //新建一个bb
-                let (inst_left, val_left) = lorexp
+                let (inst_left, _) = lorexp
                     .process((input.0, input.1, Some(inst_bb_cond_right)), kit_mut)
                     .unwrap();
                 kit_mut.context_mut.bb_now_set(inst_bb_cond_right);
-                let (inst_right, val_right) = landexp.process(input, kit_mut).unwrap();
-                let mut val_or = ExpValue::None;
-                Ok((inst_left, val_or)) //这里或许可以优化//这里随便填的
+                let (_, _) = landexp.process(input, kit_mut).unwrap();
+                Ok((inst_left, ExpValue::None)) //这里或许可以优化//这里随便填的
             }
         }
     }
 }
 
 pub fn offset_calculate(id: &str, exp_vec: &mut Vec<Exp>, kit_mut: &mut Kit) -> ObjPtr<Inst> {
-    let (mut var, mut symbol) = (
+    let (_, symbol) = (
         kit_mut.pool_inst_mut.make_int_const(0),
         Symbol {
             tp: Type::Int,

@@ -10,18 +10,16 @@ use crate::{
 ///! 3. phi的参数中多个参数相同，剩下的都指向自己，也可以将其消去。
 
 pub fn phi_run(module: &mut Module) {
-    loop {
+    func_process(module, |_, func| loop {
         let mut changed = false;
-        func_process(module, |_, func| {
-            bfs_inst_process(func.get_head(), |inst| {
-                changed |= phi_optimize(inst);
-            })
+        bfs_inst_process(func.get_head(), |inst| {
+            changed |= phi_optimize(inst);
         });
 
         if !changed {
             break;
         }
-    }
+    });
 }
 
 fn phi_optimize(mut inst: ObjPtr<Inst>) -> bool {
