@@ -100,8 +100,8 @@ impl DominatorTree {
     }
 
     /// 返回true如果a支配b
-    pub fn is_dominate(&self, a: ObjPtr<BasicBlock>, b: ObjPtr<BasicBlock>) -> bool {
-        self.dominatee.get(&b).unwrap().contains(&a)
+    pub fn is_dominate(&self, a: &ObjPtr<BasicBlock>, b: &ObjPtr<BasicBlock>) -> bool {
+        self.dominatee.get(b).unwrap().contains(a)
     }
 
     /// 深度后序遍历支配树
