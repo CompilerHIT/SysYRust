@@ -160,6 +160,15 @@ impl RegUsedStat {
         out
     }
 
+    // 获取剩余可用的某类寄存器
+    pub fn get_rest_regs_for(&self, kind: ScalarType) -> Vec<i32> {
+        match kind {
+            ScalarType::Float => self.get_rest_fregs(),
+            ScalarType::Int => self.get_rest_iregs(),
+            _ => panic!("gg"),
+        }
+    }
+
     pub fn release_reg(&mut self, reg: i32) {
         if reg >= 0 && reg < 32 {
             self.release_ireg(reg);
