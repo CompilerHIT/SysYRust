@@ -66,7 +66,7 @@ fn run_main() {
     drop(compunit);
 
     // ir优化
-    //sysylib::ir::optimizer_run(&mut module, (&mut pool_bb, &mut pool_inst), o1_option);
+    sysylib::ir::optimizer_run(&mut module, (&mut pool_bb, &mut pool_inst), o1_option);
     //dump_now(&mut module, "dump.ll");
 
     sysylib::ir::optimizer_run(&mut module, (&mut pool_bb, &mut pool_inst), true);
@@ -74,5 +74,5 @@ fn run_main() {
 
     let output2 = "row_asm.log";
     // 后端解析
-    generate_asm(filename, output, output2, &mut AsmModule::new(&module));
+    generate_asm(filename, output, output2, &mut AsmModule::new(module), o1_option);
 }

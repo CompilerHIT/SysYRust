@@ -102,10 +102,6 @@ impl GenerateAsm for LIRInst {
                     Operand::FImm(fimm) => fimm.to_string(),
                     Operand::Addr(addr) => addr.to_string(),
                 };
-                if dst == src && (op == "mv" || op == "fmv.s") {
-                    // TODO, 注释掉以检查reg merge的效果
-                    return Ok(());
-                }
                 builder.op1(op, &dst, &src)?;
                 Ok(())
             }

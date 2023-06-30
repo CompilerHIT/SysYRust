@@ -1,6 +1,8 @@
 use super::{function::Function, instruction::Inst};
 use crate::utility::ObjPtr;
 use std::collections::HashMap;
+
+#[derive(Clone)]
 pub struct Module {
     pub global_variable: HashMap<String, ObjPtr<Inst>>,
     pub function: HashMap<String, ObjPtr<Function>>,
