@@ -410,9 +410,14 @@ impl BB {
                                     || addr.as_ref().get_ir_type() == IrType::FloatPtr
                             );
                             if let Some(ga) = map_info.val_map.get(&addr) {
+                                let src_reg = match *ga {
+                                    Operand::Addr(..) => 
+                                        self.resolve_global(addr, map_info, pool),
+                                    _ => ga.clone()
+                                };
                                 self.insts.push(pool.put_inst(LIRInst::new(
-                                    InstrsType::OpReg(SingleOp::LoadAddr),
-                                    vec![dst_reg.clone(), ga.clone()],
+                                    InstrsType::OpReg(SingleOp::Mv),
+                                    vec![dst_reg.clone(), src_reg],
                                 )));
                             } else {
                                 unreachable!("invalid alloca load");
