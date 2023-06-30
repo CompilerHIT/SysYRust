@@ -74,5 +74,5 @@ fn run_main() {
 
     let output2 = "row_asm.log";
     // 后端解析
-    generate_asm(filename, output, output2, &mut AsmModule::new(module), o1_option);
+    generate_asm(filename, output, output2, &mut AsmModule::new(module), true);
 }

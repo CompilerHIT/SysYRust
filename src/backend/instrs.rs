@@ -453,7 +453,9 @@ impl LIRInst {
         self.operands[2] = Operand::IImm(offset);
     }
     pub fn get_offset(&self) -> IImm {
-        assert!(self.get_type() == InstrsType::Load || self.get_type() == InstrsType::Store);
+        if !(self.get_type() == InstrsType::Load || self.get_type() == InstrsType::Store) {
+            panic!("only support load/store, inst: {:?}", self);
+        }
         match self.operands[2] {
             Operand::IImm(offset) => offset,
             _ => unreachable!("only support imm sp offset"),

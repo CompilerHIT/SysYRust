@@ -73,7 +73,9 @@ pub fn generate_asm(in_path: &str, path: &str, row_path: &str, module: &mut AsmM
     //构造
     module.build(&mut file, &mut file2, &mut pool);
     //优化
-    BackendPass::new(ObjPtr::new(module)).run_pass();
+    if is_opt {
+        BackendPass::new(ObjPtr::new(module)).run_pass();
+    }
     //生成汇编
     module.generate_asm(&mut file, &mut pool);
     //释放

@@ -57,7 +57,7 @@ impl BackendPass {
 
     fn is_sl_same_offset(&self, inst: ObjPtr<LIRInst>, prev_inst: ObjPtr<LIRInst>) -> bool {
         if inst.get_type() == InstrsType::LoadFromStack && prev_inst.get_type() == InstrsType::StoreToStack {
-            if inst.get_offset() == prev_inst.get_offset() {
+            if inst.get_stack_offset() == prev_inst.get_stack_offset() {
                 return true;
             }
         }
