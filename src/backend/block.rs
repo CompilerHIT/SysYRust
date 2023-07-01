@@ -182,7 +182,12 @@ impl BB {
                             lhs_reg = self.resolve_operand(func, lhs, true, map_info, pool);
                             match rhs.as_ref().get_kind() {
                                 InstKind::ConstInt(imm) => {
-                                    self.resolve_opt_div(dst_reg, lhs_reg, imm, pool)
+                                    // self.resolve_opt_div(dst_reg, lhs_reg, imm, pool)
+                                    rhs_reg = self.resolve_operand(func, rhs, true, map_info, pool);
+                                    self.insts.push(pool.put_inst(LIRInst::new(
+                                        InstrsType::Binary(BinaryOp::Div),
+                                        vec![dst_reg, lhs_reg, rhs_reg],
+                                    )));
                                 }
                                 _ => {
                                     rhs_reg = self.resolve_operand(func, rhs, true, map_info, pool);
