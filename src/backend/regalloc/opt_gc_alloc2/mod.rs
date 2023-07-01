@@ -31,7 +31,7 @@ impl Regalloc for Allocator {
         self.init(func);
         // panic!("gg");
         loop {
-            while self.color() != ActionResult::Success {}
+            while self.color() != ActionResult::Finish {}
             while self.simpilfy() != ActionResult::Finish {}
             while self.spill() != ActionResult::Finish {}
             if self.check_k_graph() == ActionResult::Success {

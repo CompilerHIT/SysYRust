@@ -37,7 +37,7 @@ impl Allocator {
     // 检查是否当前k_graph中的节点都已经是合理的节点
     pub fn check_k_graph(&mut self) -> ActionResult {
         // 检查是否k_graph里面的值全部为真
-        let mut out = ActionResult::Finish;
+        let mut out = ActionResult::Success;
         let mut new_biheap: BiHeap<OperItem> = BiHeap::new();
         loop {
             if self.info.as_ref().unwrap().k_graph.0.len() == 0 {
@@ -90,5 +90,15 @@ impl Allocator {
     pub fn is_k_graph_node(&mut self, reg: &Reg) -> bool {
         self.get_available(reg).num_available_regs(reg.get_type())
             > self.get_num_of_live_neighbors(reg)
+    }
+
+    #[inline]
+    pub fn remove_from_k_graph(&mut self, reg: &Reg) {
+        self.info
+            .as_mut()
+            .unwrap()
+            .k_graph
+            .1
+            .remove(reg.bit_code() as usize);
     }
 }

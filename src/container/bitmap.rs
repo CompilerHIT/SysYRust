@@ -58,20 +58,19 @@ impl Bitmap {
         return self.len;
     }
     pub fn insert(&mut self, i: usize) {
-        if !self.contains(i) {
+        if !self.inline_contains(i) {
             self.len += 1;
         }
         while i / 64 >= self.arr.len() {
             self.arr.push(0);
         }
-        let mut v = &mut self.arr[i / 64];
+        let v = &mut self.arr[i / 64];
         *v = *v | (1 << (i as u64 % 64))
     }
     pub fn remove(&mut self, i: usize) -> bool {
-        if self.contains(i) {
+        if self.inline_contains(i) {
             self.len -= 1;
         }
-
         if i / 64 >= self.arr.len() {
             return false;
         }
@@ -80,6 +79,18 @@ impl Bitmap {
             return false;
         }
         *v = *v & (!(1 << (i as u64 % 64)));
+        true
+    }
+
+    #[inline]
+    fn inline_contains(&self, i: usize) -> bool {
+        if i / 64 >= self.arr.len() {
+            return false;
+        }
+        let v = self.arr[i / 64];
+        if v & (1 << (i as u64 % 64)) == 0 {
+            return false;
+        }
         true
     }
 

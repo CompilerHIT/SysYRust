@@ -51,6 +51,60 @@ impl Allocator {
     pub fn get_mut_available(&mut self, reg: &Reg) -> &mut RegUsedStat {
         self.info.as_mut().unwrap().availables.get_mut(reg).unwrap()
     }
+    #[inline]
+    pub fn get_num_neighbor_color(&self, reg: &Reg) -> &HashMap<i32, i32> {
+        self.info
+            .as_ref()
+            .unwrap()
+            .nums_neighbor_color
+            .get(reg)
+            .unwrap()
+    }
+    #[inline]
+    pub fn get_mut_num_neighbor_color(&mut self, reg: &Reg) -> &mut HashMap<i32, i32> {
+        self.info
+            .as_mut()
+            .unwrap()
+            .nums_neighbor_color
+            .get_mut(reg)
+            .unwrap()
+    }
+    #[inline]
+    pub fn get_mut_live_neighbors(&mut self, reg: &Reg) -> &mut LinkedList<Reg> {
+        self.info
+            .as_mut()
+            .unwrap()
+            .all_live_neighbors
+            .get_mut(reg)
+            .unwrap()
+    }
+    #[inline]
+    pub fn get_live_neighbors(&self, reg: &Reg) -> &LinkedList<Reg> {
+        self.info
+            .as_ref()
+            .unwrap()
+            .all_live_neighbors
+            .get(reg)
+            .unwrap()
+    }
+    #[inline]
+    pub fn get_live_neighbors_bitmap(&self, reg: &Reg) -> &Bitmap {
+        self.info
+            .as_ref()
+            .unwrap()
+            .all_live_neigbhors_bitmap
+            .get(reg)
+            .unwrap()
+    }
+    #[inline]
+    pub fn get_mut_live_neigbhors_bitmap(&mut self, reg: &Reg) -> &mut Bitmap {
+        self.info
+            .as_mut()
+            .unwrap()
+            .all_live_neigbhors_bitmap
+            .get_mut(reg)
+            .unwrap()
+    }
 
     #[inline]
     pub fn get_num_of_live_neighbors(&self, reg: &Reg) -> usize {

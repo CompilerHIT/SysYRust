@@ -197,16 +197,31 @@ impl Allocator {
         let mut num = info.all_live_neighbors.get(reg).unwrap().len();
         while num > 0 {
             num -= 1;
-            let live_neighbors = info.all_live_neighbors.get_mut(reg).unwrap();
-            let neighbor = live_neighbors.pop_front().unwrap();
-            let live_neigbhors_bitmap = info.all_live_neigbhors_bitmap.get(reg).unwrap();
-            if !live_neigbhors_bitmap.contains(neighbor.bit_code() as usize) {
+            let neighbor = self.get_mut_live_neighbors(reg).pop_front().unwrap();
+            if self
+                .get_live_neighbors_bitmap(reg)
+                .contains(neighbor.bit_code() as usize)
+            {
                 continue;
             }
-            live_neighbors.push_back(neighbor);
-            info.availables.get_mut(&neighbor).unwrap().use_reg(color);
-            let nums_neighbor_color = info.nums_neighbor_color.get_mut(&neighbor).unwrap();
+
+            self.get_mut_live_neighbors(&neighbor).push_back(neighbor);
+            self.get_mut_available(&neighbor).use_reg(color);
+            let nums_neighbor_color = self.get_mut_num_neighbor_color(&neighbor);
             nums_neighbor_color.insert(color, nums_neighbor_color.get(&color).unwrap_or(&0) + 1);
+            // 判断这个寄存器是否能够被加入到to simpilfy
+            if !self
+                .get_available(&neighbor)
+                .is_available(neighbor.get_type())
+            {
+                // 如果这个寄存器失效了,把它加入待spill列表中
+
+                self.push_to_simpilfy(&neighbor);
+            }
+            // 判断这个虚拟寄存器是否已经存在
+            todo!("判断是否要从 k_graph中移除");
+            // let (na,nln)=self.dra
+            // if !self.if_has_been_added_to_k_graph(&neighbor) {}
         }
     }
 }

@@ -1,6 +1,13 @@
 use super::*;
 impl Allocator {
     #[inline]
+    pub fn push_to_simpilfy(&mut self, reg: &Reg) {
+        // 把一个节点加入待着色列表中
+        let item = self.draw_spill_div_nlc_item(reg);
+        self.info.as_mut().unwrap().to_simplify.push(item);
+    }
+
+    #[inline]
     pub fn simpilfy(&mut self) -> ActionResult {
         // 此处的simplify是简化color中color到的颜色
         // simpilfy,选择spill cost最大的一个
