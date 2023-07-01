@@ -1,3 +1,5 @@
+use crate::log;
+
 use super::*;
 impl BackendPass {
     pub fn peephole_pass(&mut self, pool: &mut BackendPool) {
@@ -6,6 +8,7 @@ impl BackendPass {
                 func.blocks.iter().for_each(|block| {
                     // 在处理handle_overflow前的优化
                     self.rm_useless_overflow(*block, pool);
+                    // self.rm_useless_param_overflow(*block, pool);
                 })
             }
         });
@@ -41,6 +44,8 @@ impl BackendPass {
                     break;
                 }
                 if insts.len() > 1 {
+                    log!("rm_useless_overflow: {:?}", insts);
+                    // l/s offset(sp) -> li offset gp. add gp gp sp. l/s 0(gp).
                     let gp = Operand::Reg(Reg::new(3, ScalarType::Int));
                     block.as_mut().insts.insert(
                         index,
@@ -52,17 +57,30 @@ impl BackendPass {
                     index += 1;
                     block.as_mut().insts.insert(
                         index,
-                        pool.put_inst(LIRInst::new(InstrsType::Binary(BinaryOp::Add), vec![gp.clone(), gp.clone(), ])),
+                        pool.put_inst(LIRInst::new(
+                            InstrsType::Binary(BinaryOp::Add),
+                            vec![gp.clone(), gp.clone(), Operand::Reg(Reg::new(2, ScalarType::Int))],
+                        )),
                     );
-                    new_inst
-                        .as_mut()
-                        .replace_op(vec![insts[0].get_dst().clone(), insts[0].get_lhs().clone()]);
-                    new_inst.as_mut().replace_stack_offset(offset);
+                    index += 1;
+                    // 对组内指令进行替换
+                    for ls in insts.iter() {
+                        let ls_offset = ls.get_stack_offset().get_data() - offset;
+                        let kind = match ls.get_type() {
+                            InstrsType::LoadFromStack => InstrsType::Load,
+                            InstrsType::StoreToStack => InstrsType::Store,
+                            _ => panic!("get {:?}", inst.get_type()),
+                        };
+                        ls.as_mut().replace_kind(kind);
+                        ls.as_mut().replace_op(vec![inst.get_dst().clone(), gp.clone(), Operand::IImm(IImm::new(ls_offset))]);
+                    }
+                    let len = insts.len();
+                    // 替换原指令
                     block
                         .as_mut()
                         .insts
-                        .splice(index..index + insts.len(), vec![new_inst].into_iter());
-                    index += 1;
+                        .splice(index..index + insts.len(), insts.into_iter());
+                    index += len;
                     continue;
                 }
             }

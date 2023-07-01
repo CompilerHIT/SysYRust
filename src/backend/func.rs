@@ -454,11 +454,11 @@ impl Func {
 
         self.reg_alloc_info = alloc_stat;
         self.context.as_mut().set_reg_map(&self.reg_alloc_info.dstr);
-        log!("dstr map info{:?}", self.reg_alloc_info.dstr);
-        log!("spills:{:?}", self.reg_alloc_info.spillings);
+        // log!("dstr map info{:?}", self.reg_alloc_info.dstr);
+        // log!("spills:{:?}", self.reg_alloc_info.spillings);
 
         let stack_size = self.max_params * ADDR_SIZE;
-        log!("set stack size:{}", stack_size);
+        // log!("set stack size:{}", stack_size);
         self.context.as_mut().set_offset(stack_size);
     }
 
