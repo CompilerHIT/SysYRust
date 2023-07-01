@@ -170,8 +170,8 @@ impl<'a> AsmModule<'a> {
                 GlobalVar::GlobalConstIntArray(array) => {
                     writeln!(f, "   .globl {name}\n    .align  3\n     .type   {name}, @object\n   .size   {name}, {num}", name = array.name, num = array.size * 4);
                     writeln!(f, "{name}:", name = array.name);
-                    let sum = array.value.iter().fold(0, |sum, x| sum + x * x);
-                    if sum != 0 {
+                    let is_empty = array.value.iter().all(|x| *x == 0);
+                    if !is_empty {
                         for value in array.value.iter() {
                             writeln!(f, "    .word   {value}");
                         }
