@@ -4,7 +4,6 @@ mod get;
 mod init;
 mod jud;
 mod k_graph;
-mod opt_gc_alloc2;
 mod rescue;
 mod simplify;
 mod spill;
@@ -30,7 +29,13 @@ pub struct Allocator {
 impl Regalloc for Allocator {
     fn alloc(&mut self, func: &crate::backend::func::Func) -> FuncAllocStat {
         self.init(func);
-        panic!("gg");
+        // panic!("gg");
+        // loop {
+        //     while self.color() != ActionResult::Success {}
+        //     while self.simp
+        //     break;
+        // }
+
         // loop {
         //     loop {
         //         let mut stat = self.color();
