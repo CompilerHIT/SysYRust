@@ -1,3 +1,4 @@
+mod color;
 pub mod opt_gc_alloc2;
 
 extern crate biheap;

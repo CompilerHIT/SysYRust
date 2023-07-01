@@ -18,8 +18,16 @@ lalrpop-util = {version = "0.19.9", features = ["lexer"]}
 regex = "1"
 clap = "2.33"
 rand = "0.8.5"
+<<<<<<< HEAD
 biheap="0.5.1"
 hexf-parse = "0.2.1"
+=======
+
+biheap={path="../dep/biheap"}
+hexf-parse={path="../dep/hexf-parse"}
+libm={path="../dep/libm"}
+
+>>>>>>> 632751e (alloc:not do)
 
 
 [build-dependencies]
