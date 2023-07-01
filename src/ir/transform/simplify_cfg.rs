@@ -68,12 +68,18 @@ fn merge_bb(mut bb: ObjPtr<BasicBlock>) {
     if next_bb.is_exit() {
         bb.clear_next_bb();
     } else {
-        bb.replace_next_bb(next_bb, next_bb.get_next_bb()[0].clone());
+        let bb_next_0 = next_bb.get_next_bb()[0].clone();
+        bb.replace_next_bb(next_bb, bb_next_0);
+        bb_next_0.as_mut().replace_up_bb(next_bb, bb);
 
         if !bb_has_jump(next_bb) {
+            let bb_next_1 = next_bb.get_next_bb()[1].clone();
             bb.add_next_bb(next_bb);
-            bb.replace_next_bb(next_bb, next_bb.get_next_bb()[1].clone());
+            bb.replace_next_bb(next_bb, bb_next_1);
+            bb_next_1.as_mut().replace_up_bb(next_bb, bb);
         }
+        next_bb.as_mut().clear_next_bb();
+        next_bb.as_mut().clear_up_bb();
     }
 
     // 在进行phi优化后，单前继的块不会有phi指令

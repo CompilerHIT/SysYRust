@@ -161,13 +161,13 @@ impl BasicBlock {
     /// # Arguments
     /// * `old_bb` - 被替换的BB
     /// * `new_bb` - 新的BB
+    /// 这个替换不会修改up_bb
     pub fn replace_next_bb(&mut self, old_bb: ObjPtr<BasicBlock>, new_bb: ObjPtr<BasicBlock>) {
         let index = self
             .get_next_bb()
             .iter()
             .position(|x| *x == old_bb)
             .unwrap();
-        new_bb.as_mut().replace_up_bb(old_bb, ObjPtr::new(self));
         self.next_bb[index] = new_bb;
     }
 
@@ -197,9 +197,11 @@ impl BasicBlock {
 
     /// 清除自身记录的后继BB
     pub fn clear_next_bb(&mut self) {
-        for bb in self.get_next_bb().iter() {
-            bb.as_mut().remove_up_bb(ObjPtr::new(self));
-        }
         self.next_bb.clear();
+    }
+
+    /// 清除自身记录的前继BB
+    pub fn clear_up_bb(&mut self) {
+        self.up_bb.clear();
     }
 }
