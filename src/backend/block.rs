@@ -2364,7 +2364,6 @@ impl GenerateAsm for BB {
         context.as_mut().is_row = false;
         // log!("generate bb:{}", self.label);
         for inst in self.insts.iter() {
-            inst.as_mut().v_to_phy(context.get_reg_map().clone());
             // log!("generate inst:{:?}", inst);
             inst.as_mut().generate(context.clone(), f)?;
         }

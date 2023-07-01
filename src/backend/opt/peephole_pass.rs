@@ -72,7 +72,7 @@ impl BackendPass {
                             _ => panic!("get {:?}", inst.get_type()),
                         };
                         ls.as_mut().replace_kind(kind);
-                        ls.as_mut().replace_op(vec![inst.get_dst().clone(), gp.clone(), Operand::IImm(IImm::new(ls_offset))]);
+                        ls.as_mut().replace_op(vec![ls.get_dst().clone(), gp.clone(), Operand::IImm(IImm::new(ls_offset))]);
                     }
                     let len = insts.len();
                     // 替换原指令

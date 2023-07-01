@@ -68,12 +68,25 @@ impl AsmModule {
         self.remove_unuse_inst_suf_alloc(); //yjh:i am going to do
         
         // self.print_model(); 
+        self.map_v_to_p();
     }
 
     pub fn handle_overflow(&mut self, pool: &mut BackendPool) {
         self.func_map.iter_mut().for_each(|(_, func)| {
             if !func.is_extern {
                 func.as_mut().handle_overflow(pool);
+            }
+        });
+    }
+
+    fn map_v_to_p(&mut self) {
+        self.func_map.iter_mut().for_each(|(_, func)| {
+            if !func.is_extern {
+                func.blocks.iter().for_each(|block| {
+                    block.insts.iter().for_each(|inst| {
+                        inst.as_mut().v_to_phy(func.context.get_reg_map().clone());
+                    });
+                });
             }
         });
     }
