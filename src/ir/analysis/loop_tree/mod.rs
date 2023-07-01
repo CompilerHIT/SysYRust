@@ -8,15 +8,16 @@ use crate::{
 pub mod loop_recognize;
 
 pub struct LoopList {
-    pool: ObjPool<LoopTree>,
-    loops: Vec<ObjPtr<LoopTree>>,
+    pool: ObjPool<LoopInfo>,
+    loops: Vec<ObjPtr<LoopInfo>>,
 }
 
-pub struct LoopTree {
-    parent: Option<ObjPtr<LoopTree>>,
+pub struct LoopInfo {
+    parent: Option<ObjPtr<LoopInfo>>,
+    pre_header: Option<ObjPtr<BasicBlock>>,
     header: ObjPtr<BasicBlock>,
-    sub_loops: Vec<ObjPtr<LoopTree>>,
     blocks: Vec<ObjPtr<BasicBlock>>,
+    sub_loops: Vec<ObjPtr<LoopInfo>>,
 }
 
 impl LoopList {
@@ -25,6 +26,10 @@ impl LoopList {
             pool: ObjPool::new(),
             loops: Vec::new(),
         }
+    }
+
+    pub fn get_loop_list(&self) -> &Vec<ObjPtr<LoopInfo>> {
+        &self.loops
     }
 }
 
@@ -38,7 +43,7 @@ impl Debug for LoopList {
     }
 }
 
-impl Debug for LoopTree {
+impl Debug for LoopInfo {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut s = String::new();
         s += &format!("Loop: \n");
@@ -56,17 +61,18 @@ impl Debug for LoopTree {
     }
 }
 
-impl LoopTree {
+impl LoopInfo {
     fn new(header: ObjPtr<BasicBlock>) -> Self {
         Self {
             parent: None,
+            pre_header: None,
             header,
-            sub_loops: Vec::new(),
             blocks: Vec::new(),
+            sub_loops: Vec::new(),
         }
     }
 
-    // 判断一个块是否在当前循环中
+    /// 判断一个块是否在当前循环中
     pub fn is_in_loop(&self, bb: &ObjPtr<BasicBlock>) -> bool {
         if self.blocks.contains(bb) {
             true
@@ -80,5 +86,17 @@ impl LoopTree {
             });
             in_loop
         }
+    }
+
+    /// 在第一次设置preheader的时候使用
+    pub fn set_pre_header(&mut self, pre_header: ObjPtr<BasicBlock>) {
+        debug_assert_eq!(self.pre_header, None);
+        self.pre_header = Some(pre_header);
+        self.blocks.push(pre_header);
+    }
+
+    /// 获得循环头
+    pub fn get_header(&self) -> ObjPtr<BasicBlock> {
+        self.header
     }
 }
