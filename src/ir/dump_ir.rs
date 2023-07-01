@@ -145,6 +145,8 @@ fn dump_external_func() -> String {
     // time functions
     ext_fun.push("declare i32 @starttime()\n");
     ext_fun.push("declare i32 @stoptime()\n");
+    ext_fun.push("declare void @_sysy_starttime()\n");
+    ext_fun.push("declare void @_sysy_stoptime()\n");
 
     let mut text = String::new();
     text += "; External Functions\n";
