@@ -47,6 +47,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d468802bab17cbc0cc575e9b053f41e72aa36bfa6b7f55e3529ffa43161b97fa"
 
 [[package]]
+name = "biheap"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e39a0d1916a8bfc767dccf6f07a26ee2040972da910a8966bea2c6276ffd4b01"
+
+[[package]]
 name = "bit-set"
 version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -98,6 +104,7 @@ dependencies = [
 name = "compiler"
 version = "0.1.0"
 dependencies = [
+ "biheap",
  "clap",
  "lalrpop",
  "lalrpop-util",
