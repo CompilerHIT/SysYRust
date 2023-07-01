@@ -1,6 +1,23 @@
 use super::*;
 impl Allocator {
     #[inline]
+    pub fn simpilfy(&mut self) -> ActionResult {
+        // 此处的simplify是简化color中color到的颜色
+        // simpilfy,选择spill cost最大的一个
+        if self.info.as_ref().unwrap().to_simplify.is_empty() {
+            return ActionResult::Finish;
+        }
+        // 试图拯救to_rescue中spill代价最大的节点
+        // 试图simplify来拯救当前节点
+        let item = self.info.as_mut().unwrap().to_simplify.pop_max().unwrap();
+        // 如果化简成功
+        if self.simpilfy_one(item.reg) {
+            return ActionResult::Success;
+        }
+        self.info.as_mut().unwrap().to_spill.push(item);
+        return ActionResult::Fail;
+    }
+    #[inline]
     pub fn simpilfy_one(&mut self, reg: Reg) -> bool {
         if self.if_has_been_colored(&reg) || self.if_has_been_spilled(&reg) {
             //

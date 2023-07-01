@@ -30,11 +30,15 @@ impl Regalloc for Allocator {
     fn alloc(&mut self, func: &crate::backend::func::Func) -> FuncAllocStat {
         self.init(func);
         // panic!("gg");
-        // loop {
-        //     while self.color() != ActionResult::Success {}
-        //     while self.simp
-        //     break;
-        // }
+        loop {
+            while self.color() != ActionResult::Success {}
+            while self.simpilfy() != ActionResult::Finish {}
+            while self.spill() != ActionResult::Finish {}
+            if self.check_k_graph() == ActionResult::Success {
+                break;
+            }
+            continue;
+        }
 
         // loop {
         //     loop {
