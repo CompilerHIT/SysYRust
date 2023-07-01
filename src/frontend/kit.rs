@@ -94,6 +94,20 @@ impl Kit<'_> {
         let inst_stoptime = self.pool_func_mut.new_function();
         inst_stoptime.as_mut().set_return_type(IrType::Void);
 
+        let inst_sysy_starttime = self.pool_func_mut.new_function();
+        inst_sysy_starttime.as_mut().set_return_type(IrType::Void);
+        let param_sysy_starttime = self.pool_inst_mut.make_param(IrType::Int);
+        inst_sysy_starttime
+            .as_mut()
+            .set_parameter("a".to_string(), param_sysy_starttime);
+
+        let inst_sysy_stoptime = self.pool_func_mut.new_function();
+        inst_sysy_stoptime.as_mut().set_return_type(IrType::Void);
+        let param_sysy_stoptime = self.pool_inst_mut.make_param(IrType::Int);
+        inst_sysy_stoptime
+            .as_mut()
+            .set_parameter("a".to_string(), param_sysy_stoptime);
+
         self.context_mut
             .module_mut
             .push_function("getint".to_string(), inst_getint);
@@ -130,6 +144,12 @@ impl Kit<'_> {
         self.context_mut
             .module_mut
             .push_function("stoptime".to_string(), inst_stoptime);
+        self.context_mut
+            .module_mut
+            .push_function("_sysy_starttime".to_string(), inst_sysy_starttime);
+        self.context_mut
+            .module_mut
+            .push_function("_sysy_stoptime".to_string(), inst_sysy_stoptime);
     }
 
     pub fn push_inst(&mut self, inst_ptr: ObjPtr<Inst>) {

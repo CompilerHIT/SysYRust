@@ -1,7 +1,7 @@
 use lalrpop_util::lalrpop_mod;
 extern crate biheap;
 extern crate hexf_parse;
-extern crate libm;
+// extern crate libm;
 use std::env;
 use sysylib::backend::module::AsmModule;
 use sysylib::frontend::irgen::irgen;
