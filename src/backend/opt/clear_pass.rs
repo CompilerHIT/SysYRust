@@ -6,7 +6,6 @@ impl BackendPass {
             if !func.is_extern {
                 func.blocks.iter().for_each(|block| {
                     self.rm_useless(*block);
-                    // self.rm_same_offset_sl(*block);
                 })
             }
         });
@@ -37,17 +36,6 @@ impl BackendPass {
                 }
             }
             index += 1;
-        }
-    }
-
-    fn rm_same_offset_sl(&self, block: ObjPtr<BB>) {
-        let mut index = 0;
-        loop {
-            if index >= block.insts.len() {
-                break;
-            }
-            let offset_vec: Vec<(i32, Reg)> = Vec::new();
-            
         }
     }
 

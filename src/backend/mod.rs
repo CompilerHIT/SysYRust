@@ -74,8 +74,12 @@ pub fn generate_asm(in_path: &str, path: &str, row_path: &str, module: &mut AsmM
     module.build(&mut file, &mut file2, &mut pool);
     //优化
     if is_opt {
-        BackendPass::new(ObjPtr::new(module)).run_pass();
+        BackendPass::new(ObjPtr::new(module)).run_pass(&mut pool);
     }
+
+    // 检查地址溢出，插入间接寻址
+    module.handle_overflow(&mut pool);
+    //TODO: 块重排
     //生成汇编
     module.generate_asm(&mut file, &mut pool);
     //释放

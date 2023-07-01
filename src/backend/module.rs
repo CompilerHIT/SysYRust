@@ -13,6 +13,7 @@ use crate::log;
 use crate::utility::ObjPtr;
 
 use super::instrs::Context;
+use super::opt::BackendPass;
 use super::structs::GenerateAsm;
 
 pub struct AsmModule {
@@ -65,14 +66,11 @@ impl AsmModule {
         self.allocate_reg();
         self.handle_spill(pool, f); //yjh: i am going to adjust
         self.remove_unuse_inst_suf_alloc(); //yjh:i am going to do
-
-        // 检查地址溢出，插入间接寻址
-        self.handle_overflow(pool);
-        self.generate_global_var(f);
+        
         // self.print_model(); 
     }
 
-    fn handle_overflow(&mut self, pool: &mut BackendPool) {
+    pub fn handle_overflow(&mut self, pool: &mut BackendPool) {
         self.func_map.iter_mut().for_each(|(_, func)| {
             if !func.is_extern {
                 func.as_mut().handle_overflow(pool);
@@ -187,6 +185,9 @@ impl AsmModule {
     }
 
     pub fn generate_asm(&mut self, f: &mut File, pool: &mut BackendPool) {
+        // 生成全局变量与数组
+        self.generate_global_var(f);
+
         self.func_map.iter_mut().for_each(|(_, func)| {
             if !func.is_extern {
                 func.as_mut().generate(pool.put_context(Context::new()), f);

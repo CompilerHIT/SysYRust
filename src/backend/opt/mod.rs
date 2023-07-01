@@ -2,7 +2,9 @@ use crate::backend::module::AsmModule;
 pub use crate::utility::ObjPtr;
 pub use crate::backend::block::BB;
 use crate::backend::instrs::*;
+use crate::backend::operand;
 use crate::backend::operand::*;
+use crate::backend::BackendPool;
 
 mod peephole_pass;
 mod clear_pass;
@@ -16,8 +18,8 @@ impl BackendPass {
         Self { module }
     }
 
-    pub fn run_pass(&mut self) {
+    pub fn run_pass(&mut self, pool: &mut BackendPool) {
+        self.peephole_pass(pool);
         self.clear_pass();
-        self.peephole_pass();
     }
 }
