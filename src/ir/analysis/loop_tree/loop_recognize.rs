@@ -63,7 +63,6 @@ fn recognize_one_loop(
     for latch in latchs {
         let mut stack = vec![latch];
         while let Some(bb) = stack.pop() {
-            crate::log_file!("dead_loop", "here {}", bb.get_name());
             if visited.contains(&bb) {
                 continue;
             }

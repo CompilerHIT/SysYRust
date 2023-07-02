@@ -88,6 +88,11 @@ impl LoopInfo {
         }
     }
 
+    /// 判断一个块是否在当前循环中，不递归查找子循环
+    pub fn is_in_current_loop(&self, bb: &ObjPtr<BasicBlock>) -> bool {
+        self.blocks.contains(bb)
+    }
+
     /// 在第一次设置preheader的时候使用
     pub fn set_pre_header(&mut self, pre_header: ObjPtr<BasicBlock>) {
         debug_assert_eq!(self.pre_header, None);
@@ -98,5 +103,25 @@ impl LoopInfo {
     /// 获得循环头
     pub fn get_header(&self) -> ObjPtr<BasicBlock> {
         self.header
+    }
+
+    /// 获得pre_header
+    pub fn get_preheader(&self) -> ObjPtr<BasicBlock> {
+        debug_assert_ne!(
+            self.pre_header, None,
+            "No preheader in current loop: {:?}",
+            self
+        );
+        self.pre_header.unwrap()
+    }
+
+    /// 获得当前循环的块
+    pub fn get_current_loop_bb(&self) -> &Vec<ObjPtr<BasicBlock>> {
+        &self.blocks
+    }
+
+    /// 获得当前循环的子循环
+    pub fn get_sub_loops(&self) -> &Vec<ObjPtr<LoopInfo>> {
+        &self.sub_loops
     }
 }
