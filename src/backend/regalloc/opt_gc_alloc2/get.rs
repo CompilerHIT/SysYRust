@@ -132,31 +132,14 @@ impl Allocator {
 
     #[inline]
     pub fn get_num_of_live_neighbors(&self, reg: &Reg) -> usize {
-        self.info
-            .as_ref()
-            .unwrap()
-            .all_live_neighbors
-            .get(reg)
-            .unwrap()
-            .len()
+        self.info.as_ref().unwrap().all_live_neigbhors_bitmap.len()
     }
 
     // 获取的可用颜色以及周围的活邻居数量
+    #[inline]
     pub fn get_num_available_and_num_live_neighbor(&self, reg: &Reg) -> (i32, i32) {
-        let info = self.info.as_ref().unwrap();
-        let na = info
-            .availables
-            .get(reg)
-            .unwrap()
-            .num_available_regs(reg.get_type());
-        let nn = self
-            .info
-            .as_ref()
-            .unwrap()
-            .all_live_neigbhors_bitmap
-            .get(reg)
-            .unwrap()
-            .len();
+        let na = self.get_available(reg).num_available_regs(reg.get_type());
+        let nn = self.get_num_of_live_neighbors(reg);
         (na as i32, nn as i32)
     }
 }

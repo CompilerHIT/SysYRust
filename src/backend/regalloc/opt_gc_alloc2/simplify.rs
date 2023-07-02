@@ -17,17 +17,18 @@ impl Allocator {
         // 试图拯救to_rescue中spill代价最大的节点
         // 试图simplify来拯救当前节点
         let item = self.info.as_mut().unwrap().to_simplify.pop_max().unwrap();
-        // 如果化简成功
-        if self.simpilfy_one(item.reg) {
-            return ActionResult::Success;
-        }
-        self.info.as_mut().unwrap().to_spill.push(item);
+        self.push_to_tospill(&item.reg);
+        // TODO ,如果化简成功
+        // if self.simpilfy_one(item.reg) {
+        //     return ActionResult::Success;
+        // }
         return ActionResult::Fail;
     }
     #[inline]
     pub fn simpilfy_one(&mut self, reg: Reg) -> bool {
+        self.dump_action("simplify", &reg);
+
         if self.if_has_been_colored(&reg) || self.if_has_been_spilled(&reg) {
-            //
             panic!("");
             return false;
         }
@@ -161,6 +162,7 @@ impl Allocator {
         //         return true;
         //     }
         // }
+
         false
     }
 
@@ -259,7 +261,7 @@ impl Allocator {
     pub fn swap_color(&mut self, reg1: Reg, reg2: Reg) {
         let info = self.info.as_ref().unwrap();
         let color1 = *info.colors.get(&reg1.get_id()).unwrap();
-        let color2 = *info.colors.get(&reg1.get_id()).unwrap();
+        let color2 = *info.colors.get(&reg2.get_id()).unwrap();
         self.decolor_one(&reg1);
         self.decolor_one(&reg2);
         self.color_one_with_certain_color(&reg1, color2);

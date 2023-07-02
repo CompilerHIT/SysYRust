@@ -45,7 +45,7 @@ impl Allocator {
                 continue;
             }
             let mut live_neighbors = LinkedList::new();
-            let mut live_neigbhors_bitmap = Bitmap::with_cap(10);
+            let mut live_neigbhors_bitmap = Bitmap::with_cap(neighbors.len() / 8);
             for neighbor in neighbors {
                 if neighbor.is_physic() || last_colors.contains(neighbor) {
                     continue;

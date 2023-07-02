@@ -35,13 +35,19 @@ impl Allocator {
         // 遍历all_neigbhor得到available和nnc
         let info = self.info.as_ref().unwrap();
         for neighbor in info.all_neighbors.get(reg).unwrap() {
-            if neighbor.is_physic() || self.is_last_colored(neighbor) {
+            if self.is_last_colored(neighbor) {
                 continue;
             }
             if info.spillings.contains(&neighbor.get_id()) {
                 continue;
             }
-            let color = *info.colors.get(&neighbor.get_id()).unwrap();
+            let mut color: Option<i32> = None;
+            if neighbor.is_physic() {
+                color = Some(neighbor.get_color());
+            } else {
+                color = Some(*self.get_color(neighbor).unwrap());
+            }
+            let color = color.unwrap();
             available.use_reg(color);
             let new_num = nnc.get(&color).unwrap_or(&0) + 1;
             nnc.insert(color, new_num);
@@ -87,5 +93,25 @@ impl Allocator {
             reg: *reg,
             cost: na / (nln + 1.0),
         }
+    }
+
+    ///绘制live neighbor图
+    pub fn draw_live_neighbors(&self, reg: &Reg) -> (LinkedList<Reg>, Bitmap) {
+        let mut live_neighbors = LinkedList::new();
+        let mut live_neighbors_bitmap = Bitmap::with_cap(300);
+        for neighbor in self.get_all_neighbors(reg) {
+            if neighbor.is_physic() {
+                continue;
+            }
+            if self.is_last_colored(reg) {
+                continue;
+            }
+            if self.if_has_been_spilled(neighbor) {
+                continue;
+            }
+            live_neighbors.push_back(*neighbor);
+            live_neighbors_bitmap.insert(neighbor.bit_code() as usize);
+        }
+        (live_neighbors, live_neighbors_bitmap)
     }
 }

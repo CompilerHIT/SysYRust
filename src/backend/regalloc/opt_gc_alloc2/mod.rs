@@ -9,7 +9,6 @@ mod rescue;
 mod simplify;
 mod spill;
 pub mod structs;
-
 extern crate biheap;
 use biheap::core::BiHeap;
 
@@ -34,14 +33,17 @@ impl Regalloc for Allocator {
         // panic!("gg");
         log_file!("opt2.txt", "func:{}", func.label);
         // self.dump_all_neighbors();
+        self.dump_live_neighbors();
         // self.dump_last_colors();
-        // self.dump_tocolor();
+
+        self.dump_tocolor();
+
         loop {
             let mut stat = self.color();
             if stat == ActionResult::Success {
                 continue;
             }
-            self.check_k_graph();
+            // self.check_k_graph();
             if stat == ActionResult::Finish {
                 if self.simpilfy() != ActionResult::Finish {
                     continue;
@@ -137,7 +139,7 @@ impl Regalloc for Allocator {
             if dstr.contains_key(&reg.get_id()) || spillings.contains(&reg.get_id()) {
                 continue;
             }
-            log_file!(p, "{:?},", reg);
+            log_file!(p, "{},", reg);
         }
 
         FuncAllocStat {

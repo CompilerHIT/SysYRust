@@ -22,20 +22,13 @@ impl Allocator {
             //如果作色成功继续
             let (na, nn) = self.get_num_available_and_num_live_neighbor(&reg);
             if na > nn {
-                self.info
-                    .as_mut()
-                    .unwrap()
-                    .k_graph
-                    .1
-                    .insert(reg.bit_code() as usize);
-                // todo,修改k_color_neigbhor中节点衡量的方法
-                self.info.as_mut().unwrap().k_graph.0.push(item);
+                self.push_to_k_graph(&reg);
                 continue;
             }
             // 如果不是加入弦图的点,先进行尝试着色,
             if self.color_one(&reg) {
                 out = ActionResult::Success;
-                self.info.as_mut().unwrap().colored.push(item);
+                // self.info.as_mut().unwrap().colored.push(item);
             } else {
                 out = ActionResult::Fail;
                 self.push_to_tosimpilfy(&reg);
@@ -47,6 +40,7 @@ impl Allocator {
 
     // 把一个寄存器加入tocolor
     pub fn push_to_tocolor(&mut self, reg: &Reg) {
+        self.dump_action("tocolor", reg);
         let item = self.draw_na_div_nln_item(reg);
         self.info.as_mut().unwrap().to_color.push(item);
     }
@@ -55,7 +49,9 @@ impl Allocator {
     ///
     #[inline]
     pub fn color_one(&mut self, reg: &Reg) -> bool {
-        let color = self.choose_color(reg);
+        // let color = self.choose_color(reg);
+        //TODO CHECK
+        let color = self.get_available(reg).get_available_reg(reg.get_type());
         if color.is_none() {
             return false;
         }
@@ -127,6 +123,7 @@ impl Allocator {
     // 移除某个节点的颜色
     #[inline]
     pub fn decolor_one(&mut self, reg: &Reg) -> bool {
+        self.dump_action("decolor", reg);
         if self.if_has_been_spilled(reg) || !self.if_has_been_colored(reg) {
             panic!("unreachable!");
         }
@@ -136,15 +133,18 @@ impl Allocator {
         let mut out = false;
         let mut to_despill = LinkedList::new(); //暂存decolor过程中发现的能够拯救回来的寄存器
                                                 // todo
-        let mut num_all_neighbors = self.get_all_neighbors(reg).len();
-        while num_all_neighbors > 0 {
-            num_all_neighbors -= 1;
-            let neighbors = self.get_mut_all_neighbors(reg);
+        let mut num_live_neighbors = self.get_live_neighbors(reg).len();
+        while num_live_neighbors > 0 {
+            num_live_neighbors -= 1;
+            let neighbors = self.get_mut_live_neighbors(reg);
             let neighbor = neighbors.pop_front().unwrap();
-            neighbors.push_back(neighbor);
-            if neighbor.is_physic() || self.is_last_colored(&neighbor) {
+            if !self
+                .get_live_neighbors_bitmap(reg)
+                .contains(neighbor.bit_code() as usize)
+            {
                 continue;
             }
+            self.get_mut_live_neighbors(reg).push_back(neighbor);
             let nums_neighbor_color = self.get_mut_num_neighbor_color(&neighbor);
             let new_num = nums_neighbor_color.get(&color).unwrap_or(&0) - 1;
             nums_neighbor_color.insert(color, new_num);
@@ -156,7 +156,7 @@ impl Allocator {
                     to_despill.push_back(neighbor);
                 }
             } else if new_num < 0 {
-                panic!("gg");
+                panic!("gg{},{}", reg, neighbor);
             }
         }
         while !to_despill.is_empty() {
@@ -170,6 +170,7 @@ impl Allocator {
     /// 如果着色成功,
     #[inline]
     pub fn color_one_with_certain_color(&mut self, reg: &Reg, color: i32) {
+        self.dump_color_action(reg, color);
         if self.if_has_been_colored(reg) || self.if_has_been_spilled(reg) {
             panic!("un reachable");
         }
@@ -179,36 +180,30 @@ impl Allocator {
         }
         info.colors.insert(reg.get_id(), color);
         let mut num = info.all_live_neighbors.get(reg).unwrap().len();
+        if reg.get_id() == 187 {
+            let b = 3;
+        }
         while num > 0 {
             num -= 1;
             let neighbor = self.get_mut_live_neighbors(reg).pop_front().unwrap();
-            if self
+            if !self
                 .get_live_neighbors_bitmap(reg)
                 .contains(neighbor.bit_code() as usize)
             {
                 continue;
             }
+            self.get_mut_live_neighbors(&reg).push_back(neighbor);
 
-            self.get_mut_live_neighbors(&neighbor).push_back(neighbor);
             self.get_mut_available(&neighbor).use_reg(color);
             let nums_neighbor_color = self.get_mut_num_neighbor_color(&neighbor);
+
             nums_neighbor_color.insert(color, nums_neighbor_color.get(&color).unwrap_or(&0) + 1);
-            // 判断这个寄存器是否能够被加入到to simpilfy
-            if !self
-                .get_available(&neighbor)
-                .is_available(neighbor.get_type())
-            {
-                // 如果这个寄存器失效了,把它加入待simplify列表中
-                self.push_to_tosimpilfy(&neighbor);
-            }
+
             // 判断这个虚拟寄存器是否已经存在
             // tocheck("判断是否要从 k_graph中移除"); 如果需要则从k-graph中移除加入到tocolor
             if self.is_k_graph_node(&neighbor) {
-                let num_available = self
-                    .get_available(&neighbor)
-                    .num_available_regs(neighbor.get_type());
-                let num_live_neigbhors = self.get_num_of_live_neighbors(reg);
-                if num_available >= num_live_neigbhors {
+                let (na, nln) = self.get_num_available_and_num_live_neighbor(reg);
+                if na <= nln {
                     self.remove_from_k_graph(&neighbor);
                     self.push_to_tocolor(reg);
                 }

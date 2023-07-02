@@ -63,6 +63,7 @@ impl Allocator {
         }
         false
     }
+
     #[inline]
     pub fn is_last_colored(&self, reg: &Reg) -> bool {
         self.info.as_ref().unwrap().last_colors.contains(reg)

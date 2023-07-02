@@ -116,6 +116,7 @@ pub fn build_interference(
     func: &Func,
     ends_index_bb: &HashMap<(i32, ObjPtr<BB>), HashSet<Reg>>,
 ) -> HashMap<Reg, HashSet<Reg>> {
+    // todo,修改逻辑，以能够处理多定义的情况
     let mut interference_graph: HashMap<Reg, HashSet<Reg>> = HashMap::new();
     let tmp_set = HashSet::new();
     let process =
