@@ -639,7 +639,7 @@ impl Func {
                                 true,
                             );
                         } else if operand::is_imm_12bs(stack_size - slot.get_pos()) {
-                            builder.s(&reg.to_string(false), "sp", slot.get_pos(), is_float, true);
+                            builder.s(&reg.to_string(false), "sp", stack_size - slot.get_pos(), is_float, true);
                         } else {
                             if first {
                                 let offset = stack_size - slot.get_pos();
@@ -693,7 +693,7 @@ impl Func {
                                 true,
                             );
                         } else if operand::is_imm_12bs(stack_size - slot.get_pos()) {
-                            builder.l(&reg.to_string(false), "sp", slot.get_pos(), is_float, true);
+                            builder.l(&reg.to_string(false), "sp", stack_size - slot.get_pos(), is_float, true);
                         } else {
                             if first {
                                 let offset = stack_size - slot.get_pos();
