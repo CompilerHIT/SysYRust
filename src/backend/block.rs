@@ -1252,6 +1252,19 @@ impl BB {
         self.insts.append(inst);
     }
 
+    pub fn get_prev(&self) -> &Vec<ObjPtr<BB>> {
+        &self.in_edge
+    }
+
+    pub fn get_after(&self) -> &Vec<ObjPtr<BB>> {
+        &self.out_edge
+    }
+
+    pub fn get_tail_inst(&self) -> ObjPtr<LIRInst> {
+        assert!(self.insts.last() != None);
+        self.insts.last().unwrap().clone()
+    }
+
     pub fn save_reg(&mut self, func: ObjPtr<Func>, pool: &mut BackendPool) {
         let mut index = 0;
         loop {
