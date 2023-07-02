@@ -82,4 +82,24 @@ impl Inst {
             _ => unreachable!("Inst::get_float_bond: not a float type"),
         }
     }
+
+    /// 判断一个指令是否是全局变量
+    pub fn is_global_var(&self) -> bool {
+        match self.get_kind() {
+            InstKind::GlobalInt(_)
+            | InstKind::GlobalFloat(_)
+            | InstKind::GlobalConstInt(_)
+            | InstKind::GlobalConstInt(_) => true,
+            InstKind::Alloca(_) => {
+                if let (None, None) = (self.list.prev, self.list.next) {
+                    true
+                } else {
+                    debug_assert_ne!(self.list.prev, None);
+                    debug_assert_ne!(self.list.next, None);
+                    false
+                }
+            }
+            _ => false,
+        }
+    }
 }
