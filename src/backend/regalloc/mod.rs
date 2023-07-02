@@ -1,7 +1,6 @@
 pub mod base_alloc;
 pub mod easy_gc_alloc;
 pub mod easy_ls_alloc;
-pub mod estimate;
 pub mod local_ls_alloc;
 pub mod opt_gc_alloc;
 pub mod opt_gc_alloc2;

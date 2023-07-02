@@ -11,6 +11,9 @@ impl Allocator {
     }
     #[inline]
     pub fn if_has_been_colored(&self, reg: &Reg) -> bool {
+        if reg.get_id() == 337 {
+            let a = 2;
+        }
         self.info
             .as_ref()
             .unwrap()

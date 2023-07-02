@@ -6,6 +6,11 @@ impl Allocator {
     /// * 自身是否已经着色
     /// * 自身是否已经spill
     #[inline]
+    pub fn get_colors(&self) -> &HashMap<i32, i32> {
+        &self.info.as_ref().unwrap().colors
+    }
+
+    #[inline]
     pub fn get_spill_cost_div_lnn2(&self, reg: &Reg) -> f32 {
         let spill_cost = self.info.as_ref().unwrap().spill_cost.get(reg).unwrap();
         let nn = self
@@ -28,6 +33,20 @@ impl Allocator {
             .get(reg)
             .unwrap();
         spill_cost / nn.len() as f32
+    }
+
+    #[inline]
+    pub fn get_all_neighbors(&self, reg: &Reg) -> &LinkedList<Reg> {
+        self.info.as_ref().unwrap().all_neighbors.get(reg).unwrap()
+    }
+    #[inline]
+    pub fn get_mut_all_neighbors(&mut self, reg: &Reg) -> &mut LinkedList<Reg> {
+        self.info
+            .as_mut()
+            .unwrap()
+            .all_neighbors
+            .get_mut(reg)
+            .unwrap()
     }
 
     #[inline]
@@ -107,6 +126,11 @@ impl Allocator {
     }
 
     #[inline]
+    pub fn get_mut_colors(&mut self) -> &mut HashMap<i32, i32> {
+        &mut self.info.as_mut().unwrap().colors
+    }
+
+    #[inline]
     pub fn get_num_of_live_neighbors(&self, reg: &Reg) -> usize {
         self.info
             .as_ref()
@@ -134,5 +158,18 @@ impl Allocator {
             .unwrap()
             .len();
         (na as i32, nn as i32)
+    }
+}
+
+/// 获取自身多种寄存器集合
+impl Allocator {
+    pub fn get_mut_tocolor(&mut self) -> &mut BiHeap<OperItem> {
+        &mut self.info.as_mut().unwrap().to_color
+    }
+    pub fn get_mut_tosimplify(&mut self) -> &mut BiHeap<OperItem> {
+        &mut self.info.as_mut().unwrap().to_simplify
+    }
+    pub fn get_mut_tospill(&mut self) -> &mut BiHeap<OperItem> {
+        &mut self.info.as_mut().unwrap().to_spill
     }
 }

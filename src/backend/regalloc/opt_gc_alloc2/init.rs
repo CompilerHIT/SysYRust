@@ -6,17 +6,18 @@ impl Allocator {
     }
 
     pub fn init(&mut self, func: &Func) {
-        let mut num_estimate_regs = func.num_regs();
-        let mut ends_index_bb = regalloc::ends_index_bb(func);
-        let mut allneighbors = regalloc::build_interference_into_lst(func, &ends_index_bb);
-        let mut nums_neighbor_color = regalloc::build_nums_neighbor_color(func, &ends_index_bb);
-        let mut availables = regalloc::build_availables(func, &ends_index_bb);
-        let mut spill_cost = regalloc::estimate_spill_cost(func);
+        let num_estimate_regs = func.num_regs();
+        let ends_index_bb = regalloc::ends_index_bb(func);
+        let allneighbors = regalloc::build_interference_into_lst(func, &ends_index_bb);
+        let nums_neighbor_color = regalloc::build_nums_neighbor_color(func, &ends_index_bb);
+        let availables = regalloc::build_availables(func, &ends_index_bb);
+        let spill_cost = regalloc::estimate_spill_cost(func);
         let mut all_live_neigbhors: HashMap<Reg, LinkedList<Reg>> = HashMap::new();
         let mut all_live_neighbors_bitmap: HashMap<Reg, Bitmap> = HashMap::new();
         let mut last_colors: HashSet<Reg> = HashSet::new();
         let mut to_color: BiHeap<OperItem> = BiHeap::new();
-        // 对live neighbor的更新,以及对tocolor的更新
+
+        // 初始化last_colors  (last colors不包括物理寄存器,不包括不一定能够着色的寄存器)
         for (reg, neighbors) in &allneighbors {
             // 判断它是否是一个last colors,如果virtual neighbors< availables
             if reg.is_physic() {
@@ -38,22 +39,19 @@ impl Allocator {
             }
         }
 
-        // 初始化tocolor以及k_graph
+        // 初始化to colors和live neighbors
         for (reg, neighbors) in &allneighbors {
-            if reg.is_physic() {
+            if reg.is_physic() || last_colors.contains(reg) {
                 continue;
             }
             let mut live_neighbors = LinkedList::new();
             let mut live_neigbhors_bitmap = Bitmap::with_cap(10);
-            for reg in neighbors {
-                if reg.is_physic() {
+            for neighbor in neighbors {
+                if neighbor.is_physic() || last_colors.contains(neighbor) {
                     continue;
                 }
-                if last_colors.contains(reg) {
-                    continue;
-                }
-                live_neighbors.push_back(*reg);
-                live_neigbhors_bitmap.insert(reg.bit_code() as usize);
+                live_neighbors.push_back(*neighbor);
+                live_neigbhors_bitmap.insert(neighbor.bit_code() as usize);
             }
             to_color.push(OperItem::new(
                 reg,
@@ -64,7 +62,7 @@ impl Allocator {
         }
 
         let info = AllocatorInfo {
-            to_color: BiHeap::new(),
+            to_color: to_color,
             to_simplify: BiHeap::new(),
             to_spill: BiHeap::new(),
             colored: BiHeap::new(),
@@ -81,4 +79,5 @@ impl Allocator {
         };
         self.info = Some(info);
     }
+    //
 }

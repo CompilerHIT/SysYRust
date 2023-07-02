@@ -38,11 +38,17 @@ impl Allocator {
                 self.info.as_mut().unwrap().colored.push(item);
             } else {
                 out = ActionResult::Fail;
-                self.info.as_mut().unwrap().to_simplify.push(item);
+                self.push_to_tosimpilfy(&reg);
             }
             break;
         }
         out
+    }
+
+    // 把一个寄存器加入tocolor
+    pub fn push_to_tocolor(&mut self, reg: &Reg) {
+        let item = self.draw_na_div_nln_item(reg);
+        self.info.as_mut().unwrap().to_color.push(item);
     }
 
     ///着色某个寄存器
@@ -61,6 +67,12 @@ impl Allocator {
     // 给某个虚拟寄存器挑选可以用来作色的颜色
     #[inline]
     pub fn choose_color(&mut self, reg: &Reg) -> Option<i32> {
+        //TOCHECK
+        // return match self.get_available(reg).get_available_reg(reg.get_type()) {
+        //     None => None,
+        //     Some(color) => Some(color),
+        //     _ => panic!("gg"),
+        // };
         // TOCHECK
         // TODO, improve,加入贪心,根据所在的指令类型，以及周围已经分配的颜色的情况选择颜色
         // 比如,获取周围的周围的颜色,按照它们的周围的颜色的数量进行排序
@@ -95,7 +107,7 @@ impl Allocator {
                     continue;
                 }
                 passed_regs.insert(nn.bit_code() as usize);
-                let color = self.get_color(reg).unwrap();
+                let color = self.get_color(nn).unwrap();
                 if !colors_weights.contains_key(&color) {
                     continue;
                 }
@@ -129,39 +141,16 @@ impl Allocator {
         let mut out = false;
         let mut to_despill = LinkedList::new(); //暂存decolor过程中发现的能够拯救回来的寄存器
                                                 // todo
-        let mut num_all_neighbors = self
-            .info
-            .as_ref()
-            .unwrap()
-            .all_neighbors
-            .get(reg)
-            .unwrap()
-            .len();
-
+        let mut num_all_neighbors = self.get_all_neighbors(reg).len();
         while num_all_neighbors > 0 {
             num_all_neighbors -= 1;
-            let neighbors = self
-                .info
-                .as_mut()
-                .unwrap()
-                .all_neighbors
-                .get_mut(reg)
-                .unwrap();
-            if neighbors.is_empty() {
-                break;
-            }
+            let neighbors = self.get_mut_all_neighbors(reg);
             let neighbor = neighbors.pop_front().unwrap();
             neighbors.push_back(neighbor);
             if neighbor.is_physic() || self.is_last_colored(&neighbor) {
                 continue;
             }
-            let nums_neighbor_color = self
-                .info
-                .as_mut()
-                .unwrap()
-                .nums_neighbor_color
-                .get_mut(&neighbor)
-                .unwrap();
+            let nums_neighbor_color = self.get_mut_num_neighbor_color(&neighbor);
             let new_num = nums_neighbor_color.get(&color).unwrap_or(&0) - 1;
             nums_neighbor_color.insert(color, new_num);
             if new_num == 0 {
@@ -216,12 +205,19 @@ impl Allocator {
             {
                 // 如果这个寄存器失效了,把它加入待spill列表中
 
-                self.push_to_simpilfy(&neighbor);
+                self.push_to_tosimpilfy(&neighbor);
             }
             // 判断这个虚拟寄存器是否已经存在
-            todo!("判断是否要从 k_graph中移除");
-            // let (na,nln)=self.dra
-            // if !self.if_has_been_added_to_k_graph(&neighbor) {}
+            // tocheck("判断是否要从 k_graph中移除");
+            if self.is_k_graph_node(&neighbor) {
+                let num_available = self
+                    .get_available(&neighbor)
+                    .num_available_regs(neighbor.get_type());
+                let num_live_neigbhors = self.get_live_neighbors_bitmap(&neighbor).len();
+                if num_available >= num_live_neigbhors {
+                    self.remove_from_k_graph(&neighbor);
+                }
+            }
         }
     }
 }

@@ -23,8 +23,7 @@ impl Allocator {
         let tospill = self.choose_spill(&reg);
         if tospill != reg {
             // 如果要溢出的寄存器不等于选择的寄存器,需要把选择的寄存器再加入to_color中
-            let item = self.draw_spill_div_nlc_item(&reg);
-            self.info.as_mut().unwrap().to_color.push(item);
+            self.push_to_tocolor(&reg);
         }
         // 溢出操作一定成功
         if self.spill_one(tospill) {
@@ -32,6 +31,15 @@ impl Allocator {
         }
         panic!("gg");
         ActionResult::Fail
+    }
+
+    ///把一个寄存器加入to spill
+    /// 以 spillcost/ numl live neighbors 作为权重
+    pub fn push_to_tospill(&mut self, reg: &Reg) {
+        // TOCHECK,修改tospill权重为spillcost
+        let item = self.draw_spill_cost_item(reg);
+        // let item = self.draw_spill_div_nln_item(reg);
+        self.get_mut_tospill().push(item);
     }
 
     /// 选择spill节点
@@ -70,7 +78,7 @@ impl Allocator {
                     .get(neighbor)
                     .unwrap();
                 if *nnc.get(&color).unwrap() == 1 {
-                    out_val -= self.get_spill_cost_div_lnn(neighbor);
+                    out_val -= self.get_spill_cost_div_lnn2(neighbor);
                 }
             }
             out_val
@@ -83,12 +91,22 @@ impl Allocator {
         let mut tospill_val = val(self, reg);
         let bitmap = all_live_neigbors_bitmap.get(reg).unwrap();
         // 只在活着的节点(也就是没有被spill的节点中选择)
-        //
+        // TODO,
+        // 改进这里的选择
+        // 在周围没有作色的节点和自己中选择要spill的对象
+        // 如果节点有颜色，而且spill掉节点后能够让自己作色，则选择节点
         for neighbor in all_live_neigbhors.get(reg).unwrap() {
             let neigbor = *neighbor;
             if !bitmap.contains(neigbor.bit_code() as usize) {
                 continue;
             }
+            //
+            // if self.if_has_been_colored(&neigbor) {
+            //     let color = self.get_color(&neigbor).unwrap();
+            //     if self.get_num_neighbor_color(reg).get(color).unwrap() != &1 {
+            //         continue;
+            //     }
+            // }
             // 获取价值
             let tmp_tospill_val = val(self, &neigbor);
             if tmp_tospill_val < tospill_val {

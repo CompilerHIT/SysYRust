@@ -19,6 +19,11 @@ pub fn sort(nnc: &HashMap<i32, i32>, out_come_order: &mut Vec<i32>) {
         bucket.push_back(*color);
         sort_heap.push(*times);
     }
+    while !sort_heap.is_empty() {
+        let weight = sort_heap.pop_min().unwrap();
+        let color = buckets.get_mut(&weight).unwrap().pop_front().unwrap();
+        out_come_order.push(color);
+    }
 }
 
 #[cfg(test)]

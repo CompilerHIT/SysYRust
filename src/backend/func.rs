@@ -426,7 +426,7 @@ impl Func {
         let mut allocator = crate::backend::regalloc::easy_gc_alloc::Allocator::new();
         // let mut allocator = crate::backend::regalloc::opt_gc_alloc2::Allocator::new();
         // let mut allocator = crate::backend::regalloc::opt_gc_alloc::Allocator::new();
-        // let mut allocator = crate::backend::regalloc::base_alloc::Allocator::new();
+        let mut allocator = crate::backend::regalloc::base_alloc::Allocator::new();
         let mut alloc_stat = allocator.alloc(self);
 
         // 评价估计结果
@@ -811,5 +811,21 @@ impl Func {
             })
         });
         return out;
+    }
+
+    // 获取所有虚拟寄存器和用到的物理寄存器
+    pub fn draw_all_virtual_regs(&self) -> HashSet<Reg> {
+        let mut passed = HashSet::new();
+        let mut out = self.blocks.iter().for_each(|bb| {
+            bb.insts.iter().for_each(|inst| {
+                for reg in inst.get_regs() {
+                    if reg.is_physic() {
+                        continue;
+                    }
+                    passed.insert(reg);
+                }
+            })
+        });
+        passed
     }
 }

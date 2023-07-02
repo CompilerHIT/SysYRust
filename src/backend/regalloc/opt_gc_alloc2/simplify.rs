@@ -1,9 +1,9 @@
 use super::*;
 impl Allocator {
     #[inline]
-    pub fn push_to_simpilfy(&mut self, reg: &Reg) {
+    pub fn push_to_tosimpilfy(&mut self, reg: &Reg) {
         // 把一个节点加入待着色列表中
-        let item = self.draw_spill_div_nlc_item(reg);
+        let item = self.draw_spill_div_nln_item(reg);
         self.info.as_mut().unwrap().to_simplify.push(item);
     }
 
@@ -143,6 +143,9 @@ impl Allocator {
         let spill_cost = *self.info.as_ref().unwrap().spill_cost.get(&reg).unwrap();
         // 暂时先尝试交换最少的两种颜色的交换
         for i in 0..2 {
+            if i >= order.len() {
+                break;
+            }
             let color = *order.get(i).unwrap();
             // 判断这个颜色是否是合理的颜色
             if !tmp_regusestat.is_available_reg(color) {
@@ -157,8 +160,7 @@ impl Allocator {
                 continue;
             } else {
                 //TOCHECK,化简成功,而且代价合适,把当前的寄存器加回tocolor
-                let item = self.draw_spill_div_nlc_item(&reg);
-                self.info.as_mut().unwrap().to_color.push(item);
+                self.push_to_tocolor(&reg);
                 return true;
             }
         }

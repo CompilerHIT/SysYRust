@@ -1,5 +1,6 @@
 use super::*;
 impl Allocator {
+    /// 该函数只应该在获取最终结果的时候调用一次 (返回dstr和spilling形式(从Allocator手中复制))
     #[inline]
     pub fn draw_dstr_spillings(&mut self) -> (HashMap<i32, i32>, HashSet<i32>) {
         // TODO,把to rescue中的内容交回spillings
@@ -8,8 +9,22 @@ impl Allocator {
         (dstr, spillings)
     }
 
+    ///根据总冲突图获取可着色状态
     #[inline]
-    // 根据总冲突图刷新并返回regusestat和num neighbor color
+    pub fn draw_available(&self, reg: &Reg) -> RegUsedStat {
+        let mut available = RegUsedStat::new();
+        self.get_all_neighbors(reg).iter().for_each(|neighbor| {
+            if neighbor.is_physic() {
+                available.use_reg(neighbor.get_color());
+            } else if self.if_has_been_colored(neighbor) {
+                available.use_reg(*self.get_color(neighbor).unwrap());
+            }
+        });
+        available
+    }
+
+    #[inline]
+    /// 根据总冲突图刷新并返回regusestat和num neighbor color
     pub fn draw_available_and_num_neigbhor_color(
         &self,
         reg: &Reg,
@@ -36,7 +51,7 @@ impl Allocator {
 
     ///绘制item, 绘制(reg,spill_cost/num_live_neigbhor) item
     #[inline]
-    pub fn draw_spill_div_nlc_item(&self, reg: &Reg) -> OperItem {
+    pub fn draw_spill_div_nln_item(&self, reg: &Reg) -> OperItem {
         let spill_cost = self.info.as_ref().unwrap().spill_cost.get(reg).unwrap();
         let nlc = self
             .info
@@ -49,6 +64,28 @@ impl Allocator {
         OperItem {
             reg: *reg,
             cost: *spill_cost / (nlc as f32 + 1.0),
+        }
+    }
+
+    /// 绘制以spill cost为代价的item
+    pub fn draw_spill_cost_item(&self, reg: &Reg) -> OperItem {
+        let cost = self.get_spill_cost(reg);
+        OperItem {
+            reg: *reg,
+            cost: cost,
+        }
+    }
+
+    /// 绘制以 num_available_color(可选择的着色的数量) / num_live_neigbhor (周围未spill的寄存器的数量)为代价的item,<br>
+    ///
+    pub fn draw_na_div_nln_item(&self, reg: &Reg) -> OperItem {
+        let na = self.draw_available(reg).num_available_regs(reg.get_type()) as f32;
+        let nln = self.get_live_neighbors_bitmap(reg).len() as f32;
+        // 考虑到nln可能为0，可能会/0错误，所以加1
+        // TODO, 衡量+1的影响，考虑是否有其他函数可以处理这个问题
+        OperItem {
+            reg: *reg,
+            cost: na / (nln + 1.0),
         }
     }
 }
