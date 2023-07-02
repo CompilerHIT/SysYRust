@@ -2,6 +2,13 @@ use crate::log_file;
 
 use super::*;
 impl Allocator {
+    pub fn dump_action(actions: &str, reg: &Reg) {
+        match actions {
+            "spill" => {}
+            _ => unreachable!(),
+        };
+    }
+
     pub fn dump_last_colors(&self) {
         let p = "opt2.txt";
         log_file!(

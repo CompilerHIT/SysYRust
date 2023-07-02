@@ -131,13 +131,8 @@ impl Allocator {
             panic!("unreachable!");
         }
         // 移除着色并且取出颜色
-        let color = self
-            .info
-            .as_mut()
-            .unwrap()
-            .colors
-            .remove(&reg.get_id())
-            .unwrap();
+        let color = *self.get_color(reg).unwrap();
+        self.get_mut_colors().remove(&reg.get_id());
         let mut out = false;
         let mut to_despill = LinkedList::new(); //暂存decolor过程中发现的能够拯救回来的寄存器
                                                 // todo
@@ -175,7 +170,7 @@ impl Allocator {
     /// 如果着色成功,
     #[inline]
     pub fn color_one_with_certain_color(&mut self, reg: &Reg, color: i32) {
-        if self.if_has_been_colored(reg) || self.if_has_been_colored(reg) {
+        if self.if_has_been_colored(reg) || self.if_has_been_spilled(reg) {
             panic!("un reachable");
         }
         let info = self.info.as_mut().unwrap();
@@ -203,19 +198,19 @@ impl Allocator {
                 .get_available(&neighbor)
                 .is_available(neighbor.get_type())
             {
-                // 如果这个寄存器失效了,把它加入待spill列表中
-
+                // 如果这个寄存器失效了,把它加入待simplify列表中
                 self.push_to_tosimpilfy(&neighbor);
             }
             // 判断这个虚拟寄存器是否已经存在
-            // tocheck("判断是否要从 k_graph中移除");
+            // tocheck("判断是否要从 k_graph中移除"); 如果需要则从k-graph中移除加入到tocolor
             if self.is_k_graph_node(&neighbor) {
                 let num_available = self
                     .get_available(&neighbor)
                     .num_available_regs(neighbor.get_type());
-                let num_live_neigbhors = self.get_live_neighbors_bitmap(&neighbor).len();
+                let num_live_neigbhors = self.get_num_of_live_neighbors(reg);
                 if num_available >= num_live_neigbhors {
                     self.remove_from_k_graph(&neighbor);
+                    self.push_to_tocolor(reg);
                 }
             }
         }

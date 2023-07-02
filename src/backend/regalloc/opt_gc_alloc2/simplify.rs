@@ -34,13 +34,7 @@ impl Allocator {
 
         //简化成功,该实例可以使用颜色,则化简成功,否则化简失败(但是化简失败也可能让别的spill能够恢复可着色状态)
         // 首先获取其nnc,从颜色最少的节点开始尝试,判断是否周围的节点能够与其他的地方交换颜色从而化简
-        let nnc = self
-            .info
-            .as_mut()
-            .unwrap()
-            .nums_neighbor_color
-            .get(&reg)
-            .unwrap();
+        let nnc = self.get_num_neighbor_color(&reg);
         // 对nnc进行堆排序找到一个可以开始的节点,并对节点进行尝试
         let mut order: Vec<i32> = Vec::with_capacity(32);
         // 获取颜色排序
@@ -98,21 +92,16 @@ impl Allocator {
                         continue;
                     }
                     // 判断是否和周围存在寄存器可以交换颜色
+                    // 选中第一个可以交换颜色的寄存器
                     let mut neighbor_to_swap_to: Option<Reg> = None;
-                    for ntst in allocator
-                        .info
-                        .as_ref()
-                        .unwrap()
-                        .all_live_neighbors
-                        .get(&neighbor)
-                        .unwrap()
-                        .iter()
-                    {
+                    for ntst in allocator.get_live_neighbors(&neighbor) {
                         if !allocator.if_has_been_colored(ntst) {
                             continue;
                         }
-                        neighbor_to_swap_to = Some(*ntst);
-                        break;
+                        if allocator.if_swapable_for_color(ntst, &neighbor) {
+                            neighbor_to_swap_to = Some(*ntst);
+                            break;
+                        }
                     }
                     if let Some(neighbor_to_swap_to) = neighbor_to_swap_to {
                         // 如果可以交换颜色,获取交换颜色造成的代价
