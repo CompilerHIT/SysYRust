@@ -17,11 +17,11 @@ impl Allocator {
         // 试图拯救to_rescue中spill代价最大的节点
         // 试图simplify来拯救当前节点
         let item = self.info.as_mut().unwrap().to_simplify.pop_max().unwrap();
-        self.push_to_tospill(&item.reg);
-        // TODO ,如果化简成功
+        // // TODO ,如果化简成功
         // if self.simpilfy_one(item.reg) {
         //     return ActionResult::Success;
         // }
+        self.push_to_tospill(&item.reg);
         return ActionResult::Fail;
     }
     #[inline]

@@ -3,8 +3,13 @@ mod test {
     use std::collections::{HashMap, HashSet, VecDeque};
 
     use biheap::BiHeap;
+    #[test]
+    fn test_get_ltzero() {
+        let m: Vec<i32> = Vec::new();
+        let g = m.get(0 - 1);
+    }
 
-    
+    #[test]
     fn test_clone() {
         let mut m = HashMap::new();
         m.insert(1, 3);

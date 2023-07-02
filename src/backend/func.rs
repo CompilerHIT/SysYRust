@@ -439,8 +439,10 @@ impl Func {
 
         log_file!(
             "calout.txt",
-            "{:?},\n{:?}",
+            "dstr,num:{} :{:?},\nspillings,num:{}:{:?}",
+            alloc_stat.dstr.len(),
             alloc_stat.dstr,
+            alloc_stat.spillings.len(),
             alloc_stat.spillings
         );
         let check_alloc_path = "check_alloc.txt";

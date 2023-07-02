@@ -49,9 +49,9 @@ impl Allocator {
     ///
     #[inline]
     pub fn color_one(&mut self, reg: &Reg) -> bool {
-        // let color = self.choose_color(reg);
+        let color = self.choose_color(reg);
         //TODO CHECK
-        let color = self.get_available(reg).get_available_reg(reg.get_type());
+        // let color = self.get_available(reg).get_available_reg(reg.get_type());
         if color.is_none() {
             return false;
         }
@@ -74,6 +74,9 @@ impl Allocator {
         // 比如,获取周围的周围的颜色,按照它们的周围的颜色的数量进行排序
         // 找到color所在的地方
         let available = self.get_available(reg).get_rest_regs_for(reg.get_type());
+        if available.len() == 0 {
+            return None;
+        }
         let mut colors_weights = HashMap::new();
         for color in available.iter() {
             colors_weights.insert(*color, 0);
@@ -114,7 +117,7 @@ impl Allocator {
         let sort = crate::backend::regalloc::utils::sort;
         let mut order = Vec::new();
         sort(&colors_weights, &mut order);
-        match order.get(0) {
+        match order.get(order.len() - 1) {
             None => None,
             Some(color) => Some(*color),
         }
@@ -180,9 +183,7 @@ impl Allocator {
         }
         info.colors.insert(reg.get_id(), color);
         let mut num = info.all_live_neighbors.get(reg).unwrap().len();
-        if reg.get_id() == 187 {
-            let b = 3;
-        }
+
         while num > 0 {
             num -= 1;
             let neighbor = self.get_mut_live_neighbors(reg).pop_front().unwrap();
