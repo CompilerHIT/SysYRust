@@ -3,6 +3,7 @@ pub mod context;
 pub mod error;
 pub mod irgen;
 pub mod kit;
+pub mod preprocess;
 pub mod typesearch;
 use crate::{ir::basicblock::BasicBlock, utility::ObjPtr};
 

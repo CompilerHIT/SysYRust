@@ -1,4 +1,5 @@
 use lalrpop_util::lalrpop_mod;
+use sysylib::frontend::preprocess::preprocess;
 extern crate biheap;
 // extern crate hexf_parse;
 // extern crate libm;
@@ -55,8 +56,10 @@ fn run_main() {
 
     let mut pool_inst: ObjPool<Inst> = ObjPool::new();
 
+    let file_preprocessed = preprocess(file.as_str());
+
     let mut compunit = SysYRust::CompUnitParser::new()
-        .parse(file.as_str())
+        .parse(file_preprocessed.as_str())
         .unwrap();
 
     irgen(
