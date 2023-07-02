@@ -8,7 +8,7 @@ use crate::{
     utility::ObjPtr,
 };
 
-use super::{LoopList, LoopTree};
+use super::{LoopInfo, LoopList};
 
 /// 循环的识别
 /// # Params
@@ -53,8 +53,8 @@ fn recognize_one_loop(
     loop_list: &mut LoopList,
     header: ObjPtr<BasicBlock>,
     latchs: Vec<ObjPtr<BasicBlock>>,
-) -> ObjPtr<LoopTree> {
-    let mut tree = loop_list.pool.put(LoopTree::new(header));
+) -> ObjPtr<LoopInfo> {
+    let mut tree = loop_list.pool.put(LoopInfo::new(header));
     tree.blocks.push(header);
     let mut visited = HashSet::new();
     // 将header加入visited
@@ -91,7 +91,6 @@ fn recognize_one_loop(
                     .iter_mut()
                     .find(|loop_tree| loop_tree.blocks.contains(&bb))
                     .unwrap();
-                debug_assert_eq!(sub_loop.parent, None, "loop tree parent should be none");
                 sub_loop.parent = Some(tree.clone());
                 tree.sub_loops.push(sub_loop.clone());
             } else {

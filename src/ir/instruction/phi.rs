@@ -10,6 +10,15 @@ impl ObjPool<Inst> {
     pub fn make_float_phi(&mut self) -> ObjPtr<Inst> {
         self.put(Inst::new(IrType::Float, InstKind::Phi, vec![]))
     }
+
+    /// 创建指定类型的phi指令
+    pub fn make_phi_with_operands(
+        &mut self,
+        irtype: IrType,
+        operands: Vec<ObjPtr<Inst>>,
+    ) -> ObjPtr<Inst> {
+        self.put(Inst::new(irtype, InstKind::Phi, operands))
+    }
 }
 impl Inst {
     /// 向phi指令中添加一个操作数

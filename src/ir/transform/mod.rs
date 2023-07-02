@@ -1,11 +1,12 @@
-use super::tools::*;
 use super::{basicblock::BasicBlock, instruction::Inst, module::Module};
+use super::{dump_now, tools::*};
 use crate::ir::transform::constant_folding::constant_folding;
 use crate::utility::ObjPool;
 
 mod constant_folding;
 mod dead_code_eliminate;
 mod func_inline;
+mod loop_operation;
 mod phi_optimizer;
 mod simplify_cfg;
 
@@ -31,6 +32,10 @@ pub fn optimizer_run(
 
         // phi优化
         phi_optimizer::phi_run(module);
+
+        // 循环优化
+        loop_operation::loop_optimize(module, &mut pools);
+
         // TODO: 性能优化
     }
 }

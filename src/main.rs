@@ -28,7 +28,7 @@ fn run_main() {
         .arg(Arg::with_name("filename").required(true))
         .arg(Arg::with_name("S").short("S"))
         .arg(Arg::with_name("o").short("o").takes_value(true))
-        .arg(Arg::with_name("O1").long("O1"))
+        .arg(Arg::with_name("O1").short("O").takes_value(true))
         .get_matches();
 
     // 获取文件名

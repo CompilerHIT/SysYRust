@@ -174,7 +174,7 @@ impl BasicBlock {
     /// 删除前继BB
     /// # Arguments
     /// * `bb` - 被删除的BB
-    fn remove_up_bb(&mut self, bb: ObjPtr<BasicBlock>) {
+    pub fn remove_up_bb(&mut self, bb: ObjPtr<BasicBlock>) {
         let index = self.get_up_bb().iter().position(|x| *x == bb).unwrap();
         self.up_bb.remove(index);
 
