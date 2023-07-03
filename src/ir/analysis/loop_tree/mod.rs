@@ -97,7 +97,9 @@ impl LoopInfo {
     pub fn set_pre_header(&mut self, pre_header: ObjPtr<BasicBlock>) {
         debug_assert_eq!(self.pre_header, None);
         self.pre_header = Some(pre_header);
-        self.blocks.push(pre_header);
+        if let Some(mut parent) = self.parent {
+            parent.blocks.push(pre_header);
+        }
     }
 
     /// 获得循环头
