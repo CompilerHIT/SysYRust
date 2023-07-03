@@ -85,12 +85,18 @@ impl BackendPass {
 
                             let prevs = block.get_prev();
                             prevs.iter().for_each(|prev| {
-                                let last_two_tail = prev.get_last_not_tail_inst();
+                                if prev.insts.len() == 0 {
+                                    replace_first_block(block.clone(), func.clone());
+                                    return;
+                                }
                                 let prev_tail = prev.get_tail_inst();
                                 if *prev_tail.get_label() == Operand::Addr(block.label.clone()) {
                                     prev_tail.as_mut().replace_label(after_label.clone());
                                 } else {
-                                    last_two_tail.as_mut().replace_label(after_label.clone());
+                                    if prev.insts.len() > 1 {
+                                        let last_two_tail = prev.get_last_not_tail_inst();
+                                        last_two_tail.as_mut().replace_label(after_label.clone());
+                                    }
                                 }
                                 prev.as_mut().out_edge = vec![block.get_after()[0].clone()];
                             });
@@ -111,6 +117,9 @@ impl BackendPass {
                 func.blocks.iter().for_each(|block| {
                     if block.insts.len() > 0 {
                         exsit_blocks.push(block.clone());
+                    } else {
+                        block.as_mut().in_edge.clear();
+                        block.as_mut().out_edge.clear();
                     }
                 });
                 func.as_mut().blocks = exsit_blocks.clone();
@@ -151,4 +160,22 @@ fn adjust_after_in(block: ObjPtr<BB>, prevs: Vec<ObjPtr<BB>>, clear_label: &Stri
         .collect();
     final_prevs.append(&mut prevs.clone());
     block.as_mut().in_edge = final_prevs;
+}
+
+fn replace_first_block(block: ObjPtr<BB>, func: ObjPtr<Func>) {
+    assert!(block.get_after().len() == 1);
+    let after = block.get_after()[0].clone();
+    let mut index = 0;
+    loop {
+        if index >= func.blocks.len() {
+            unreachable!("can't find after");
+        }
+        if func.blocks[index].label == after.label {
+            break;
+        }
+        index +=1;
+    }
+    func.as_mut().blocks.remove(index);
+    func.as_mut().blocks.remove(0);
+    func.as_mut().blocks.insert(0, after.clone());
 }
