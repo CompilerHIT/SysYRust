@@ -17,7 +17,11 @@ impl ObjPool<Inst> {
         irtype: IrType,
         operands: Vec<ObjPtr<Inst>>,
     ) -> ObjPtr<Inst> {
-        self.put(Inst::new(irtype, InstKind::Phi, operands))
+        let inst = self.put(Inst::new(irtype, InstKind::Phi, operands));
+        for op in inst.get_operands() {
+            op.as_mut().add_user(inst.as_ref());
+        }
+        inst
     }
 }
 impl Inst {
