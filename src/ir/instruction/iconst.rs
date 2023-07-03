@@ -89,7 +89,7 @@ impl Inst {
             InstKind::GlobalInt(_)
             | InstKind::GlobalFloat(_)
             | InstKind::GlobalConstInt(_)
-            | InstKind::GlobalConstInt(_) => true,
+            | InstKind::GlobalConstFloat(_) => true,
             InstKind::Alloca(_) => {
                 if let (None, None) = (self.list.prev, self.list.next) {
                     true
