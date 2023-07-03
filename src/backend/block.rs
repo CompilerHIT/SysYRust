@@ -2059,7 +2059,7 @@ impl BB {
                 0,
                 pool.put_inst(LIRInst::new(
                     InstrsType::OpReg(SingleOp::LoadAddr),
-                    vec![Operand::Reg(tmp), Operand::Addr(String::from("_exp_32"))],
+                    vec![Operand::Reg(tmp), Operand::Addr(String::from(".LC_exp_32"))],
                 )),
             );
         }
@@ -2091,7 +2091,7 @@ impl BB {
         func: ObjPtr<Func>,
         args: &Vec<i32>,
     ) {
-        let name = String::from("_exp_32");
+        let name = String::from(".LC_exp_32");
         let array = IntArray::new(name.clone(), args.len() as i32, true, args.clone());
         func.as_mut().const_array.insert(array);
     }
