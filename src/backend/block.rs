@@ -183,12 +183,12 @@ impl BB {
                             lhs_reg = self.resolve_operand(func, lhs, true, map_info, pool);
                             match rhs.as_ref().get_kind() {
                                 InstKind::ConstInt(imm) => {
-                                    // self.resolve_opt_div(dst_reg, lhs_reg, imm, pool)
-                                    rhs_reg = self.resolve_operand(func, rhs, true, map_info, pool);
-                                    self.insts.push(pool.put_inst(LIRInst::new(
-                                        InstrsType::Binary(BinaryOp::Div),
-                                        vec![dst_reg, lhs_reg, rhs_reg],
-                                    )));
+                                    self.resolve_opt_div(dst_reg, lhs_reg, imm, pool)
+                                    // rhs_reg = self.resolve_operand(func, rhs, true, map_info, pool);
+                                    // self.insts.push(pool.put_inst(LIRInst::new(
+                                    //     InstrsType::Binary(BinaryOp::Div),
+                                    //     vec![dst_reg, lhs_reg, rhs_reg],
+                                    // )));
                                 }
                                 _ => {
                                     rhs_reg = self.resolve_operand(func, rhs, true, map_info, pool);
@@ -2303,8 +2303,9 @@ impl BB {
                             break;
                         }
                     }
-
-                    let mut magic = (q2 + 1) as i32;
+                    log!("{q2}");
+                    let mut magic = (q2 + 1) as i64;
+                    log!("{magic}");
                     if is_neg {
                         magic = -magic;
                     }
@@ -2313,7 +2314,7 @@ impl BB {
                     // load magic number M
                     self.insts.push(pool.put_inst(LIRInst::new(
                         InstrsType::OpReg(SingleOp::Li),
-                        vec![tmp.clone(), Operand::IImm(IImm::new(magic))],
+                        vec![tmp.clone(), Operand::Addr(magic.to_string())],
                     )));
                     // q = floor(M * an / 2^32)
                     let mut inst = LIRInst::new(
