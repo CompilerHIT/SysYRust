@@ -17,7 +17,7 @@ pub fn optimizer_run(
 ) {
     // 在功能点上对phi指令进行优化
     functional_optimizer(module);
-    constant_folding(module, &mut pools);
+    constant_folding(module, &mut pools,false);
     dead_code_eliminate::dead_code_eliminate(module, true);
 
     if optimize_flag {
