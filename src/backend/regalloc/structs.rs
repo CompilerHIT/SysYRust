@@ -80,6 +80,7 @@ impl RegUsedStat {
     pub fn is_available_freg(&self, freg: i32) -> bool {
         let freg = freg - 32;
         let mut unusable: HashSet<i32> = HashSet::from([18, 19, 20]);
+        // unusable.extend(0..20);
         if unusable.contains(&freg) {
             return false;
         }
