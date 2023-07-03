@@ -4,7 +4,7 @@ impl BackendPass {
     pub fn block_pass(&mut self, pool: &mut BackendPool) {
         self.clear_one_jump();
         self.fuse_imm_br(pool);
-        self.fuse_basic_block(pool);
+        self.fuse_basic_block();
         self.clear_empty_block();
     }
 
@@ -19,7 +19,6 @@ impl BackendPass {
                         imm_br.push(block.clone());
                     }
                 });
-
                 imm_br.iter().for_each(|block| {
                     let prev = block.get_prev()[0];
                     let after = block.get_after()[0];
@@ -30,15 +29,19 @@ impl BackendPass {
                         InstrsType::Jump,
                         vec![Operand::Addr(after.label.clone())],
                     ));
+                    log!("prev {}, {:?}", prev.label, br);
                     prev.as_mut().push_back(br);
+                    log!("prev {}, {:?}", prev.label, prev.as_ref().insts);
                     prev.as_mut().out_edge = vec![after.clone()];
-                    after.as_mut().in_edge = vec![prev.clone()];
+                    adjust_after_in(after, block.get_prev().clone(), &block.label);
+                    block.as_mut().in_edge.clear();
+                    block.as_mut().out_edge.clear();
                 })
             }
         });
     }
 
-    fn fuse_basic_block(&mut self, pool: &mut BackendPool) {
+    fn fuse_basic_block(&mut self) {
         self.module.func_map.iter().for_each(|(_, func)| {
             if !func.is_extern {
                 let mut useless_blocks: Vec<ObjPtr<BB>> = vec![];
@@ -58,8 +61,10 @@ impl BackendPass {
                     prev.as_mut().push_back_list(&mut block.as_mut().insts);
                     prev.as_mut().out_edge = block.get_after().clone();
                     block.get_after().iter().for_each(|after| {
-                        after.as_mut().in_edge = vec![prev.clone()];
-                    })
+                        adjust_after_in(after.clone(), block.get_prev().clone(), &block.label);
+                    });
+                    block.as_mut().in_edge.clear();
+                    block.as_mut().out_edge.clear();
                 })
             }
         })
@@ -73,16 +78,11 @@ impl BackendPass {
                         let tail = block.get_tail_inst();
                         if tail.get_type() == InstrsType::Jump {
                             block.as_mut().insts.clear();
-                            let after_label = block.get_after()[0].label.clone();
-                            let mut final_prevs: Vec<ObjPtr<BB>> = block.get_after()[0]
-                                .as_mut()
-                                .in_edge
-                                .clone()
-                                .into_iter()
-                                .filter(|b| b.label != block.label.clone())
-                                .collect();
-                            final_prevs.append(&mut block.get_prev().clone());
-                            block.get_after()[0].as_mut().in_edge = final_prevs;
+                            let next = block.get_after()[0].clone();
+                            let after_label = next.label.clone();
+
+                            adjust_after_in(next, block.get_prev().clone(), &block.label);
+
                             let prevs = block.get_prev();
                             prevs.iter().for_each(|prev| {
                                 let last_two_tail = prev.get_last_not_tail_inst();
@@ -93,7 +93,10 @@ impl BackendPass {
                                     last_two_tail.as_mut().replace_label(after_label.clone());
                                 }
                                 prev.as_mut().out_edge = vec![block.get_after()[0].clone()];
-                            })
+                            });
+
+                            block.as_mut().in_edge.clear();
+                            block.as_mut().out_edge.clear();
                         }
                     }
                 })
@@ -136,4 +139,16 @@ fn is_jump(block: ObjPtr<BB>) -> bool {
         }
     }
     false
+}
+
+fn adjust_after_in(block: ObjPtr<BB>, prevs: Vec<ObjPtr<BB>>, clear_label: &String) {
+    let mut final_prevs: Vec<ObjPtr<BB>> = block
+        .as_mut()
+        .in_edge
+        .clone()
+        .into_iter()
+        .filter(|b| b.label != *clear_label)
+        .collect();
+    final_prevs.append(&mut prevs.clone());
+    block.as_mut().in_edge = final_prevs;
 }
