@@ -75,24 +75,27 @@ impl GenerateAsm for LIRInst {
             InstrsType::OpReg(op) => {
                 let mut op = match op {
                     SingleOp::Li => "li",
-                    SingleOp::IMv => "mv",
-                    SingleOp::FMv => "fmv.s",
-                    SingleOp::INeg => "neg",
-                    SingleOp::FNeg => "fneg.s",
+                    SingleOp::Mv => "mv",
+                    SingleOp::Neg => "neg",
                     SingleOp::I2F => "fcvt.s.w",
                     SingleOp::F2I => "fcvt.w.s",
                     SingleOp::LoadAddr => "la",
-                    SingleOp::Abs => "abs",
                     SingleOp::Seqz => "seqz",
                     SingleOp::Snez => "snez",
                     SingleOp::LoadFImm => "fmv.w.x",
                 };
+                let mut is_float = false;
                 let dst = match self.get_dst() {
                     Operand::Reg(reg) => reg.to_string(row),
                     _ => panic!("dst of single op must be reg, to improve"),
                 };
                 let src = match self.get_lhs() {
-                    Operand::Reg(reg) => reg.to_string(row),
+                    Operand::Reg(reg) => {
+                        if reg.get_type() == ScalarType::Float {
+                            is_float = true;
+                        }
+                        reg.to_string(row)
+                    },
                     Operand::IImm(iimm) => {
                         if is_imm_12bs(iimm.get_data()) && op == "li" {
                             op = "addiw";
@@ -102,9 +105,9 @@ impl GenerateAsm for LIRInst {
                     Operand::FImm(fimm) => fimm.to_string(),
                     Operand::Addr(addr) => addr.to_string(),
                 };
-                if dst == src && (op == "mv" || op == "fmv.s") {
-                    // TODO, 注释掉以检查reg merge的效果
-                    return Ok(());
+                let fop = &format!("f{}.s", op);
+                if is_float && (op == "mv" || op == "neg") {
+                    op = fop
                 }
                 builder.op1(op, &dst, &src)?;
                 Ok(())

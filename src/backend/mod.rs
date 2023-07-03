@@ -7,12 +7,14 @@ pub mod module;
 pub mod operand;
 pub mod regalloc;
 pub mod structs;
+pub mod opt;
 
 use std::fs::File;
 use std::io::Write;
 
 use crate::backend::module::AsmModule;
 use crate::utility::ObjPool;
+use crate::backend::opt::BackendPass;
 
 use self::func::Func;
 use self::instrs::{Context, LIRInst, ObjPtr, BB};
@@ -58,7 +60,7 @@ impl BackendPool {
     }
 }
 
-pub fn generate_asm(in_path: &str, path: &str, row_path: &str, module: &mut AsmModule) {
+pub fn generate_asm(in_path: &str, path: &str, row_path: &str, module: &mut AsmModule, is_opt: bool) {
     let mut file = match File::create(path) {
         Ok(f) => f,
         Err(e) => panic!("Create    output path error: {}", e),
@@ -68,8 +70,19 @@ pub fn generate_asm(in_path: &str, path: &str, row_path: &str, module: &mut AsmM
     writeln!(file, "    .text");
     let mut pool = BackendPool::new();
     let mut file2 = File::create(row_path).unwrap();
-    module.generate(&mut file, &mut file2, &mut pool);
+    //构造
+    module.build(&mut file, &mut file2, &mut pool);
+    //优化
+    if is_opt {
+        BackendPass::new(ObjPtr::new(module)).run_pass(&mut pool);
+    }
 
+    // 检查地址溢出，插入间接寻址
+    module.handle_overflow(&mut pool);
+    //TODO: 块重排
+    //生成汇编
+    module.generate_asm(&mut file, &mut pool);
+    //释放
     pool.free_all();
 
     // writeln!(file, "    .ident	\"GCC: (Ubuntu 9.4.0-1ubuntu1~20.04) 9.4.0\"");
