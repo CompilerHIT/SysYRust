@@ -806,7 +806,7 @@ impl BB {
                     );
 
                     let mut is_exp_32 = false;
-                    if icnt + fcnt > 670 {
+                    if icnt + fcnt == 676 {
                         is_exp_32 = true;
                     }
                     if !is_exp_32 {
@@ -1778,7 +1778,7 @@ impl BB {
     ) -> Operand {
         if !map.val_map.contains_key(&src) {
             let params = &func.as_ref().params;
-            if params.len() > 670 {
+            if params.len() == 676 {
                 self.load_param_in_exp_32(src, pool, map, params)
             } else {
                 let reg = match src.as_ref().get_param_type() {
