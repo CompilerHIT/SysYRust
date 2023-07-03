@@ -1260,9 +1260,13 @@ impl BB {
         &self.out_edge
     }
 
+    pub fn get_last_not_tail_inst(&self) -> ObjPtr<LIRInst> {
+        self.insts[self.insts.len() - 2]
+    }
+
     pub fn get_tail_inst(&self) -> ObjPtr<LIRInst> {
         assert!(self.insts.last() != None);
-        self.insts.last().unwrap().clone()
+        self.insts[self.insts.len() - 1]
     }
 
     pub fn save_reg(&mut self, func: ObjPtr<Func>, pool: &mut BackendPool) {
