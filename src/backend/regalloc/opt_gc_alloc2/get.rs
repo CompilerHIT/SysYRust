@@ -63,8 +63,8 @@ impl Allocator {
     }
 
     #[inline]
-    pub fn get_available(&self, reg: &Reg) -> RegUsedStat {
-        *self.info.as_ref().unwrap().availables.get(reg).unwrap()
+    pub fn get_available(&self, reg: &Reg) -> &RegUsedStat {
+        self.info.as_ref().unwrap().availables.get(reg).unwrap()
     }
     #[inline]
     pub fn get_mut_available(&mut self, reg: &Reg) -> &mut RegUsedStat {
@@ -146,6 +146,9 @@ impl Allocator {
 
 /// 获取自身多种寄存器集合
 impl Allocator {
+    pub fn get_tocolor(&self) -> &BiHeap<OperItem> {
+        &self.info.as_ref().unwrap().to_color
+    }
     pub fn get_mut_tocolor(&mut self) -> &mut BiHeap<OperItem> {
         &mut self.info.as_mut().unwrap().to_color
     }
@@ -154,5 +157,15 @@ impl Allocator {
     }
     pub fn get_mut_tospill(&mut self) -> &mut BiHeap<OperItem> {
         &mut self.info.as_mut().unwrap().to_spill
+    }
+}
+
+///last colors相关处理
+impl Allocator {
+    pub fn get_mut_last_colors_lst(&mut self) -> &mut LinkedList<Reg> {
+        &mut self.info.as_mut().unwrap().last_colors_lst
+    }
+    pub fn get_last_colors_lst(&self) -> &LinkedList<Reg> {
+        &self.info.as_ref().unwrap().last_colors_lst
     }
 }

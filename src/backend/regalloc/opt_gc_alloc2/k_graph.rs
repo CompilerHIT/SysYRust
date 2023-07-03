@@ -1,18 +1,15 @@
 use super::*;
 
 impl Allocator {
+    /// 该函数应该且只应该在活跃虚拟寄存器着色完后调用一次
     #[inline]
     pub fn color_last(&mut self) {
         // 着色最后的节点
-        let last_colors = &self.info.as_ref().unwrap().last_colors;
-        let mut tocolors = Vec::with_capacity(last_colors.len());
-        for reg in last_colors {
-            tocolors.push(*reg);
-        }
-        for reg in tocolors {
-            let available = self.draw_available(&reg);
-            let color = available.get_available_reg(reg.get_type()).unwrap();
-            self.get_mut_colors().insert(reg.get_id(), color);
+        while self.get_last_colors_lst().len() != 0 {
+            let last_reg = self.get_mut_last_colors_lst().pop_back().unwrap();
+            let available = self.draw_available(&last_reg);
+            let color = available.get_available_reg(last_reg.get_type()).unwrap();
+            self.get_mut_colors().insert(last_reg.get_id(), color);
         }
     }
 

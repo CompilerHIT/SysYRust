@@ -41,8 +41,10 @@ pub struct AllocatorInfo {
     pub to_spill: BiHeap<OperItem>,          //待spill寄存器
     pub to_color: BiHeap<OperItem>,          //待着色寄存器
     pub colored: BiHeap<OperItem>,           //已着色寄存器
-    pub last_colors: HashSet<Reg>,           //真正的弦点,永恒悬点
-    pub spill_cost: HashMap<Reg, f32>,       //节点溢出代价 (用来启发寻找溢出代价最小的节点溢出)
+    pub last_colors: Bitmap,                 //真正的弦点,永恒悬点的集合
+    /// 悬点集合,按照加入顺序组织,反序着色，先入后出,使用push_back加入，着色时使用pop back取出
+    pub last_colors_lst: LinkedList<Reg>,
+    pub spill_cost: HashMap<Reg, f32>, //节点溢出代价 (用来启发寻找溢出代价最小的节点溢出)
     pub all_neighbors: HashMap<Reg, LinkedList<Reg>>, //所有邻居,在恢复节点的时候考虑,该表初始化后就不改变
     pub all_live_neighbors: HashMap<Reg, LinkedList<Reg>>, //还活着的邻居,在着色的时候动态考虑
     pub all_live_neigbhors_bitmap: HashMap<Reg, Bitmap>, //记录还活着的邻居 TODO,

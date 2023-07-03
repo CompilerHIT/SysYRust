@@ -62,7 +62,8 @@ impl Allocator {
 
     // 给某个虚拟寄存器挑选可以用来作色的颜色
     #[inline]
-    pub fn choose_color(&mut self, reg: &Reg) -> Option<i32> {
+    pub fn choose_color(&self, reg: &Reg) -> Option<i32> {
+        //TODO 测试随机取颜色好还是顺序取颜色好
         //TOCHECK
         // return match self.get_available(reg).get_available_reg(reg.get_type()) {
         //     None => None,
@@ -134,8 +135,8 @@ impl Allocator {
         let color = *self.get_color(reg).unwrap();
         self.get_mut_colors().remove(&reg.get_id());
         let mut out = false;
-        let mut to_despill = LinkedList::new(); //暂存decolor过程中发现的能够拯救回来的寄存器
-                                                // todo
+        // let mut to_despill = LinkedList::new(); //暂存decolor过程中发现的能够拯救回来的寄存器
+        // todo
         let mut num_live_neighbors = self.get_live_neighbors(reg).len();
         while num_live_neighbors > 0 {
             num_live_neighbors -= 1;
@@ -152,20 +153,32 @@ impl Allocator {
             let new_num = nums_neighbor_color.get(&color).unwrap_or(&0) - 1;
             nums_neighbor_color.insert(color, new_num);
             if new_num == 0 {
-                // self.in
+                if neighbor.get_id() == 71 {
+                    log_file!(
+                        "tmp5.txt",
+                        "release:reg:{},neighbor:{},color:{},neighboravail:{}",
+                        reg,
+                        neighbor,
+                        color,
+                        self.get_available(&neighbor)
+                    );
+                }
                 self.get_mut_available(&neighbor).release_reg(color);
-                if self.if_has_been_spilled(&neighbor) {
-                    out = true;
-                    to_despill.push_back(neighbor);
+                if neighbor.get_id() == 71 {
+                    log_file!(
+                        "tmp5.txt",
+                        "neighboravail:{}\n\n",
+                        self.get_available(&neighbor)
+                    );
                 }
             } else if new_num < 0 {
                 panic!("gg{},{}", reg, neighbor);
             }
         }
-        while !to_despill.is_empty() {
-            let to_despill_one = to_despill.pop_front().unwrap();
-            self.despill_one(&to_despill_one);
-        }
+        // while !to_despill.is_empty() {
+        //     let to_despill_one = to_despill.pop_front().unwrap();
+        //     self.despill_one(&to_despill_one);
+        // }
         out
     }
 

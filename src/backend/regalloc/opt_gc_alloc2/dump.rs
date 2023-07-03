@@ -61,8 +61,9 @@ impl Allocator {
         let p = "opt2.txt";
         log_file!(
             p,
-            "last_colors:\n{:?}",
-            self.info.as_ref().unwrap().last_colors
+            "last_colors,({}):\n{:?}",
+            self.get_last_colors_lst().len(),
+            self.info.as_ref().unwrap().last_colors_lst
         );
     }
 
@@ -75,7 +76,7 @@ impl Allocator {
             .all_neighbors
             .iter()
             .for_each(|(reg, neighbors)| {
-                log_file_uln!(intereref_path, "node {reg}\n{{");
+                log_file_uln!(intereref_path, "node {reg}\n num:{}{{", neighbors.len());
                 neighbors
                     .iter()
                     .for_each(|neighbor| log_file_uln!(intereref_path, "({},{})", reg, neighbor));
@@ -83,16 +84,16 @@ impl Allocator {
             });
     }
 
-    pub fn dump_live_neighbors(&self) {
-        let intereref_path = "opt2.txt";
-        log_file!(intereref_path, "all neighbors:");
+    pub fn dump_live_neighbors(&self, func: String) {
+        let intereref_path = "opt2_live_graph.txt";
+        log_file!(intereref_path, "func:{}:\nlive neighbors:", func);
         self.info
             .as_ref()
             .unwrap()
             .all_live_neighbors
             .iter()
             .for_each(|(reg, neighbors)| {
-                log_file_uln!(intereref_path, "node {reg}\n{{");
+                log_file_uln!(intereref_path, "node {reg}\tnum:{}\n{{", neighbors.len());
                 neighbors
                     .iter()
                     .for_each(|neighbor| log_file_uln!(intereref_path, "({},{})", reg, neighbor));
@@ -102,7 +103,7 @@ impl Allocator {
     // dump to colors
     pub fn dump_tocolor(&self) {
         let p = "opt2.txt";
-        log_file!(p, "to colors:");
+        log_file!(p, "to colors ({}):", self.get_tocolor().len());
         for item in self.info.as_ref().unwrap().to_color.iter() {
             log_file!(p, "{},", item.reg);
         }

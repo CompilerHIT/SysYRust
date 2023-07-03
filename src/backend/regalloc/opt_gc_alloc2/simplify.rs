@@ -1,7 +1,10 @@
+use crate::log;
+
 use super::*;
 impl Allocator {
     #[inline]
     pub fn push_to_tosimpilfy(&mut self, reg: &Reg) {
+        self.dump_action("tosimplify", reg);
         // 把一个节点加入待着色列表中
         let item = self.draw_spill_div_nln_item(reg);
         self.info.as_mut().unwrap().to_simplify.push(item);
@@ -18,10 +21,9 @@ impl Allocator {
         // 试图simplify来拯救当前节点
         let item = self.info.as_mut().unwrap().to_simplify.pop_max().unwrap();
         // // TODO ,如果化简成功
-        // if self.simpilfy_one(item.reg) {
-        //     return ActionResult::Success;
-        // }
-        self.push_to_tospill(&item.reg);
+        if self.simpilfy_one(item.reg) {
+            return ActionResult::Success;
+        }
         return ActionResult::Fail;
     }
     #[inline]
@@ -43,81 +45,111 @@ impl Allocator {
         sort(nnc, &mut order); //按照颜色在邻居节点出现数量数量从小到大升序排序
         let tmp_regusestat = RegUsedStat::init_for_reg(reg.get_type());
         // 判断是否能够化简成功,如果能够化简成功,返回交换队列以及产生的代价,以及是否能够成功 (如果化简失败回回退自己的化简操作)
-        let try_simplify =
-            |allocator: &mut Allocator, color: i32, reg: &Reg| -> (Vec<(Reg, Reg)>, f32, bool) {
-                // 模拟simplify过程,如果模拟成功了,则进行spimlify
-                // 遍历所有邻居,找到所有颜色为color的节点,然后判断是否它与附近的颜色有可以交换的
-                // 如果可以,则进行交换,并记录在交换表中,
-                // 一直交换下去直到交换完成,返回是否交换成功
-                let mut num_live_neigbhors = allocator
-                    .info
-                    .as_ref()
-                    .unwrap()
-                    .all_live_neighbors
-                    .get(reg)
-                    .unwrap()
-                    .len();
-                let mut simpilfy_cost: f32 = 0.0;
-                let mut swap_list: Vec<(Reg, Reg)> = Vec::new();
-                while num_live_neigbhors > 0 {
-                    num_live_neigbhors -= 1;
-                    let neighbor = allocator
-                        .info
-                        .as_mut()
-                        .unwrap()
-                        .all_live_neighbors
-                        .get_mut(reg)
-                        .unwrap()
-                        .pop_front()
-                        .unwrap();
-                    let neighbor_bitmap = allocator
-                        .info
-                        .as_ref()
-                        .unwrap()
-                        .all_live_neigbhors_bitmap
-                        .get(reg)
-                        .unwrap();
-                    if !neighbor_bitmap.contains(neighbor.bit_code() as usize) {
+        let try_simplify = |allocator: &mut Allocator,
+                            color: i32,
+                            times_to_remove: i32,
+                            reg: &Reg|
+         -> (Vec<(Reg, Reg)>, f32, bool) {
+            // 模拟simplify过程,如果模拟成功了,则进行spimlify
+            // 遍历所有邻居,找到所有颜色为color的节点,然后判断是否它与附近的颜色有可以交换的
+            // 如果可以,则进行交换,并记录在交换表中,
+            // 一直交换下去直到交换完成,返回是否交换成功
+            let mut num_live_neigbhors = allocator.get_live_neighbors(reg).len();
+            let mut simpilfy_cost: f32 = 0.0;
+            let mut remove_num_neibor_this_color = 0; //移除的周围的该颜色的数量
+            let mut swap_list: Vec<(Reg, Reg)> = Vec::new();
+
+            log!(
+                "num_live_neighbors:{},{:?}\n\n",
+                num_live_neigbhors,
+                allocator.get_live_neighbors(reg)
+            );
+
+            while num_live_neigbhors > 0 {
+                num_live_neigbhors -= 1;
+                let neighbor = allocator.get_mut_live_neighbors(reg).pop_front().unwrap();
+                if !allocator
+                    .get_live_neighbors_bitmap(reg)
+                    .contains(neighbor.bit_code() as usize)
+                {
+                    continue;
+                }
+                allocator.get_mut_live_neighbors(reg).push_back(neighbor);
+
+                //
+                if !allocator.if_has_been_colored(&neighbor) {
+                    continue;
+                }
+                let neighbor_color = *allocator.get_color(&neighbor).unwrap();
+                if neighbor_color != color {
+                    continue;
+                }
+                // 判断是否和周围存在寄存器可以交换颜色
+                // 选中第一个可以交换颜色的寄存器
+                let mut neighbor_to_swap_to: Option<Reg> = None;
+                for neighbor_to_neighbor in allocator.get_live_neighbors(&neighbor) {
+                    if !allocator.if_has_been_colored(neighbor_to_neighbor) {
                         continue;
                     }
-                    allocator
-                        .info
-                        .as_mut()
-                        .unwrap()
-                        .all_live_neighbors
-                        .get_mut(reg)
-                        .unwrap()
-                        .push_back(neighbor);
-                    //
-                    if !allocator.if_has_been_colored(&neighbor) {
+                    if allocator
+                        .get_live_neighbors_bitmap(reg)
+                        .contains(neighbor_to_neighbor.bit_code() as usize)
+                    {
+                        // 如果nn和n都是reg地邻接点,则它们交换颜色不会减少reg身边的指定颜色color的数量
                         continue;
                     }
-                    // 判断是否和周围存在寄存器可以交换颜色
-                    // 选中第一个可以交换颜色的寄存器
-                    let mut neighbor_to_swap_to: Option<Reg> = None;
-                    for ntst in allocator.get_live_neighbors(&neighbor) {
-                        if !allocator.if_has_been_colored(ntst) {
-                            continue;
-                        }
-                        if allocator.if_swapable_for_color(ntst, &neighbor) {
-                            neighbor_to_swap_to = Some(*ntst);
-                            break;
-                        }
-                    }
-                    if let Some(neighbor_to_swap_to) = neighbor_to_swap_to {
-                        // 如果可以交换颜色,获取交换颜色造成的代价
-                        simpilfy_cost += allocator.eval_swap(&neighbor, &neighbor_to_swap_to);
-                        allocator.swap_color(neighbor, neighbor_to_swap_to);
-                        swap_list.push((neighbor, neighbor_to_swap_to));
-                    } else {
-                        for (reg1, reg2) in swap_list.iter().rev() {
-                            allocator.swap_color(*reg1, *reg2);
-                        }
-                        return (swap_list, simpilfy_cost, false);
+                    if allocator.if_swapable_for_color(neighbor_to_neighbor, &neighbor) {
+                        neighbor_to_swap_to = Some(*neighbor_to_neighbor);
+                        break;
                     }
                 }
-                (swap_list, simpilfy_cost, true)
-            };
+                if let Some(neighbor_to_swap_to) = neighbor_to_swap_to {
+                    // 如果可以交换颜色,获取交换颜色造成的代价
+                    simpilfy_cost += allocator.eval_swap(&neighbor, &neighbor_to_swap_to);
+                    // if reg.get_id() == 71 {
+                    //     // println!("swap:{")
+                    //     println!(
+                    //         "{}\n{:?}",
+                    //         allocator.get_available(reg),
+                    //         allocator.get_num_neighbor_color(reg)
+                    //     );
+                    // }
+                    allocator.swap_color(neighbor, neighbor_to_swap_to);
+                    // if reg.get_id() == 71 {
+                    //     println!(
+                    //         "{}\n{:?}",
+                    //         allocator.get_available(reg),
+                    //         allocator.get_num_neighbor_color(reg)
+                    //     );
+                    // }
+
+                    swap_list.push((neighbor, neighbor_to_swap_to));
+                    remove_num_neibor_this_color += 1;
+                } else {
+                    for (reg1, reg2) in swap_list.iter().rev() {
+                        allocator.swap_color(*reg1, *reg2);
+                    }
+                    return (swap_list, simpilfy_cost, false);
+                }
+            }
+
+            if remove_num_neibor_this_color > times_to_remove {
+                // log!(
+                //     "num_live_neighbors:{},{:?}",
+                //     num_live_neigbhors,
+                //     allocator.get_live_neighbors(reg)
+                // );
+                unreachable!();
+            }
+            // 如果移除的数量少于原本数量,则交易失败
+            if remove_num_neibor_this_color != times_to_remove {
+                for (reg1, reg2) in swap_list.iter().rev() {
+                    allocator.swap_color(*reg1, *reg2);
+                }
+                return (swap_list, simpilfy_cost, false);
+            }
+            (swap_list, simpilfy_cost, true)
+        };
         // 指定预算下尝试化简,如果化简超过预算或者化简失败返回false (todo,替换try_simplify加速)
         // let try_simplify_with_budget =
         //     |allocator: &mut Allocator, color: i32, reg: &Reg, budget: i32| -> bool {
@@ -137,11 +169,12 @@ impl Allocator {
                 break;
             }
             let color = *order.get(i).unwrap();
+            let times_to_remove = *self.get_num_neighbor_color(&reg).get(&color).unwrap();
             // 判断这个颜色是否是合理的颜色
             if !tmp_regusestat.is_available_reg(color) {
                 continue;
             }
-            let (swap_list, simpilfy_cost, ok) = try_simplify(self, color, &reg);
+            let (swap_list, simpilfy_cost, ok) = try_simplify(self, color, times_to_remove, &reg);
             if !ok {
                 continue;
             } else if simpilfy_cost > spill_cost {
@@ -149,25 +182,18 @@ impl Allocator {
                 undo_simpilify(self, swap_list);
                 continue;
             } else {
-                //TOCHECK,化简成功,而且代价合适,把当前的寄存器加回tocolor
-                self.push_to_tocolor(&reg);
+                //TOCHECK,化简成功,而且代价合适,则着色当前寄存器
+                self.color_one(&reg);
                 return true;
             }
         }
-        // // todo,尝试所有能够腾出的颜色
-        // for color in order.iter() {
-        //     if try_simplify(*color, &reg) {
-        //         // 模拟成功,把当前节点作色
-        //         self.color_one_with_certain_color(&reg, *color);
-        //         return true;
-        //     }
-        // }
-
+        self.push_to_tospill(&reg);
         false
     }
 
     #[inline]
-    pub fn eval_swap(&mut self, reg1: &Reg, reg2: &Reg) -> f32 {
+    pub fn eval_swap(&self, reg1: &Reg, reg2: &Reg) -> f32 {
+        // TODO,检查这里的值
         //衡量交换的价值
         let color1 = *self.get_color(reg1).unwrap();
         let color2 = *self.get_color(reg2).unwrap();
@@ -259,6 +285,7 @@ impl Allocator {
 
     #[inline]
     pub fn swap_color(&mut self, reg1: Reg, reg2: Reg) {
+        self.dump_swap_color(&reg1, &reg2);
         let info = self.info.as_ref().unwrap();
         let color1 = *info.colors.get(&reg1.get_id()).unwrap();
         let color2 = *info.colors.get(&reg2.get_id()).unwrap();

@@ -32,6 +32,8 @@ impl Allocator {
             .contains(reg.bit_code() as usize)
     }
 
+    ///判断两个有色虚拟寄存器是否是可以交换颜色的
+    /// 如果它们两个颜色不一样而且交换后不造成冲突，则它们可以交换颜色
     #[inline]
     pub fn if_swapable_for_color(&self, reg1: &Reg, reg2: &Reg) -> bool {
         // 判断两个寄存器的颜色是否能够发生交换
@@ -41,6 +43,9 @@ impl Allocator {
         // 判断
         let color1 = *self.get_color(reg1).unwrap();
         let color2 = *self.get_color(reg2).unwrap();
+        if color1 == color2 {
+            return false;
+        }
         let nncs = &self.info.as_ref().unwrap().nums_neighbor_color;
         let color2_times_around_reg1 = nncs.get(reg1).unwrap().get(&color2).unwrap_or(&0);
         let color1_times_arount_reg2 = nncs.get(reg2).unwrap().get(&color1).unwrap_or(&0);
@@ -66,6 +71,10 @@ impl Allocator {
 
     #[inline]
     pub fn is_last_colored(&self, reg: &Reg) -> bool {
-        self.info.as_ref().unwrap().last_colors.contains(reg)
+        self.info
+            .as_ref()
+            .unwrap()
+            .last_colors
+            .contains(reg.bit_code() as usize)
     }
 }

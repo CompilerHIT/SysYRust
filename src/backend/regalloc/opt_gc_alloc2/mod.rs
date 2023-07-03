@@ -33,9 +33,8 @@ impl Regalloc for Allocator {
         // panic!("gg");
         log_file!("opt2.txt", "func:{}", func.label);
         // self.dump_all_neighbors();
-        self.dump_live_neighbors();
-        // self.dump_last_colors();
-
+        self.dump_live_neighbors(func.label.to_owned());
+        self.dump_last_colors();
         self.dump_tocolor();
 
         loop {

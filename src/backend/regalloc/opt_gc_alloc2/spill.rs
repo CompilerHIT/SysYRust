@@ -38,6 +38,7 @@ impl Allocator {
     ///把一个寄存器加入to spill
     /// 以 spillcost/ numl live neighbors 作为权重
     pub fn push_to_tospill(&mut self, reg: &Reg) {
+        self.dump_action("tospill", reg);
         // TOCHECK,修改tospill权重为spillcost
         let item = self.draw_spill_cost_item(reg);
         // let item = self.draw_spill_div_nln_item(reg);
@@ -96,7 +97,7 @@ impl Allocator {
         // TODO,
         // 改进这里的选择
         // 在周围没有作色的节点和自己中选择要spill的对象
-        // 如果节点有颜色，而且spill掉节点后能够让自己作色，则选择节点
+        // 如果节点有颜色，而且spill掉节点后能够让自己作色,且收益更高，则选择节点
         for neighbor in all_live_neigbhors.get(reg).unwrap() {
             let neigbor = *neighbor;
             if !bitmap.contains(neigbor.bit_code() as usize) {
