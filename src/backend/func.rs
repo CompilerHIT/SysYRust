@@ -302,9 +302,6 @@ impl Func {
             }
         };
 
-        // log_file!(calc_live_file,"-----------------------------------before count live def,live use----------------------------");
-        // printinterval();
-
         // 计算公式，live in 来自于所有前继的live out的集合 + 自身的live use
         // live out等于所有后继块的live in的集合与 (自身的livein 和live def的并集) 的交集
         // 以块为遍历单位进行更新
@@ -322,16 +319,12 @@ impl Func {
             for it in block.as_ref().insts.iter().rev() {
                 log_file!(calc_live_file, "{}", it.as_ref());
                 for reg in it.as_ref().get_reg_def().into_iter() {
-                    if reg.is_virtual() || reg.is_allocable() {
-                        block.as_mut().live_use.remove(&reg);
-                        block.as_mut().live_def.insert(reg);
-                    }
+                    block.as_mut().live_use.remove(&reg);
+                    block.as_mut().live_def.insert(reg);
                 }
                 for reg in it.as_ref().get_reg_use().into_iter() {
-                    if reg.is_virtual() || reg.is_allocable() {
-                        block.as_mut().live_def.remove(&reg);
-                        block.as_mut().live_use.insert(reg);
-                    }
+                    block.as_mut().live_def.remove(&reg);
+                    block.as_mut().live_use.insert(reg);
                 }
             }
             log_file!(
@@ -356,9 +349,6 @@ impl Func {
             block.as_mut().live_out.clear();
         }
 
-        // log_file!(calc_live_file,"-----------------------------------before count live in,live out----------------------------");
-        // printinterval();
-
         //然后计算live in 和live out
         while let Some(value) = queue.pop_front() {
             let (block, reg) = value;
@@ -381,26 +371,6 @@ impl Func {
                         queue.push_back((pred.clone(), reg));
                     }
                 }
-                // log_file!(
-                //     "19_2.txt",
-                //     "live in:{:?}\nlive out:{:?}\nlive def:{:?}\nlive use:{:?}",
-                //     pred.live_in
-                //         .iter()
-                //         .map(|r| r.get_id())
-                //         .collect::<HashSet<i32>>(),
-                //     pred.live_out
-                //         .iter()
-                //         .map(|r| r.get_id())
-                //         .collect::<HashSet<i32>>(),
-                //     pred.live_def
-                //         .iter()
-                //         .map(|r| r.get_id())
-                //         .collect::<HashSet<i32>>(),
-                //     pred.live_use
-                //         .iter()
-                //         .map(|r| r.get_id())
-                //         .collect::<HashSet<i32>>(),
-                // );
             }
         }
 
@@ -424,8 +394,8 @@ impl Func {
         //     }
         // }
         // let mut allocator = crate::backend::regalloc::easy_ls_alloc::Allocator::new();
-        // let mut allocator = crate::backend::regalloc::easy_gc_alloc::Allocator::new();
-        let mut allocator = crate::backend::regalloc::opt_gc_alloc2::Allocator::new();
+        let mut allocator = crate::backend::regalloc::easy_gc_alloc::Allocator::new();
+        // let mut allocator = crate::backend::regalloc::opt_gc_alloc2::Allocator::new();
         // let mut allocator = crate::backend::regalloc::opt_gc_alloc::Allocator::new();
         // let mut allocator = crate::backend::regalloc::base_alloc::Allocator::new();
         let mut alloc_stat = allocator.alloc(self);
