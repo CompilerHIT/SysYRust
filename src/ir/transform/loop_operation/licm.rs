@@ -48,6 +48,7 @@ fn licm_one_loop(loop_info: ObjPtr<LoopInfo>) -> bool {
                 match inst.get_kind() {
                     InstKind::Alloca(_)
                     | InstKind::Load
+                    | InstKind::Store
                     | InstKind::Return
                     | InstKind::Branch
                     | InstKind::Phi
