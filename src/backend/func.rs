@@ -25,8 +25,8 @@ use crate::ir::basicblock::BasicBlock;
 use crate::ir::function::Function;
 use crate::ir::instruction::Inst;
 use crate::ir::ir_type::IrType;
-use crate::log_file;
 use crate::utility::{ObjPtr, ScalarType};
+use crate::{config, log_file};
 
 #[derive(Clone)]
 pub struct Func {
@@ -446,7 +446,24 @@ impl Func {
             alloc_stat.spillings.len(),
             alloc_stat.spillings
         );
-        let check_alloc_path = "./data/check_alloc.txt";
+        let file_path = config::get_file_path().unwrap();
+        if alloc_stat.spillings.len() == 0 {
+            log_file!(
+                "bestalloc.txt",
+                "func: {}-{}",
+                file_path.to_owned(),
+                self.label
+            );
+        } else {
+            log_file!(
+                "unbestalloc.txt",
+                "func:{}-{},dstr/spill:{}",
+                file_path.to_owned(),
+                self.label,
+                alloc_stat.dstr.len() as f32 / alloc_stat.spillings.len() as f32
+            );
+        }
+        let check_alloc_path = "./check_alloc.txt";
         log_file!(check_alloc_path, "{:?}", self.label);
         log_file!(
             check_alloc_path,

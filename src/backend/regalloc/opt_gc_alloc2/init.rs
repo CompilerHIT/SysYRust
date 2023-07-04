@@ -1,3 +1,5 @@
+use crate::log;
+
 use super::*;
 
 impl Allocator {
@@ -16,30 +18,13 @@ impl Allocator {
 
         let (last_colors, last_colors_lst, all_live_neighbors_bitmap, all_live_neigbhors) =
             Allocator::build_live_graph_and_last_colors(&all_neighbors, &availables);
-        //
-        // todo!("分离悬点集合构建的逻辑,完成初始化纯净干涉图操作");
 
-        // 初始化last_colors  (last colors不包括物理寄存器,不包括不一定能够着色的寄存器)
-        // for (reg, neighbors) in &all_neighbors {
-        //     // 判断它是否是一个last colors,如果virtual neighbors< availables
-        //     if reg.is_physic() {
-        //         continue;
-        //     }
-        //     let num = availables
-        //         .get(reg)
-        //         .unwrap()
-        //         .num_available_regs(reg.get_type());
-        //     let mut num_v_neighbors = 0;
-        //     for neighbor in neighbors {
-        //         if neighbor.is_physic() {
-        //             continue;
-        //         }
-        //         num_v_neighbors += 1;
-        //     }
-        //     if num_v_neighbors < num {
-        //         last_colors.insert(*reg);
-        //     }
-        // }
+        log_file!("alloc_action.txt", "alloc for func :{}", func.label);
+        log_file!(
+            "alloc_action.txt",
+            "count last colors num:{}",
+            last_colors.len()
+        );
 
         // TOCHECK,根据live_graph初始化to_color
         for (reg, live_neighbors) in &all_live_neigbhors {
@@ -48,27 +33,7 @@ impl Allocator {
                 &(*spill_cost.get(reg).unwrap() / (live_neighbors.len() as f32)),
             ));
         }
-        //
-        // for (reg, neighbors) in &all_neighbors {
-        //     if reg.is_physic() || last_colors.contains(reg) {
-        //         continue;
-        //     }
-        //     let mut live_neighbors = LinkedList::new();
-        //     let mut live_neigbhors_bitmap = Bitmap::with_cap(neighbors.len() / 8);
-        //     for neighbor in neighbors {
-        //         if neighbor.is_physic() || last_colors.contains(neighbor) {
-        //             continue;
-        //         }
-        //         live_neighbors.push_back(*neighbor);
-        //         live_neigbhors_bitmap.insert(neighbor.bit_code() as usize);
-        //     }
-        //     to_color.push(OperItem::new(
-        //         reg,
-        //         &(*spill_cost.get(reg).unwrap() / (live_neighbors.len() as f32)),
-        //     ));
-        //     all_live_neigbhors.insert(*reg, live_neighbors);
-        //     all_live_neighbors_bitmap.insert(*reg, live_neigbhors_bitmap);
-        // }
+        log_file!("alloc_action.txt", "rest live regs num:{}", to_color.len());
 
         let info = AllocatorInfo {
             to_color: to_color,

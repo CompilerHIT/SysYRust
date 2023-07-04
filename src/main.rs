@@ -1,4 +1,5 @@
 use lalrpop_util::lalrpop_mod;
+use sysylib::config;
 use sysylib::frontend::preprocess::preprocess;
 extern crate biheap;
 // extern crate hexf_parse;
@@ -34,6 +35,8 @@ fn run_main() {
 
     // 获取文件名
     let filename = matches.value_of("filename").unwrap();
+
+    crate::config::set_file_path(&String::from(filename)); //把函数名加载到全局
 
     // 生成汇编的标志
     let s_option = matches.is_present("S");
@@ -75,6 +78,7 @@ fn run_main() {
     sysylib::ir::optimizer_run(&mut module, (&mut pool_bb, &mut pool_inst), o1_option);
 
     let output2 = "row_asm.log";
+
     // 后端解析
     generate_asm(filename, output, output2, &mut AsmModule::new(module), true);
 }

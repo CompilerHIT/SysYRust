@@ -1,4 +1,5 @@
 use std::collections::{HashMap, HashSet, LinkedList, VecDeque};
+use std::fmt::Display;
 use std::hash::Hash;
 use std::num;
 use std::path::Iter;
@@ -426,8 +427,8 @@ pub fn build_nums_neighbor_color(
 // 获取 （下标,块)->失效寄存器集合  表
 pub fn build_ends_index_bb(func: &Func) -> HashMap<(i32, ObjPtr<BB>), HashSet<Reg>> {
     // TODO 更换新的build ends
-    // let a = build_ends_index_bb_old(func);
-    let b = build_ends_index_bb_new(func);
+    let a = build_ends_index_bb_old(func);
+    // let b = build_ends_index_bb_new(func);
     // log_file!("ends.txt", "func:{}", func.label.to_owned());
     // log_file!("ends.txt", "old:");
     // a.iter().for_each(|((index, bb), sets)| {
@@ -442,8 +443,8 @@ pub fn build_ends_index_bb(func: &Func) -> HashMap<(i32, ObjPtr<BB>), HashSet<Re
     //     });
     // });
     // log_file!("ends.txt");
-    return b;
-    // return a;
+    // return b;
+    return a;
 }
 // todo,进行替换尝试，更精确地分析
 fn build_ends_index_bb_old(func: &Func) -> HashMap<(i32, ObjPtr<BB>), HashSet<Reg>> {
@@ -794,94 +795,106 @@ pub fn check_alloc(
     func: &Func,
     dstr: &HashMap<i32, i32>,
     spillings: &HashSet<i32>,
-) -> Vec<(i32, i32, i32, String)> {
-    let mut out: Vec<(i32, i32, i32, String)> = Vec::new();
+) -> Vec<(Reg, Reg, i32, String)> {
+    let mut out: Vec<(Reg, Reg, i32, String)> = Vec::new();
     let ends_index_bb = build_ends_index_bb(func);
     let tmp_set = HashSet::new();
-    let mut check_alloc_one =
-        |reg: &Reg,
-         index: i32,
-         bb: ObjPtr<BB>,
-         reg_use_stat: &mut RegUsedStat,
-         livenow: &mut HashMap<i32, HashSet<i32>>| {
-            if spillings.contains(&reg.get_id()) {
-                return;
-            }
-            if reg.is_physic() {
-                if reg.get_type() == ScalarType::Float {
-                    //fixme
-                } else if reg.get_type() == ScalarType::Int {
-                    reg_use_stat.use_ireg(reg.get_id())
-                }
-                return;
-            }
-            // println!("g?{}", reg.get_id());
-            let color = dstr.get(&reg.get_id());
-            // fix me
-            // if color.is_none() {
-            //     out.push((reg.get_id(),-1,index,bb.label.clone()));
-            //     return;
-            // }
+    let mut check_alloc_one = |reg: &Reg,
+                               index: i32,
+                               bb: ObjPtr<BB>,
+                               reg_use_stat: &mut RegUsedStat,
+                               livenow: &mut HashMap<i32, HashSet<Reg>>|
+     -> bool {
+        if spillings.contains(&reg.get_id()) {
+            return true;
+        }
+        if reg.is_physic() {
+            reg_use_stat.use_reg(reg.get_color());
+            livenow.get_mut(&reg.get_color()).unwrap().insert(*reg);
+            return true;
+        }
+        // println!("g?{}", reg.get_id());
+        let color = dstr.get(&reg.get_id());
+        // fix me
+        // if color.is_none() {
+        //     out.push((reg.get_id(),-1,index,bb.label.clone()));
+        //     return;
+        // }
 
-            let color = color.unwrap();
-            //
-            if !reg_use_stat.is_available_reg(*color) {
-                let interef_regs = livenow.get(color).unwrap();
-                if interef_regs.contains(&reg.get_id()) {
-                    return;
-                }
-                for interef_reg in interef_regs.iter() {
-                    out.push((*interef_reg, reg.get_id(), index, bb.label.clone()));
-                }
+        let color = color.unwrap();
+        //
+        if !reg_use_stat.is_available_reg(*color) {
+            // panic!();
+            let interef_regs = livenow.get(color).unwrap();
+            if interef_regs.contains(&reg) {
+                return true;
             }
-            reg_use_stat.use_reg(*color);
-            livenow.get_mut(color).unwrap().insert(reg.get_id());
-        };
+            for interef_reg in interef_regs.iter() {
+                out.push((*interef_reg, *reg, index, bb.label.clone()));
+            }
+            return false;
+        }
+        reg_use_stat.use_reg(*color);
+        livenow.get_mut(color).unwrap().insert(*reg);
+        return true;
+    };
     for bb in func.blocks.iter() {
         let mut reg_use_stat = RegUsedStat::new();
-        let mut livenow: HashMap<i32, HashSet<i32>> = HashMap::new();
+        let mut livenow: HashMap<i32, HashSet<Reg>> = HashMap::new();
         for i in 0..=63 {
             livenow.insert(i, HashSet::new());
         }
 
-        bb.live_in
-            .iter()
-            .for_each(|reg| check_alloc_one(reg, -1, *bb, &mut reg_use_stat, &mut livenow));
+        let mut ifFinish = false;
+        bb.live_in.iter().for_each(|reg| {
+            if ifFinish {
+                return;
+            }
+            if !check_alloc_one(reg, -1, *bb, &mut reg_use_stat, &mut livenow) {
+                ifFinish = true;
+            }
+        });
+        if ifFinish {
+            return out;
+        }
         for (index, inst) in bb.insts.iter().enumerate() {
             // 先處理生命周期結束的寄存器
             let end_regs = ends_index_bb.get(&(index as i32, *bb)).unwrap_or(&tmp_set);
+
             for reg in end_regs {
                 if spillings.contains(&reg.get_id()) {
                     continue;
                 }
-                if !reg.is_virtual() {
-                    continue;
-                }
                 // println!("{}", reg.get_id());
-                let color = dstr.get(&reg.get_id());
+                let color = if reg.is_physic() {
+                    reg.get_color()
+                } else {
+                    *dstr.get(&reg.get_id()).unwrap()
+                };
                 // if color.is_none() {return  out;}   //FIXME
-                let color = color.unwrap();
-                livenow.get_mut(color).unwrap().remove(&reg.get_id());
-                if livenow.get(color).unwrap().is_empty() {
-                    reg_use_stat.release_reg(*color);
-                }
+                livenow.get_mut(&color).unwrap().remove(&reg);
+                reg_use_stat.release_reg(color);
             }
 
             for reg in inst.get_reg_def() {
                 check_alloc_one(&reg, index as i32, *bb, &mut reg_use_stat, &mut livenow);
-                if end_regs.contains(&reg) {
-                    if spillings.contains(&reg.get_id()) {
-                        continue;
-                    }
-                    if !reg.is_virtual() {
-                        continue;
-                    }
-                    let color = dstr.get(&reg.get_id());
-                    // if color.is_none() {return  out;}   //FIXME
-                    let color = color.unwrap();
-                    livenow.get_mut(color).unwrap().remove(&reg.get_id());
-                    if livenow.get(color).unwrap().is_empty() {
-                        reg_use_stat.release_reg(*color);
+                // if bb.live_out.contains(&reg) {
+                //     continue;
+                // }
+                if spillings.contains(&reg.get_id()) {
+                    continue;
+                }
+                if end_regs.contains(&reg) && !bb.live_out.contains(&reg) {
+                    let color = if reg.is_physic() {
+                        reg.get_color()
+                    } else {
+                        *dstr.get(&reg.get_id()).unwrap()
+                    };
+                    livenow.get_mut(&color).unwrap().remove(&reg);
+                    if livenow.get(&color).unwrap().len() == 0 {
+                        reg_use_stat.release_reg(color);
+                    } else {
+                        unreachable!();
                     }
                 }
             }
