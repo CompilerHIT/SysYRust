@@ -6,6 +6,7 @@ impl BackendPass {
         self.fuse_imm_br(pool);
         self.fuse_basic_block();
         self.clear_empty_block();
+        self.resolve_merge_br();
     }
 
     fn fuse_imm_br(&mut self, pool: &mut BackendPool) {
@@ -29,9 +30,7 @@ impl BackendPass {
                         InstrsType::Jump,
                         vec![Operand::Addr(after.label.clone())],
                     ));
-                    log!("prev {}, {:?}", prev.label, br);
                     prev.as_mut().push_back(br);
-                    log!("prev {}, {:?}", prev.label, prev.as_ref().insts);
                     prev.as_mut().out_edge = vec![after.clone()];
                     adjust_after_in(after, block.get_prev().clone(), &block.label);
                     block.as_mut().in_edge.clear();
@@ -77,10 +76,12 @@ impl BackendPass {
                     if block.insts.len() == 1 {
                         let tail = block.get_tail_inst();
                         if tail.get_type() == InstrsType::Jump {
+                            log!("clear one jump {}", block.label);
                             block.as_mut().insts.clear();
                             let next = block.get_after()[0].clone();
                             let after_label = next.label.clone();
 
+                            //调整后继的前驱
                             adjust_after_in(next, block.get_prev().clone(), &block.label);
 
                             let prevs = block.get_prev();
@@ -98,7 +99,7 @@ impl BackendPass {
                                         last_two_tail.as_mut().replace_label(after_label.clone());
                                     }
                                 }
-                                prev.as_mut().out_edge = vec![block.get_after()[0].clone()];
+                                adjust_prev_out(prev.clone(), block.get_after().clone(), &block.label);
                             });
 
                             block.as_mut().in_edge.clear();
@@ -126,6 +127,29 @@ impl BackendPass {
                 exsit_blocks.clear();
             }
         })
+    }
+
+    fn resolve_merge_br(&mut self) {
+        self.module.func_map.iter().for_each(|(_, func)| {
+            if !func.is_extern {
+                func.blocks.iter().for_each(|block| {
+                    if block.insts.len() > 1 {
+                        let last_not_tail = block.get_last_not_tail_inst();
+                        let tail = block.get_tail_inst();
+                        match last_not_tail.get_type() {
+                            InstrsType::Branch(..) => {
+                                if tail.get_type() == InstrsType::Jump && tail.get_label() == last_not_tail.get_label() {
+                                    block.as_mut().insts.pop();
+                                    block.as_mut().insts.pop();
+                                    block.as_mut().push_back(tail);
+                                }
+                            },
+                            _ => {}
+                        }
+                    }
+                })
+            }
+        });
     }
 }
 
@@ -160,6 +184,18 @@ fn adjust_after_in(block: ObjPtr<BB>, prevs: Vec<ObjPtr<BB>>, clear_label: &Stri
         .collect();
     final_prevs.append(&mut prevs.clone());
     block.as_mut().in_edge = final_prevs;
+}
+
+fn adjust_prev_out(block: ObjPtr<BB>, prevs: Vec<ObjPtr<BB>>, clear_label: &String) {
+    let mut final_prevs: Vec<ObjPtr<BB>> = block
+        .as_mut()
+        .out_edge
+        .clone()
+        .into_iter()
+        .filter(|b| b.label != *clear_label)
+        .collect();
+    final_prevs.append(&mut prevs.clone());
+    block.as_mut().out_edge = final_prevs;
 }
 
 fn replace_first_block(block: ObjPtr<BB>, func: ObjPtr<Func>) {
