@@ -131,11 +131,9 @@ pub fn build_interference(
                     interef_graph.insert(*reg, HashSet::new());
                 }
                 for live in livenow.iter() {
-                    log_file!("tmp2.txt", "pre {} {}.", live, reg);
                     if live == reg {
                         continue;
                     }
-                    log_file!("tmp2.txt", "suf {} {}.", live, reg);
                     interef_graph.get_mut(live).unwrap().insert(*reg);
                     interef_graph.get_mut(reg).unwrap().insert(*live);
                 }
@@ -283,7 +281,6 @@ pub fn build_availables(
         |cur_bb: ObjPtr<BB>, availables: &mut HashMap<Reg, RegUsedStat>, kind: ScalarType| {
             let mut livenow: HashSet<Reg> = HashSet::new();
             // 冲突分析
-            let mut passed_regs: HashSet<Reg> = HashSet::new();
             cur_bb.live_in.iter().for_each(|reg| {
                 if reg.get_type() != kind {
                     return;
@@ -427,7 +424,29 @@ pub fn build_nums_neighbor_color(
 }
 
 // 获取 （下标,块)->失效寄存器集合  表
-pub fn ends_index_bb(func: &Func) -> HashMap<(i32, ObjPtr<BB>), HashSet<Reg>> {
+pub fn build_ends_index_bb(func: &Func) -> HashMap<(i32, ObjPtr<BB>), HashSet<Reg>> {
+    // TODO 更换新的build ends
+    // let a = build_ends_index_bb_old(func);
+    let b = build_ends_index_bb_new(func);
+    // log_file!("ends.txt", "func:{}", func.label.to_owned());
+    // log_file!("ends.txt", "old:");
+    // a.iter().for_each(|((index, bb), sets)| {
+    //     sets.iter().for_each(|reg| {
+    //         log_file!("ends.txt", "{},{},{}", index, bb.label, reg);
+    //     });
+    // });
+    // log_file!("ends.txt", "new:");
+    // b.iter().for_each(|((index, bb), sets)| {
+    //     sets.iter().for_each(|reg| {
+    //         log_file!("ends.txt", "{},{},{}", index, bb.label, reg);
+    //     });
+    // });
+    // log_file!("ends.txt");
+    return b;
+    // return a;
+}
+// todo,进行替换尝试，更精确地分析
+fn build_ends_index_bb_old(func: &Func) -> HashMap<(i32, ObjPtr<BB>), HashSet<Reg>> {
     // 获取reg
     let mut out: HashMap<(i32, ObjPtr<BB>), HashSet<Reg>> = HashMap::new();
     let mut passed_regs: HashSet<Reg> = HashSet::new();
@@ -445,6 +464,33 @@ pub fn ends_index_bb(func: &Func) -> HashMap<(i32, ObjPtr<BB>), HashSet<Reg>> {
                 }
                 passed_regs.insert(reg);
                 out.get_mut(&(index as i32, *bb)).unwrap().insert(reg);
+            }
+        }
+    }
+    out
+}
+
+fn build_ends_index_bb_new(func: &Func) -> HashMap<(i32, ObjPtr<BB>), HashSet<Reg>> {
+    // 获取reg
+    let mut out: HashMap<(i32, ObjPtr<BB>), HashSet<Reg>> = HashMap::new();
+    for bb in func.blocks.iter() {
+        let mut livenow: HashSet<Reg> = HashSet::new();
+        bb.live_out.iter().for_each(|reg| {
+            livenow.insert(*reg);
+        });
+        for (index, inst) in bb.insts.iter().enumerate().rev() {
+            if let None = out.get(&(index as i32, *bb)) {
+                out.insert((index as i32, *bb), HashSet::new());
+            }
+            for reg in inst.get_regs() {
+                if livenow.contains(&reg) {
+                    continue;
+                }
+                out.get_mut(&(index as i32, *bb)).unwrap().insert(reg);
+                livenow.insert(reg);
+            }
+            for reg in inst.get_reg_def() {
+                livenow.remove(&reg);
             }
         }
     }
@@ -750,7 +796,7 @@ pub fn check_alloc(
     spillings: &HashSet<i32>,
 ) -> Vec<(i32, i32, i32, String)> {
     let mut out: Vec<(i32, i32, i32, String)> = Vec::new();
-    let ends_index_bb = ends_index_bb(func);
+    let ends_index_bb = build_ends_index_bb(func);
     let tmp_set = HashSet::new();
     let mut check_alloc_one =
         |reg: &Reg,

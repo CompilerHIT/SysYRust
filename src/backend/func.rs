@@ -266,6 +266,7 @@ impl Func {
     }
 
     pub fn calc_live(&mut self) {
+        //TODO, 去除allocable限制!
         let calc_live_file = "callive.txt";
         // fs::remove_file(calc_live_file);
         log_file!(
@@ -445,7 +446,7 @@ impl Func {
             alloc_stat.spillings.len(),
             alloc_stat.spillings
         );
-        let check_alloc_path = "check_alloc.txt";
+        let check_alloc_path = "./data/check_alloc.txt";
         log_file!(check_alloc_path, "{:?}", self.label);
         log_file!(
             check_alloc_path,
@@ -479,8 +480,7 @@ impl Func {
                 }
                 let dst = inst.get_dst();
                 let src = inst.get_lhs();
-                if inst.get_type() == InstrsType::OpReg(super::instrs::SingleOp::Mv) && dst == src
-                {
+                if inst.get_type() == InstrsType::OpReg(super::instrs::SingleOp::Mv) && dst == src {
                     bb.as_mut().insts.remove(index);
                 } else {
                     index += 1;
@@ -641,7 +641,13 @@ impl Func {
                                 true,
                             );
                         } else if operand::is_imm_12bs(stack_size - slot.get_pos()) {
-                            builder.s(&reg.to_string(false), "sp", stack_size - slot.get_pos(), is_float, true);
+                            builder.s(
+                                &reg.to_string(false),
+                                "sp",
+                                stack_size - slot.get_pos(),
+                                is_float,
+                                true,
+                            );
                         } else {
                             if first {
                                 let offset = stack_size - slot.get_pos();
@@ -695,7 +701,13 @@ impl Func {
                                 true,
                             );
                         } else if operand::is_imm_12bs(stack_size - slot.get_pos()) {
-                            builder.l(&reg.to_string(false), "sp", stack_size - slot.get_pos(), is_float, true);
+                            builder.l(
+                                &reg.to_string(false),
+                                "sp",
+                                stack_size - slot.get_pos(),
+                                is_float,
+                                true,
+                            );
                         } else {
                             if first {
                                 let offset = stack_size - slot.get_pos();

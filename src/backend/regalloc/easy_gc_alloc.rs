@@ -51,7 +51,7 @@ impl Allocator {
     // 判断两个虚拟寄存器是否是通用寄存器分配冲突
     // 建立虚拟寄存器之间的冲突图
     pub fn build_interference_graph(&mut self, func: &Func) {
-        self.ends_index_bb = regalloc::ends_index_bb(func);
+        self.ends_index_bb = regalloc::build_ends_index_bb(func);
         let ends_index_bb = &self.ends_index_bb;
         self.interference_graph = regalloc::build_interference(func, &ends_index_bb);
         self.availables = regalloc::build_availables(func, &ends_index_bb);

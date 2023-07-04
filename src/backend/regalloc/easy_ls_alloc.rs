@@ -31,7 +31,7 @@ impl Regalloc for Allocator {
     fn alloc(&mut self, func: &crate::backend::instrs::Func) -> FuncAllocStat {
         let mut dstr: HashMap<i32, i32> = HashMap::new();
         let mut spillings: HashSet<i32> = HashSet::new();
-        let ends_index_bb = regalloc::regalloc::ends_index_bb(func);
+        let ends_index_bb = regalloc::regalloc::build_ends_index_bb(func);
         let interference_graph = regalloc::regalloc::build_interference(func, &ends_index_bb);
         let availables = regalloc::regalloc::build_availables(func, &ends_index_bb);
         // 获取周围的颜色,
