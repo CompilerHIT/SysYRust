@@ -21,20 +21,10 @@ impl TypeProcess for RelExp {
             RelExp::AddExp(addexp) => {
                 return addexp.type_process(input, kit_mut);
             }
-            RelExp::OpExp((relexp, _, addexp)) => {
-                // let tp_left = relexp.type_process(input, kit_mut).unwrap();
-                // let tp_right = addexp.type_process(input, kit_mut).unwrap();
-                // if tp_left > tp_right {
-                //     return Ok(tp_left);
-                // } else {
-                //     return Ok(tp_right);
-                // }
+            RelExp::OpExp((_, _, _)) => {
                 return Ok(1);
             }
         }
-        // Err(Error::TypeCheckError)
-        // unreachable!()
-        // todo!()
     }
 }
 
@@ -58,7 +48,6 @@ impl TypeProcess for AddExp {
                 }
             }
         }
-        // todo!()
     }
 }
 
@@ -86,7 +75,6 @@ impl TypeProcess for MulExp {
                 }
             }
         }
-        // todo!()
     }
 }
 
@@ -112,7 +100,6 @@ impl TypeProcess for UnaryExp {
             }
             UnaryExp::OpUnary((_, unaryexp)) => unaryexp.type_process(input, kit_mut),
         }
-        // todo!()
     }
 }
 
@@ -130,7 +117,6 @@ impl TypeProcess for PrimaryExp {
                 let sym = kit_mut.get_var_symbol(&lval.id).unwrap();
                 match sym.tp {
                     Type::ConstFloat | Type::Float => {
-                        // println!("typesearch:{:?}float型", lval.id);
                         Ok(3)
                     }
                     Type::ConstInt | Type::Int => Ok(1),
@@ -149,7 +135,6 @@ impl TypeProcess for PrimaryExp {
                 }
             }
         }
-        // todo!()
     }
 }
 
@@ -162,8 +147,7 @@ impl TypeProcess for Exp {
         kit_mut: &mut Kit,
     ) -> Result<Self::Ret, Error> {
         self.add_exp.type_process(input, kit_mut)
-        // todo!()
-    }
+   }
 }
 
 impl TypeProcess for EqExp {
@@ -178,14 +162,7 @@ impl TypeProcess for EqExp {
             EqExp::RelExp(relexp) => {
                 return relexp.type_process(input, kit_mut);
             }
-            EqExp::EqualExp((eqexp, relexp)) | EqExp::NotEqualExp((eqexp, relexp)) => {
-                // let tp_left = eqexp.type_process(input, kit_mut).unwrap();
-                // let tp_right = relexp.type_process(input, kit_mut).unwrap();
-                // if tp_left > tp_right {
-                //     return Ok(tp_left);
-                // } else {
-                //     return Ok(tp_right);
-                // }
+            EqExp::EqualExp((_, _)) | EqExp::NotEqualExp((_, _)) => {
                 return Ok(1);
             }
         }

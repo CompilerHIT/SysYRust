@@ -549,7 +549,7 @@ impl Kit<'_> {
                     .map(|x| x.clone());
                 let bbname = "notinblock";
 
-                let inst_opt = self
+                self
                     .context_mut
                     .bb_map
                     .get(bbname)

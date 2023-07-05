@@ -9,7 +9,7 @@ pub fn preprocess(input: &str) -> String {
             for i in 0..pparts.len() - 1 {
                 if pparts[i].contains("starttime()") {
                     result.push_str(&format!("_sysy_starttime({});", line_number));
-                } else if (pparts[i].contains("stoptime()")) {
+                } else if pparts[i].contains("stoptime()") {
                     result.push_str(&format!("_sysy_stoptime({});", line_number));
                 } else {
                     result.push_str((" ".to_string() + pparts[i] + ";").as_str());
@@ -18,7 +18,7 @@ pub fn preprocess(input: &str) -> String {
             if !pparts[pparts.len() - 1].is_empty() {
                 if pparts[pparts.len() - 1].contains("starttime()") {
                     result.push_str(&format!("_sysy_starttime({})", line_number));
-                } else if (pparts[pparts.len() - 1].contains("stoptime()")) {
+                } else if pparts[pparts.len() - 1].contains("stoptime()") {
                     result.push_str(&format!("_sysy_stoptime({})", line_number));
                 } else {
                     result.push_str((" ".to_string() + pparts[pparts.len() - 1]).as_str());
