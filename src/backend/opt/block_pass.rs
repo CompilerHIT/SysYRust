@@ -76,7 +76,6 @@ impl BackendPass {
                     if block.insts.len() == 1 {
                         let tail = block.get_tail_inst();
                         if tail.get_type() == InstrsType::Jump {
-                            log!("clear one jump {}", block.label);
                             block.as_mut().insts.clear();
                             let next = block.get_after()[0].clone();
                             let after_label = next.label.clone();

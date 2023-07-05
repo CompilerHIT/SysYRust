@@ -6,7 +6,8 @@ impl BackendPass {
             if !func.is_extern {
                 func.blocks.iter().for_each(|block| {
                     self.rm_useless(*block);
-                })
+                });
+                self.rm_useless_def(func.clone());
             }
         });
     }
@@ -37,6 +38,10 @@ impl BackendPass {
             }
             index += 1;
         }
+    }
+
+    fn rm_useless_def(&self, func: ObjPtr<Func>) {
+
     }
 
     fn is_mv_same(&self, inst: ObjPtr<LIRInst>) -> bool {

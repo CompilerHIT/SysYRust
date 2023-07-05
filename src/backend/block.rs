@@ -388,10 +388,11 @@ impl BB {
                                         map_info,
                                         pool,
                                     );
+                                    let tmp1 = Operand::Reg(Reg::init(ScalarType::Int));
                                     self.insts.push(pool.put_inst(LIRInst::new(
                                         InstrsType::Binary(BinaryOp::Shl),
                                         vec![
-                                            offset.clone(),
+                                            tmp1.clone(),
                                             offset.clone(),
                                             Operand::IImm(IImm::new(2)),
                                         ],
@@ -399,7 +400,7 @@ impl BB {
                                     let tmp = Operand::Reg(Reg::init(ScalarType::Int));
                                     let mut inst = LIRInst::new(
                                         InstrsType::Binary(BinaryOp::Add),
-                                        vec![tmp.clone(), src_reg.clone(), offset],
+                                        vec![tmp.clone(), src_reg.clone(), tmp1],
                                     );
                                     inst.set_double();
                                     self.insts.push(pool.put_inst(inst));
@@ -499,11 +500,11 @@ impl BB {
                                         map_info,
                                         pool,
                                     );
-
+                                    let tmp1 = Operand::Reg(Reg::init(ScalarType::Int));
                                     self.insts.push(pool.put_inst(LIRInst::new(
                                         InstrsType::Binary(BinaryOp::Shl),
                                         vec![
-                                            temp.clone(),
+                                            tmp1.clone(),
                                             temp.clone(),
                                             Operand::IImm(IImm::new(2)),
                                         ],
@@ -511,7 +512,7 @@ impl BB {
                                     let tmp = Operand::Reg(Reg::init(ScalarType::Int));
                                     let mut inst = LIRInst::new(
                                         InstrsType::Binary(BinaryOp::Add),
-                                        vec![tmp.clone(), addr_reg.clone(), temp],
+                                        vec![tmp.clone(), addr_reg.clone(), tmp1],
                                     );
                                     // log!("addr_reg: {:?}, value_reg: {:?}", addr_reg, value_reg);
                                     inst.set_double();
@@ -837,17 +838,18 @@ impl BB {
                                                 let dst_reg = self.resolve_operand(
                                                     func, **arg, true, map_info, pool,
                                                 );
+                                                let tmp1 = Operand::Reg(Reg::init(ScalarType::Int));
                                                 self.insts.push(pool.put_inst(LIRInst::new(
                                                     InstrsType::Binary(BinaryOp::Shl),
                                                     vec![
-                                                        tmp.clone(),
+                                                        tmp1.clone(),
                                                         tmp.clone(),
                                                         Operand::IImm(IImm::new(2)),
                                                     ],
                                                 )));
                                                 let mut add = LIRInst::new(
                                                     InstrsType::Binary(BinaryOp::Add),
-                                                    vec![dst_reg.clone(), src_reg.clone(), tmp],
+                                                    vec![dst_reg.clone(), src_reg.clone(), tmp1],
                                                 );
                                                 add.set_double();
                                                 self.insts.push(pool.put_inst(add));
@@ -889,17 +891,18 @@ impl BB {
                                                 let dst_reg = self.resolve_operand(
                                                     func, **arg, true, map_info, pool,
                                                 );
+                                                let tmp1 = Operand::Reg(Reg::init(ScalarType::Int));
                                                 self.insts.push(pool.put_inst(LIRInst::new(
                                                     InstrsType::Binary(BinaryOp::Shl),
                                                     vec![
-                                                        tmp.clone(),
+                                                        tmp1.clone(),
                                                         tmp.clone(),
                                                         Operand::IImm(IImm::new(2)),
                                                     ],
                                                 )));
                                                 let mut add = LIRInst::new(
                                                     InstrsType::Binary(BinaryOp::Add),
-                                                    vec![dst_reg.clone(), src_reg.clone(), tmp],
+                                                    vec![dst_reg.clone(), src_reg.clone(), tmp1],
                                                 );
                                                 add.set_double();
                                                 self.insts.push(pool.put_inst(add));
@@ -979,17 +982,18 @@ impl BB {
                                                 let dst_reg = self.resolve_operand(
                                                     func, **arg, true, map_info, pool,
                                                 );
+                                                let tmp1 = Operand::Reg(Reg::init(ScalarType::Int));
                                                 self.insts.push(pool.put_inst(LIRInst::new(
                                                     InstrsType::Binary(BinaryOp::Shl),
                                                     vec![
-                                                        tmp.clone(),
+                                                        tmp1.clone(),
                                                         tmp.clone(),
                                                         Operand::IImm(IImm::new(2)),
                                                     ],
                                                 )));
                                                 let mut add = LIRInst::new(
                                                     InstrsType::Binary(BinaryOp::Add),
-                                                    vec![dst_reg.clone(), src_reg.clone(), tmp],
+                                                    vec![dst_reg.clone(), src_reg.clone(), tmp1],
                                                 );
                                                 add.set_double();
                                                 self.insts.push(pool.put_inst(add));
@@ -1852,7 +1856,6 @@ impl BB {
                         }
                         IrType::Float => {
                             if src == *p {
-                                log!("func: {} fnum: {}", func.label, fnum);
                                 if fnum < ARG_REG_COUNT {
                                     let inst = LIRInst::new(
                                         InstrsType::OpReg(SingleOp::Mv),
@@ -1864,7 +1867,6 @@ impl BB {
                                             )),
                                         ],
                                     );
-                                    log!("insert param save inst: {:?}", inst);
                                     func.as_mut()
                                         .get_first_block()
                                         .as_mut()
@@ -2019,15 +2021,16 @@ impl BB {
                 if is_rimm {
                     rhs_reg = self.resolve_operand(func, rhs, true, map, pool);
                 }
+                let tmp = Operand::Reg(Reg::init(ScalarType::Int));
                 self.insts.push(pool.put_inst(LIRInst::new(
                     InstrsType::Binary(BinaryOp::Slt),
-                    vec![dst_reg.clone(), rhs_reg, lhs_reg],
+                    vec![tmp.clone(), rhs_reg, lhs_reg],
                 )));
                 self.insts.push(pool.put_inst(LIRInst::new(
                     InstrsType::Binary(BinaryOp::Xor),
                     vec![
                         dst_reg.clone(),
-                        dst_reg.clone(),
+                        tmp,
                         Operand::IImm(IImm::new(1)),
                     ],
                 )));
@@ -2037,15 +2040,16 @@ impl BB {
                 if is_limm {
                     lhs_reg = self.resolve_operand(func, lhs, true, map, pool);
                 }
+                let tmp = Operand::Reg(Reg::init(ScalarType::Int));
                 self.insts.push(pool.put_inst(LIRInst::new(
                     InstrsType::Binary(BinaryOp::Slt),
-                    vec![dst_reg.clone(), lhs_reg, rhs_reg],
+                    vec![tmp.clone(), lhs_reg, rhs_reg],
                 )));
                 self.insts.push(pool.put_inst(LIRInst::new(
                     InstrsType::Binary(BinaryOp::Xor),
                     vec![
                         dst_reg.clone(),
-                        dst_reg.clone(),
+                        tmp.clone(),
                         Operand::IImm(IImm::new(1)),
                     ],
                 )));
@@ -2303,9 +2307,7 @@ impl BB {
                             break;
                         }
                     }
-                    log!("{q2}");
                     let mut magic = (q2 + 1) as i64;
-                    log!("{magic}");
                     if is_neg {
                         magic = -magic;
                     }
