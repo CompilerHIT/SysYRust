@@ -670,7 +670,7 @@ impl Func {
                 builder.addi("sp", "sp", stack_size);
             } else {
                 builder.op1("li", "gp", &stack_size.to_string());
-                builder.op2("add", "sp", "sp", "gp", false, true);
+                builder.op2("add", "sp", "gp", "sp", false, true);
                 builder.l(&ra.to_string(false), "sp", -ADDR_SIZE, false, true);
 
                 let mut first = true;

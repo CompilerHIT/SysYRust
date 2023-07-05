@@ -1486,6 +1486,7 @@ impl BB {
                     }
                     // log!("over offset: {}", offset);
                     self.resolve_overflow_sl(temp.clone(), &mut pos, offset, pool);
+
                     // load的dst是reg，lhs是src_addr
                     // store的dst是addr，lhs是val
                     match inst_ref.get_type() {
