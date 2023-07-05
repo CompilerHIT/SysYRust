@@ -265,7 +265,7 @@ impl Func {
         }
     }
 
-    pub fn calc_live(&mut self) {
+    pub fn calc_live(&self) {
         //TODO, 去除allocable限制!
         let calc_live_file = "callive.txt";
         // fs::remove_file(calc_live_file);

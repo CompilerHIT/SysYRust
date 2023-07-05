@@ -76,12 +76,15 @@ pub fn generate_asm(
     writeln!(file, "    .text");
     let mut pool = BackendPool::new();
     let mut file2 = File::create(row_path).unwrap();
+
     //构造
     module.build(&mut file, &mut file2, &mut pool);
+    // module.generate_row_asm(&mut file2, &mut pool);
     //优化
     if is_opt {
         BackendPass::new(ObjPtr::new(module)).run_pass(&mut pool);
     }
+    // module.generate_row_asm(&mut file2, &mut pool);
 
     // 检查地址溢出，插入间接寻址
     module.handle_overflow(&mut pool);
