@@ -55,13 +55,16 @@ impl BackendPass {
                         )),
                     );
                     index += 1;
-                    block.as_mut().insts.insert(
-                        index,
-                        pool.put_inst(LIRInst::new(
-                            InstrsType::Binary(BinaryOp::Add),
-                            vec![gp.clone(), gp.clone(), Operand::Reg(Reg::new(2, ScalarType::Int))],
-                        )),
+                    let mut add = LIRInst::new(
+                        InstrsType::Binary(BinaryOp::Add),
+                        vec![
+                            gp.clone(),
+                            gp.clone(),
+                            Operand::Reg(Reg::new(2, ScalarType::Int)),
+                        ],
                     );
+                    add.set_double();
+                    block.as_mut().insts.insert(index, pool.put_inst(add));
                     index += 1;
                     // 对组内指令进行替换
                     for ls in insts.iter() {
@@ -72,7 +75,11 @@ impl BackendPass {
                             _ => panic!("get {:?}", inst.get_type()),
                         };
                         ls.as_mut().replace_kind(kind);
-                        ls.as_mut().replace_op(vec![ls.get_dst().clone(), gp.clone(), Operand::IImm(IImm::new(ls_offset))]);
+                        ls.as_mut().replace_op(vec![
+                            ls.get_dst().clone(),
+                            gp.clone(),
+                            Operand::IImm(IImm::new(ls_offset)),
+                        ]);
                     }
                     let len = insts.len();
                     // 替换原指令

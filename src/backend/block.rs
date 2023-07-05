@@ -806,11 +806,11 @@ impl BB {
                             .collect(),
                     );
 
-                    let mut is_exp_32 = false;
-                    if icnt + fcnt == 676 {
-                        is_exp_32 = true;
-                    }
-                    if !is_exp_32 {
+                    // let mut is_exp_32 = false;
+                    // if icnt + fcnt == 676 {
+                    //     is_exp_32 = true;
+                    // }
+                    // if !is_exp_32 {
                         for arg in final_args.iter().rev() {
                             match arg.as_ref().get_param_type() {
                                 IrType::Int | IrType::IntPtr | IrType::FloatPtr => {
@@ -1032,13 +1032,13 @@ impl BB {
                                 }
                             }
                         }
-                    } else {
-                        let mut args = vec![];
-                        final_args.iter().for_each(|arg| {
-                            args.push(arg.get_int_bond());
-                        });
-                        self.save_param_in_exp_32(func, &args);
-                    }
+                    // } else {
+                    //     let mut args = vec![];
+                    //     final_args.iter().for_each(|arg| {
+                    //         args.push(arg.get_int_bond());
+                    //     });
+                    //     self.save_param_in_exp_32(func, &args);
+                    // }
                     let mut lir_inst = LIRInst::new(
                         InstrsType::Call,
                         vec![Operand::Addr(func_label.to_string())],
@@ -1796,9 +1796,9 @@ impl BB {
     ) -> Operand {
         if !map.val_map.contains_key(&src) {
             let params = &func.as_ref().params;
-            if params.len() == 676 {
-                self.load_param_in_exp_32(src, pool, map, params)
-            } else {
+            // if params.len() == 676 {
+            //     self.load_param_in_exp_32(src, pool, map, params)
+            // } else {
                 let reg = match src.as_ref().get_param_type() {
                     IrType::Int | IrType::IntPtr | IrType::FloatPtr => {
                         Operand::Reg(Reg::init(ScalarType::Int))
@@ -1900,7 +1900,7 @@ impl BB {
                     }
                 }
                 reg
-            }
+            // }
         } else {
             map.val_map.get(&src).unwrap().clone()
         }
@@ -2055,64 +2055,64 @@ impl BB {
         dst_reg
     }
 
-    fn load_param_in_exp_32(
-        &mut self,
-        src: ObjPtr<Inst>,
-        pool: &mut BackendPool,
-        map: &mut Mapping,
-        params: &Vec<ObjPtr<Inst>>,
-    ) -> Operand {
-        let mut first = true;
-        self.insts.iter().for_each(|inst| {
-            if inst.get_type() == InstrsType::OpReg(SingleOp::LoadAddr) {
-                first = false;
-            }
-        });
-        if first {
-            let tmp = Reg::init(ScalarType::Int);
-            unsafe {
-                exp_32_reg = tmp.get_id();
-            }
-            self.insts.insert(
-                0,
-                pool.put_inst(LIRInst::new(
-                    InstrsType::OpReg(SingleOp::LoadAddr),
-                    vec![Operand::Reg(tmp), Operand::Addr(String::from(".LC_exp_32"))],
-                )),
-            );
-        }
-        let reg = Operand::Reg(Reg::init(ScalarType::Int));
-        map.val_map.insert(src, reg.clone());
-        let mut inum = 0;
-        for p in params {
-            if src == *p {
-                unsafe {
-                    let mut inst = LIRInst::new(
-                        InstrsType::Load,
-                        vec![
-                            reg.clone(),
-                            Operand::Reg(Reg::new(exp_32_reg, ScalarType::Int)),
-                            Operand::IImm(IImm::new(inum * NUM_SIZE)),
-                        ],
-                    );
-                    inst.set_double();
-                    self.insts.insert(1, pool.put_inst(inst));
-                }
-            }
-            inum += 1;
-        }
-        reg
-    }
+    // fn load_param_in_exp_32(
+    //     &mut self,
+    //     src: ObjPtr<Inst>,
+    //     pool: &mut BackendPool,
+    //     map: &mut Mapping,
+    //     params: &Vec<ObjPtr<Inst>>,
+    // ) -> Operand {
+    //     let mut first = true;
+    //     self.insts.iter().for_each(|inst| {
+    //         if inst.get_type() == InstrsType::OpReg(SingleOp::LoadAddr) {
+    //             first = false;
+    //         }
+    //     });
+    //     if first {
+    //         let tmp = Reg::init(ScalarType::Int);
+    //         unsafe {
+    //             exp_32_reg = tmp.get_id();
+    //         }
+    //         self.insts.insert(
+    //             0,
+    //             pool.put_inst(LIRInst::new(
+    //                 InstrsType::OpReg(SingleOp::LoadAddr),
+    //                 vec![Operand::Reg(tmp), Operand::Addr(String::from(".LC_exp_32"))],
+    //             )),
+    //         );
+    //     }
+    //     let reg = Operand::Reg(Reg::init(ScalarType::Int));
+    //     map.val_map.insert(src, reg.clone());
+    //     let mut inum = 0;
+    //     for p in params {
+    //         if src == *p {
+    //             unsafe {
+    //                 let mut inst = LIRInst::new(
+    //                     InstrsType::Load,
+    //                     vec![
+    //                         reg.clone(),
+    //                         Operand::Reg(Reg::new(exp_32_reg, ScalarType::Int)),
+    //                         Operand::IImm(IImm::new(inum * NUM_SIZE)),
+    //                     ],
+    //                 );
+    //                 inst.set_double();
+    //                 self.insts.insert(1, pool.put_inst(inst));
+    //             }
+    //         }
+    //         inum += 1;
+    //     }
+    //     reg
+    // }
 
-    fn save_param_in_exp_32(
-        &mut self,
-        func: ObjPtr<Func>,
-        args: &Vec<i32>,
-    ) {
-        let name = String::from(".LC_exp_32");
-        let array = IntArray::new(name.clone(), args.len() as i32, true, args.clone());
-        func.as_mut().const_array.insert(array);
-    }
+    // fn save_param_in_exp_32(
+    //     &mut self,
+    //     func: ObjPtr<Func>,
+    //     args: &Vec<i32>,
+    // ) {
+    //     let name = String::from(".LC_exp_32");
+    //     let array = IntArray::new(name.clone(), args.len() as i32, true, args.clone());
+    //     func.as_mut().const_array.insert(array);
+    // }
 
     fn resolve_opt_mul(&mut self, dst: Operand, src: Operand, imm: i32, pool: &mut BackendPool) {
         let abs = imm.abs();
