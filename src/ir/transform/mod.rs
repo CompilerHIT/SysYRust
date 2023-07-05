@@ -5,6 +5,7 @@ use crate::utility::ObjPool;
 mod constant_folding;
 mod dead_code_eliminate;
 mod func_inline;
+mod global_value_numbering;
 mod loop_operation;
 mod phi_optimizer;
 mod simplify_cfg;
@@ -46,6 +47,9 @@ fn functional_optimizer(
 
     // phi优化
     phi_optimizer::phi_run(module);
+
+    // 全局值编号
+    // global_value_numbering::easy_gvn(module);
 
     // 常量折叠
     constant_folding::constant_folding(module, &mut pools, optimize_flag);
