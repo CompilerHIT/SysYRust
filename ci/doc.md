@@ -1,5 +1,8 @@
 ### 测试镜像版本:
 
+`10.249.12.83:5000/compilerhit/sysy-rv64-cpci:4.0` :
+提供样例原文件名作为我们编译器的输入，方便定位
+
 `10.249.12.83:5000/compilerhit/sysy-rv64-cpci:3.4` :
 修复了执行std target exe 会崩溃的bug,
 新增加了stdtime/mytime比值显示,
