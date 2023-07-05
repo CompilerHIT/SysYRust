@@ -27,14 +27,12 @@ impl Allocator {
         );
 
         // TOCHECK,根据live_graph初始化to_color
-        for (reg, live_neighbors) in &all_live_neigbhors {
-            to_color.push(OperItem::new(
-                reg,
-                &(*spill_cost.get(reg).unwrap() / (live_neighbors.len() as f32)),
-            ));
-        }
-        log_file!("alloc_action.txt", "rest live regs num:{}", to_color.len());
-
+        // for (reg, live_neighbors) in &all_live_neigbhors {
+        //     to_color.push(OperItem::new(
+        //         reg,
+        //         &(*spill_cost.get(reg).unwrap() / (live_neighbors.len() as f32)),
+        //     ));
+        // }
         let info = AllocatorInfo {
             to_color: to_color,
             to_simplify: BiHeap::new(),
@@ -53,6 +51,7 @@ impl Allocator {
             all_live_neigbhors_bitmap: all_live_neighbors_bitmap,
         };
         self.info = Some(info);
+        self.init_tocolor();
     }
 
     /// build last colors 和livegraph,
@@ -173,5 +172,17 @@ impl Allocator {
             all_live_neighbors_bitmap,
             all_live_neighbors,
         )
+    }
+
+    // 初始化to color的寄存器
+    fn init_tocolor(&mut self) {
+        let mut to_colors: LinkedList<Reg> = LinkedList::new();
+        for (reg, _) in self.info.as_ref().unwrap().all_live_neighbors.iter() {
+            to_colors.push_back(*reg);
+        }
+        for reg in to_colors.iter() {
+            self.push_to_tocolor(reg);
+        }
+        log_file!("alloc_action.txt", "init tocolors,num:{}", to_colors.len());
     }
 }
