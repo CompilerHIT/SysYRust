@@ -44,7 +44,6 @@ impl BackendPass {
                     break;
                 }
                 if insts.len() > 1 {
-                    log!("rm_useless_overflow: {:?}", insts);
                     // l/s offset(sp) -> li offset gp. add gp gp sp. l/s 0(gp).
                     let gp = Operand::Reg(Reg::new(3, ScalarType::Int));
                     block.as_mut().insts.insert(

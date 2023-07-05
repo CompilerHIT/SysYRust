@@ -571,7 +571,6 @@ impl Func {
             Err(e) => panic!("Error: {}", e),
         };
         let mut stack_size = self.context.get_offset();
-        log!("stack size:{}", stack_size);
 
         if let Some(addition_stack_info) = self.stack_addr.front() {
             stack_size += addition_stack_info.get_pos();
@@ -748,11 +747,6 @@ impl GenerateAsm for Func {
         }
         AsmBuilder::new(f).show_func(&self.label)?;
         self.context.as_mut().call_prologue_event();
-        log!(
-            "func: {}, stack size:{}",
-            self.label,
-            self.context.get_offset()
-        );
         let mut size = 0;
         for block in self.blocks.iter() {
             size += block.insts.len();
