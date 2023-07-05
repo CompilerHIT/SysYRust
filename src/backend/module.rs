@@ -66,8 +66,8 @@ impl AsmModule {
         self.allocate_reg();
         self.handle_spill(pool, f); //yjh: i am going to adjust
         self.remove_unuse_inst_suf_alloc(); //yjh:i am going to do
-        
-        // self.print_model(); 
+
+        // self.print_model();
         self.map_v_to_p();
     }
 
@@ -208,7 +208,7 @@ impl AsmModule {
         });
     }
 
-    fn generate_row_asm(&mut self, f: &mut File, pool: &mut BackendPool) {
+    pub fn generate_row_asm(&mut self, f: &mut File, pool: &mut BackendPool) {
         self.func_map.iter_mut().for_each(|(_, func)| {
             if !func.is_extern {
                 func.as_mut()
