@@ -13,18 +13,19 @@ use crate::log;
 use crate::utility::ObjPtr;
 
 use super::instrs::Context;
+use super::opt::BackendPass;
 use super::structs::GenerateAsm;
 
-pub struct AsmModule<'a> {
+pub struct AsmModule {
     pub global_var_list: Vec<(ObjPtr<Inst>, GlobalVar)>,
 
-    func_map: Vec<(ObjPtr<Function>, ObjPtr<Func>)>,
-    pub upper_module: &'a Module,
+    pub func_map: Vec<(ObjPtr<Function>, ObjPtr<Func>)>,
+    pub upper_module: Module,
 }
 
-impl<'a> AsmModule<'a> {
-    pub fn new(ir_module: &'a Module) -> Self {
-        let global_var_list = Self::get_global(ir_module);
+impl AsmModule {
+    pub fn new(ir_module: Module) -> Self {
+        let global_var_list = Self::get_global(ir_module.clone());
         Self {
             global_var_list,
             // global_fvar_list,
@@ -57,33 +58,35 @@ impl<'a> AsmModule<'a> {
     // 寄存器分配和使用后 移除无用指令(比如移除多余的缓存指令)
     fn remove_unuse_inst_suf_alloc(&mut self) {}
 
-    pub fn generate(&mut self, f: &mut File, f2: &mut File, pool: &mut BackendPool) {
+    pub fn build(&mut self, f: &mut File, f2: &mut File, pool: &mut BackendPool) {
         self.build_lir(pool);
         // TOCHECK 寄存器分配和handlespill前无用指令删除,比如删除mv指令方便寄存器分配
         self.remove_unuse_inst_pre_alloc(); //fixme: to imporve
-        // self.generate_row_asm(f2, pool); //注释
+                                            // self.generate_row_asm(f2, pool); //注释
         self.allocate_reg();
         self.handle_spill(pool, f); //yjh: i am going to adjust
         self.remove_unuse_inst_suf_alloc(); //yjh:i am going to do
-
-        // 检查地址溢出，插入间接寻址
-        self.handle_overflow(pool);
-        self.generate_global_var(f);
-        self.print_model();
-
-        // TODO 1:汇编前进行窥孔优化,比如移除mv循环 a->b,b->a
-
-        // TODO 2:并行化分析,进行长块内并行分析,找出所有并行区间和串行区域
-
-        // TODO 3:使用并行化分析结果,插入调用并行函数汇编
-
-        self.generate_asm(f, pool);
+        
+        // self.print_model(); 
+        self.map_v_to_p();
     }
 
-    fn handle_overflow(&mut self, pool: &mut BackendPool) {
+    pub fn handle_overflow(&mut self, pool: &mut BackendPool) {
         self.func_map.iter_mut().for_each(|(_, func)| {
             if !func.is_extern {
                 func.as_mut().handle_overflow(pool);
+            }
+        });
+    }
+
+    fn map_v_to_p(&mut self) {
+        self.func_map.iter_mut().for_each(|(_, func)| {
+            if !func.is_extern {
+                func.blocks.iter().for_each(|block| {
+                    block.insts.iter().for_each(|inst| {
+                        inst.as_mut().v_to_phy(func.context.get_reg_map().clone());
+                    });
+                });
             }
         });
     }
@@ -105,7 +108,7 @@ impl<'a> AsmModule<'a> {
         });
     }
 
-    fn get_global(ir_module: &Module) -> Vec<(ObjPtr<Inst>, GlobalVar)> {
+    fn get_global(ir_module: Module) -> Vec<(ObjPtr<Inst>, GlobalVar)> {
         let map = &ir_module.global_variable;
         let mut list = Vec::with_capacity(map.len());
         for (name, iter) in map {
@@ -194,7 +197,10 @@ impl<'a> AsmModule<'a> {
         }
     }
 
-    fn generate_asm(&mut self, f: &mut File, pool: &mut BackendPool) {
+    pub fn generate_asm(&mut self, f: &mut File, pool: &mut BackendPool) {
+        // 生成全局变量与数组
+        self.generate_global_var(f);
+
         self.func_map.iter_mut().for_each(|(_, func)| {
             if !func.is_extern {
                 func.as_mut().generate(pool.put_context(Context::new()), f);

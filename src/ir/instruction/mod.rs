@@ -68,7 +68,35 @@ pub enum InstKind {
     Head(Option<ObjPtr<BasicBlock>>),
 }
 
-#[derive(Debug, Clone, Copy)]
+impl PartialEq for InstKind {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Alloca(_), Self::Alloca(_)) => true,
+            (Self::Gep, Self::Gep) => true,
+            (Self::Load, Self::Load) => true,
+            (Self::Store, Self::Store) => true,
+            (Self::Binary(bop1), Self::Binary(bop2)) => bop1 == bop2,
+            (Self::Unary(uop1), Self::Unary(uop2)) => uop1 == uop2,
+            (Self::Branch, Self::Branch) => true,
+            (Self::Call(_), Self::Call(_)) => true,
+            (Self::Parameter, Self::Parameter) => true,
+            (Self::Return, Self::Return) => true,
+            (Self::FtoI, Self::FtoI) => true,
+            (Self::ItoF, Self::ItoF) => true,
+            (Self::ConstInt(_), Self::ConstInt(_)) => true,
+            (Self::GlobalConstInt(_), Self::GlobalConstInt(_)) => true,
+            (Self::ConstFloat(_), Self::ConstFloat(_)) => true,
+            (Self::GlobalConstFloat(_), Self::GlobalConstFloat(_)) => true,
+            (Self::GlobalInt(_), Self::GlobalInt(_)) => true,
+            (Self::GlobalFloat(_), Self::GlobalFloat(_)) => true,
+            (Self::Phi, Self::Phi) => true,
+            (Self::Head(_), Self::Head(_)) => true,
+            _ => false,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum BinOp {
     Add,
     Sub,
@@ -83,7 +111,7 @@ pub enum BinOp {
     Gt,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum UnOp {
     Pos,
     Neg,
@@ -146,7 +174,7 @@ impl Inst {
         }
     }
 
-    /// 获得当前指令的前一条指令。若为第一条指令，则返回None
+    /// 获得当前指令的前一条指令。
     pub fn get_prev(&self) -> ObjPtr<Inst> {
         self.list.get_prev()
     }

@@ -25,8 +25,8 @@ use crate::ir::basicblock::BasicBlock;
 use crate::ir::function::Function;
 use crate::ir::instruction::Inst;
 use crate::ir::ir_type::IrType;
-use crate::log_file;
 use crate::utility::{ObjPtr, ScalarType};
+use crate::{config, log_file};
 
 #[derive(Clone)]
 pub struct Func {
@@ -266,6 +266,7 @@ impl Func {
     }
 
     pub fn calc_live(&mut self) {
+        //TODO, 去除allocable限制!
         let calc_live_file = "callive.txt";
         // fs::remove_file(calc_live_file);
         log_file!(
@@ -301,9 +302,6 @@ impl Func {
             }
         };
 
-        // log_file!(calc_live_file,"-----------------------------------before count live def,live use----------------------------");
-        // printinterval();
-
         // 计算公式，live in 来自于所有前继的live out的集合 + 自身的live use
         // live out等于所有后继块的live in的集合与 (自身的livein 和live def的并集) 的交集
         // 以块为遍历单位进行更新
@@ -321,16 +319,12 @@ impl Func {
             for it in block.as_ref().insts.iter().rev() {
                 log_file!(calc_live_file, "{}", it.as_ref());
                 for reg in it.as_ref().get_reg_def().into_iter() {
-                    if reg.is_virtual() || reg.is_allocable() {
-                        block.as_mut().live_use.remove(&reg);
-                        block.as_mut().live_def.insert(reg);
-                    }
+                    block.as_mut().live_use.remove(&reg);
+                    block.as_mut().live_def.insert(reg);
                 }
                 for reg in it.as_ref().get_reg_use().into_iter() {
-                    if reg.is_virtual() || reg.is_allocable() {
-                        block.as_mut().live_def.remove(&reg);
-                        block.as_mut().live_use.insert(reg);
-                    }
+                    block.as_mut().live_def.remove(&reg);
+                    block.as_mut().live_use.insert(reg);
                 }
             }
             log_file!(
@@ -355,9 +349,6 @@ impl Func {
             block.as_mut().live_out.clear();
         }
 
-        // log_file!(calc_live_file,"-----------------------------------before count live in,live out----------------------------");
-        // printinterval();
-
         //然后计算live in 和live out
         while let Some(value) = queue.pop_front() {
             let (block, reg) = value;
@@ -380,26 +371,6 @@ impl Func {
                         queue.push_back((pred.clone(), reg));
                     }
                 }
-                // log_file!(
-                //     "19_2.txt",
-                //     "live in:{:?}\nlive out:{:?}\nlive def:{:?}\nlive use:{:?}",
-                //     pred.live_in
-                //         .iter()
-                //         .map(|r| r.get_id())
-                //         .collect::<HashSet<i32>>(),
-                //     pred.live_out
-                //         .iter()
-                //         .map(|r| r.get_id())
-                //         .collect::<HashSet<i32>>(),
-                //     pred.live_def
-                //         .iter()
-                //         .map(|r| r.get_id())
-                //         .collect::<HashSet<i32>>(),
-                //     pred.live_use
-                //         .iter()
-                //         .map(|r| r.get_id())
-                //         .collect::<HashSet<i32>>(),
-                // );
             }
         }
 
@@ -439,11 +410,30 @@ impl Func {
 
         log_file!(
             "calout.txt",
-            "{:?},\n{:?}",
+            "dstr,num:{} :{:?},\nspillings,num:{}:{:?}",
+            alloc_stat.dstr.len(),
             alloc_stat.dstr,
+            alloc_stat.spillings.len(),
             alloc_stat.spillings
         );
-        let check_alloc_path = "check_alloc.txt";
+        let file_path = config::get_file_path().unwrap();
+        if alloc_stat.spillings.len() == 0 {
+            log_file!(
+                "bestalloc.txt",
+                "func: {}-{}",
+                file_path.to_owned(),
+                self.label
+            );
+        } else {
+            log_file!(
+                "unbestalloc.txt",
+                "func:{}-{},dstr/spill:{}",
+                file_path.to_owned(),
+                self.label,
+                alloc_stat.dstr.len() as f32 / alloc_stat.spillings.len() as f32
+            );
+        }
+        let check_alloc_path = "./check_alloc.txt";
         log_file!(check_alloc_path, "{:?}", self.label);
         log_file!(
             check_alloc_path,
@@ -455,11 +445,11 @@ impl Func {
 
         self.reg_alloc_info = alloc_stat;
         self.context.as_mut().set_reg_map(&self.reg_alloc_info.dstr);
-        log!("dstr map info{:?}", self.reg_alloc_info.dstr);
-        log!("spills:{:?}", self.reg_alloc_info.spillings);
+        // log!("dstr map info{:?}", self.reg_alloc_info.dstr);
+        // log!("spills:{:?}", self.reg_alloc_info.spillings);
 
         let stack_size = self.max_params * ADDR_SIZE;
-        log!("set stack size:{}", stack_size);
+        // log!("set stack size:{}", stack_size);
         self.context.as_mut().set_offset(stack_size);
     }
 
@@ -477,8 +467,7 @@ impl Func {
                 }
                 let dst = inst.get_dst();
                 let src = inst.get_lhs();
-                if inst.get_type() == InstrsType::OpReg(super::instrs::SingleOp::IMv) && dst == src
-                {
+                if inst.get_type() == InstrsType::OpReg(super::instrs::SingleOp::Mv) && dst == src {
                     bb.as_mut().insts.remove(index);
                 } else {
                     index += 1;
@@ -639,7 +628,13 @@ impl Func {
                                 true,
                             );
                         } else if operand::is_imm_12bs(stack_size - slot.get_pos()) {
-                            builder.s(&reg.to_string(false), "sp", stack_size - slot.get_pos(), is_float, true);
+                            builder.s(
+                                &reg.to_string(false),
+                                "sp",
+                                stack_size - slot.get_pos(),
+                                is_float,
+                                true,
+                            );
                         } else {
                             if first {
                                 let offset = stack_size - slot.get_pos();
@@ -693,7 +688,13 @@ impl Func {
                                 true,
                             );
                         } else if operand::is_imm_12bs(stack_size - slot.get_pos()) {
-                            builder.l(&reg.to_string(false), "sp", stack_size - slot.get_pos(), is_float, true);
+                            builder.l(
+                                &reg.to_string(false),
+                                "sp",
+                                stack_size - slot.get_pos(),
+                                is_float,
+                                true,
+                            );
                         } else {
                             if first {
                                 let offset = stack_size - slot.get_pos();
@@ -811,5 +812,21 @@ impl Func {
             })
         });
         return out;
+    }
+
+    // 获取所有虚拟寄存器和用到的物理寄存器
+    pub fn draw_all_virtual_regs(&self) -> HashSet<Reg> {
+        let mut passed = HashSet::new();
+        let mut out = self.blocks.iter().for_each(|bb| {
+            bb.insts.iter().for_each(|inst| {
+                for reg in inst.get_regs() {
+                    if reg.is_physic() {
+                        continue;
+                    }
+                    passed.insert(reg);
+                }
+            })
+        });
+        passed
     }
 }

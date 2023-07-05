@@ -1,40 +1,35 @@
 use super::*;
 
 impl Allocator {
+    /// 该函数应该且只应该在活跃虚拟寄存器着色完后调用一次
     #[inline]
     pub fn color_last(&mut self) {
         // 着色最后的节点
-        let last_colors = &self.info.as_ref().unwrap().last_colors;
-        let spillings = &self.info.as_ref().unwrap().spillings;
-        let dstr = &self.info.as_ref().unwrap().colors;
-        let mut to_color: Vec<(i32, i32)> =
-            Vec::with_capacity(self.info.as_ref().unwrap().last_colors.len());
-        let interference_graph = &self.info.as_ref().unwrap().all_neighbors;
-        for reg in last_colors {
-            // 计算其available
-            let mut reg_use_stat = RegUsedStat::new();
-            for reg in interference_graph.get(&reg).unwrap() {
-                if reg.is_physic() {
-                    reg_use_stat.use_reg(reg.get_color());
-                } else {
-                    if spillings.contains(&reg.get_id()) {
-                        continue;
-                    }
-                    reg_use_stat.use_reg(*dstr.get(&reg.get_id()).unwrap());
-                }
-            }
-            to_color.push((
-                reg.get_id(),
-                reg_use_stat.get_available_reg(reg.get_type()).unwrap(),
-            ));
-        }
-        let dstr = &mut self.info.as_mut().unwrap().colors;
-        for (reg, color) in to_color {
-            dstr.insert(reg, color);
+        while self.get_last_colors_lst().len() != 0 {
+            let last_reg = self.get_mut_last_colors_lst().pop_back().unwrap();
+            let available = self.draw_available(&last_reg);
+            let color = available.get_available_reg(last_reg.get_type()).unwrap();
+            self.get_mut_colors().insert(last_reg.get_id(), color);
         }
     }
 
+    // 把一个虚拟寄存器加入 k_graph
+    pub fn push_to_k_graph(&mut self, reg: &Reg) {
+        // 加入虚拟寄存器的k_graph item 以 num_available/num live neighbor为权重
+        // 检查的时候优先检查权重小的
+        // 这样可以优先检查到不在k-graph的节点
+        let item = self.draw_na_div_nln_item(reg);
+        self.info.as_mut().unwrap().k_graph.0.push(item);
+        self.info
+            .as_mut()
+            .unwrap()
+            .k_graph
+            .1
+            .insert(reg.bit_code() as usize);
+    }
+
     // 检查是否当前k_graph中的节点都已经是合理的节点
+    // 如果k_graph中的节点不是已经
     pub fn check_k_graph(&mut self) -> ActionResult {
         // 检查是否k_graph里面的值全部为真
         let mut out = ActionResult::Success;
@@ -44,20 +39,34 @@ impl Allocator {
                 break;
             }
             let item = self.info.as_mut().unwrap().k_graph.0.pop_min().unwrap();
-            let map = &self.info.as_ref().unwrap().k_graph.1;
-            if !map.contains(item.reg.bit_code() as usize) {
-                // 如果不在k graph中了,则继续
-                continue;
-            }
             let reg = item.reg;
-            if !self.is_k_graph_node(&reg) {
-                out = ActionResult::Unfinish;
-                let new_item = self.draw_spill_div_nlc_item(&reg);
-                self.info.as_mut().unwrap().to_color.push(new_item);
+            if self.if_has_been_colored(&reg) || self.if_has_been_spilled(&reg) {
+                // unreachable!();
                 continue;
             }
-            let new_item = self.draw_spill_div_nlc_item(&reg);
-            new_biheap.push(new_item);
+            if !self
+                .info
+                .as_ref()
+                .unwrap()
+                .k_graph
+                .1
+                .contains(reg.bit_code() as usize)
+            {
+                continue;
+            }
+            let (na, nln) = self.get_num_available_and_num_live_neighbor(&reg);
+            if na <= nln {
+                self.info
+                    .as_mut()
+                    .unwrap()
+                    .k_graph
+                    .1
+                    .remove(reg.bit_code() as usize);
+                out = ActionResult::Fail;
+                self.push_to_tocolor(&reg);
+                break;
+            }
+            new_biheap.push(item);
         }
         if self.info.as_ref().unwrap().k_graph.0.len() == 0 {
             self.info.as_mut().unwrap().k_graph.0 = new_biheap;
@@ -72,16 +81,20 @@ impl Allocator {
     ///  给剩余地悬点进行着色  (悬点并未进入spilling中,所以仍然获取到周围地颜色)
     pub fn color_k_graph(&mut self) -> ActionResult {
         // 对最后的k个节点进行着色
+        assert!(true);
         loop {
             let k_graph = &mut self.info.as_mut().unwrap().k_graph;
             if k_graph.0.is_empty() {
                 break;
             }
+            // println!("{}", k_graph.0.len());
             let item = k_graph.0.pop_min().unwrap();
             let reg = item.reg;
-            let available = self.draw_available_and_num_neigbhor_color(&reg);
+            // println!("{}", reg);
+            let available = self.draw_available(&reg);
+            let color = available.get_available_reg(reg.get_type()).unwrap();
+            self.get_mut_colors().insert(reg.get_id(), color);
         }
-
         ActionResult::Success
     }
 

@@ -15,4 +15,9 @@ impl Inst {
     pub fn get_param_type(&self) -> IrType {
         self.user.get_ir_type()
     }
+
+    /// 判断是否为参数指令
+    pub fn is_param(&self) -> bool {
+        self.kind == InstKind::Parameter
+    }
 }

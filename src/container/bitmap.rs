@@ -146,6 +146,7 @@ mod test_bitmap {
     #[test]
     fn test_insert() {
         let mut bitmap = Bitmap::new();
+        println!("ss");
         bitmap.insert(33);
         assert!(bitmap.contains(33));
     }
