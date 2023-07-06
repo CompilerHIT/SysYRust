@@ -32,6 +32,10 @@ pub fn optimizer_run(
         func_inline::inline_run(module, &mut pools);
         functional_optimizer(module, &mut pools, optimize_flag);
 
+        // 全局值编号
+        global_value_numbering::easy_gvn(module);
+        functional_optimizer(module, &mut pools, optimize_flag);
+
         // TODO: 性能优化
     }
 }
@@ -47,9 +51,6 @@ fn functional_optimizer(
 
     // phi优化
     phi_optimizer::phi_run(module);
-
-    // 全局值编号
-    // global_value_numbering::easy_gvn(module);
 
     // 常量折叠
     constant_folding::constant_folding(module, &mut pools, optimize_flag);
