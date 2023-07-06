@@ -1,4 +1,6 @@
 //! src/ir/Instruction/mod.rs
+use std::fmt::Debug;
+
 ///! 此模块中存放有Inst和InstKind结构体的定义，还有
 ///! 所有Inst类型的公有方法和Head的简单实现。特定的
 ///! inst的相关实现放在当前目录下的其他文件中。
@@ -19,7 +21,7 @@ mod phi;
 mod store;
 mod unary;
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Inst {
     user: User,
     list: IList<Inst>,
@@ -27,7 +29,7 @@ pub struct Inst {
     init: (Vec<i32>, Vec<f32>),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub enum InstKind {
     // 内存相关
     Alloca(i32),
@@ -66,6 +68,42 @@ pub enum InstKind {
 
     // 作为链表头存在，没有实际意义
     Head(Option<ObjPtr<BasicBlock>>),
+}
+
+impl Debug for InstKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s;
+        match self {
+            InstKind::ConstInt(i) => s = format!("ConstInt({})", i),
+            InstKind::ConstFloat(f) => s = format!("ConstFloat({})", f),
+            InstKind::GlobalConstInt(i) => s = format!("GlobalConstInt({})", i),
+            InstKind::GlobalConstFloat(f) => s = format!("GlobalConstFloat({})", f),
+            InstKind::GlobalInt(i) => s = format!("GlobalInt({})", i),
+            InstKind::GlobalFloat(f) => s = format!("GlobalFloat({})", f),
+            InstKind::Alloca(i) => s = format!("Alloca({})", i),
+            InstKind::Gep => s = format!("Gep"),
+            InstKind::Load => s = format!("Load"),
+            InstKind::Store => s = format!("Store"),
+            InstKind::Binary(bop) => s = format!("Binary({:?})", bop),
+            InstKind::Unary(uop) => s = format!("Unary({:?})", uop),
+            InstKind::Branch => s = format!("Branch"),
+            InstKind::Call(name) => s = format!("Call({})", name),
+            InstKind::Parameter => s = format!("Parameter"),
+            InstKind::Return => s = format!("Return"),
+            InstKind::FtoI => s = format!("FtoI"),
+            InstKind::ItoF => s = format!("ItoF"),
+            InstKind::Phi => s = format!("Phi"),
+            InstKind::Head(Some(bb)) => s = format!("Head({})", bb.get_name()),
+            InstKind::Head(None) => s = format!("Head(None)"),
+        }
+        write!(f, "{}", s)
+    }
+}
+
+impl Debug for Inst {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self.kind)
+    }
 }
 
 impl PartialEq for InstKind {
