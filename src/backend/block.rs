@@ -354,20 +354,20 @@ impl BB {
                             // 数组成员若是int型则不超过32位，使用word
                             // ld dst array_offset(sp) # get label(base addr)
                             // lw dst 4 * gep_offset(dst)
-                            let mut src_reg;
                             let index = addr.as_ref().get_gep_ptr();
-                            if let Some(head) = map_info.array_slot_map.get(&index) {
-                                src_reg = Operand::Reg(Reg::init(ScalarType::Int));
-                                let mut load = LIRInst::new(
-                                    InstrsType::LoadParamFromStack,
-                                    vec![src_reg.clone(), Operand::IImm(IImm::new(*head))],
-                                );
-                                load.set_double();
-                                self.insts.push(pool.put_inst(load));
-                            } else {
-                                // 找不到，认为是全局数组或者参数，全局数组的访问是load -> gep -> load -> alloca
-                                src_reg = self.resolve_operand(func, index, true, map_info, pool);
-                            }
+                            let src_reg = self.resolve_operand(func, index, true, map_info, pool);
+                            // if let Some(head) = map_info.array_slot_map.get(&index) {
+                            //     src_reg = Operand::Reg(Reg::init(ScalarType::Int));
+                            //     let mut load = LIRInst::new(
+                            //         InstrsType::LoadParamFromStack,
+                            //         vec![src_reg.clone(), Operand::IImm(IImm::new(*head))],
+                            //     );
+                            //     load.set_double();
+                            //     self.insts.push(pool.put_inst(load));
+                            // } else {
+                            //     // 找不到，认为是全局数组或者参数，全局数组的访问是load -> gep -> load -> alloca
+                            //     // src_reg = self.resolve_operand(func, index, true, map_info, pool);
+                            // }
                             match addr.get_gep_offset().get_kind() {
                                 InstKind::ConstInt(imm) | InstKind::GlobalConstInt(imm) => {
                                     let offset = imm * 4;
@@ -444,45 +444,52 @@ impl BB {
                     let value_reg = self.resolve_operand(func, value, true, map_info, pool);
                     match addr.as_ref().get_kind() {
                         InstKind::Gep => {
-                            let mut load_new = true;
-                            let mut addr_reg = match map_info.val_map.get(&addr.get_gep_ptr()) {
-                                Some(reg) => {
-                                    load_new = false;
-                                    reg.clone()
-                                }
-                                None => Operand::Reg(Reg::init(ScalarType::Int)),
-                            };
-                            if let Some(base) = map_info.array_slot_map.get(&addr.get_gep_ptr()) {
-                                if load_new {
-                                    let mut load = LIRInst::new(
-                                        InstrsType::LoadParamFromStack,
-                                        vec![addr_reg.clone(), Operand::IImm(IImm::new(*base))],
-                                    );
-                                    load.set_double();
-                                    self.insts.push(pool.put_inst(load));
-                                }
-                            } else {
-                                // 找不到，认为是全局数组或者参数或嵌套的gep
-                                addr_reg = self.resolve_operand(
-                                    func,
-                                    addr.get_gep_ptr(),
-                                    true,
-                                    map_info,
-                                    pool,
-                                );
-                            }
-                            match addr_reg {
-                                // 使用全局数组，addr_reg获得的是地址，而非寄存器，因此需要加载
-                                Operand::Addr(..) => {
-                                    let addr = addr_reg.clone();
-                                    addr_reg = Operand::Reg(Reg::init(ScalarType::Int));
-                                    self.insts.push(pool.put_inst(LIRInst::new(
-                                        InstrsType::OpReg(SingleOp::LoadAddr),
-                                        vec![addr_reg.clone(), addr],
-                                    )));
-                                }
-                                _ => {}
-                            }
+                            // let mut load_new = true;
+                            // let mut addr_reg = match map_info.val_map.get(&addr.get_gep_ptr()) {
+                            //     Some(reg) => {
+                            //         load_new = false;
+                            //         reg.clone()
+                            //     }
+                            //     None => Operand::Reg(Reg::init(ScalarType::Int)),
+                            // };
+                            // if let Some(base) = map_info.array_slot_map.get(&addr.get_gep_ptr()) {
+                            //     if load_new {
+                            //         let mut load = LIRInst::new(
+                            //             InstrsType::LoadParamFromStack,
+                            //             vec![addr_reg.clone(), Operand::IImm(IImm::new(*base))],
+                            //         );
+                            //         load.set_double();
+                            //         self.insts.push(pool.put_inst(load));
+                            //     }
+                            // } else {
+                            //     // 找不到，认为是全局数组或者参数或嵌套的gep
+                            //     addr_reg = self.resolve_operand(
+                            //         func,
+                            //         addr.get_gep_ptr(),
+                            //         true,
+                            //         map_info,
+                            //         pool,
+                            //     );
+                            // }
+                            let addr_reg = self.resolve_operand(
+                                func,
+                                addr.get_gep_ptr(),
+                                true,
+                                map_info,
+                                pool,
+                            );
+                            // match addr_reg {
+                            //     // 使用全局数组，addr_reg获得的是地址，而非寄存器，因此需要加载
+                            //     Operand::Addr(..) => {
+                            //         let addr = addr_reg.clone();
+                            //         addr_reg = Operand::Reg(Reg::init(ScalarType::Int));
+                            //         self.insts.push(pool.put_inst(LIRInst::new(
+                            //             InstrsType::OpReg(SingleOp::LoadAddr),
+                            //             vec![addr_reg.clone(), addr],
+                            //         )));
+                            //     }
+                            //     _ => {}
+                            // }
                             match addr.get_gep_offset().get_kind() {
                                 InstKind::ConstInt(offset) | InstKind::GlobalConstInt(offset) => {
                                     self.insts.push(pool.put_inst(LIRInst::new(
@@ -543,6 +550,9 @@ impl BB {
                     //TODO:la dst label    sd dst (offset)sp
                     //TODO: 大数组而装填因子过低的压缩问题
                     //FIXME: 认为未初始化数组也被初始化为全0
+
+                    //TODO: opt: 对于出现过的数组，从寄存器中取出
+                    let mut first = false;
                     match inst_ref.get_ir_type() {
                         IrType::IntPtr => {
                             let alloca = IntArray::new(
@@ -551,7 +561,7 @@ impl BB {
                                 true,
                                 inst_ref.get_int_init().clone(),
                             );
-                            func.as_mut().const_array.insert(alloca);
+                            first = func.as_mut().const_array.insert(alloca);
                         }
                         IrType::FloatPtr => {
                             let alloca = FloatArray::new(
@@ -560,34 +570,35 @@ impl BB {
                                 true,
                                 inst_ref.get_float_init().clone(),
                             );
-                            func.as_mut().float_array.insert(alloca);
+                            first = func.as_mut().float_array.insert(alloca);
                         }
                         _ => unreachable!("invalid alloca type {:?}", inst_ref.get_ir_type()),
                     }
 
-                    let last = func.as_ref().stack_addr.front().unwrap();
-                    let pos = last.get_pos() + ADDR_SIZE;
-                    func.as_mut()
-                        .stack_addr
-                        .push_front(StackSlot::new(pos, ADDR_SIZE));
+                    // let last = func.as_ref().stack_addr.front().unwrap();
+                    // let pos = last.get_pos() + ADDR_SIZE;
+                    // func.as_mut()
+                    //     .stack_addr
+                    //     .push_front(StackSlot::new(pos, ADDR_SIZE));
+                    if first {
+                        let dst_reg = self.resolve_operand(func, ir_block_inst, true, map_info, pool);
+                        // let offset = pos;
+                        self.insts.push(pool.put_inst(LIRInst::new(
+                            InstrsType::OpReg(SingleOp::LoadAddr),
+                            vec![dst_reg.clone(), Operand::Addr(label.clone())],
+                        )));
+                    }
 
-                    let dst_reg = self.resolve_operand(func, ir_block_inst, true, map_info, pool);
-                    let offset = pos;
-                    self.insts.push(pool.put_inst(LIRInst::new(
-                        InstrsType::OpReg(SingleOp::LoadAddr),
-                        vec![dst_reg.clone(), Operand::Addr(label.clone())],
-                    )));
-
-                    let mut store = LIRInst::new(
-                        InstrsType::StoreParamToStack,
-                        vec![dst_reg.clone(), Operand::IImm(IImm::new(offset))],
-                    );
-                    store.set_double();
-                    self.insts.push(pool.put_inst(store));
+                    // let mut store = LIRInst::new(
+                    //     InstrsType::StoreParamToStack,
+                    //     vec![dst_reg.clone(), Operand::IImm(IImm::new(offset))],
+                    // );
+                    // store.set_double();
+                    // self.insts.push(pool.put_inst(store));
 
                     // array: offset~offset+size(8字节对齐)
                     // map_key: array_name
-                    map_info.array_slot_map.insert(ir_block_inst, offset);
+                    // map_info.array_slot_map.insert(ir_block_inst, offset);
                 }
                 InstKind::Branch => {
                     // if jump
