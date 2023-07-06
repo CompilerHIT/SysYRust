@@ -84,8 +84,11 @@ fn bb_verify(
 }
 
 fn inst_verify(inst: ObjPtr<Inst>, inst_map: &mut HashMap<ObjPtr<Inst>, Vec<ObjPtr<Inst>>>) {
-    let _prev = inst.get_prev();
-    let _next = inst.get_next();
+    let prev = inst.get_prev();
+    let next = inst.get_next();
+    debug_assert_ne!(prev, inst, "prev == inst: {:?}", inst.get_kind());
+    debug_assert_ne!(next, inst, "next == inst: {:?}", inst.get_kind());
+    debug_assert_ne!(prev, next, "prev == next: {:?}", prev.get_kind());
 
     debug_assert_ne!(inst.get_kind(), InstKind::Parameter);
     debug_assert_ne!(inst.get_kind(), InstKind::GlobalConstInt(0));
