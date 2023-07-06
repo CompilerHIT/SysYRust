@@ -160,7 +160,6 @@ impl Func {
             }
             let block = self.blocks[index];
             if block != self.entry.unwrap() {
-                // log!("start build block");
                 if i == 0 {
                     block.as_mut().showed = false;
                 }
@@ -176,6 +175,9 @@ impl Func {
                         .construct(this, *basicblock, None, &mut info, pool);
                 }
                 i += 1;
+                if get_32_flag() {
+                    return;
+                }
             }
             index += 1;
         }
@@ -204,10 +206,8 @@ impl Func {
             if !insert_before {
                 index += 1;
             }
-            if let Some(mut target) = info.phis_to_block.get_mut(&block.label) {
+            if let Some(target) = info.phis_to_block.get_mut(&block.label) {
                 for inst in target.iter() {
-                    // log!("label: {}", block.label);
-                    // log!("insert phi to last: {:?}", inst);
                     block.as_mut().insts.insert(index, *inst);
                 }
             }
@@ -216,15 +216,6 @@ impl Func {
                 block.as_mut().insts.insert(0, inst);
             }
             size += block.insts.len();
-        }
-        // log!("phi insert size: {}", size);
-
-        for block in self.blocks.iter() {
-            // log!("-----------------");
-            // log!("block: {:?}", block.label);
-            for inst in block.insts.iter() {
-                // log!("row inst: {:?}", inst);
-            }
         }
         self.update(this);
     }
@@ -736,6 +727,9 @@ impl Func {
 
 impl GenerateAsm for Func {
     fn generate(&mut self, _: ObjPtr<Context>, f: &mut File) -> Result<()> {
+        if get_32_flag() && self.label != "main"{
+            return Ok(());
+        }
         if self.const_array.len() > 0 || self.float_array.len() > 0 {
             writeln!(f, "	.data\n   .align  3")?;
         }
