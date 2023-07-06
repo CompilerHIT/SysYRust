@@ -30,6 +30,7 @@ macro_rules! log_file {
         .expect("Failed to open log file");
 
         writeln!(file, $($arg)*).expect("Failed to write to log file");
+        true
     }};
 }
 
@@ -47,6 +48,7 @@ macro_rules! log_file_uln {
         .open($file)
         .expect("Failed to open log file");
         write!(file, $($arg)*).expect("Failed to write to log file");
+        true
     }};
 }
 
