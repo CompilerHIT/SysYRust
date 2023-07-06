@@ -88,7 +88,16 @@ fn inst_verify(inst: ObjPtr<Inst>, inst_map: &mut HashMap<ObjPtr<Inst>, Vec<ObjP
     let next = inst.get_next();
     debug_assert_ne!(prev, inst, "prev == inst: {:?}", inst.get_kind());
     debug_assert_ne!(next, inst, "next == inst: {:?}", inst.get_kind());
-    debug_assert_ne!(prev, next, "prev == next: {:?}", prev.get_kind());
+    debug_assert!(
+        if prev == next {
+            prev.get_kind() == InstKind::Head(None)
+        } else {
+            true
+        },
+        "prev == next: {:?}, prev & inst: {:?}",
+        inst,
+        prev
+    );
 
     debug_assert_ne!(inst.get_kind(), InstKind::Parameter);
     debug_assert_ne!(inst.get_kind(), InstKind::GlobalConstInt(0));
