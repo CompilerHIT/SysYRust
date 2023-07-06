@@ -10,8 +10,6 @@ use crate::{
     utility::ObjPtr,
 };
 
-use super::constant_folding::replace_inst;
-
 pub struct Congruence {
     pub vec_class: Vec<Vec<ObjPtr<Inst>>>,
     pub map: HashMap<ObjPtr<Inst>, usize>,
@@ -28,6 +26,7 @@ pub fn easy_gvn(module: &mut Module) {
         loop {
             let mut changed = false;
             bfs_inst_process(func.get_head(), |inst| {
+                // println!("inst:{:?}inst_bb:{:?}",inst.get_kind(),inst.get_parent_bb().get_name());
                 changed |= has_val(&mut congruence, inst, &dominator_tree)
             });
             if !changed {
@@ -42,6 +41,7 @@ pub fn has_val(
     inst: ObjPtr<Inst>,
     dominator_tree: &DominatorTree,
 ) -> bool {
+    // println!("{:?}",dominator_tree.is_dominate(&inst.get_parent_bb(), &inst.get_parent_bb()));
     match inst.get_kind() {
         InstKind::Alloca(_)
         | InstKind::Branch
@@ -55,13 +55,22 @@ pub fn has_val(
         | InstKind::GlobalConstInt(_)
         | InstKind::GlobalFloat(_)
         | InstKind::GlobalInt(_)
-        | InstKind::Phi => {} //todo:phi可以被优化吗
+        | InstKind::Phi => {
+            // println!("跳过指令{:?}",inst.get_kind());
+        } //todo:phi可以被优化吗
         _ => {
+            // println!("gvn_process inst:{:?},所在块:{:?}",inst.get_kind(),inst.get_parent_bb().get_name());
             for vec_congruent in congrunce.vec_class.clone() {
                 if compare_two_inst(inst, vec_congruent[0], &congrunce) {
                     //todo:找到一个dominant node,返回true和这个node
+                    // println!("找到同类指令集");
+                    if vec_congruent[0].get_parent_bb().get_name()==inst.get_parent_bb().get_name(){
+                        println!("同块");
+                    }
+                    // println!("和首指令不同块");
                     if dominator_tree
-                        .is_dominate(&vec_congruent[0].get_parent_bb(), &inst.get_parent_bb())
+                        .is_dominate(&vec_congruent[0].get_parent_bb(), &inst.get_parent_bb())||
+                        vec_congruent[0].get_parent_bb().get_name()==inst.get_parent_bb().get_name()
                     {
                         println!(
                             "指令{:?}被指令{:?}替换",
@@ -73,10 +82,11 @@ pub fn has_val(
                         return true;
                     } else {
                         for i in 1..vec_congruent.len() {
-                            if dominator_tree.is_dominate(
+                            if dominator_tree.is_dominate (
                                 &vec_congruent[i].get_parent_bb(),
                                 &inst.get_parent_bb(),
-                            ) {
+                            ) ||
+                            vec_congruent[i].get_parent_bb().get_name()==inst.get_parent_bb().get_name(){
                                 println!(
                                     "指令{:?}被指令{:?}替换",
                                     inst.get_kind(),
@@ -102,6 +112,7 @@ pub fn has_val(
     }
 
     let index = congrunce.vec_class.len();
+    println!("inst:{:?}没找到相应同质类,形成一个新类,index:{:?}",inst.get_kind(),index);
     congrunce.vec_class.push(vec![inst]); //加入新的congruent class
     congrunce.map.insert(inst, index); //增加索引映射
     false
@@ -226,4 +237,15 @@ pub fn compare_two_operands(
         return true;
     }
     false
+}
+
+pub fn replace_inst(inst_old: ObjPtr<Inst>, inst_new: ObjPtr<Inst>) {
+    let use_list = inst_old.get_use_list().clone();
+    // inst_old.as_mut().insert_before(inst_new); //插入新指令
+    for user in use_list {
+        //将使用过旧指令的指令指向新指令
+        let index = user.get_operand_index(inst_old);
+        user.as_mut().set_operand(inst_new, index);
+    }
+    inst_old.as_mut().remove_self(); //丢掉旧指令
 }

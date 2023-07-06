@@ -140,7 +140,7 @@ pub fn fold_two_mixed_binst(
                             let inst_result =
                                 pool.make_int_const(const1.get_int_bond() + const2.get_int_bond());
                             let inst_new = pool.make_add(inst_result, inst_unknown);
-                            replace_inst(inst, inst_new);
+                            replace_inst_with_new(inst, inst_new);
                             inst_new.as_mut().insert_before(inst_result);
                         } 
                         return true;
@@ -151,13 +151,13 @@ pub fn fold_two_mixed_binst(
                             let inst_result =
                                 pool.make_int_const(const1.get_int_bond() - const2.get_int_bond());
                             let inst_new = pool.make_add(inst_result, inst_unknown);
-                            replace_inst(inst, inst_new);
+                            replace_inst_with_new(inst, inst_new);
                             inst_new.as_mut().insert_before(inst_result);
                         }else{
                             let inst_result =
                                 pool.make_int_const(const1.get_int_bond() + const2.get_int_bond());
                             let inst_new = pool.make_sub(inst_result, inst_unknown);
-                            replace_inst(inst, inst_new);
+                            replace_inst_with_new(inst, inst_new);
                             inst_new.as_mut().insert_before(inst_result);
                         }
                     }
@@ -178,25 +178,25 @@ pub fn fold_two_mixed_binst(
                                     let inst_result =
                                         pool.make_int_const(const1.get_int_bond() - const2.get_int_bond());
                                     let inst_new = pool.make_add(inst_result, inst_unknown);
-                                    replace_inst(inst, inst_new);
+                                    replace_inst_with_new(inst, inst_new);
                                     inst_new.as_mut().insert_before(inst_result);
                                 }else if num_unknown==1 && num_operand==0{
                                     let inst_result =
                                         pool.make_int_const(-const1.get_int_bond() + const2.get_int_bond());
                                     let inst_new = pool.make_sub(inst_result, inst_unknown);
-                                    replace_inst(inst, inst_new);
+                                    replace_inst_with_new(inst, inst_new);
                                     inst_new.as_mut().insert_before(inst_result);
                                 }else if num_unknown==0 && num_operand==0{
                                     let inst_result =
                                         pool.make_int_const(const1.get_int_bond() + const2.get_int_bond());
                                     let inst_new = pool.make_sub(inst_unknown, inst_result);
-                                    replace_inst(inst, inst_new);
+                                    replace_inst_with_new(inst, inst_new);
                                     inst_new.as_mut().insert_before(inst_result);
                                 }else if num_unknown==0 && num_operand==1{
                                     let inst_result =
                                         pool.make_int_const(const1.get_int_bond() + const2.get_int_bond());
                                     let inst_new = pool.make_sub(inst_result, inst_unknown);
-                                    replace_inst(inst, inst_new);
+                                    replace_inst_with_new(inst, inst_new);
                                 }
                             }
                             return true;
@@ -207,13 +207,13 @@ pub fn fold_two_mixed_binst(
                                     let inst_result =
                                         pool.make_int_const(const2.get_int_bond() - const1.get_int_bond());
                                     let inst_new = pool.make_add(inst_result, inst_unknown);
-                                    replace_inst(inst, inst_new);
+                                    replace_inst_with_new(inst, inst_new);
                                     inst_new.as_mut().insert_before(inst_result);
                                 }else{
                                     let inst_result =
                                         pool.make_int_const(const1.get_int_bond() - const2.get_int_bond());
                                     let inst_new = pool.make_sub(inst_result, inst_unknown);
-                                    replace_inst(inst, inst_new);
+                                    replace_inst_with_new(inst, inst_new);
                                     inst_new.as_mut().insert_before(inst_result);
                                 }
                             }
@@ -232,7 +232,7 @@ pub fn fold_two_mixed_binst(
                                 let inst_result =
                                         pool.make_int_const(const1.get_int_bond() * const2.get_int_bond());
                                     let inst_new = pool.make_mul(inst_result, inst_unknown);
-                                    replace_inst(inst, inst_new);
+                                    replace_inst_with_new(inst, inst_new);
                                     inst_new.as_mut().insert_before(inst_result);
                             }
                             return true;
@@ -264,75 +264,75 @@ pub fn fold_inst(inst_old: ObjPtr<Inst>, pool: &mut ObjPool<Inst>) -> bool {
                         if let Some(val_right) = get_fconstant(operands[1]) {
                             match binop {
                                 BinOp::Add => {
-                                    replace_inst(
+                                    replace_inst_with_new(
                                         inst_old,
                                         pool.make_float_const(val_left + val_right),
                                     );
                                 }
                                 BinOp::Sub => {
-                                    replace_inst(
+                                    replace_inst_with_new(
                                         inst_old,
                                         pool.make_float_const(val_left - val_right),
                                     );
                                 }
                                 BinOp::Mul => {
-                                    replace_inst(
+                                    replace_inst_with_new(
                                         inst_old,
                                         pool.make_float_const(val_left * val_right),
                                     );
                                 }
                                 BinOp::Div => {
-                                    replace_inst(
+                                    replace_inst_with_new(
                                         inst_old,
                                         pool.make_float_const(val_left / val_right),
                                     );
                                 }
                                 BinOp::Rem => {
-                                    replace_inst(
+                                    replace_inst_with_new(
                                         inst_old,
                                         pool.make_float_const(val_left % val_right),
                                     );
                                 }
                                 BinOp::Eq => {
                                     if val_left == val_right {
-                                        replace_inst(inst_old, pool.make_int_const(1));
+                                        replace_inst_with_new(inst_old, pool.make_int_const(1));
                                     } else {
-                                        replace_inst(inst_old, pool.make_int_const(0));
+                                        replace_inst_with_new(inst_old, pool.make_int_const(0));
                                     }
                                 }
                                 BinOp::Ne => {
                                     if val_left != val_right {
-                                        replace_inst(inst_old, pool.make_int_const(1));
+                                        replace_inst_with_new(inst_old, pool.make_int_const(1));
                                     } else {
-                                        replace_inst(inst_old, pool.make_int_const(0));
+                                        replace_inst_with_new(inst_old, pool.make_int_const(0));
                                     }
                                 }
                                 BinOp::Lt => {
                                     if val_left < val_right {
-                                        replace_inst(inst_old, pool.make_int_const(1));
+                                        replace_inst_with_new(inst_old, pool.make_int_const(1));
                                     } else {
-                                        replace_inst(inst_old, pool.make_int_const(0));
+                                        replace_inst_with_new(inst_old, pool.make_int_const(0));
                                     }
                                 }
                                 BinOp::Ge => {
                                     if val_left >= val_right {
-                                        replace_inst(inst_old, pool.make_int_const(1));
+                                        replace_inst_with_new(inst_old, pool.make_int_const(1));
                                     } else {
-                                        replace_inst(inst_old, pool.make_int_const(0));
+                                        replace_inst_with_new(inst_old, pool.make_int_const(0));
                                     }
                                 }
                                 BinOp::Gt => {
                                     if val_left > val_right {
-                                        replace_inst(inst_old, pool.make_int_const(1));
+                                        replace_inst_with_new(inst_old, pool.make_int_const(1));
                                     } else {
-                                        replace_inst(inst_old, pool.make_int_const(0));
+                                        replace_inst_with_new(inst_old, pool.make_int_const(0));
                                     }
                                 }
                                 BinOp::Le => {
                                     if val_left <= val_right {
-                                        replace_inst(inst_old, pool.make_int_const(1));
+                                        replace_inst_with_new(inst_old, pool.make_int_const(1));
                                     } else {
-                                        replace_inst(inst_old, pool.make_int_const(0));
+                                        replace_inst_with_new(inst_old, pool.make_int_const(0));
                                     }
                                 }
                             }
@@ -345,75 +345,75 @@ pub fn fold_inst(inst_old: ObjPtr<Inst>, pool: &mut ObjPool<Inst>) -> bool {
                         if let Some(val_right) = get_iconstant(operands[1]) {
                             match binop {
                                 BinOp::Add => {
-                                    replace_inst(
+                                    replace_inst_with_new(
                                         inst_old,
                                         pool.make_int_const(val_left + val_right),
                                     );
                                 }
                                 BinOp::Sub => {
-                                    replace_inst(
+                                    replace_inst_with_new(
                                         inst_old,
                                         pool.make_int_const(val_left - val_right),
                                     );
                                 }
                                 BinOp::Mul => {
-                                    replace_inst(
+                                    replace_inst_with_new(
                                         inst_old,
                                         pool.make_int_const(val_left * val_right),
                                     );
                                 }
                                 BinOp::Div => {
-                                    replace_inst(
+                                    replace_inst_with_new(
                                         inst_old,
                                         pool.make_int_const(val_left / val_right),
                                     );
                                 }
                                 BinOp::Rem => {
-                                    replace_inst(
+                                    replace_inst_with_new(
                                         inst_old,
                                         pool.make_int_const(val_left % val_right),
                                     );
                                 }
                                 BinOp::Eq => {
                                     if val_left == val_right {
-                                        replace_inst(inst_old, pool.make_int_const(1));
+                                        replace_inst_with_new(inst_old, pool.make_int_const(1));
                                     } else {
-                                        replace_inst(inst_old, pool.make_int_const(0));
+                                        replace_inst_with_new(inst_old, pool.make_int_const(0));
                                     }
                                 }
                                 BinOp::Ne => {
                                     if val_left != val_right {
-                                        replace_inst(inst_old, pool.make_int_const(1));
+                                        replace_inst_with_new(inst_old, pool.make_int_const(1));
                                     } else {
-                                        replace_inst(inst_old, pool.make_int_const(0));
+                                        replace_inst_with_new(inst_old, pool.make_int_const(0));
                                     }
                                 }
                                 BinOp::Lt => {
                                     if val_left < val_right {
-                                        replace_inst(inst_old, pool.make_int_const(1));
+                                        replace_inst_with_new(inst_old, pool.make_int_const(1));
                                     } else {
-                                        replace_inst(inst_old, pool.make_int_const(0));
+                                        replace_inst_with_new(inst_old, pool.make_int_const(0));
                                     }
                                 }
                                 BinOp::Ge => {
                                     if val_left >= val_right {
-                                        replace_inst(inst_old, pool.make_int_const(1));
+                                        replace_inst_with_new(inst_old, pool.make_int_const(1));
                                     } else {
-                                        replace_inst(inst_old, pool.make_int_const(0));
+                                        replace_inst_with_new(inst_old, pool.make_int_const(0));
                                     }
                                 }
                                 BinOp::Gt => {
                                     if val_left > val_right {
-                                        replace_inst(inst_old, pool.make_int_const(1));
+                                        replace_inst_with_new(inst_old, pool.make_int_const(1));
                                     } else {
-                                        replace_inst(inst_old, pool.make_int_const(0));
+                                        replace_inst_with_new(inst_old, pool.make_int_const(0));
                                     }
                                 }
                                 BinOp::Le => {
                                     if val_left <= val_right {
-                                        replace_inst(inst_old, pool.make_int_const(1));
+                                        replace_inst_with_new(inst_old, pool.make_int_const(1));
                                     } else {
-                                        replace_inst(inst_old, pool.make_int_const(0));
+                                        replace_inst_with_new(inst_old, pool.make_int_const(0));
                                     }
                                 }
                             }
@@ -433,17 +433,17 @@ pub fn fold_inst(inst_old: ObjPtr<Inst>, pool: &mut ObjPool<Inst>) -> bool {
                     if let Some(val) = get_fconstant(operands[0]) {
                         match unop {
                             UnOp::Neg => {
-                                replace_inst(inst_old, pool.make_float_const(-val));
+                                replace_inst_with_new(inst_old, pool.make_float_const(-val));
                             }
                             UnOp::Not => {
                                 if val == 0.0 {
-                                    replace_inst(inst_old, pool.make_float_const(1.0));
+                                    replace_inst_with_new(inst_old, pool.make_float_const(1.0));
                                 } else {
-                                    replace_inst(inst_old, pool.make_float_const(0.0));
+                                    replace_inst_with_new(inst_old, pool.make_float_const(0.0));
                                 }
                             }
                             UnOp::Pos => {
-                                replace_inst(inst_old, pool.make_float_const(val));
+                                replace_inst_with_new(inst_old, pool.make_float_const(val));
                             }
                         }
                         return true;
@@ -453,17 +453,17 @@ pub fn fold_inst(inst_old: ObjPtr<Inst>, pool: &mut ObjPool<Inst>) -> bool {
                     if let Some(val) = get_iconstant(operands[0]) {
                         match unop {
                             UnOp::Neg => {
-                                replace_inst(inst_old, pool.make_int_const(-val));
+                                replace_inst_with_new(inst_old, pool.make_int_const(-val));
                             }
                             UnOp::Not => {
                                 if val == 0 {
-                                    replace_inst(inst_old, pool.make_int_const(1));
+                                    replace_inst_with_new(inst_old, pool.make_int_const(1));
                                 } else {
-                                    replace_inst(inst_old, pool.make_int_const(0));
+                                    replace_inst_with_new(inst_old, pool.make_int_const(0));
                                 }
                             }
                             UnOp::Pos => {
-                                replace_inst(inst_old, pool.make_int_const(val));
+                                replace_inst_with_new(inst_old, pool.make_int_const(val));
                             }
                         }
                         return true;
@@ -477,14 +477,14 @@ pub fn fold_inst(inst_old: ObjPtr<Inst>, pool: &mut ObjPool<Inst>) -> bool {
         InstKind::FtoI => {
             let operands = inst_old.get_operands();
             if let Some(val) = get_fconstant(operands[0]) {
-                replace_inst(inst_old, pool.make_int_const(val as i32));
+                replace_inst_with_new(inst_old, pool.make_int_const(val as i32));
                 return true;
             }
         }
         InstKind::ItoF => {
             let operands = inst_old.get_operands();
             if let Some(val) = get_iconstant(operands[0]) {
-                replace_inst(inst_old, pool.make_float_const(val as f32));
+                replace_inst_with_new(inst_old, pool.make_float_const(val as f32));
                 return true;
             }
         }
@@ -495,9 +495,13 @@ pub fn fold_inst(inst_old: ObjPtr<Inst>, pool: &mut ObjPool<Inst>) -> bool {
     //能替换则用一条const指令替换该指令，更改使用这条指令的所有指令的操作数指向,删除该指令
 }
 
+pub fn replace_inst_with_new(inst_old: ObjPtr<Inst>, inst_new: ObjPtr<Inst>){
+    inst_old.as_mut().insert_before(inst_new);//插入新指令
+    replace_inst(inst_old, inst_new);
+}
 pub fn replace_inst(inst_old: ObjPtr<Inst>, inst_new: ObjPtr<Inst>) {
     let use_list = inst_old.get_use_list().clone();
-    inst_old.as_mut().insert_before(inst_new); //插入新指令
+    // inst_old.as_mut().insert_before(inst_new); //插入新指令
     for user in use_list {
         //将使用过旧指令的指令指向新指令
         let index = user.get_operand_index(inst_old);

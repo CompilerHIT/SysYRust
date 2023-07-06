@@ -583,8 +583,8 @@ impl Process for VarDecl {
                                 let mut flag_trans = false;
                                 if flag > 1 {
                                     flag_trans = true;
-                                    inst_ptr = kit_mut.pool_inst_mut.make_float_to_int(inst_ptr);
-                                    kit_mut.context_mut.push_inst_bb(inst_ptr); //先放进去,不管是否冗余
+                                    // inst_ptr = kit_mut.pool_inst_mut.make_float_to_int(inst_ptr);
+                                    // kit_mut.context_mut.push_inst_bb(inst_ptr); //先放进去,不管是否冗余
                                 }
 
                                 if kit_mut.context_mut.get_layer() < 0 {
@@ -631,7 +631,9 @@ impl Process for VarDecl {
                                                 inst_ptr =
                                                     kit_mut.pool_inst_mut.make_int_const(f as i32);
                                             }
-                                            _ => {}
+                                            _ => {
+                                                inst_ptr = kit_mut.pool_inst_mut.make_float_to_int(inst_ptr);
+                                            }
                                         }
                                         kit_mut.context_mut.push_inst_bb(inst_ptr);
                                     }
@@ -811,8 +813,6 @@ impl Process for VarDecl {
                                 let mut flag_trans = false;
                                 if flag <= 1 {
                                     flag_trans = true;
-                                    inst_ptr = kit_mut.pool_inst_mut.make_int_to_float(inst_ptr);
-                                    kit_mut.context_mut.push_inst_bb(inst_ptr);
                                 }
                                 if kit_mut.context_mut.get_layer() < 0 {
                                     //设计相关(全局变量指令与局部变量不同)，全局变量得在这额外判断，放到module里
@@ -859,7 +859,9 @@ impl Process for VarDecl {
                                                     .pool_inst_mut
                                                     .make_float_const(i as f32);
                                             }
-                                            _ => {}
+                                            _ => {
+                                                inst_ptr = kit_mut.pool_inst_mut.make_int_to_float(inst_ptr);
+                                            }
                                         }
                                         kit_mut.context_mut.push_inst_bb(inst_ptr);
                                     }
