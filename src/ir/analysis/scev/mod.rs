@@ -111,27 +111,29 @@ impl<'a> SCEVAnalyzer<'a> {
 
         let loop_list = self.loops.unwrap();
         let bb = inst.get_parent_bb();
-        if let Some(_) = loop_list.get_loop_list().iter().find(|&l| l.is_header(bb)) {
+        if let Some(loop_info) = loop_list.get_loop_list().iter().find(|&l| l.is_header(bb)) {
             let op1 = self.analyze(inst.get_operands()[0]);
             let op2 = self.analyze(inst.get_operands()[1]);
-            match (op1.get_kind(), op2.get_kind()) {
-                (SCEVExpKind::SCEVAddExpr, SCEVExpKind::SCEVUnknown) => {
-                    let operands = op1.get_operands();
-                    if operands[0].get_bond_inst() == inst || operands[1].get_bond_inst() == inst {
+
+            let mut match_rec_expr = |op: ObjPtr<SCEVExp>| -> ObjPtr<SCEVExp> {
+                if let SCEVExpKind::SCEVAddExpr = op.get_kind() {
+                    if op.get_operands().iter().any(|&x| x.get_bond_inst() == inst) {
                         return self
                             .scevexp_pool
                             .make_scev_add_rec_expr(vec![op1, op2], inst);
                     }
                 }
-                (SCEVExpKind::SCEVUnknown, SCEVExpKind::SCEVAddExpr) => {
-                    let operands = op2.get_operands();
-                    if operands[0].get_bond_inst() == inst || operands[1].get_bond_inst() == inst {
-                        return self
-                            .scevexp_pool
-                            .make_scev_add_rec_expr(vec![op2, op1], inst);
-                    }
-                }
-                _ => {}
+                return self.scevexp_pool.make_scev_unknown(inst);
+            };
+
+            if loop_info.is_in_loop(&op1.get_bond_inst().get_parent_bb())
+                && !loop_info.is_in_loop(&op2.get_bond_inst().get_parent_bb())
+            {
+                return match_rec_expr(op1);
+            } else if !loop_info.is_in_loop(&op1.get_bond_inst().get_parent_bb())
+                && loop_info.is_in_loop(&op2.get_bond_inst().get_parent_bb())
+            {
+                return match_rec_expr(op2);
             }
         }
 
