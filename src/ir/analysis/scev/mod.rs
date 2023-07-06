@@ -79,21 +79,25 @@ impl<'a> SCEVAnalyzer<'a> {
             (SCEVExpKind::SCEVConstant, SCEVExpKind::SCEVAddRecExpr)
             | (SCEVExpKind::SCEVAddRecExpr, SCEVExpKind::SCEVConstant) => self
                 .scevexp_pool
-                .make_scev_add_rec_expr(vec![lhs, rhs], inst),
-            _ => self.scevexp_pool.make_scev_add_expr(vec![lhs, rhs], inst),
+                .make_scev_add_rec_expr(vec![lhs.get_bond_inst(), rhs.get_bond_inst()], inst),
+            _ => self
+                .scevexp_pool
+                .make_scev_add_expr(vec![lhs.get_bond_inst(), rhs.get_bond_inst()], inst),
         }
     }
 
     fn analyze_binary_mul(&mut self, inst: ObjPtr<Inst>) -> ObjPtr<SCEVExp> {
         let lhs = self.analyze(inst.get_lhs());
         let rhs = self.analyze(inst.get_rhs());
-        self.scevexp_pool.make_scev_mul_expr(vec![lhs, rhs], inst)
+        self.scevexp_pool
+            .make_scev_mul_expr(vec![lhs.get_bond_inst(), rhs.get_bond_inst()], inst)
     }
 
     fn analyze_gep(&mut self, inst: ObjPtr<Inst>) -> ObjPtr<SCEVExp> {
         let lhs = self.analyze(inst.get_lhs());
         let rhs = self.analyze(inst.get_rhs());
-        self.scevexp_pool.make_scev_add_expr(vec![lhs, rhs], inst)
+        self.scevexp_pool
+            .make_scev_add_expr(vec![lhs.get_bond_inst(), rhs.get_bond_inst()], inst)
     }
 
     fn analyze_unary_neg(&mut self, inst: ObjPtr<Inst>) -> ObjPtr<SCEVExp> {
@@ -117,10 +121,11 @@ impl<'a> SCEVAnalyzer<'a> {
 
             let mut match_rec_expr = |op: ObjPtr<SCEVExp>| -> ObjPtr<SCEVExp> {
                 if let SCEVExpKind::SCEVAddExpr = op.get_kind() {
-                    if op.get_operands().iter().any(|&x| x.get_bond_inst() == inst) {
-                        return self
-                            .scevexp_pool
-                            .make_scev_add_rec_expr(vec![op1, op2], inst);
+                    if op.get_operands().iter().any(|&x| x == inst) {
+                        return self.scevexp_pool.make_scev_add_rec_expr(
+                            vec![op1.get_bond_inst(), op2.get_bond_inst()],
+                            inst,
+                        );
                     }
                 }
                 return self.scevexp_pool.make_scev_unknown(inst);

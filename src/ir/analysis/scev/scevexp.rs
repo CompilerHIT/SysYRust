@@ -4,7 +4,7 @@ use super::*;
 
 pub struct SCEVExp {
     kind: SCEVExpKind,
-    operands: Vec<ObjPtr<SCEVExp>>,
+    operands: Vec<ObjPtr<Inst>>,
     bond_inst: ObjPtr<Inst>,
 }
 
@@ -21,8 +21,8 @@ impl SCEVExp {
     pub fn get_kind(&self) -> SCEVExpKind {
         self.kind
     }
-    pub fn get_operands(&self) -> &Vec<ObjPtr<SCEVExp>> {
-        &self.operands
+    pub fn get_operands(&self) -> Vec<ObjPtr<Inst>> {
+        self.operands.clone()
     }
     pub fn get_bond_inst(&self) -> ObjPtr<Inst> {
         self.bond_inst
@@ -42,7 +42,7 @@ impl SCEVExp {
     pub fn is_scev_add_rec_expr(&self) -> bool {
         self.kind == SCEVExpKind::SCEVAddRecExpr
     }
-    pub fn set_operands(&mut self, operands: Vec<ObjPtr<SCEVExp>>) {
+    pub fn set_operands(&mut self, operands: Vec<ObjPtr<Inst>>) {
         self.operands = operands;
     }
 }
@@ -66,7 +66,7 @@ impl ObjPool<SCEVExp> {
 
     pub fn make_scev_add_expr(
         &mut self,
-        operands: Vec<ObjPtr<SCEVExp>>,
+        operands: Vec<ObjPtr<Inst>>,
         bond_inst: ObjPtr<Inst>,
     ) -> ObjPtr<SCEVExp> {
         self.put(SCEVExp {
@@ -78,7 +78,7 @@ impl ObjPool<SCEVExp> {
 
     pub fn make_scev_mul_expr(
         &mut self,
-        operands: Vec<ObjPtr<SCEVExp>>,
+        operands: Vec<ObjPtr<Inst>>,
         bond_inst: ObjPtr<Inst>,
     ) -> ObjPtr<SCEVExp> {
         self.put(SCEVExp {
@@ -90,7 +90,7 @@ impl ObjPool<SCEVExp> {
 
     pub fn make_scev_add_rec_expr(
         &mut self,
-        operands: Vec<ObjPtr<SCEVExp>>,
+        operands: Vec<ObjPtr<Inst>>,
         bond_inst: ObjPtr<Inst>,
     ) -> ObjPtr<SCEVExp> {
         self.put(SCEVExp {
