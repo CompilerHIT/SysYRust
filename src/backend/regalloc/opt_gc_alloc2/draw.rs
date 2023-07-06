@@ -91,10 +91,31 @@ impl Allocator {
         // TODO, 衡量+1的影响，考虑是否有其他函数可以处理这个问题
         OperItem {
             reg: *reg,
-            cost: na / (nln + 1.0),
+            cost: na / (nln + 0.01),
         }
     }
 
+    /// 绘制 以 周围活跃寄存器数量/自身着色可用寄存器数量 为cost的 item
+    ///
+    pub fn draw_nln_div_na_item(&self, reg: &Reg) -> OperItem {
+        let na = self.draw_available(reg).num_available_regs(reg.get_type()) as f32;
+        let nln = self.get_live_neighbors_bitmap(reg).len() as f32;
+        // 考虑到nln可能为0，可能会/0错误，所以加1
+        // TODO, 衡量+1的影响，考虑是否有其他函数可以处理这个问题
+        OperItem {
+            reg: *reg,
+            cost: nln / (na + 0.01),
+        }
+    }
+
+    /// 绘制以 num_live_neighbors为cost的item
+    pub fn draw_nln_item(&self, reg: &Reg) -> OperItem {
+        let nln = self.get_live_neighbors_bitmap(reg).len() as f32;
+        OperItem {
+            reg: *reg,
+            cost: nln,
+        }
+    }
     ///绘制live neighbor图
     pub fn draw_live_neighbors(&self, reg: &Reg) -> (LinkedList<Reg>, Bitmap) {
         let mut live_neighbors = LinkedList::new();

@@ -5,6 +5,7 @@ mod get;
 mod init;
 mod jud;
 mod k_graph;
+pub mod params;
 mod rescue;
 mod simplify;
 mod spill;
@@ -42,24 +43,19 @@ impl Regalloc for Allocator {
             if stat == ActionResult::Success {
                 continue;
             }
-            // self.check_k_graph();
-            if stat == ActionResult::Finish {
-                if self.simpilfy() != ActionResult::Finish {
-                    continue;
-                }
-                if self.spill() != ActionResult::Finish {
-                    continue;
-                }
-                if self.check_k_graph() != ActionResult::Success {
-                    continue;
-                }
-                break;
-            }
-            stat = self.simpilfy();
-            if stat == ActionResult::Success {
+            while self.simpilfy() != ActionResult::Finish {
                 continue;
             }
-            stat = self.spill();
+            while self.spill() != ActionResult::Finish {
+                continue;
+            }
+            if self.check_k_graph() != ActionResult::Success {
+                continue;
+            }
+            if self.color() != ActionResult::Finish {
+                continue;
+            }
+            break;
         }
 
         // loop {

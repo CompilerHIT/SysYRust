@@ -424,18 +424,21 @@ pub fn build_nums_neighbor_color(
     nums_neighbor_color
 }
 
-// 获取 （下标,块)->失效寄存器集合  表
+///
+///  获取 （下标,块)->失效寄存器集合  表
+/// 注意！！！！ 该函数依赖于func的cal live的结果，内部并不会调用func的cal live
 pub fn build_ends_index_bb(func: &Func) -> HashMap<(i32, ObjPtr<BB>), HashSet<Reg>> {
-    // TODO 更换新的build ends
+    func.calc_live(); //首先重新计算依赖到的calc_live
+                      // TODO 更换新的build ends
     let a = build_ends_index_bb_old(func);
     // let b = build_ends_index_bb_new(func);
-    // log_file!("ends.txt", "func:{}", func.label.to_owned());
-    // log_file!("ends.txt", "old:");
-    // a.iter().for_each(|((index, bb), sets)| {
-    //     sets.iter().for_each(|reg| {
-    //         log_file!("ends.txt", "{},{},{}", index, bb.label, reg);
-    //     });
-    // });
+    log_file!("ends.txt", "func:{}", func.label.to_owned());
+    log_file!("ends.txt", "old:");
+    a.iter().for_each(|((index, bb), sets)| {
+        sets.iter().for_each(|reg| {
+            log_file!("ends.txt", "{},{},{}", index, bb.label, reg);
+        });
+    });
     // log_file!("ends.txt", "new:");
     // b.iter().for_each(|((index, bb), sets)| {
     //     sets.iter().for_each(|reg| {

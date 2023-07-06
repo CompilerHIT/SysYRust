@@ -56,7 +56,11 @@ impl AsmModule {
     }
 
     // 寄存器分配和使用后 移除无用指令(比如移除多余的缓存指令)
-    fn remove_unuse_inst_suf_alloc(&mut self) {}
+    fn remove_unuse_inst_suf_alloc(&mut self) {
+        self.func_map.iter().for_each(|(_, func)| {
+            func.as_mut().remove_unuse_inst();
+        });
+    }
 
     pub fn build(&mut self, f: &mut File, f2: &mut File, pool: &mut BackendPool) {
         self.build_lir(pool);
@@ -65,10 +69,9 @@ impl AsmModule {
         self.generate_row_asm(f2, pool); //注释
         self.allocate_reg();
         self.handle_spill(pool, f); //yjh: i am going to adjust
-        self.remove_unuse_inst_suf_alloc(); //yjh:i am going to do
-        
-        // self.print_model(); 
+                                    // self.print_model();
         self.map_v_to_p();
+        self.remove_unuse_inst_suf_alloc(); //yjh:i am going to do
     }
 
     pub fn handle_overflow(&mut self, pool: &mut BackendPool) {
@@ -208,7 +211,7 @@ impl AsmModule {
         });
     }
 
-    fn generate_row_asm(&mut self, f: &mut File, pool: &mut BackendPool) {
+    pub fn generate_row_asm(&mut self, f: &mut File, pool: &mut BackendPool) {
         self.func_map.iter_mut().for_each(|(_, func)| {
             if !func.is_extern {
                 func.as_mut()

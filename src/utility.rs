@@ -13,7 +13,7 @@ use std::{
 #[macro_export]
 macro_rules! log {
     ($($arg:tt)*) => {
-        // crate::log_file!("log", $($arg)*);
+        crate::log_file!("log", $($arg)*);
     };
 }
 

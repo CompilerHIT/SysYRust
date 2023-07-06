@@ -2,6 +2,7 @@ use super::*;
 
 impl Allocator {
     /// color:选择一个合适的颜色进行着色
+    /// color会优先选择(reg,cost)中cost大的进行着色
     /// * 如果着色成功,把项目加入到colored中
     /// * 如果着色失败了,把项目加入到to_simplify中
     pub fn color(&mut self) -> ActionResult {
@@ -36,13 +37,6 @@ impl Allocator {
             break;
         }
         out
-    }
-
-    // 把一个寄存器加入tocolor
-    pub fn push_to_tocolor(&mut self, reg: &Reg) {
-        self.dump_action("tocolor", reg);
-        let item = self.draw_na_div_nln_item(reg);
-        self.info.as_mut().unwrap().to_color.push(item);
     }
 
     ///着色某个寄存器

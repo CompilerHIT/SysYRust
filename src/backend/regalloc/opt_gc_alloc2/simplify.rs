@@ -3,14 +3,6 @@ use crate::log;
 use super::*;
 impl Allocator {
     #[inline]
-    pub fn push_to_tosimpilfy(&mut self, reg: &Reg) {
-        self.dump_action("tosimplify", reg);
-        // 把一个节点加入待着色列表中
-        let item = self.draw_spill_div_nln_item(reg);
-        self.info.as_mut().unwrap().to_simplify.push(item);
-    }
-
-    #[inline]
     pub fn simpilfy(&mut self) -> ActionResult {
         // 此处的simplify是简化color中color到的颜色
         // simpilfy,选择spill cost最大的一个
@@ -26,6 +18,7 @@ impl Allocator {
         }
         return ActionResult::Fail;
     }
+
     #[inline]
     pub fn simpilfy_one(&mut self, reg: Reg) -> bool {
         self.dump_action("simplify", &reg);
