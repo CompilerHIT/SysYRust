@@ -5,8 +5,37 @@ impl BackendPass {
         self.clear_one_jump();
         self.fuse_imm_br(pool);
         self.fuse_basic_block();
+        // 跳转合并需要放在消除无用块之后，否则会干扰消除的正确性
+        self.merge_br_jump();
         self.clear_empty_block();
         self.resolve_merge_br();
+    }
+
+    fn merge_br_jump(&mut self) {
+        self.module.func_map.iter().for_each(|(_, func)| {
+            if !func.is_extern {
+                let mut jumps: Vec<ObjPtr<BB>> = vec![];
+                func.blocks.iter().for_each(|block| { 
+                    if block.get_prev().len() == 1 && is_br(block.get_prev()[0]) {
+                        let prev_tail = block.get_prev()[0].get_tail_inst();
+                        let jump_label = prev_tail.get_label();
+                        if *jump_label == Operand::Addr(block.label.clone()) {
+                            jumps.push(block.clone());
+                        }
+                    }
+                });
+                jumps.iter().for_each(|block| {
+                    let prev = block.get_prev()[0];
+                    prev.as_mut().insts.pop();
+                    prev.as_mut().push_back_list(&mut block.as_mut().insts);
+                    block.as_mut().insts.clear();
+                    adjust_prev_out(prev.clone(), block.get_after().clone(), &block.label);
+                    for after in block.get_after() {
+                        adjust_after_in(after.clone(), block.get_prev().clone(), &block.label);
+                    }
+                })
+            }
+        })
     }
 
     fn fuse_imm_br(&mut self, pool: &mut BackendPool) {
@@ -173,6 +202,20 @@ fn is_jump(block: ObjPtr<BB>) -> bool {
     false
 }
 
+fn is_br(block: ObjPtr<BB>) -> bool {
+    if block.insts.len() > 1 {
+        match block.get_last_not_tail_inst().get_type() {
+            InstrsType::Branch(..) => {
+                return true;
+            }
+            _ => {
+                return false;
+            }
+        }
+    }
+    false
+}
+
 fn adjust_after_in(block: ObjPtr<BB>, prevs: Vec<ObjPtr<BB>>, clear_label: &String) {
     let mut final_prevs: Vec<ObjPtr<BB>> = block
         .as_mut()
@@ -185,7 +228,7 @@ fn adjust_after_in(block: ObjPtr<BB>, prevs: Vec<ObjPtr<BB>>, clear_label: &Stri
     block.as_mut().in_edge = final_prevs;
 }
 
-fn adjust_prev_out(block: ObjPtr<BB>, prevs: Vec<ObjPtr<BB>>, clear_label: &String) {
+fn adjust_prev_out(block: ObjPtr<BB>, afters: Vec<ObjPtr<BB>>, clear_label: &String) {
     let mut final_prevs: Vec<ObjPtr<BB>> = block
         .as_mut()
         .out_edge
@@ -193,7 +236,7 @@ fn adjust_prev_out(block: ObjPtr<BB>, prevs: Vec<ObjPtr<BB>>, clear_label: &Stri
         .into_iter()
         .filter(|b| b.label != *clear_label)
         .collect();
-    final_prevs.append(&mut prevs.clone());
+    final_prevs.append(&mut afters.clone());
     block.as_mut().out_edge = final_prevs;
 }
 
