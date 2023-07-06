@@ -709,14 +709,14 @@ fn dump_inst(
                     name_index = put_name(local_map, inst, name_index);
                     if let IrType::Int = inst.get_ir_type() {
                         text += format!(
-                            "  {} = icmp ne i32 {}, 0\n",
+                            "  {} = icmp eq i32 {}, 0 ;not\n",
                             local_map.get(&inst).unwrap().clone(),
                             get_inst_value(inst.get_unary_operand(), local_map, global_map),
                         )
                         .as_str();
                     } else {
                         text += format!(
-                            "  {} = fcmp one float {}, 0.0\n",
+                            "  {} = fcmp one float {}, 0.0 ;not\n",
                             local_map.get(&inst).unwrap().clone(),
                             get_inst_value(inst.get_unary_operand(), local_map, global_map),
                         )

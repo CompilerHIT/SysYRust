@@ -49,7 +49,7 @@ impl<'f> AsmBuilder<'f> {
                 writeln!(self.f, "    xori {dest}, {dest}, 1")
             }
             "fgt.s" => {
-                writeln!(self.f, "    flt.s {dest}, {lhs}, {rhs}")?;
+                writeln!(self.f, "    fle.s {dest}, {lhs}, {rhs}")?;
                 writeln!(self.f, "    xori {dest}, {dest}, 1")
             }
             "fge.s" => {
@@ -194,8 +194,9 @@ impl<'f> AsmBuilder<'f> {
         writeln!(self.f, "    b{cond}    {lhs}, {rhs}, {label}")
     }
 
-    pub fn bnez(&mut self, reg: &str, label: &str) -> Result<()> {
-        writeln!(self.f, "    bnez {reg}, {label}")
+
+    pub fn beqz(&mut self, reg: &str, label: &str) -> Result<()> {
+        writeln!(self.f, "    beqz {reg}, {label}")
     }
 
     pub fn j(&mut self, label: &str) -> Result<()> {
