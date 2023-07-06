@@ -88,6 +88,11 @@ impl LoopInfo {
         }
     }
 
+    /// 判断一个块是否是当前循环的头
+    pub fn is_header(&self, bb: ObjPtr<BasicBlock>) -> bool {
+        self.header == bb
+    }
+
     /// 判断一个块是否在当前循环中，不递归查找子循环
     pub fn is_in_current_loop(&self, bb: &ObjPtr<BasicBlock>) -> bool {
         self.blocks.contains(bb)
