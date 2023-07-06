@@ -71,7 +71,7 @@ pub enum CmpOp {
     Lt,
     Ge,
     Le,
-    Nez,
+    Eqz,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -159,15 +159,15 @@ impl fmt::Display for LIRInst {
                 kind = "store";
             }
             // 判断！是否需要多插入一条j，间接跳转到
-            InstrsType::Branch(cond) => {
-                kind = match cond {
+            InstrsType::Branch(CmpOp) => {
+                kind = match CmpOp {
                     CmpOp::Eq => "eq",
                     CmpOp::Ne => "ne",
                     CmpOp::Lt => "lt",
                     CmpOp::Le => "le",
                     CmpOp::Gt => "gt",
                     CmpOp::Ge => "ge",
-                    CmpOp::Nez => "nez",
+                    CmpOp::Eqz => "eqz",
                 };
             }
             InstrsType::Jump => {

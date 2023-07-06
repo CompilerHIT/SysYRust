@@ -16,6 +16,7 @@ use crate::ir::instruction::{BinOp, Inst, InstKind, UnOp};
 use crate::ir::ir_type::IrType;
 use crate::utility::{ObjPtr, ScalarType};
 
+use super::instrs;
 use super::instrs::AsmBuilder;
 use super::operand::FImm;
 use super::operand::ARG_REG_COUNT;
@@ -605,7 +606,6 @@ impl BB {
                             inst.replace_op(vec![Operand::Addr(jump_block.label.to_string())]);
                             let obj_inst = pool.put_inst(inst);
                             self.insts.push(obj_inst);
-                            map_info.block_branch.insert(self.label.clone(), obj_inst);
                         }
                         jump_block.as_mut().in_edge.push(ObjPtr::new(self));
                         self.out_edge.push(*jump_block);
@@ -613,16 +613,17 @@ impl BB {
                     }
 
                     // if branch
+                    // 将前端的跳转视为不跳转，并优先执行，因此设为j的目标。故要对前端传来的条件取反
                     let cond_ref = inst_ref.get_br_cond();
 
                     let false_cond_bb = block.as_ref().get_next_bb()[0];
                     let true_cond_bb = block.as_ref().get_next_bb()[1];
                     let block_map = map_info.ir_block_map.clone();
-                    let true_succ_block = match block_map.get(&false_cond_bb) {
+                    let true_succ_block = match block_map.get(&true_cond_bb) {
                         Some(block) => block,
                         None => unreachable!("true block not found"),
                     };
-                    let false_succ_block = match block_map.get(&true_cond_bb) {
+                    let false_succ_block = match block_map.get(&false_cond_bb) {
                         Some(block) => block,
                         None => unreachable!("false block not found"),
                     };
@@ -668,18 +669,17 @@ impl BB {
                             }
 
                             let mut bz = false;
-                            let inst_kind = match cond {
-                                BinOp::Eq => InstrsType::Branch(CmpOp::Eq),
-                                BinOp::Ne => InstrsType::Branch(CmpOp::Ne),
-                                BinOp::Ge => InstrsType::Branch(CmpOp::Ge),
-                                BinOp::Le => InstrsType::Branch(CmpOp::Le),
-                                BinOp::Gt => InstrsType::Branch(CmpOp::Gt),
-                                BinOp::Lt => InstrsType::Branch(CmpOp::Lt),
-                                // BinOp::And =>
+                            let mut inst_kind = match cond {
+                                BinOp::Eq => InstrsType::Branch(CmpOp::Ne),
+                                BinOp::Ne => InstrsType::Branch(CmpOp::Eq),
+                                BinOp::Ge => InstrsType::Branch(CmpOp::Lt),
+                                BinOp::Le => InstrsType::Branch(CmpOp::Gt),
+                                BinOp::Gt => InstrsType::Branch(CmpOp::Le),
+                                BinOp::Lt => InstrsType::Branch(CmpOp::Ge),
                                 _ => {
                                     // 无法匹配，认为是if(a)情况，与0进行比较
                                     bz = true;
-                                    InstrsType::Branch(CmpOp::Nez)
+                                    InstrsType::Branch(CmpOp::Eqz)
                                 }
                             };
                             if bz {
@@ -718,7 +718,7 @@ impl BB {
                                         vec![dst_reg.clone(), lhs_reg, rhs_reg],
                                     )));
                                     self.insts.push(pool.put_inst(LIRInst::new(
-                                        InstrsType::Branch(CmpOp::Nez),
+                                        InstrsType::Branch(CmpOp::Eqz),
                                         vec![
                                             Operand::Addr(false_succ_block.label.to_string()),
                                             dst_reg,
@@ -740,11 +740,7 @@ impl BB {
                                 vec![Operand::Addr(true_succ_block.label.to_string())],
                             )));
 
-                            inst.replace_op(vec![Operand::Addr(
-                                true_cond_bb.as_ref().get_name().to_string(),
-                            )]);
-                            let obj_inst = pool.put_inst(inst);
-                            map_info.block_branch.insert(self.label.clone(), obj_inst);
+
                             true_succ_block.as_mut().in_edge.push(ObjPtr::new(self));
                             false_succ_block.as_mut().in_edge.push(ObjPtr::new(self));
                             self.out_edge
@@ -754,7 +750,7 @@ impl BB {
                             // log!("{:?}", cond_ref.get_kind());
                             let lhs_reg =
                                 self.resolve_operand(func, cond_ref, true, map_info, pool);
-                            let inst_kind = InstrsType::Branch(CmpOp::Nez);
+                            let inst_kind = InstrsType::Branch(CmpOp::Eqz);
                             self.insts.push(pool.put_inst(LIRInst::new(
                                 inst_kind,
                                 vec![Operand::Addr(false_succ_block.label.to_string()), lhs_reg],
@@ -764,11 +760,6 @@ impl BB {
                                 vec![Operand::Addr(true_succ_block.label.to_string())],
                             )));
 
-                            inst.replace_op(vec![Operand::Addr(
-                                true_cond_bb.as_ref().get_name().to_string(),
-                            )]);
-                            let obj_inst = pool.put_inst(inst);
-                            map_info.block_branch.insert(self.label.clone(), obj_inst);
                             true_succ_block.as_mut().in_edge.push(ObjPtr::new(self));
                             false_succ_block.as_mut().in_edge.push(ObjPtr::new(self));
                             self.out_edge
@@ -1617,6 +1608,10 @@ impl BB {
                         i += 1;
                     }
                     let mut distance = 0;
+                    if start == end {
+                        pos += 1;
+                        continue;
+                    }
                     let (st, ed) = (min(start, end), max(start, end));
                     let rev = start > end;
                     for i in st + 1..=ed - 1 {
