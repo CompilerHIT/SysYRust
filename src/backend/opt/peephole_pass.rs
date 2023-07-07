@@ -8,8 +8,7 @@ impl BackendPass {
                 func.blocks.iter().for_each(|block| {
                     // 在处理handle_overflow前的优化
                     self.rm_useless_overflow(*block, pool);
-                    //FIXME: 由于set_offset在此之后，因此无法进行优化
-                    // self.rm_useless_param_overflow(*func, *block, pool);
+                    self.rm_useless_param_overflow(*func, *block, pool);
                 })
             }
         });
@@ -100,12 +99,14 @@ impl BackendPass {
     fn rm_useless_param_overflow(&self, func: ObjPtr<Func>, block: ObjPtr<BB>, pool: &mut BackendPool) {
         // 处理l/s param to stack
         let mut index = 0;
+        log!("stack_size: {}", func.context.get_offset());
         loop {
             if index >= block.insts.len() {
                 break;
             }
             let inst = block.insts[index];
-            if self.is_param_overflow(inst) {
+            let stack_size = func.context.get_offset();
+            if self.is_param_overflow(inst, stack_size) {
                 let offset = inst.get_stack_offset().get_data();
                 let mut insts = vec![inst];
                 let mut index2 = index + 1;
@@ -115,7 +116,7 @@ impl BackendPass {
                     }
                     let inst2 = block.insts[index2];
                     // 处理load/store to stack
-                    if self.is_param_overflow(inst2) {
+                    if self.is_param_overflow(inst2, stack_size) {
                         if operand::is_imm_12bs(inst2.get_stack_offset().get_data() - offset) {
                             insts.push(inst2);
                             index2 += 1;
@@ -124,6 +125,7 @@ impl BackendPass {
                     }
                     break;
                 }
+                log!("inst: {:?}", insts);
                 if insts.len() > 1 {
                     // l/s offset(sp) -> li offset gp. add gp gp sp. l/s 0(gp).
                     let gp = Operand::Reg(Reg::new(3, ScalarType::Int));
@@ -181,6 +183,9 @@ impl BackendPass {
         if inst.get_type() == InstrsType::LoadFromStack
             || inst.get_type() == InstrsType::StoreToStack
         {
+            if inst.get_type() == InstrsType::StoreToStack {
+                log!("store: {:?}", inst.get_stack_offset().get_data());
+            }
             if !operand::is_imm_12bs(inst.get_stack_offset().get_data()) {
                 return true;
             }
@@ -188,11 +193,11 @@ impl BackendPass {
         false
     }
 
-    fn is_param_overflow(&self, inst: ObjPtr<LIRInst>) -> bool {
+    fn is_param_overflow(&self, inst: ObjPtr<LIRInst>, stack_size: i32) -> bool {
         if inst.get_type() == InstrsType::LoadParamFromStack
             || inst.get_type() == InstrsType::StoreParamToStack
         {
-            if !operand::is_imm_12bs(inst.get_stack_offset().get_data()) {
+            if !operand::is_imm_12bs(stack_size - inst.get_stack_offset().get_data()) {
                 return true;
             }
         }

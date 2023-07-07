@@ -175,9 +175,6 @@ impl Func {
                         .construct(this, *basicblock, None, &mut info, pool);
                 }
                 i += 1;
-                if get_32_flag() {
-                    return;
-                }
             }
             index += 1;
         }
@@ -727,9 +724,6 @@ impl Func {
 
 impl GenerateAsm for Func {
     fn generate(&mut self, _: ObjPtr<Context>, f: &mut File) -> Result<()> {
-        if get_32_flag() && self.label != "main"{
-            return Ok(());
-        }
         if self.const_array.len() > 0 || self.float_array.len() > 0 {
             writeln!(f, "	.data\n   .align  3")?;
         }

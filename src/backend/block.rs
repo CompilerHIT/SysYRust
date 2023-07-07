@@ -30,7 +30,6 @@ pub static mut TMP_BB: i32 = 0;
 pub const ADDR_SIZE: i32 = 8;
 pub const NUM_SIZE: i32 = 4;
 pub const FLOAT_BASE: i32 = 32;
-pub static mut IS_EXP_32: bool = false;
 
 #[derive(Clone)]
 pub struct BB {
@@ -810,10 +809,6 @@ impl BB {
                             .collect(),
                     );
 
-                    if icnt + fcnt == 676 {
-                        self.resolve_exp32(pool);
-                        return;
-                    }
                     for arg in final_args.iter().rev() {
                         match arg.as_ref().get_param_type() {
                             IrType::Int | IrType::IntPtr | IrType::FloatPtr => {
@@ -2364,24 +2359,6 @@ impl BB {
         )))
     }
 
-    fn resolve_exp32(&mut self, pool: &mut BackendPool) {
-        set_exp_32();
-        self.insts.clear();
-        let reg = Operand::Reg(Reg::init(ScalarType::Int));
-        let inst = LIRInst::new(
-            InstrsType::OpReg(SingleOp::Li),
-            vec![reg.clone(), Operand::IImm(IImm::new(75909))],
-        );
-        self.insts.push(pool.put_inst(inst));
-        let inst = LIRInst::new(
-            InstrsType::OpReg(SingleOp::Mv),
-            vec![Operand::Reg(Reg::new(10, ScalarType::Int)), reg.clone()],
-        );
-        self.insts.push(pool.put_inst(inst));
-        self.insts
-            .push(pool.put_inst(LIRInst::new(InstrsType::Ret(ScalarType::Int), vec![])));
-    }
-
     pub fn generate_row(&mut self, context: ObjPtr<Context>, f: &mut File) -> Result<()> {
         if self.showed {
             let mut builder = AsmBuilder::new(f);
@@ -2440,14 +2417,6 @@ fn get_tmp_bb() -> i32 {
         TMP_BB += 1;
         TMP_BB
     }
-}
-
-pub fn get_32_flag() -> bool {
-    unsafe { IS_EXP_32 }
-}
-
-pub fn set_exp_32() {
-    unsafe { IS_EXP_32 = true; }
 }
 
 fn is_cond_op(cond: ObjPtr<Inst>) -> Option<BinOp> {
