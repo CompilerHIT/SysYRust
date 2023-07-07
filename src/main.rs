@@ -22,7 +22,11 @@ fn run_main() {
     // let m=LinkedList::new();
     // let cursor=m.cursor_front_mut();
     // ---------------------测试代码---------------------
-    env::set_var("RUST_BACKTRACE", "1");
+    #[cfg(debug_assertions)]
+    {
+        env::set_var("RUST_BACKTRACE", "1");
+        println!("debug mode");
+    }
     // --------------------------------------------------
     use clap::{App, Arg};
     // 获取命令行解析

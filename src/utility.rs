@@ -19,7 +19,7 @@ macro_rules! log {
 
 #[macro_export]
 macro_rules! log_file {
-    ($file:expr, $($arg:tt)*) => {{
+    ($file:expr, $($arg:tt)*) => {{ #[cfg(debug_assertions)] {
         use std::fs::OpenOptions;
         use std::io::Write;
 
@@ -30,14 +30,13 @@ macro_rules! log_file {
         .expect("Failed to open log file");
 
         writeln!(file, $($arg)*).expect("Failed to write to log file");
-        true
-    }};
+    }}};
 }
 
 // 该宏用来进行不换行的文件log
 #[macro_export]
 macro_rules! log_file_uln {
-    ($file:expr, $($arg:tt)*) => {{
+    ($file:expr, $($arg:tt)*) => {{ #[cfg(debug_assertions)] {
 
         use std::fs::OpenOptions;
         use std::io::Write;
@@ -48,7 +47,7 @@ macro_rules! log_file_uln {
         .open($file)
         .expect("Failed to open log file");
         write!(file, $($arg)*).expect("Failed to write to log file");
-    }};
+    }}};
 }
 
 #[derive(Clone, Copy, PartialEq, Hash, Eq, Debug)]
