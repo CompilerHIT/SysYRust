@@ -152,3 +152,19 @@ pub fn bfs_find_end_bb(head: ObjPtr<BasicBlock>) -> ObjPtr<BasicBlock> {
 
     unreachable!("can't find end bb")
 }
+
+/// 用一条指令代替另一条指令
+/// # Arguments
+/// * 'inst_old'
+/// * 'inst_new'
+/// # Arguments
+/// * 'inst_old' - 被代替的指令
+/// * 'inst_new' - 新任命的指令
+pub fn replace_inst(inst_old: ObjPtr<Inst>, inst_new: ObjPtr<Inst>) {
+    let use_list = inst_old.get_use_list().clone();
+    for user in use_list {
+        let index = user.get_operand_index(inst_old);
+        user.as_mut().set_operand(inst_new, index);
+    }
+    inst_old.as_mut().remove_self();
+}

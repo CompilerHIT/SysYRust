@@ -7,6 +7,7 @@ mod dead_code_eliminate;
 mod func_inline;
 mod global_value_numbering;
 mod loop_operation;
+mod meaningless_insts_folding;
 mod phi_optimizer;
 mod simplify_cfg;
 mod verify;
@@ -54,6 +55,9 @@ fn functional_optimizer(
 
     // 常量折叠
     constant_folding::constant_folding(module, &mut pools, optimize_flag);
+
+    // 消除不必要的指令
+    meaningless_insts_folding::meaningless_inst_folding(module, &mut pools);
 
     // 全局死代码删除
     dead_code_eliminate::global_eliminate(module);

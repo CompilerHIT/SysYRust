@@ -1,20 +1,21 @@
 use crate::{
+    frontend::context::Type,
     ir::basicblock::BasicBlock,
     ir::instruction::Inst,
     ir::instruction::InstKind,
-    ir::module::Module,
     ir::{instruction::BinOp, ir_type::*},
     ir::{
         instruction::UnOp,
         tools::{bfs_inst_process, func_process},
     },
-    utility::{ObjPool, ObjPtr}, frontend::context::Type,
+    ir::{module::Module, tools::replace_inst},
+    utility::{ObjPool, ObjPtr},
 };
 
 pub fn constant_folding(
     module: &mut Module,
     pools: &mut (&mut ObjPool<BasicBlock>, &mut ObjPool<Inst>),
-    flag:bool,
+    flag: bool,
 ) {
     func_process(module, |_, func| loop {
         let mut changed = false;
@@ -23,11 +24,13 @@ pub fn constant_folding(
             break;
         }
     });
-    if flag{
-        func_process(module, |_,func|loop{
+    if flag {
+        func_process(module, |_, func| loop {
             let mut changed = false;
-            bfs_inst_process(func.get_head(), |inst| changed |= fold_mixed_binst(inst, pools.1));
-            if !changed{
+            bfs_inst_process(func.get_head(), |inst| {
+                changed |= fold_mixed_binst(inst, pools.1)
+            });
+            if !changed {
                 break;
             }
         })
@@ -41,8 +44,10 @@ pub fn fold_mixed_binst(inst_old: ObjPtr<Inst>, pool: &mut ObjPool<Inst>) -> boo
         InstKind::Binary(_) => {
             if let Some((num_operand, num_const1, _)) = check_mixed_binst(inst_old) {
                 match operands[num_operand].get_kind() {
-                    InstKind::Binary(_) =>{
-                        if let Some((num_unknown, num_const2, tp)) = check_mixed_binst(operands[num_operand]) {
+                    InstKind::Binary(_) => {
+                        if let Some((num_unknown, num_const2, tp)) =
+                            check_mixed_binst(operands[num_operand])
+                        {
                             fold_two_mixed_binst(
                                 inst_old,
                                 num_operand,
@@ -56,7 +61,7 @@ pub fn fold_mixed_binst(inst_old: ObjPtr<Inst>, pool: &mut ObjPool<Inst>) -> boo
                             false
                         }
                     }
-                    _=>false,
+                    _ => false,
                 }
             } else {
                 false
@@ -142,106 +147,112 @@ pub fn fold_two_mixed_binst(
                             let inst_new = pool.make_add(inst_result, inst_unknown);
                             replace_inst_with_new(inst, inst_new);
                             inst_new.as_mut().insert_before(inst_result);
-                        } 
+                        }
                         return true;
                     }
                     BinOp::Sub => {
                         if iflag {
-                        if num_unknown==0{
-                            let inst_result =
-                                pool.make_int_const(const1.get_int_bond() - const2.get_int_bond());
-                            let inst_new = pool.make_add(inst_result, inst_unknown);
-                            replace_inst_with_new(inst, inst_new);
-                            inst_new.as_mut().insert_before(inst_result);
-                        }else{
-                            let inst_result =
-                                pool.make_int_const(const1.get_int_bond() + const2.get_int_bond());
-                            let inst_new = pool.make_sub(inst_result, inst_unknown);
-                            replace_inst_with_new(inst, inst_new);
-                            inst_new.as_mut().insert_before(inst_result);
+                            if num_unknown == 0 {
+                                let inst_result = pool
+                                    .make_int_const(const1.get_int_bond() - const2.get_int_bond());
+                                let inst_new = pool.make_add(inst_result, inst_unknown);
+                                replace_inst_with_new(inst, inst_new);
+                                inst_new.as_mut().insert_before(inst_result);
+                            } else {
+                                let inst_result = pool
+                                    .make_int_const(const1.get_int_bond() + const2.get_int_bond());
+                                let inst_new = pool.make_sub(inst_result, inst_unknown);
+                                replace_inst_with_new(inst, inst_new);
+                                inst_new.as_mut().insert_before(inst_result);
+                            }
                         }
+                        return true;
                     }
-                    return true;
+                    _ => {
+                        return false;
                     }
-                    _ => {return false;}
                 },
                 _ => {
                     unreachable!()
                 }
-            }
-            BinOp::Sub =>match inst_operand.get_kind() {
-                InstKind::Binary(binop2) =>{
-                    match binop2 {
-                        BinOp::Sub=>{
-                            if iflag{
-                                if num_unknown==1 &&num_operand==1{
-                                    let inst_result =
-                                        pool.make_int_const(const1.get_int_bond() - const2.get_int_bond());
-                                    let inst_new = pool.make_add(inst_result, inst_unknown);
-                                    replace_inst_with_new(inst, inst_new);
-                                    inst_new.as_mut().insert_before(inst_result);
-                                }else if num_unknown==1 && num_operand==0{
-                                    let inst_result =
-                                        pool.make_int_const(-const1.get_int_bond() + const2.get_int_bond());
-                                    let inst_new = pool.make_sub(inst_result, inst_unknown);
-                                    replace_inst_with_new(inst, inst_new);
-                                    inst_new.as_mut().insert_before(inst_result);
-                                }else if num_unknown==0 && num_operand==0{
-                                    let inst_result =
-                                        pool.make_int_const(const1.get_int_bond() + const2.get_int_bond());
-                                    let inst_new = pool.make_sub(inst_unknown, inst_result);
-                                    replace_inst_with_new(inst, inst_new);
-                                    inst_new.as_mut().insert_before(inst_result);
-                                }else if num_unknown==0 && num_operand==1{
-                                    let inst_result =
-                                        pool.make_int_const(const1.get_int_bond() + const2.get_int_bond());
-                                    let inst_new = pool.make_sub(inst_result, inst_unknown);
-                                    replace_inst_with_new(inst, inst_new);
-                                }
+            },
+            BinOp::Sub => match inst_operand.get_kind() {
+                InstKind::Binary(binop2) => match binop2 {
+                    BinOp::Sub => {
+                        if iflag {
+                            if num_unknown == 1 && num_operand == 1 {
+                                let inst_result = pool
+                                    .make_int_const(const1.get_int_bond() - const2.get_int_bond());
+                                let inst_new = pool.make_add(inst_result, inst_unknown);
+                                replace_inst_with_new(inst, inst_new);
+                                inst_new.as_mut().insert_before(inst_result);
+                            } else if num_unknown == 1 && num_operand == 0 {
+                                let inst_result = pool
+                                    .make_int_const(-const1.get_int_bond() + const2.get_int_bond());
+                                let inst_new = pool.make_sub(inst_result, inst_unknown);
+                                replace_inst_with_new(inst, inst_new);
+                                inst_new.as_mut().insert_before(inst_result);
+                            } else if num_unknown == 0 && num_operand == 0 {
+                                let inst_result = pool
+                                    .make_int_const(const1.get_int_bond() + const2.get_int_bond());
+                                let inst_new = pool.make_sub(inst_unknown, inst_result);
+                                replace_inst_with_new(inst, inst_new);
+                                inst_new.as_mut().insert_before(inst_result);
+                            } else if num_unknown == 0 && num_operand == 1 {
+                                let inst_result = pool
+                                    .make_int_const(const1.get_int_bond() + const2.get_int_bond());
+                                let inst_new = pool.make_sub(inst_result, inst_unknown);
+                                replace_inst_with_new(inst, inst_new);
                             }
-                            return true;
                         }
-                        BinOp::Add =>{
-                            if iflag {
-                                if num_operand==0{
-                                    let inst_result =
-                                        pool.make_int_const(const2.get_int_bond() - const1.get_int_bond());
-                                    let inst_new = pool.make_add(inst_result, inst_unknown);
-                                    replace_inst_with_new(inst, inst_new);
-                                    inst_new.as_mut().insert_before(inst_result);
-                                }else{
-                                    let inst_result =
-                                        pool.make_int_const(const1.get_int_bond() - const2.get_int_bond());
-                                    let inst_new = pool.make_sub(inst_result, inst_unknown);
-                                    replace_inst_with_new(inst, inst_new);
-                                    inst_new.as_mut().insert_before(inst_result);
-                                }
-                            }
-                            return true;
-                        }
-                        _=>{return false;}
+                        return true;
                     }
-                }
-                _=>{unreachable!()}
-            }
-            BinOp::Mul =>match inst_operand.get_kind(){
-                InstKind::Binary(binop2) =>{
-                    match binop2 {
-                        BinOp::Mul =>{
-                            if iflag{
-                                let inst_result =
-                                        pool.make_int_const(const1.get_int_bond() * const2.get_int_bond());
-                                    let inst_new = pool.make_mul(inst_result, inst_unknown);
-                                    replace_inst_with_new(inst, inst_new);
-                                    inst_new.as_mut().insert_before(inst_result);
+                    BinOp::Add => {
+                        if iflag {
+                            if num_operand == 0 {
+                                let inst_result = pool
+                                    .make_int_const(const2.get_int_bond() - const1.get_int_bond());
+                                let inst_new = pool.make_add(inst_result, inst_unknown);
+                                replace_inst_with_new(inst, inst_new);
+                                inst_new.as_mut().insert_before(inst_result);
+                            } else {
+                                let inst_result = pool
+                                    .make_int_const(const1.get_int_bond() - const2.get_int_bond());
+                                let inst_new = pool.make_sub(inst_result, inst_unknown);
+                                replace_inst_with_new(inst, inst_new);
+                                inst_new.as_mut().insert_before(inst_result);
                             }
-                            return true;
                         }
-                        _=>{return false;}
+                        return true;
                     }
+                    _ => {
+                        return false;
+                    }
+                },
+                _ => {
+                    unreachable!()
                 }
-                _=>{unreachable!()}
-            }
+            },
+            BinOp::Mul => match inst_operand.get_kind() {
+                InstKind::Binary(binop2) => match binop2 {
+                    BinOp::Mul => {
+                        if iflag {
+                            let inst_result =
+                                pool.make_int_const(const1.get_int_bond() * const2.get_int_bond());
+                            let inst_new = pool.make_mul(inst_result, inst_unknown);
+                            replace_inst_with_new(inst, inst_new);
+                            inst_new.as_mut().insert_before(inst_result);
+                        }
+                        return true;
+                    }
+                    _ => {
+                        return false;
+                    }
+                },
+                _ => {
+                    unreachable!()
+                }
+            },
             _ => {
                 return false;
             }
@@ -495,19 +506,9 @@ pub fn fold_inst(inst_old: ObjPtr<Inst>, pool: &mut ObjPool<Inst>) -> bool {
     //能替换则用一条const指令替换该指令，更改使用这条指令的所有指令的操作数指向,删除该指令
 }
 
-pub fn replace_inst_with_new(inst_old: ObjPtr<Inst>, inst_new: ObjPtr<Inst>){
-    inst_old.as_mut().insert_before(inst_new);//插入新指令
+pub fn replace_inst_with_new(inst_old: ObjPtr<Inst>, inst_new: ObjPtr<Inst>) {
+    inst_old.as_mut().insert_before(inst_new); //插入新指令
     replace_inst(inst_old, inst_new);
-}
-pub fn replace_inst(inst_old: ObjPtr<Inst>, inst_new: ObjPtr<Inst>) {
-    let use_list = inst_old.get_use_list().clone();
-    // inst_old.as_mut().insert_before(inst_new); //插入新指令
-    for user in use_list {
-        //将使用过旧指令的指令指向新指令
-        let index = user.get_operand_index(inst_old);
-        user.as_mut().set_operand(inst_new, index);
-    }
-    inst_old.as_mut().remove_self(); //丢掉旧指令
 }
 
 pub fn get_iconstant(inst: ObjPtr<Inst>) -> Option<i32> {

@@ -6,7 +6,7 @@ use crate::{
         instruction::{BinOp, Inst, InstKind},
         ir_type::IrType,
         module::Module,
-        tools::{bfs_inst_process, func_process},
+        tools::{bfs_inst_process, func_process, replace_inst},
     },
     utility::ObjPtr,
 };
@@ -87,11 +87,18 @@ pub fn has_val(
                         || vec_congruent[0].get_parent_bb().get_name()
                             == inst.get_parent_bb().get_name()
                     {
-                        // println!(
-                        //     "指令{:?}被指令{:?}替换",
-                        //     inst.get_kind(),
-                        //     vec_congruent[0].get_kind()
-                        // );
+                        // match inst.get_kind() {
+                        //     InstKind::ConstFloat(_)|InstKind::ConstInt(_) =>{
+
+                        //     }
+                        //     _=>{
+                        //         println!(
+                        //             "指令{:?}被指令{:?}替换",
+                        //             inst.get_kind(),
+                        //             vec_congruent[0].get_kind()
+                        //         );
+                        //     }
+                        // }
                         // println!("块{:?}", vec_congruent[0].get_parent_bb().get_name());
                         replace_inst(inst, vec_congruent[0]);
                         return true;
@@ -103,11 +110,18 @@ pub fn has_val(
                             ) || vec_congruent[i].get_parent_bb().get_name()
                                 == inst.get_parent_bb().get_name()
                             {
-                                // println!(
-                                //     "指令{:?}被指令{:?}替换",
-                                //     inst.get_kind(),
-                                //     vec_congruent[i].get_kind()
-                                // );
+                                // match inst.get_kind() {
+                                //     InstKind::ConstFloat(_)|InstKind::ConstInt(_) =>{
+
+                                //     }
+                                //     _=>{
+                                //         println!(
+                                //             "指令{:?}被指令{:?}替换",
+                                //             inst.get_kind(),
+                                //             vec_congruent[i].get_kind()
+                                //         );
+                                //     }
+                                // }
                                 // println!("块{:?}", vec_congruent[i].get_parent_bb().get_name());
 
                                 replace_inst(inst, vec_congruent[i]);
@@ -142,7 +156,12 @@ pub fn compare_two_inst(inst1: ObjPtr<Inst>, inst2: ObjPtr<Inst>, congrunce: &Co
     let tpflag = inst1.get_ir_type() == inst2.get_ir_type();
     if inst1.get_kind() == inst2.get_kind() && tpflag {
         match inst1.get_kind() {
-            InstKind::Alloca(_) => {}
+            InstKind::Gep => {
+                let operands1 = inst1.get_operands();
+                let operands2 = inst2.get_operands();
+                return compare_two_inst_with_index(operands1[0], operands2[0], congrunce)
+                    && compare_two_inst_with_index(operands1[1], operands2[1], congrunce);
+            }
             InstKind::Unary(unop1) => match inst2.get_kind() {
                 InstKind::Unary(unop2) => {
                     let operands1 = inst1.get_operands();
@@ -244,6 +263,25 @@ pub fn compare_two_inst(inst1: ObjPtr<Inst>, inst2: ObjPtr<Inst>, congrunce: &Co
             },
             _ => {}
         }
+    } else if tpflag {
+        match inst1.get_kind() {
+            InstKind::Binary(binop1) => match inst2.get_kind() {
+                InstKind::Binary(binop2) => {
+                    let operands1 = inst1.get_operands();
+                    let operands2 = inst2.get_operands();
+                    if (binop1 == BinOp::Ge && binop2 == BinOp::Lt)
+                        || (binop1 == BinOp::Gt && binop2 == BinOp::Le)
+                        || (binop1 == BinOp::Le && binop2 == BinOp::Gt)
+                        || (binop1 == BinOp::Lt && binop2 == BinOp::Ge)
+                    {
+                        return compare_two_inst_with_index(operands1[0], operands2[1], congrunce)
+                            && compare_two_inst_with_index(operands1[1], operands2[0], congrunce);
+                    }
+                }
+                _ => {}
+            },
+            _ => {}
+        }
     }
     false
 }
@@ -278,15 +316,4 @@ pub fn compare_two_operands(
         return true;
     }
     false
-}
-
-pub fn replace_inst(inst_old: ObjPtr<Inst>, inst_new: ObjPtr<Inst>) {
-    let use_list = inst_old.get_use_list().clone();
-    // inst_old.as_mut().insert_before(inst_new); //插入新指令
-    for user in use_list {
-        //将使用过旧指令的指令指向新指令
-        let index = user.get_operand_index(inst_old);
-        user.as_mut().set_operand(inst_new, index);
-    }
-    inst_old.as_mut().remove_self(); //丢掉旧指令
 }
