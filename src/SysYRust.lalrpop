@@ -12,28 +12,28 @@ match {
     _
   }
 
-pub CompUnit:CompUnit  = <mut global_items:GlobalItems*> =>CompUnit{<>};
+pub CompUnit:CompUnit  = <global_items:GlobalItems*> =>CompUnit{<>};
 
 
 
 GlobalItems:GlobalItems = {
-    <d:Decl> =>{GlobalItems::Decl(<>)},
-    <fd:FuncDef> =>{GlobalItems::FuncDef(<>)},
+    <d:Decl> =>GlobalItems::Decl(<>),
+    <fd:FuncDef> =>GlobalItems::FuncDef(<>),
 
 }
 
 Decl:Decl = {
-    ConstDecl=>{Decl::ConstDecl(<>)},
-    VarDecl =>{Decl::VarDecl(<>)},
+    ConstDecl=>Decl::ConstDecl(<>),
+    VarDecl =>Decl::VarDecl(<>),
 }
 
 ConstDecl:ConstDecl = {
-    "const" "int"  <cdv:ConstDefVec> ";"=>{ConstDecl{btype:BType::Int,const_def_vec:cdv}},
-    "const" "float"  <cdv:ConstDefVec> ";"=>{ConstDecl{btype:BType::Float,const_def_vec:cdv}},
+    "const" "int"  <cdv:ConstDefVec> ";"=>ConstDecl{btype:BType::Int,const_def_vec:cdv},
+    "const" "float"  <cdv:ConstDefVec> ";"=>ConstDecl{btype:BType::Float,const_def_vec:cdv},
 }
 
 ConstDefVec:Vec<ConstDef> = {
-    <mut constvec:(<ConstDef> ",")*>  <c:ConstDef?> =>{
+    <mut constvec:(<ConstDef> ",")*>  <c:ConstDef?> =>
         match c{
             None =>constvec,
             Some(c) =>{
@@ -41,18 +41,18 @@ ConstDefVec:Vec<ConstDef> = {
                 constvec
             }
         }
-    },
+    ,
 }
 
 
 
 ConstDef:ConstDef = {
-    <ident:Ident> <mut const_exp_vec:("[" <ConstExp> "]")*> "=" <const_init_val:ConstInitVal> =>{ConstDef{<>}},
+    <ident:Ident> <const_exp_vec:("[" <ConstExp> "]")*> "=" <const_init_val:ConstInitVal> =>ConstDef{<>},
 }
 
 ConstInitVal:ConstInitVal = {
-    ConstExp =>{ConstInitVal::ConstExp(<>)},
-    "{" <mut v:(<ConstInitVal> ",")*> <val:ConstInitVal?> "}"=>{
+    ConstExp =>ConstInitVal::ConstExp(<>),
+    "{" <mut v:(<ConstInitVal> ",")*> <val:ConstInitVal?> "}"=>
         match val{
             None =>ConstInitVal::ConstInitValVec(v),
             Some(val) =>{
@@ -60,17 +60,16 @@ ConstInitVal:ConstInitVal = {
                 ConstInitVal::ConstInitValVec(v)
             }
         }
-    },
+    ,
 }
 
 VarDecl:VarDecl = {
-    // <t:BType> <mut v:VarDefVec> ";"=>{VarDecl{<>}},
-    "int" <mut v:VarDefVec> ";"=>{VarDecl{btype:BType::Int,var_def_vec:v}},
-    "float" <mut v:VarDefVec> ";"=>{VarDecl{btype:BType::Float,var_def_vec:v}},
+    "int" <v:VarDefVec> ";"=>VarDecl{btype:BType::Int,var_def_vec:v},
+    "float" <v:VarDefVec> ";"=>VarDecl{btype:BType::Float,var_def_vec:v},
 }
 
 VarDefVec:Vec<VarDef> = {
-    <mut v:(<VarDef> ",")*> <e:VarDef?> =>{
+    <mut v:(<VarDef> ",")*> <e:VarDef?> =>
         match e{
             None => v,
             Some(e) =>{
@@ -78,54 +77,54 @@ VarDefVec:Vec<VarDef> = {
                 v
             }
         }
-    },
+    ,
 }
 
 
 VarDef:VarDef = {
-    <i:Ident>  =>{
+    <i:Ident>  =>
         VarDef::NonArray(<>)
-    },
+    ,
     
-    <i:Ident> <mut expvec:("[" <ConstExp> "]")+> =>{VarDef::Array((i,expvec))},
+    <i:Ident> <expvec:("[" <ConstExp> "]")+> =>VarDef::Array((i,expvec)),
 
 
-    <i:Ident> "=" <initval:InitVal> =>{VarDef::NonArrayInit((i,initval))},
+    <i:Ident> "=" <initval:InitVal> =>VarDef::NonArrayInit((i,initval)),
 
-    <i:Ident> <mut expvec:("[" <ConstExp> "]")+> "=" <initval:InitVal> =>{VarDef::ArrayInit((i,expvec,initval))},
+    <i:Ident> <expvec:("[" <ConstExp> "]")+> "=" <initval:InitVal> =>VarDef::ArrayInit((i,expvec,initval)),
 }
 
 
 InitVal:InitVal = {
-    Exp =>{InitVal::Exp(<>)},
+    Exp =>InitVal::Exp(<>),
     "{" <i:InitVal> <mut initvec1:("," <InitVal>)*> "}" =>{
         initvec1.insert(0,i);
         InitVal::InitValVec(initvec1)
     },
-    "{" "}" =>{InitVal::InitValVec(Vec::new())},
+    "{" "}" =>InitVal::InitValVec(Vec::new()),
 }
 
 
 FuncDef:FuncDef = {
-    "int" <mut funcname:Ident> "(" <mut funcfpv:FuncFParams> ")" <b:Block> =>{
+    "int" <funcname:Ident> "(" <funcfpv:FuncFParams> ")" <b:Block> =>
         FuncDef::ParameterFuncDef((FuncType::Int, funcname, funcfpv,b))
-    },
-    "void" <mut funcname:Ident> "(" <mut funcfpv:FuncFParams> ")" <b:Block> =>{
+    ,
+    "void" <funcname:Ident> "(" <funcfpv:FuncFParams> ")" <b:Block> =>
         FuncDef::ParameterFuncDef((FuncType::Void, funcname, funcfpv,b))
-    },
-    "float" <mut funcname:Ident> "(" <mut funcfpv:FuncFParams> ")" <b:Block> =>{
+    ,
+    "float" <funcname:Ident> "(" <funcfpv:FuncFParams> ")" <b:Block> =>
         FuncDef::ParameterFuncDef((FuncType::Float, funcname, funcfpv,b))
-    },
+    ,
 
-    "int" <mut funcname:Ident> "(" ")" <b:Block> =>{
+    "int" <funcname:Ident> "(" ")" <b:Block> =>
         FuncDef::NonParameterFuncDef((FuncType::Int, funcname,b))
-    },
-    "void" <mut funcname:Ident> "(" ")" <b:Block> =>{
+    ,
+    "void" <funcname:Ident> "(" ")" <b:Block> =>
         FuncDef::NonParameterFuncDef((FuncType::Void, funcname,b))
-    },
-    "float" <mut funcname:Ident> "(" ")" <b:Block> =>{
+    ,
+    "float" <funcname:Ident> "(" ")" <b:Block> =>
         FuncDef::NonParameterFuncDef((FuncType::Float, funcname,b))
-    },
+    ,
 }
 
 
@@ -137,78 +136,33 @@ FuncFParams:FuncFParams= {
 }
 
 FuncFParam:FuncFParam = {
-    "int" <name:Ident>  =>{
+    "int" <name:Ident>  =>
         FuncFParam::NonArray((BType::Int,name))
-    },
-    "float" <name:Ident>  =>{
+    ,
+    "float" <name:Ident>  =>
         FuncFParam::NonArray((BType::Float,name))
-    },
+    ,
 
-    "int" <name:Ident> "[" "]" <mut expvec:("[" <Exp> "]")*> =>{
+    "int" <name:Ident> "[" "]" <expvec:("[" <Exp> "]")*> =>
         FuncFParam::Array((BType::Int,name,expvec))
-    },
-    "float" <name:Ident> "[" "]" <mut expvec:("[" <Exp> "]")*> =>{
+    ,
+    "float" <name:Ident> "[" "]" <expvec:("[" <Exp> "]")*> =>
         FuncFParam::Array((BType::Float,name,expvec))
-    },
+    ,
 }
 
 Block:Block = {
-    "{" <mut block_vec:BlockItem*> "}"=>{
+    "{" <block_vec:BlockItem*> "}"=>
 Block{<>}
-    },
+    ,
 }
 
 BlockItem:BlockItem = {
-    Decl =>{BlockItem::Decl(<>)},
-    Stmt =>{BlockItem::Stmt(<>)},
+    Decl =>BlockItem::Decl(<>),
+    Stmt =>BlockItem::Stmt(<>),
 }
 
 
-// Stmt: Stmt = {
-//     MatchedStmt => {Stmt::MatchedStmt(<>)},
-//     OpenStmt => {Stmt::OpenStmt(<>)},
-// }
-
-// MatchedStmt: MatchedStmt = {
-//   <lval: LVal> "=" <exp: Exp> ";" => {
-//     MatchedStmt::AssignStmt((lval, exp))
-//   },
-//   <exp: (Exp)?> ";" => {
-//     MatchedStmt::NonActionStmt(ExpStmt{<>})
-//   },
-//   Block =>{
-//     MatchedStmt::BlockStmt(<>)
-//   },
-//   "if" "(" <cond: Cond> ")" <then: MatchedStmt> 
-//   "else" <else_then: MatchedStmt> => {
-//     MatchedStmt::IfElseStmt((cond,then,else_then))
-//   },
-//   "while" "(" <cond: Cond> ")" <body: MatchedStmt> => {
-//     MatchedStmt::WhileStmt((cond,body))
-//   },
-//   "break" ";" => {
-//     MatchedStmt::BreakStmt
-//   },
-//   "continue" ";" => {
-//     MatchedStmt::ContinueStmt
-//   },
-//   "return" <exp: (Exp)?> ";" => {
-//     MatchedStmt::RetStmt(ExpStmt{<>})
-//   },
-// }
-
-// OpenStmt: OpenStmt = {
-//   "if" "(" <cond: Cond> ")" <then: Stmt> => {
-//     OpenStmt::IfStmt((cond,then))
-//   },
-//   "if" "(" <cond: Cond> ")" <then: MatchedStmt> 
-//   "else" <else_then: OpenStmt> => {
-//     OpenStmt::IfElseStmt((cond,then,else_then))
-//   },
-//   "while" "(" <cond: Cond> ")" <body: OpenStmt> => {
-//     OpenStmt::WhileStmt((cond,body))
-//   },
-// }
 
 
 Stmt: Stmt = {
@@ -221,88 +175,85 @@ Stmt: Stmt = {
     <exp: (Exp)?> ";" => Stmt::ExpStmt(ExpStmt { <> }),
     Block => Stmt::Block(<>),
     "if" "(" <cond: Cond> ")" <then: MatchedStmt>
-    "else" <else_then: MatchedStmt> => {
+    "else" <else_then: MatchedStmt> => 
       Stmt::If(Box::new(If { cond, then, else_then: Some(else_then) }))
-    },
-    "while" "(" <cond: Cond> ")" <body: MatchedStmt> => {
+    ,
+    "while" "(" <cond: Cond> ")" <body: MatchedStmt> => 
       Stmt::While(Box::new(While { <> }))
-    },
+    ,
     "break" ";" => Stmt::Break(Break),
     "continue" ";" => Stmt::Continue(Continue),
     "return" <exp: (Exp)?> ";" => Stmt::Return(Return { <> }),
   }
   
   OpenStmt: Stmt = {
-    "if" "(" <cond: Cond> ")" <then: Stmt> => {
+    "if" "(" <cond: Cond> ")" <then: Stmt> => 
       Stmt::If(Box::new(If { cond, then, else_then: None }))
-    },
+    ,
     "if" "(" <cond: Cond> ")" <then: MatchedStmt>
-    "else" <else_then: OpenStmt> => {
+    "else" <else_then: OpenStmt> => 
       Stmt::If(Box::new(If { cond, then, else_then: Some(else_then) }))
-    },
-    "while" "(" <cond: Cond> ")" <body: OpenStmt> => {
+    ,
+    "while" "(" <cond: Cond> ")" <body: OpenStmt> => 
       Stmt::While(Box::new(While { <> }))
-    },
+    ,
   }
 
 Exp:Exp = {
-    AddExp =>{Exp{add_exp:Box::new(<>)}},
+    AddExp =>Exp{add_exp:Box::new(<>)},
 }
 
 Cond:Cond = {
-    <l_or_exp:LOrExp> =>{Cond{<>}},
+    <l_or_exp:LOrExp> =>Cond{<>},
 }
 
 LVal:LVal = {
-    <id:Ident> <mut exp_vec:("[" <Exp> "]")*> =>{LVal{<>}},
+    <id:Ident> <exp_vec:("[" <Exp> "]")*> =>LVal{<>},
 }
 
 PrimaryExp:PrimaryExp = {
-    "(" <Exp> ")" =>{
+    "(" <Exp> ")" =>
         PrimaryExp::Exp(Box::new(<>))
-    },
-    LVal =>{
+    ,
+    LVal =>
         PrimaryExp::LVal(<>)
-    },
-    Number =>{
+    ,
+    Number =>
         PrimaryExp::Number(<>)
-    },
+    ,
 }
 
 Number:Number = {
-    <int_const:IntConst> =>{
+    <int_const:IntConst> =>
         Number::IntConst(int_const)
-    },
-    <float_const:FloatConst> =>{
+    ,
+    <float_const:FloatConst> =>
         Number::FloatConst(float_const)
-    },//todo:floatConst
+    ,//todo:floatConst
 }
 
 UnaryExp:UnaryExp = {
-    PrimaryExp =>{
+    PrimaryExp =>
         UnaryExp::PrimaryExp(Box::new(<>))
-    },
-    <id:Ident> "(" <func_fparams:FuncRParams?> ")" =>{
+    ,
+    <id:Ident> "(" <func_fparams:FuncRParams?> ")" =>
         UnaryExp::FuncCall((id,OptionFuncRParams{func_fparams}))
-    },
-    // "+" <UnaryExp> =>{
-    //     UnaryExp::AddUnaryExp(Box::new(<>))
-    // },
-    <op:UnaryOp> <exp:UnaryExp> =>{
+    ,
+    <op:UnaryOp> <exp:UnaryExp> =>
         UnaryExp::OpUnary((op,Box::new(exp)))
-    },
+    ,
 }
 
 UnaryOp:UnaryOp = {
-    "+" =>{
+    "+" =>
         UnaryOp::Add
-    },
-    "-" =>{
+    ,
+    "-" =>
         UnaryOp::Minus
-    },
-    "!" =>{
+    ,
+    "!" =>
         UnaryOp::Exclamation
-    },
+    ,
 }
 
 FuncRParams:FuncRParams = {
@@ -314,101 +265,98 @@ FuncRParams:FuncRParams = {
 
 
 MulExp:MulExp = {
-    UnaryExp =>{
+    UnaryExp =>
         MulExp::UnaryExp(Box::new(<>))
-    },
-    <m:MulExp> "*" <u:UnaryExp> =>{
+    ,
+    <m:MulExp> "*" <u:UnaryExp> =>
         MulExp::MulExp((Box::new(m),u))
-    },
-    <m:MulExp> "/" <u:UnaryExp> =>{
+    ,
+    <m:MulExp> "/" <u:UnaryExp> =>
         MulExp::DivExp((Box::new(m),u))
-    },
-    <m:MulExp> "%" <u:UnaryExp> =>{
+    ,
+    <m:MulExp> "%" <u:UnaryExp> =>
         MulExp::ModExp((Box::new(m),u))
-    },
+    ,
 }
 
 AddOp:AddOp  = {
-    "+" =>{
+    "+" =>
         AddOp::Add
-    },
-    "-" =>{
+    ,
+    "-" =>
         AddOp::Minus
-    },
+    ,
 }
 
 AddExp:AddExp = {
-    MulExp =>{
+    MulExp =>
         AddExp::MulExp(Box::new(<>))
-    },
-    //AddExp "+" MulExp =>{}
-    <a:AddExp> <op:AddOp> <m:MulExp> =>{
+    ,
+    <a:AddExp> <op:AddOp> <m:MulExp> =>
         AddExp::OpExp((Box::new(a),op,m))
-    },
-    //AddExp "-" MulExp =>{
-//0
-    //},
+    ,
+
 }
 
 RelOp:RelOp = {
-    "<" =>{
+    "<" =>
         RelOp::Less
-    },
-    "<=" =>{
+    ,
+    "<=" =>
         RelOp::LessOrEqual
-    },
-    ">" =>{
+    ,
+    ">" =>
         RelOp::Greater
-    },
-    ">=" =>{
+    ,
+    ">=" =>
         RelOp::GreaterOrEqual
-    },
+    ,
 
 }
 
 RelExp:RelExp = {
-    AddExp =>{
+    AddExp =>
         RelExp::AddExp(<>)
-    },
-    <r:RelExp> <op:RelOp> <a:AddExp> =>{
+    ,
+    <r:RelExp> <op:RelOp> <a:AddExp> =>
         RelExp::OpExp((Box::new(r),op,a))
-    },
+    ,
 }
 
 EqExp:EqExp = {
-    RelExp =>{
+    RelExp =>
         EqExp::RelExp(<>)
-    },
-    <e:EqExp> "==" <r:RelExp> =>{
+    ,
+    <e:EqExp> "==" <r:RelExp> =>
         EqExp::EqualExp((Box::new(e), r))
-    },
-    <e:EqExp> "!=" <r:RelExp> =>{
+    ,
+    <e:EqExp> "!=" <r:RelExp> =>
         EqExp::NotEqualExp((Box::new(e), r))
-    },
+    ,
 }
 
 LAndExp:LAndExp = {
-    EqExp =>{
+    EqExp =>
         LAndExp::EqExp(<>)
-    },
-    <l:LAndExp> "&&" <e:EqExp> =>{
+    ,
+    <l:LAndExp> "&&" <e:EqExp> =>
         LAndExp::AndExp((Box::new(l), e))
-    },
+    ,
 }
 
 LOrExp:LOrExp = {
-    LAndExp =>{
+    LAndExp =>
         LOrExp::LAndExp(<>)
-    },
-    <o:LOrExp> "||" <a:LAndExp> =>{
+    ,
+    <o:LOrExp> "||" <a:LAndExp> =>
         LOrExp::OrExp((Box::new(o),a))
-    },
+    ,
 }
 
 ConstExp:ConstExp = {
-    <add_exp:AddExp> =>{
+    <add_exp:AddExp> =>
         ConstExp{<>}
-    },
+    ,
 }
 
 
@@ -418,141 +366,81 @@ ConstExp:ConstExp = {
 
 Ident:Ident = {
 
-    <mut s:r"[_a-zA-Z][_a-zA-Z0-9]*"> =>{
+    <s:r"[_a-zA-Z][_a-zA-Z0-9]*"> =>
         s.to_string()//todo:返回字符串值
-    },
+    ,
 }
 
 IntConst:IntConst = {
-    <i:DecimalConst> =>{
-       i 
-    },
-    <i:OctalConst> =>{
+    <i:DecimalConst> =>
+       i ,
+    <i:OctalConst> =>
 i
-    },
-    <i:HexadecimalConst> =>{
+    ,
+    <i:HexadecimalConst> =>
 i
-    },
+    ,
 }
 
 DecimalConst:IntConst = {
-    <mut s:r"[1-9][0-9]*"> =>{
+    <s:r"[1-9][0-9]*"> =>
         i32::from_str_radix(<>, 10).unwrap()
-    },
+    ,
 }
 
 OctalConst:IntConst = {
 
-    <mut s:r"0[0-7]*"> =>{
+    <s:r"0[0-7]*"> =>
         //s//todo:返回字符串值
         i32::from_str_radix(<>, 8).unwrap()
-    },
+    ,
 }
 
 HexadecimalConst:IntConst = {
-    <mut s:r"0[xX][0-9a-fA-F]+"> =>{
+    <s:r"0[xX][0-9a-fA-F]+"> =>
         i32::from_str_radix(&<>[2..], 16).unwrap()//s//todo:返回字符串值
-    },
+    ,
 }
 
 
 FloatConst:FloatConst = {
-    <f:DecimalFloat> =>{
+    <f:DecimalFloat> =>
         f
-    },
-    <f:HexadecimalFloat> =>{
+    ,
+    <f:HexadecimalFloat> =>
         f
-    },
+    ,
 }
 
 DecimalFloat:FloatConst = {
-    <mut s:r"[0-9]*\.[0-9]+([eE][+-]?[0-9]+)?"> =>{
+    <s:r"[0-9]*\.[0-9]+([eE][+-]?[0-9]+)?"> =>
         s.parse::<f32>().unwrap()
-    },
-    <mut s:r"[0-9]+\.([eE][+-]?[0-9]+)?"> =>{
+    ,
+    <s:r"[0-9]+\.([eE][+-]?[0-9]+)?"> =>
         s.parse::<f32>().unwrap()
-    },
-    <mut s:r"[0-9]+[eE][+-]?[0-9]+"> =>{
+    ,
+    <s:r"[0-9]+[eE][+-]?[0-9]+"> =>
         s.parse::<f32>().unwrap()
-    },
+    ,
 }
 
 
 HexadecimalFloat:FloatConst = {
-    <head:r"0[xX][0-9a-fA-F]+[pP][-+]?[0-9]+">=>{
-        // let mut split_iter = head.split(|c| c == 'p' || c == 'P');
-        // if let Some(first) = split_iter.next() {
-        //     if let Some(second) = split_iter.next() {
-        //         let h = i32::from_str_radix(&first[2..], 16).unwrap();
-        //         let tmp = h.to_string()+"e"+&second;
-        //         return tmp.parse::<f32>().unwrap();
-        //     }
-        // }
-        // -1129.0
-        //let float_repr: FloatLiteral = head.parse().unwrap();
-        //float_repr.convert::<f32>().inner()
+    <head:r"0[xX][0-9a-fA-F]+[pP][-+]?[0-9]+">=>
         parse_hexf32(head, false).unwrap()
-    },
+    ,
 
-    <head:r"0[xX][0-9a-fA-F]+\.[0-9a-fA-F]+[pP][-+]?[0-9]+"> =>{
-        // let mut split_iter = head.splitn(2,".");
-        // if let Some(first) = split_iter.next() {
-        //     if let Some(second) = split_iter.next() {
-        //         let h = i32::from_str_radix(&first[2..], 16).unwrap();
-        //         let mut split_iter_2 = second.split(|c| c == 'p' || c == 'P');
-        //         if let Some(tail) = split_iter_2.next() {
-        //             if let Some(exp) = split_iter_2.next(){
-        //                 let tt = i32::from_str_radix(&tail, 16).unwrap();
-        //                 let tmp = h.to_string()+"."+tt.to_string().as_str()+"e"+&exp;
-        //                 return tmp.parse::<f32>().unwrap();
-        //             }
-        //         }
-        //     }
-        // }
-        // -1129.0
-        
-        //let float_repr: FloatLiteral = head.parse().unwrap();
-        //float_repr.convert::<f32>().inner()
+    <head:r"0[xX][0-9a-fA-F]+\.[0-9a-fA-F]+[pP][-+]?[0-9]+"> =>
         parse_hexf32(head, false).unwrap()
-    },
+    ,
 
-    <mut head:r"0[xX]\.[0-9a-fA-F]+[pP][-+]?[0-9]+"> =>{
-        // let mut split_iter = head.split(|c| c == 'p' || c == 'P');
-        // if let Some(first) = split_iter.next() {
-        //     if let Some(exp) = split_iter.next() {
-        //         let t = i32::from_str_radix(&first[3..], 16).unwrap();
-        //         let tmp = ".".to_string()+t.to_string().as_str()+"e"+&exp[1..];
-        //         return tmp.parse::<f32>().unwrap();
-        //     }
-        // }
-        // -1129.0
-        //let float_repr: FloatLiteral = head.parse().unwrap();
-        //float_repr.convert::<f32>().inner()
+    <head:r"0[xX]\.[0-9a-fA-F]+[pP][-+]?[0-9]+"> =>
         parse_hexf32(head, false).unwrap()
-    },
+    ,
 
-    <head:r"0[xX][0-9a-fA-F]+\.[pP][-+]?[0-9]+"> =>{
-        // let mut split_iter = head.splitn(2,".");
-        // if let Some(first) = split_iter.next() {
-        //     if let Some(exp) = split_iter.next() {
-        //         let h = i32::from_str_radix(&first[2..], 16).unwrap();
-        //         // let exp = i32::from_str_radix(&second[1..], 16).unwrap();
-        //         let tmp = h.to_string()+"."+"e"+&exp[1..];
-        //         return tmp.parse::<f32>().unwrap();        
-        //         }
-        //     }
-        
-        // -1129.0
-        //let float_repr: FloatLiteral = head.parse().unwrap();
-        //float_repr.convert::<f32>().inner()
+    <head:r"0[xX][0-9a-fA-F]+\.[pP][-+]?[0-9]+"> =>
         parse_hexf32(head, false).unwrap()
-    },
-
-    // <head:HexadecimalConst>  <exp:r"[pP][-+]?[0-9]+"> =>{
-    //     let tmp = head.to_string()+"e"+&exp[1..];
-    //     tmp.parse::<f32>().unwrap()
-    // },
-    
+    ,
 }
 //todo:浮点数还没加
 
