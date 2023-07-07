@@ -83,6 +83,17 @@ impl Inst {
         }
     }
 
+    /// 判断一个指令是否是常量
+    pub fn is_const(&self) -> bool {
+        match self.get_kind() {
+            InstKind::ConstInt(_)
+            | InstKind::ConstFloat(_)
+            | InstKind::GlobalConstInt(_)
+            | InstKind::GlobalConstFloat(_) => true,
+            _ => false,
+        }
+    }
+
     /// 判断一个指令是否是全局变量
     pub fn is_global_var(&self) -> bool {
         match self.get_kind() {
