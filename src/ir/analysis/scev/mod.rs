@@ -43,6 +43,9 @@ impl<'a> SCEVAnalyzer<'a> {
                 scev = self.analyze_binary_add(inst);
                 self.map.insert(inst, scev);
             }
+            InstKind::Binary(BinOp::Sub) => {
+                scev = self.analyze_binary_sub(inst);
+            }
             InstKind::Binary(BinOp::Mul) => {
                 scev = self.analyze_binary_mul(inst);
                 self.map.insert(inst, scev);
@@ -73,17 +76,17 @@ impl<'a> SCEVAnalyzer<'a> {
     }
 
     fn analyze_binary_add(&mut self, inst: ObjPtr<Inst>) -> ObjPtr<SCEVExp> {
-        let lhs = self.analyze(inst.get_lhs());
-        let rhs = self.analyze(inst.get_rhs());
-        match (lhs.get_kind(), rhs.get_kind()) {
-            (SCEVExpKind::SCEVConstant, SCEVExpKind::SCEVAddRecExpr)
-            | (SCEVExpKind::SCEVAddRecExpr, SCEVExpKind::SCEVConstant) => self
-                .scevexp_pool
-                .make_scev_add_rec_expr(vec![lhs.get_bond_inst(), rhs.get_bond_inst()], inst),
-            _ => self
-                .scevexp_pool
-                .make_scev_add_expr(vec![lhs.get_bond_inst(), rhs.get_bond_inst()], inst),
-        }
+        self.analyze(inst.get_lhs());
+        self.analyze(inst.get_rhs());
+        self.scevexp_pool
+            .make_scev_add_expr(inst.get_operands().clone(), inst)
+    }
+
+    fn analyze_binary_sub(&mut self, inst: ObjPtr<Inst>) -> ObjPtr<SCEVExp> {
+        self.analyze(inst.get_lhs());
+        self.analyze(inst.get_rhs());
+        self.scevexp_pool
+            .make_scev_sub_expr(inst.get_operands().clone(), inst)
     }
 
     fn analyze_binary_mul(&mut self, inst: ObjPtr<Inst>) -> ObjPtr<SCEVExp> {
@@ -94,8 +97,8 @@ impl<'a> SCEVAnalyzer<'a> {
     }
 
     fn analyze_gep(&mut self, inst: ObjPtr<Inst>) -> ObjPtr<SCEVExp> {
-        let lhs = self.analyze(inst.get_lhs());
-        let rhs = self.analyze(inst.get_rhs());
+        let lhs = self.analyze(inst.get_gep_ptr());
+        let rhs = self.analyze(inst.get_gep_offset());
         self.scevexp_pool
             .make_scev_add_expr(vec![lhs.get_bond_inst(), rhs.get_bond_inst()], inst)
     }
@@ -119,26 +122,41 @@ impl<'a> SCEVAnalyzer<'a> {
             let op1 = self.analyze(inst.get_operands()[0]);
             let op2 = self.analyze(inst.get_operands()[1]);
 
-            let mut match_rec_expr = |op: ObjPtr<SCEVExp>| -> ObjPtr<SCEVExp> {
-                if let SCEVExpKind::SCEVAddExpr = op.get_kind() {
-                    if op.get_operands().iter().any(|&x| x == inst) {
-                        return self.scevexp_pool.make_scev_add_rec_expr(
-                            vec![op1.get_bond_inst(), op2.get_bond_inst()],
-                            inst,
-                        );
+            let mut match_rec_expr = |op1: ObjPtr<SCEVExp>,
+                                      op2: ObjPtr<SCEVExp>|
+             -> ObjPtr<SCEVExp> {
+                if let SCEVExpKind::SCEVAddExpr = op1.get_kind() {
+                    let adder = op1.get_operands()[0];
+                    let addee = op1.get_operands()[1];
+                    if adder == inst && addee.is_const() {
+                        return self
+                            .scevexp_pool
+                            .make_scev_add_rec_expr(vec![op2.get_bond_inst(), addee], inst);
+                    } else if addee == inst && adder.is_const() {
+                        return self
+                            .scevexp_pool
+                            .make_scev_add_rec_expr(vec![op2.get_bond_inst(), adder], inst);
+                    }
+                } else if let SCEVExpKind::SCEVSubExpr = op1.get_kind() {
+                    let minuend = op1.get_operands()[0];
+                    let subtrahend = op1.get_operands()[1];
+                    if minuend == inst && subtrahend.is_const() {
+                        return self
+                            .scevexp_pool
+                            .make_scev_sub_rec_expr(vec![op2.get_bond_inst(), subtrahend], inst);
                     }
                 }
                 return self.scevexp_pool.make_scev_unknown(inst);
             };
 
-            if loop_info.is_in_loop(&op1.get_bond_inst().get_parent_bb())
-                && !loop_info.is_in_loop(&op2.get_bond_inst().get_parent_bb())
+            if loop_info.is_in_current_loop(&op1.get_bond_inst().get_parent_bb())
+                && !loop_info.is_in_current_loop(&op2.get_bond_inst().get_parent_bb())
             {
-                return match_rec_expr(op1);
+                return match_rec_expr(op1, op2);
             } else if !loop_info.is_in_loop(&op1.get_bond_inst().get_parent_bb())
                 && loop_info.is_in_loop(&op2.get_bond_inst().get_parent_bb())
             {
-                return match_rec_expr(op2);
+                return match_rec_expr(op2, op1);
             }
         }
 
