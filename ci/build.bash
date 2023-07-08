@@ -2,3 +2,6 @@
 cd exec
 go build test.go
 mv test ../../test
+
+
+
