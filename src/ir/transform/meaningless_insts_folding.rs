@@ -1,5 +1,4 @@
 use crate::{
-    backend::operand,
     ir::{
         basicblock::BasicBlock,
         instruction::{BinOp, Inst, InstKind},
@@ -45,12 +44,20 @@ pub fn delete_useless_inst(inst: ObjPtr<Inst>, pool: &mut ObjPool<Inst>) {
                     InstKind::ConstInt(i) => {
                         if i == 1 {
                             replace_inst(inst, operands[1]);
+                        }else if i==-1{
+                            let inst_new = pool.make_neg(operands[1]);
+                            inst.as_mut().insert_before(inst_new);
+                            replace_inst(inst, inst_new);
                         }
                     }
                     _ => match operands[1].get_kind() {
                         InstKind::ConstInt(i) => {
                             if i == 1 {
                                 replace_inst(inst, operands[0]);
+                            }else if i==-1{
+                                let inst_new = pool.make_neg(operands[0]);
+                                inst.as_mut().insert_before(inst_new);
+                                replace_inst(inst, inst_new);
                             }
                         }
                         _ => {}
@@ -75,6 +82,22 @@ pub fn delete_useless_inst(inst: ObjPtr<Inst>, pool: &mut ObjPool<Inst>) {
             }
             _ => {}
         },
+        InstKind::Load =>{
+            let operand = inst.get_operands();
+            match operand[0].get_kind() {
+                InstKind::GlobalConstInt(i) =>{
+                    let inst_new = pool.make_int_const(i);
+                    inst.as_mut().insert_before(inst_new);
+                    replace_inst(inst, inst_new);
+                }
+                InstKind::GlobalConstFloat(f) =>{
+                    let inst_new = pool.make_float_const(f);
+                    inst.as_mut().insert_before(inst_new);
+                    replace_inst(inst, inst_new);
+                }
+                _=>{}
+            }
+        }
         _ => {}
     }
 }
