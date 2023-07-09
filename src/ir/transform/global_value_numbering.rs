@@ -27,7 +27,6 @@ pub fn easy_gvn(module: &mut Module) {
         loop {
             let mut changed = false;
             bfs_inst_process(func.get_head(), |inst| {
-                // println!("inst:{:?}inst_bb:{:?}",inst.get_kind(),inst.get_parent_bb().get_name());
                 changed |= has_val(&mut congruence, inst, &dominator_tree)
             });
             if !changed {
@@ -42,7 +41,6 @@ pub fn has_val(
     inst: ObjPtr<Inst>,
     dominator_tree: &DominatorTree,
 ) -> bool {
-    // println!("{:?}",dominator_tree.is_dominate(&inst.get_parent_bb(), &inst.get_parent_bb()));
     match inst.get_kind() {
         InstKind::Alloca(_)
         | InstKind::Branch
@@ -57,49 +55,18 @@ pub fn has_val(
         | InstKind::GlobalFloat(_)
         | InstKind::GlobalInt(_)
         | InstKind::Phi => {
-            // println!(
-            //     "跳过指令{:?},块:{:?}",
-            //     inst.get_kind(),
-            //     inst.get_parent_bb().get_name()
-            // );
         } //todo:phi可以被优化吗
         _ => {
-            // println!(
-            //     "gvn_process inst:{:?},所在块:{:?}",
-            //     inst.get_kind(),
-            //     inst.get_parent_bb().get_name()
-            // );
             if let Some(_index) = congrunce.map.get(&inst) {
                 return false;
             }
             for vec_congruent in congrunce.vec_class.clone() {
                 if compare_two_inst(inst, vec_congruent[0], &congrunce) {
-                    //todo:找到一个dominant node,返回true和这个node
-                    // println!("找到同类指令集");
-                    // if vec_congruent[0].get_parent_bb().get_name()
-                    //     == inst.get_parent_bb().get_name()
-                    // {
-                    //     println!("同块");
-                    // }
-                    // println!("和首指令不同块");
                     if dominator_tree
                         .is_dominate(&vec_congruent[0].get_parent_bb(), &inst.get_parent_bb())
                         || vec_congruent[0].get_parent_bb().get_name()
                             == inst.get_parent_bb().get_name()
                     {
-                        // match inst.get_kind() {
-                        //     InstKind::ConstFloat(_)|InstKind::ConstInt(_) =>{
-
-                        //     }
-                        //     _=>{
-                        //         println!(
-                        //             "指令{:?}被指令{:?}替换",
-                        //             inst.get_kind(),
-                        //             vec_congruent[0].get_kind()
-                        //         );
-                        //     }
-                        // }
-                        // println!("块{:?}", vec_congruent[0].get_parent_bb().get_name());
                         replace_inst(inst, vec_congruent[0]);
                         return true;
                     } else {
@@ -110,20 +77,6 @@ pub fn has_val(
                             ) || vec_congruent[i].get_parent_bb().get_name()
                                 == inst.get_parent_bb().get_name()
                             {
-                                // match inst.get_kind() {
-                                //     InstKind::ConstFloat(_)|InstKind::ConstInt(_) =>{
-
-                                //     }
-                                //     _=>{
-                                //         println!(
-                                //             "指令{:?}被指令{:?}替换",
-                                //             inst.get_kind(),
-                                //             vec_congruent[i].get_kind()
-                                //         );
-                                //     }
-                                // }
-                                // println!("块{:?}", vec_congruent[i].get_parent_bb().get_name());
-
                                 replace_inst(inst, vec_congruent[i]);
                                 return true;
                             }
@@ -135,18 +88,11 @@ pub fn has_val(
                         congrunce.map.insert(inst, *index);
                     }
                     return false;
-                    //todo:没找到则返回将该指令放到相应的congruent class里,返回false
                 }
             }
         }
     }
-
     let index = congrunce.vec_class.len();
-    // println!(
-    //     "inst:{:?}没找到相应同质类,形成一个新类,index:{:?}",
-    //     inst.get_kind(),
-    //     index
-    // );
     congrunce.vec_class.push(vec![inst]); //加入新的congruent class
     congrunce.map.insert(inst, index); //增加索引映射
     false

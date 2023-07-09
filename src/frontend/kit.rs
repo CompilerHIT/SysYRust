@@ -157,13 +157,8 @@ impl Kit<'_> {
 
     pub fn phi_padding_allfunctions(&mut self) {
         //填充所有函数中的phi
-        // // println!("填phi开始");
         let vec_funcs = self.get_functions().unwrap().clone();
         for func in vec_funcs {
-            // // println!(
-            //     "填phi,函数头basicblock名:{:?}",
-            //     func.as_ref().get_head().get_name()
-            // );
             if func.is_empty_bb() {
                 continue;
             }
@@ -206,7 +201,6 @@ impl Kit<'_> {
         if bb_success.is_empty() {}
         for bb_next in bb_success {
             if let Some((_, is_padded_temp)) = self.context_mut.phi_list.get(bb_next.get_name()) {
-                // vec_phi = vec_phi_temp.clone();
                 if *is_padded_temp {
                     continue;
                 }
@@ -384,22 +378,10 @@ impl Kit<'_> {
                     bb_merge.as_mut().push_back(inst_ret);
                 }
                 _ => {
-                    // println!("funcname:{:?},rettype{:?}", func_name, ret_type);
                     unreachable!()
                 }
             }
         }
-        // else if vec_endpoint.len()==0{
-        //     match ret_type {
-        //         IrType::Void =>{
-        //             let end_bb = Self::bfs_find_end_bb(inst_func.get_head());
-        //             end_bb.as_mut().push_back(self.pool_inst_mut.make_return_void());
-        //         }
-        //         _=>{
-        //             unreachable!("无返回值,且函数返回类型应该为{:?}",ret_type)
-        //         }
-        //     }
-        // }
     }
 
     pub fn add_var(
