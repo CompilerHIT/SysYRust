@@ -8,7 +8,7 @@ impl BackendPass {
                 func.blocks.iter().for_each(|block| {
                     // 在处理handle_overflow前的优化
                     self.rm_useless_overflow(*block, pool);
-                    self.rm_useless_param_overflow(*func, *block, pool);
+                    // self.rm_useless_param_overflow(*func, *block, pool);
                 })
             }
         });
