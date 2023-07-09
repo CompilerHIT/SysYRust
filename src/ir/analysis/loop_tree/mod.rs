@@ -122,6 +122,16 @@ impl LoopInfo {
         self.pre_header.unwrap()
     }
 
+    /// 获得latchs
+    pub fn get_latchs(&self) -> Vec<ObjPtr<BasicBlock>> {
+        self.header
+            .get_up_bb()
+            .iter()
+            .filter(|bb| self.is_in_current_loop(bb))
+            .cloned()
+            .collect()
+    }
+
     /// 获得当前循环的块
     pub fn get_current_loop_bb(&self) -> &Vec<ObjPtr<BasicBlock>> {
         &self.blocks

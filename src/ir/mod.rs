@@ -33,19 +33,11 @@ impl<T: 'static> IList<T> {
         self.next = Some(value);
     }
 
-    pub fn get_prev(&self) -> ObjPtr<T> {
-        if let Some(p) = self.prev {
-            p
-        } else {
-            panic!("prev is none")
-        }
+    pub fn get_prev(&self) -> Option<ObjPtr<T>> {
+        self.prev
     }
 
-    pub fn get_next(&self) -> ObjPtr<T> {
-        if let Some(p) = self.next {
-            p
-        } else {
-            panic!("next is none")
-        }
+    pub fn get_next(&self) -> Option<ObjPtr<T>> {
+        self.next
     }
 }

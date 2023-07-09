@@ -25,6 +25,11 @@ impl ObjPool<Inst> {
     }
 }
 impl Inst {
+    /// 判断是否为phi指令
+    pub fn is_phi(&self) -> bool {
+        self.get_kind() == InstKind::Phi
+    }
+
     /// 向phi指令中添加一个操作数
     pub fn add_operand(&mut self, mut operand: ObjPtr<Inst>) {
         // 正确性检查

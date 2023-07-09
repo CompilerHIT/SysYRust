@@ -18,4 +18,6 @@ row_asm.log
 *.log
 *.c
 *.out
+./ci2/local_mount_dir
+./ci2/ci.cnf
 *.lock

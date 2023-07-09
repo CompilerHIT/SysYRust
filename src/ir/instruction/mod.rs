@@ -214,17 +214,21 @@ impl Inst {
 
     /// 获得当前指令的前一条指令。
     pub fn get_prev(&self) -> ObjPtr<Inst> {
-        self.list.get_prev()
+        let prev = self.list.get_prev();
+        debug_assert_ne!(prev, None, "prev is None. inst: {:?}", self);
+        prev.unwrap()
     }
 
     /// 获得当前指令的下一条指令。
     pub fn get_next(&self) -> ObjPtr<Inst> {
-        self.list.get_next()
+        let next = self.list.get_next();
+        debug_assert_ne!(next, None, "next is None. inst: {:?}", self);
+        next.unwrap()
     }
 
     /// 在当前指令之前插入一条指令
     pub fn insert_before(&mut self, inst: ObjPtr<Inst>) {
-        let p = self.list.get_prev().as_mut();
+        let p = self.get_prev().as_mut();
         self.list.set_prev(inst);
         p.list.set_next(inst);
         inst.as_mut().list.set_prev(ObjPtr::new(p));
@@ -233,7 +237,7 @@ impl Inst {
 
     /// 在当前指令之后插入一条指令
     pub fn insert_after(&mut self, inst: ObjPtr<Inst>) {
-        let p = self.list.get_next().as_mut();
+        let p = self.get_next().as_mut();
         self.list.set_next(inst);
         p.list.set_prev(inst);
         inst.as_mut().list.set_prev(ObjPtr::new(self));
@@ -242,8 +246,8 @@ impl Inst {
 
     /// 把自己从指令中移除并删除use
     pub fn remove_self(&mut self) {
-        let next = self.list.get_next().as_mut();
-        let prev = self.list.get_prev().as_mut();
+        let next = self.get_next().as_mut();
+        let prev = self.get_prev().as_mut();
 
         next.list.set_prev(ObjPtr::new(prev));
         prev.list.set_next(ObjPtr::new(next));
@@ -258,8 +262,8 @@ impl Inst {
 
     /// 把自己从指令序列中删除但不删除use
     pub fn move_self(&mut self) {
-        let next = self.list.get_next().as_mut();
-        let prev = self.list.get_prev().as_mut();
+        let next = self.get_next().as_mut();
+        let prev = self.get_prev().as_mut();
 
         next.list.set_prev(ObjPtr::new(prev));
         prev.list.set_next(ObjPtr::new(next));
