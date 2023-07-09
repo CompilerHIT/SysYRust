@@ -9,7 +9,7 @@ use crate::{
 };
 
 pub struct DominatorTree {
-    pool: ObjPool<DominatorNode>,
+    _pool: ObjPool<DominatorNode>,
     dominatee: HashMap<ObjPtr<BasicBlock>, HashSet<ObjPtr<BasicBlock>>>,
     head_node: ObjPtr<DominatorNode>,
 }
@@ -48,7 +48,7 @@ impl DominatorTree {
         let mut pool = ObjPool::new();
         let tree = Self::make_tree(&mut pool, &dominatee);
         Self {
-            pool,
+            _pool: pool,
             dominatee,
             head_node: tree,
         }
@@ -101,7 +101,11 @@ impl DominatorTree {
 
     /// 返回true如果a支配b
     pub fn is_dominate(&self, a: &ObjPtr<BasicBlock>, b: &ObjPtr<BasicBlock>) -> bool {
-        self.dominatee.get(b).unwrap().contains(a)
+        if a == b {
+            true
+        } else {
+            self.dominatee.get(b).unwrap().contains(a)
+        }
     }
 
     /// 深度后序遍历支配树
@@ -121,7 +125,7 @@ impl DominatorTree {
 
     /// 销毁支配树
     pub fn destroy(mut self) {
-        self.pool.free_all();
+        self._pool.free_all();
     }
 }
 
