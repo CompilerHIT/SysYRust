@@ -94,6 +94,11 @@ impl Inst {
         }
     }
 
+    /// 判断一个指令是否是全局变量或者函数参数
+    pub fn is_global_var_or_param(&self) -> bool {
+        self.is_global_var() || self.is_param()
+    }
+
     /// 判断一个指令是否是全局变量
     pub fn is_global_var(&self) -> bool {
         match self.get_kind() {
