@@ -30,6 +30,11 @@ impl<'a> SCEVAnalyzer<'a> {
         self.loops = Some(loops);
     }
 
+    pub fn clear(&mut self) {
+        self.scevexp_pool.free_all();
+        self.map.clear();
+    }
+
     pub fn analyze(&mut self, inst: ObjPtr<Inst>) -> ObjPtr<SCEVExp> {
         if let Some(scev) = self.map.get(&inst) {
             return *scev;
@@ -149,8 +154,9 @@ impl<'a> SCEVAnalyzer<'a> {
                 return self.scevexp_pool.make_scev_unknown(inst);
             };
 
-            if loop_info.is_in_current_loop(&op1.get_bond_inst().get_parent_bb())
-                && !loop_info.is_in_current_loop(&op2.get_bond_inst().get_parent_bb())
+            if op2.get_bond_inst().is_global_var_or_param()
+                || (loop_info.is_in_current_loop(&op1.get_bond_inst().get_parent_bb())
+                    && !loop_info.is_in_current_loop(&op2.get_bond_inst().get_parent_bb()))
             {
                 return match_rec_expr(op1, op2);
             } else if !loop_info.is_in_loop(&op1.get_bond_inst().get_parent_bb())
