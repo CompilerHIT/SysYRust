@@ -610,21 +610,21 @@ impl Func {
                             builder.s(
                                 &reg.to_string(false),
                                 "gp",
-                                -(slot.get_pos()),
+                                -(slot.get_pos() + ADDR_SIZE),
                                 is_float,
                                 true,
                             );
-                        } else if operand::is_imm_12bs(stack_size - slot.get_pos()) {
+                        } else if operand::is_imm_12bs(stack_size - slot.get_pos() - ADDR_SIZE) {
                             builder.s(
                                 &reg.to_string(false),
                                 "sp",
-                                stack_size - slot.get_pos(),
+                                stack_size - ADDR_SIZE - slot.get_pos(),
                                 is_float,
                                 true,
                             );
                         } else {
                             if first {
-                                let offset = stack_size - slot.get_pos();
+                                let offset = stack_size - ADDR_SIZE - slot.get_pos();
                                 builder.op1("li", "gp", &offset.to_string());
                                 builder.op2("add", "gp", "gp", "sp", false, true);
                                 first = false;
@@ -670,21 +670,21 @@ impl Func {
                             builder.l(
                                 &reg.to_string(false),
                                 "sp",
-                                -(slot.get_pos()),
+                                -(slot.get_pos() + ADDR_SIZE),
                                 is_float,
                                 true,
                             );
-                        } else if operand::is_imm_12bs(stack_size - slot.get_pos()) {
+                        } else if operand::is_imm_12bs(stack_size - slot.get_pos() - ADDR_SIZE) {
                             builder.l(
                                 &reg.to_string(false),
                                 "sp",
-                                stack_size - slot.get_pos(),
+                                stack_size - slot.get_pos() - ADDR_SIZE,
                                 is_float,
                                 true,
                             );
                         } else {
                             if first {
-                                let offset = stack_size - slot.get_pos();
+                                let offset = stack_size - slot.get_pos() - ADDR_SIZE;
                                 builder.op1("li", "gp", &offset.to_string());
                                 builder.op2("add", "gp", "gp", "sp", false, true);
                                 first = false;
