@@ -11,6 +11,7 @@ use std::vec::Vec;
 use biheap::BiHeap;
 
 use super::instrs::InstrsType;
+use super::regalloc::structs::RegUsedStat;
 use super::{structs::*, BackendPool};
 use crate::backend::asm_builder::AsmBuilder;
 use crate::backend::instrs::{LIRInst, Operand};
@@ -48,6 +49,7 @@ pub struct Func {
     pub context: ObjPtr<Context>,
 
     pub reg_alloc_info: FuncAllocStat,
+    pub physic_stack_map: HashMap<Reg, StackSlot>, //暂时存储的主人寄存器的空间
     pub spill_stack_map: HashMap<Reg, StackSlot>,
 
     pub const_array: HashSet<IntArray>,
@@ -77,6 +79,7 @@ impl Func {
             context,
 
             reg_alloc_info: FuncAllocStat::new(),
+            physic_stack_map: HashMap::new(),
             spill_stack_map: HashMap::new(),
             const_array: HashSet::new(),
             float_array: HashSet::new(),
@@ -518,7 +521,7 @@ impl Func {
     pub fn handle_spill_v2(&mut self, pool: &mut BackendPool, f: &mut File) {
         let this = pool.put_func(self.clone());
         // 首先给这个函数分配spill的空间
-        self.assign_stack_slot_for_spillings();
+        self.assign_stack_slot_for_spill();
         for block in self.blocks.iter() {
             block
                 .as_mut()
@@ -530,8 +533,32 @@ impl Func {
         self.update(this);
         self.save_callee(pool, f);
     }
-    fn assign_stack_slot_for_spillings(&mut self) {
+
+    fn assign_stack_slot_for_spill(&mut self) {
         // 统计所有spill寄存器的使用次数,根据寄存器数量更新其值
+
+        // 首先给存储在物理寄存器中的值的空间
+        //
+
+        for reg in RegUsedStat::new().get_available_freg() {
+            let last_slot = self.stack_addr.back().unwrap();
+            let pos = last_slot.get_pos() + last_slot.get_size();
+            let stack_slot = StackSlot::new(pos, ADDR_SIZE);
+            self.stack_addr.push_back(stack_slot);
+            let reg = Reg::new(reg, ScalarType::Float);
+            self.spill_stack_map.insert(reg, stack_slot);
+            self.physic_stack_map.insert(reg, stack_slot);
+        }
+        for reg in RegUsedStat::new().get_available_ireg() {
+            let last_slot = self.stack_addr.back().unwrap();
+            let pos = last_slot.get_pos() + last_slot.get_size();
+            let stack_slot = StackSlot::new(pos, ADDR_SIZE);
+            self.stack_addr.push_back(stack_slot);
+            let reg = Reg::new(reg, ScalarType::Int);
+            self.spill_stack_map.insert(reg, stack_slot);
+            self.physic_stack_map.insert(reg, stack_slot);
+        }
+
         // TODO tocheck 是否功能正常
         let mut spill_coes: HashMap<i32, i32> = HashMap::new();
         let mut id_to_regs: HashMap<i32, Reg> = HashMap::new();
