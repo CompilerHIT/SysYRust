@@ -10,7 +10,7 @@ impl BackendPass {
                     self.rm_useless(*block);
                 });
                 self.rm_useless_def(func.clone());
-                self.rm_repeated_sl(func.clone());
+                // self.rm_repeated_sl(func.clone());
             }
         });
     }
