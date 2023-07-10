@@ -30,7 +30,17 @@ pub fn irgen(
     kit_mut.init_external_funcs();
     compunit.process(1, &mut kit_mut).unwrap();
     kit_mut.phi_padding_allfunctions();
+
+    // let vec = kit_mut.context_mut.module_mut.get_all_func().clone();
+    // for (func_name, func) in vec {
+    //     if func.is_empty_bb() {
+    //         continue;
+    //     }
+    //     kit_mut.merge_function(func_name.to_string(), func.clone());
+    // }
     kit_mut.merge_allfunctions();
+
+    // merge_allfunctions(&mut kit_mut);
 }
 
 pub trait Process {
@@ -632,7 +642,9 @@ impl Process for VarDecl {
                                                     kit_mut.pool_inst_mut.make_int_const(f as i32);
                                             }
                                             _ => {
-                                                inst_ptr = kit_mut.pool_inst_mut.make_float_to_int(inst_ptr);
+                                                inst_ptr = kit_mut
+                                                    .pool_inst_mut
+                                                    .make_float_to_int(inst_ptr);
                                             }
                                         }
                                         kit_mut.context_mut.push_inst_bb(inst_ptr);
@@ -860,7 +872,9 @@ impl Process for VarDecl {
                                                     .make_float_const(i as f32);
                                             }
                                             _ => {
-                                                inst_ptr = kit_mut.pool_inst_mut.make_int_to_float(inst_ptr);
+                                                inst_ptr = kit_mut
+                                                    .pool_inst_mut
+                                                    .make_int_to_float(inst_ptr);
                                             }
                                         }
                                         kit_mut.context_mut.push_inst_bb(inst_ptr);
@@ -2490,15 +2504,15 @@ impl Process for UnaryExp {
                     //根据返回值类型生成call指令
                     IrType::Float => {
                         let args = funcparams.process(fparams_type_vec, kit_mut).unwrap(); //获得实参
-                        let mut fname = " ".to_string();
-                        if let Some((funcname_in, _)) = kit_mut
-                            .context_mut
-                            .module_mut
-                            .function
-                            .get_key_value(funcname)
-                        {
-                            fname = funcname_in.clone();
-                        }
+                        let fname = funcname.clone();
+
+                        // let mut fname = " ".to_string();
+
+                        // if let Some((funcname_in, _)) =
+                        //     kit_mut.context_mut.module_mut.get_function(&funcname)
+                        // {
+                        //     fname = funcname_in.clone();
+                        // }
                         let mut inst = kit_mut.pool_inst_mut.make_float_call(fname, args);
                         kit_mut.context_mut.push_inst_bb(inst);
                         match input {
@@ -2512,15 +2526,16 @@ impl Process for UnaryExp {
                     }
                     IrType::Int => {
                         let args = funcparams.process(fparams_type_vec, kit_mut).unwrap();
-                        let mut fname = " ".to_string();
-                        if let Some((funcname_in, _)) = kit_mut
-                            .context_mut
-                            .module_mut
-                            .function
-                            .get_key_value(funcname)
-                        {
-                            fname = funcname_in.clone();
-                        }
+                        let fname = funcname.clone();
+                        // let mut fname = " ".to_string();
+                        // if let Some((funcname_in, _)) = kit_mut
+                        //     .context_mut
+                        //     .module_mut
+                        //     .function
+                        //     .get_key_value(funcname)
+                        // {
+                        //     fname = funcname_in.clone();
+                        // }
                         let mut inst = kit_mut.pool_inst_mut.make_int_call(fname, args);
                         kit_mut.context_mut.push_inst_bb(inst);
                         match input {
@@ -2534,15 +2549,16 @@ impl Process for UnaryExp {
                     }
                     IrType::Void => {
                         let args = funcparams.process(fparams_type_vec, kit_mut).unwrap();
-                        let mut fname = " ".to_string();
-                        if let Some((funcname_in, _)) = kit_mut
-                            .context_mut
-                            .module_mut
-                            .function
-                            .get_key_value(funcname)
-                        {
-                            fname = funcname_in.clone();
-                        }
+                        let fname = funcname.clone();
+                        // let mut fname = " ".to_string();
+                        // if let Some((funcname_in, _)) = kit_mut
+                        //     .context_mut
+                        //     .module_mut
+                        //     .function
+                        //     .get_key_value(funcname)
+                        // {
+                        //     fname = funcname_in.clone();
+                        // }
                         let inst = kit_mut.pool_inst_mut.make_void_call(fname, args);
                         kit_mut.context_mut.push_inst_bb(inst);
                         Ok((inst, ExpValue::None)) //这里可以进一步对返回值进行分析

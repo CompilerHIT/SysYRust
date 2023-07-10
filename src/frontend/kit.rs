@@ -282,11 +282,15 @@ impl Kit<'_> {
 
     pub fn merge_allfunctions(&mut self) {
         //填充所有函数中的phi
-        for (func_name, func) in self.context_mut.module_mut.function.clone().iter() {
-            if func.is_empty_bb() {
-                continue;
+        let vec_temp = self.context_mut.module_mut.get_all_func();
+        let vec: Vec<_> = vec_temp
+            .iter()
+            .map(|(x, y)| (x.to_string(), y.clone()))
+            .collect();
+        for (func_name, func) in vec {
+            if !func.is_empty_bb() {
+                self.merge_function(func_name.to_string(), func.clone());
             }
-            self.merge_function(func_name.to_string(), *func);
         }
     }
 
@@ -531,8 +535,7 @@ impl Kit<'_> {
                     .map(|x| x.clone());
                 let bbname = "notinblock";
 
-                self
-                    .context_mut
+                self.context_mut
                     .bb_map
                     .get(bbname)
                     .and_then(|var_inst_map| var_inst_map.get(&name_changed));
