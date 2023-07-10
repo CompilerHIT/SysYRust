@@ -66,6 +66,12 @@ impl SCEVExp {
         self.get_operands()[1]
     }
 
+    /// 获得SCEVAddRecExpr的end值
+    pub fn get_add_rec_end(&self) -> ObjPtr<Inst> {
+        debug_assert_eq!(self.get_kind(), SCEVExpKind::SCEVAddRecExpr);
+        self.get_operands()[2]
+    }
+
     /// 获得SCEVSubRecExpr的start值
     pub fn get_sub_rec_start(&self) -> ObjPtr<Inst> {
         debug_assert_eq!(self.get_kind(), SCEVExpKind::SCEVSubRecExpr);
@@ -76,6 +82,12 @@ impl SCEVExp {
     pub fn get_sub_rec_step(&self) -> ObjPtr<Inst> {
         debug_assert_eq!(self.get_kind(), SCEVExpKind::SCEVSubRecExpr);
         self.get_operands()[1]
+    }
+
+    /// 获得SCEVSubRecExpr的end值
+    pub fn get_sub_rec_end(&self) -> ObjPtr<Inst> {
+        debug_assert_eq!(self.get_kind(), SCEVExpKind::SCEVSubRecExpr);
+        self.get_operands()[2]
     }
 }
 
