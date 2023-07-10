@@ -538,8 +538,6 @@ impl Func {
         // 统计所有spill寄存器的使用次数,根据寄存器数量更新其值
 
         // 首先给存储在物理寄存器中的值的空间
-        //
-
         for reg in RegUsedStat::new().get_available_freg() {
             let last_slot = self.stack_addr.back().unwrap();
             let pos = last_slot.get_pos() + last_slot.get_size();

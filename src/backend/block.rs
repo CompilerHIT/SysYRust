@@ -1533,8 +1533,9 @@ impl BB {
 
         let mut index = 0;
         // 对于一个块,先从进入寄存器开始记录寄存器使用情况
-        let mut rent_tbl: HashMap<i32, Reg> = HashMap::new(); //记录寄存器的借用情况
+        let mut rent_tbl: HashMap<i32, Reg> = HashMap::new(); //记录寄存器的借用情况 (只有)
 
+        // 主权表
         let mut own_tbl: HashMap<i32, Reg> = HashMap::new(); //记录寄存器的主人(实际主人)
 
         // hold tbl  (持有表)
@@ -1565,15 +1566,17 @@ impl BB {
                 break;
             }
             let inst = self.insts[index];
+
+            // 首先更新主权表
             for reg in inst.get_regs() {
                 if reg.is_physic() {
                     own_tbl.insert(reg.get_color(), reg);
                 } else if !spill.contains(&reg.get_id()) {
                     let color = *func.reg_alloc_info.dstr.get(&reg.get_id()).unwrap();
                     own_tbl.insert(color, reg);
+                    // 如果更新主权表的时候,有某个值正在
                 }
             }
-
             let mut pre_insert: VecDeque<Inst> = VecDeque::new(); //记录前插语句
             let mut suf_insert: VecDeque<Inst> = VecDeque::new();
             // 判断是否需要把实际寄存器归还主人，如果有，前面插入归还语句
