@@ -153,11 +153,16 @@ impl LoopInfo {
             exit_blocks.clone()
         } else {
             let mut exit_blocks = Vec::new();
-            self.get_header().get_up_bb().iter().for_each(|bb| {
-                if !self.is_in_current_loop(bb) {
-                    exit_blocks.push(*bb);
-                }
-            });
+            for bb in self.blocks.iter() {
+                bb.get_next_bb().iter().any(|next_bb| {
+                    if !self.is_in_loop(next_bb) {
+                        exit_blocks.push(*bb);
+                        true
+                    } else {
+                        false
+                    }
+                });
+            }
             self.exit_blocks = Some(exit_blocks.clone());
             exit_blocks
         }
