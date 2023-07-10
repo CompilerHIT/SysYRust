@@ -64,8 +64,7 @@ pub fn has_val(
                 if compare_two_inst(inst, vec_congruent[0], &congrunce) {
                     if dominator_tree
                         .is_dominate(&vec_congruent[0].get_parent_bb(), &inst.get_parent_bb())
-                        || vec_congruent[0].get_parent_bb().get_name()
-                            == inst.get_parent_bb().get_name()
+                        
                     {
                         replace_inst(inst, vec_congruent[0]);
                         return true;
@@ -74,8 +73,7 @@ pub fn has_val(
                             if dominator_tree.is_dominate(
                                 &vec_congruent[i].get_parent_bb(),
                                 &inst.get_parent_bb(),
-                            ) || vec_congruent[i].get_parent_bb().get_name()
-                                == inst.get_parent_bb().get_name()
+                            ) 
                             {
                                 replace_inst(inst, vec_congruent[i]);
                                 return true;

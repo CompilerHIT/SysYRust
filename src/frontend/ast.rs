@@ -19,7 +19,6 @@ pub enum Decl {
 pub struct ConstDecl {
     pub btype: BType,
     pub const_def_vec: Vec<ConstDef>,
-    // pub init: ConstInitVal,
 }
 
 #[derive(Debug)]
@@ -44,7 +43,7 @@ pub enum ConstInitVal {
 #[derive(Debug)]
 pub struct VarDecl {
     pub btype: BType,
-    pub var_def_vec: Vec<VarDef>, //可能得改
+    pub var_def_vec: Vec<VarDef>,
 }
 
 #[derive(Debug)]
@@ -82,7 +81,7 @@ pub struct FuncFParams {
 #[derive(Debug)]
 pub enum FuncFParam {
     NonArray((BType, Ident)),
-    Array((BType, Ident, Vec<Exp>)), //注意，第一维数组默认存在，可能会出错
+    Array((BType, Ident, Vec<Exp>)),
 }
 
 #[derive(Debug)]
@@ -95,32 +94,6 @@ pub enum BlockItem {
     Decl(Decl),
     Stmt(Stmt),
 }
-
-// pub enum Stmt {
-//     MatchedStmt(MatchedStmt),
-//     OpenStmt(OpenStmt),
-// }
-
-// pub struct ExpStmt {
-//     non_action_stmt: Option<Exp>,
-// }
-
-// pub enum MatchedStmt {
-//     AssignStmt((LVal, Exp)),
-//     NonActionStmt(ExpStmt),
-//     BlockStmt(Block),
-//     IfElseStmt((Cond, MatchedStmt, MatchedStmt)),
-//     WhileStmt(Cond, MatchedStmt),
-//     BreakStmt,
-//     ContinueStmt,
-//     RetStmt(ExpStmt),
-// }
-
-// pub enum OpenStmt {
-//     IfStmt((Cond, Stmt)),
-//     IfElseStmt((Cond, MatchedStmt, OpenStmt)),
-//     WhileStmt((Cond, OpenStmt)),
-// }
 
 #[derive(Debug)]
 pub enum Stmt {
@@ -207,7 +180,6 @@ pub struct OptionFuncRParams {
 pub enum UnaryExp {
     PrimaryExp(Box<PrimaryExp>),
     FuncCall((Ident, OptionFuncRParams)),
-    // AddUnaryExp(Box<UnaryExp>),
     OpUnary((UnaryOp, Box<UnaryExp>)),
 }
 

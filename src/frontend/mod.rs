@@ -18,8 +18,6 @@ pub enum ExpValue {
     Float(f32),
     Int(i32),
     Bool(i32),
-    // True,
-    // False,
     None,
 }
 
@@ -38,8 +36,6 @@ pub fn init_padding_int(vec: &mut Vec<i32>, dimension_now: Vec<i32>, pre_num: i3
     if remain < total {
         total = remain;
     }
-    // // println!("total:{:?},now{:?}",total,now);
-    // println!("total{:?}now{:?}", total, now);
     let need = total as usize - now;
     for _i in 0..need {
         vec.push(0);

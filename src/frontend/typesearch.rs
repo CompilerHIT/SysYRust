@@ -128,7 +128,6 @@ impl TypeProcess for PrimaryExp {
             PrimaryExp::Number(imm) => {
                 match imm {
                     Number::FloatConst(_) => {
-                        //需要改吗优先级
                         Ok(2)
                     }
                     Number::IntConst(_) => Ok(0),

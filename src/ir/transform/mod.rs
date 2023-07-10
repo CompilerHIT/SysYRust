@@ -3,6 +3,7 @@ use super::{dump_now, tools::*};
 use crate::utility::ObjPool;
 
 mod constant_folding;
+mod delete_redundant_load_store;
 mod dead_code_eliminate;
 mod func_inline;
 mod global_value_numbering;
@@ -58,6 +59,9 @@ fn functional_optimizer(
 
     // 消除不必要的指令
     meaningless_insts_folding::meaningless_inst_folding(module, &mut pools);
+
+    //冗余load,store删除
+    // delete_redundant_load_store::load_store_opt(module);
 
     // 全局死代码删除
     dead_code_eliminate::global_eliminate(module);
