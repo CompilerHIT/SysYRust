@@ -76,7 +76,7 @@ fn mul_livo(
         (inst.get_operands()[1], inst.get_operands()[0])
     };
 
-    if loop_info.is_in_loop(&other.get_parent_bb()) {
+    if !other.is_param() && loop_info.is_in_loop(&other.get_parent_bb()) {
         return false;
     }
 
