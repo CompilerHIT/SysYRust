@@ -288,11 +288,11 @@ impl Kit<'_> {
 
     pub fn merge_allfunctions(&mut self) {
         //填充所有函数中的phi
-        for (func_name, func) in self.context_mut.module_mut.function.clone().iter() {
+        for (func_name, func) in self.context_mut.module_mut.get_all_func() {
             if func.is_empty_bb() {
                 continue;
             }
-            self.merge_function(func_name.to_string(), *func);
+            self.merge_function(func_name.to_string(), func);
         }
     }
 
@@ -549,8 +549,7 @@ impl Kit<'_> {
                     .map(|x| x.clone());
                 let bbname = "notinblock";
 
-                self
-                    .context_mut
+                self.context_mut
                     .bb_map
                     .get(bbname)
                     .and_then(|var_inst_map| var_inst_map.get(&name_changed));
