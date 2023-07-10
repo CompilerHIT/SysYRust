@@ -225,17 +225,17 @@ impl BB {
                                             )));
                                         }
                                         _ => {
-                                            // self.resolve_opt_rem(
-                                            //     func, map_info, dst_reg, lhs, imm, pool,
-                                            // );
-                                            lhs_reg = self
-                                                .resolve_operand(func, lhs, true, map_info, pool);
-                                            rhs_reg = self
-                                                .resolve_operand(func, rhs, true, map_info, pool);
-                                            self.insts.push(pool.put_inst(LIRInst::new(
-                                                InstrsType::Binary(BinaryOp::Rem),
-                                                vec![dst_reg, lhs_reg, rhs_reg],
-                                            )));
+                                            self.resolve_opt_rem(
+                                                func, map_info, dst_reg, lhs, imm, pool,
+                                            );
+                                            // lhs_reg = self
+                                            //     .resolve_operand(func, lhs, true, map_info, pool);
+                                            // rhs_reg = self
+                                            //     .resolve_operand(func, rhs, true, map_info, pool);
+                                            // self.insts.push(pool.put_inst(LIRInst::new(
+                                            //     InstrsType::Binary(BinaryOp::Rem),
+                                            //     vec![dst_reg, lhs_reg, rhs_reg],
+                                            // )));
                                         }
                                     }
                                 }
@@ -2439,21 +2439,28 @@ impl BB {
             // r = ((n + t) & (2^k - 1)) - t
             // t = (n >> k - 1) >> 32 - k
             let tmp = Operand::Reg(Reg::init(ScalarType::Int));
-            self.insts.push(pool.put_inst(LIRInst::new(
-                InstrsType::Binary(BinaryOp::Sar),
-                vec![
-                    tmp.clone(),
-                    lhs_reg.clone(),
-                    Operand::IImm(IImm::new(k - 1)),
-                ],
-            )));
-            self.insts.push(pool.put_inst(LIRInst::new(
-                InstrsType::Binary(BinaryOp::Shr),
-                vec![tmp.clone(), tmp.clone(), Operand::IImm(IImm::new(32 - k))],
-            )));
+            if k == 1 {
+                self.insts.push(pool.put_inst(LIRInst::new(
+                    InstrsType::Binary(BinaryOp::Shr),
+                    vec![tmp.clone(), lhs_reg.clone(), Operand::IImm(IImm::new(32 - k))],
+                )));
+            } else {
+                self.insts.push(pool.put_inst(LIRInst::new(
+                    InstrsType::Binary(BinaryOp::Sar),
+                    vec![
+                        tmp.clone(),
+                        lhs_reg.clone(),
+                        Operand::IImm(IImm::new(k - 1)),
+                    ],
+                )));
+                self.insts.push(pool.put_inst(LIRInst::new(
+                    InstrsType::Binary(BinaryOp::Shr),
+                    vec![tmp.clone(), tmp.clone(), Operand::IImm(IImm::new(32 - k))],
+                )));
+            }
             self.insts.push(pool.put_inst(LIRInst::new(
                 InstrsType::Binary(BinaryOp::Add),
-                vec![dst.clone(), dst.clone(), tmp.clone()],
+                vec![dst.clone(), lhs_reg.clone(), tmp.clone()],
             )));
             self.insts.push(pool.put_inst(LIRInst::new(
                 InstrsType::Binary(BinaryOp::And),
