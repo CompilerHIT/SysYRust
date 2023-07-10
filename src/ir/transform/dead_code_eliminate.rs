@@ -42,7 +42,7 @@ pub fn global_eliminate(module: &mut Module) {
     }
 
     for name in delete_list {
-        module.remove_var(name.as_str());
+        module.delete_var(name.as_str());
     }
 }
 
