@@ -4,15 +4,15 @@ use std::collections::HashMap;
 
 #[derive(Clone)]
 pub struct Module {
-    pub global_variable: HashMap<String, ObjPtr<Inst>>,
-    pub function: HashMap<String, ObjPtr<Function>>,
+    global_variable: HashMap<String, ObjPtr<Inst>>,
+    function: Vec<(String, ObjPtr<Function>)>,
 }
 impl Module {
     /// 构造一个新的module
     pub fn new() -> Module {
         Module {
             global_variable: HashMap::new(),
-            function: HashMap::new(),
+            function: Vec::new(),
         }
     }
 
@@ -27,16 +27,14 @@ impl Module {
 
     /// 将新建的函数加入module中
     pub fn push_function(&mut self, name: String, function: ObjPtr<Function>) {
-        if let None = self.function.get(&name) {
-            self.function.insert(name, function);
-        } else {
-            debug_assert!(false);
-        }
+        debug_assert_ne!(self.function.iter().position(|(n, _)| n == &name), None);
+        self.function.push((name, function));
     }
 
     /// 删除函数
     pub fn delete_function(&mut self, name: &str) {
-        self.function.remove(name);
+        let index = self.function.iter().position(|(n, _)| n == name).unwrap();
+        self.function.remove(index);
     }
 
     /// 删除全局变量
@@ -57,11 +55,12 @@ impl Module {
     /// 根据名字查找函数
     /// 默认先前已经放入module中
     pub fn get_function(&self, name: &str) -> ObjPtr<Function> {
-        if let Some(func) = self.function.get(name) {
-            func.clone()
-        } else {
-            panic!("在定义函数前就使用函数, {}", name);
-        }
+        self.function
+            .iter()
+            .find(|(n, _)| n == &name)
+            .unwrap()
+            .1
+            .clone()
     }
 
     /// 用于遍历所有全局变量
