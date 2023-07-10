@@ -107,6 +107,8 @@ impl AsmModule {
         self.func_map.iter_mut().for_each(|(_, func)| {
             if !func.is_extern {
                 func.as_mut().handle_spill(pool, f);
+                //TODO CHECK!
+                // func.as_mut().handle_spill_v2(pool, f);
             }
         });
     }

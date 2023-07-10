@@ -37,6 +37,7 @@ impl Allocator {
             to_color: to_color,
             to_simplify: BiHeap::new(),
             to_spill: BiHeap::new(),
+            to_rescue: BiHeap::new(),
             colored: BiHeap::new(),
             k_graph: (BiHeap::new(), Bitmap::with_cap(num_estimate_regs / 8 + 1)),
             spill_cost: spill_cost,

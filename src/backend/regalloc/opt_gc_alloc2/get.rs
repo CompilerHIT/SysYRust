@@ -158,6 +158,9 @@ impl Allocator {
     pub fn get_mut_tospill(&mut self) -> &mut BiHeap<OperItem> {
         &mut self.info.as_mut().unwrap().to_spill
     }
+    pub fn get_mut_torescue(&mut self) -> &mut BiHeap<OperItem> {
+        &mut self.info.as_mut().unwrap().to_rescue
+    }
 }
 
 ///last colors相关处理

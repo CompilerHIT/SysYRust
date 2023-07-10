@@ -40,6 +40,7 @@ pub struct AllocatorInfo {
     pub to_simplify: BiHeap<OperItem>,       //准备化简保留的寄存器
     pub to_spill: BiHeap<OperItem>,          //待spill寄存器
     pub to_color: BiHeap<OperItem>,          //待着色寄存器
+    pub to_rescue: BiHeap<OperItem>,         //待拯救寄存器
     pub colored: BiHeap<OperItem>,           //已着色寄存器
     pub last_colors: Bitmap,                 //真正的弦点,永恒悬点的集合
     /// 悬点集合,按照加入顺序组织,反序着色，先入后出,使用push_back加入，着色时使用pop back取出

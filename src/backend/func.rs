@@ -8,6 +8,8 @@ pub use std::io::Result;
 use std::io::Write;
 use std::vec::Vec;
 
+use biheap::BiHeap;
+
 use super::instrs::InstrsType;
 use super::{structs::*, BackendPool};
 use crate::backend::asm_builder::AsmBuilder;
@@ -511,6 +513,86 @@ impl Func {
         }
         self.update(this);
         self.save_callee(pool, f);
+    }
+
+    pub fn handle_spill_v2(&mut self, pool: &mut BackendPool, f: &mut File) {
+        let this = pool.put_func(self.clone());
+        // 首先给这个函数分配spill的空间
+        self.assign_stack_slot_for_spillings();
+        for block in self.blocks.iter() {
+            block
+                .as_mut()
+                .handle_spill(this, &self.reg_alloc_info.spillings, pool);
+        }
+        for block in self.blocks.iter() {
+            block.as_mut().save_reg(this, pool);
+        }
+        self.update(this);
+        self.save_callee(pool, f);
+    }
+    fn assign_stack_slot_for_spillings(&mut self) {
+        // 统计所有spill寄存器的使用次数,根据寄存器数量更新其值
+        // TODO tocheck 是否功能正常
+        let mut spill_coes: HashMap<i32, i32> = HashMap::new();
+        let mut id_to_regs: HashMap<i32, Reg> = HashMap::new();
+        let spillings = &self.reg_alloc_info.spillings;
+        for bb in self.blocks.iter() {
+            for inst in bb.insts.iter() {
+                for reg in inst.get_reg_use() {
+                    if reg.is_physic() {
+                        continue;
+                    }
+                    if !spillings.contains(&reg.get_id()) {
+                        continue;
+                    }
+                    id_to_regs.insert(reg.get_id(), reg);
+                    spill_coes.insert(
+                        reg.get_id(),
+                        spill_coes.get(&reg.get_id()).unwrap_or(&0) + 1,
+                    );
+                }
+                for reg in inst.get_reg_def() {
+                    if reg.is_physic() {
+                        continue;
+                    }
+                    if !spillings.contains(&reg.get_id()) {
+                        continue;
+                    }
+                    id_to_regs.insert(reg.get_id(), reg);
+                    spill_coes.insert(
+                        reg.get_id(),
+                        spill_coes.get(&reg.get_id()).unwrap_or(&0) + 1,
+                    );
+                }
+            }
+        }
+        // 桶排序
+        let mut buckets: HashMap<i32, LinkedList<Reg>> = HashMap::new();
+        let mut order: BiHeap<i32> = BiHeap::new();
+        for id in spillings {
+            if !buckets.contains_key(id) {
+                order.push(*id);
+                buckets.insert(*id, LinkedList::new());
+            }
+            let reg = id_to_regs.get(id).unwrap();
+            buckets.get_mut(id).unwrap().push_back(*reg);
+        }
+        // 优先给使用次数最多的spill寄存器分配内存空间
+        while !order.is_empty() {
+            let id = order.pop_max().unwrap();
+            let lst = buckets.get_mut(&id).unwrap();
+            while !lst.is_empty() {
+                let toassign = lst.pop_front().unwrap();
+                if self.spill_stack_map.contains_key(&toassign) {
+                    unreachable!()
+                }
+                let last_slot = self.stack_addr.back().unwrap();
+                let pos = last_slot.get_pos() + last_slot.get_size();
+                let stack_slot = StackSlot::new(pos, ADDR_SIZE);
+                self.stack_addr.push_back(stack_slot);
+                self.spill_stack_map.insert(toassign, stack_slot);
+            }
+        }
     }
 
     pub fn handle_overflow(&mut self, pool: &mut BackendPool) {
