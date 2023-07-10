@@ -288,11 +288,15 @@ impl Kit<'_> {
 
     pub fn merge_allfunctions(&mut self) {
         //填充所有函数中的phi
-        for (func_name, func) in self.context_mut.module_mut.get_all_func() {
-            if func.is_empty_bb() {
-                continue;
+        let vec_temp = self.context_mut.module_mut.get_all_func();
+        let vec: Vec<_> = vec_temp
+            .iter()
+            .map(|(x, y)| (x.to_string(), y.clone()))
+            .collect();
+        for (func_name, func) in vec {
+            if !func.is_empty_bb() {
+                self.merge_function(func_name.to_string(), func.clone());
             }
-            self.merge_function(func_name.to_string(), func);
         }
     }
 
@@ -384,22 +388,10 @@ impl Kit<'_> {
                     bb_merge.as_mut().push_back(inst_ret);
                 }
                 _ => {
-                    // println!("funcname:{:?},rettype{:?}", func_name, ret_type);
                     unreachable!()
                 }
             }
         }
-        // else if vec_endpoint.len()==0{
-        //     match ret_type {
-        //         IrType::Void =>{
-        //             let end_bb = Self::bfs_find_end_bb(inst_func.get_head());
-        //             end_bb.as_mut().push_back(self.pool_inst_mut.make_return_void());
-        //         }
-        //         _=>{
-        //             unreachable!("无返回值,且函数返回类型应该为{:?}",ret_type)
-        //         }
-        //     }
-        // }
     }
 
     pub fn add_var(
