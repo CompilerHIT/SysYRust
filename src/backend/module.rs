@@ -36,7 +36,7 @@ impl AsmModule {
 
     pub fn build_lir(&mut self, pool: &mut BackendPool) {
         let mut func_seq = 0;
-        for (name, iter) in &self.upper_module.function {
+        for (name, iter) in &self.upper_module.get_all_func() {
             let ir_func = iter.as_ref();
             let mut func = Func::new(name, pool.put_context(Context::new()));
             func.construct(&self, ir_func, func_seq, pool);
@@ -112,7 +112,7 @@ impl AsmModule {
     }
 
     fn get_global(ir_module: Module) -> Vec<(ObjPtr<Inst>, GlobalVar)> {
-        let map = &ir_module.global_variable;
+        let map = &ir_module.get_all_var();
         let mut list = Vec::with_capacity(map.len());
         for (name, iter) in map {
             //TODO: update ir translation，to use ObjPtr match
@@ -130,7 +130,7 @@ impl AsmModule {
                     match iter.get_ir_type() {
                         IrType::IntPtr => {
                             let alloca = IntArray::new(
-                                name.clone(),
+                                name.to_string(),
                                 size,
                                 true,
                                 iter.as_ref().get_int_init().clone(),
@@ -139,7 +139,7 @@ impl AsmModule {
                         }
                         IrType::FloatPtr => {
                             let alloca = FloatArray::new(
-                                name.clone(),
+                                name.to_string(),
                                 size,
                                 true,
                                 iter.as_ref().get_float_init().clone(),
