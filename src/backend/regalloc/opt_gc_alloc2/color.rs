@@ -3,8 +3,9 @@ use super::*;
 impl Allocator {
     /// color:选择一个合适的颜色进行着色
     /// color会优先选择(reg,cost)中cost大的进行着色
-    /// * 如果着色成功,把项目加入到colored中
-    /// * 如果着色失败了,把项目加入到to_simplify中
+    /// * 如果着色成功,把项目加入到colored中,返回Success
+    /// * 如果着色失败了,把项目加入到to_simplify中,返回Fail
+    /// * 如果待着色列表为空,返回Finish
     pub fn color(&mut self) -> ActionResult {
         // color度数最小的节点
         let mut out = ActionResult::Finish;
@@ -169,10 +170,6 @@ impl Allocator {
                 panic!("gg{},{}", reg, neighbor);
             }
         }
-        // while !to_despill.is_empty() {
-        //     let to_despill_one = to_despill.pop_front().unwrap();
-        //     self.despill_one(&to_despill_one);
-        // }
         out
     }
 

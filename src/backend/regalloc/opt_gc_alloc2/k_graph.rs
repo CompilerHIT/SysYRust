@@ -13,21 +13,6 @@ impl Allocator {
         }
     }
 
-    // 把一个虚拟寄存器加入 k_graph
-    pub fn push_to_k_graph(&mut self, reg: &Reg) {
-        // 加入虚拟寄存器的k_graph item 以 num_available/num live neighbor为权重
-        // 检查的时候优先检查权重小的
-        // 这样可以优先检查到不在k-graph的节点
-        let item = self.draw_na_div_nln_item(reg);
-        self.info.as_mut().unwrap().k_graph.0.push(item);
-        self.info
-            .as_mut()
-            .unwrap()
-            .k_graph
-            .1
-            .insert(reg.bit_code() as usize);
-    }
-
     // 检查是否当前k_graph中的节点都已经是合理的节点
     // 如果k_graph中的节点不是已经
     pub fn check_k_graph(&mut self) -> ActionResult {
@@ -79,6 +64,7 @@ impl Allocator {
     }
     /// 在color_k_graph之前应该check k graph<br>
     ///  给剩余地悬点进行着色  (悬点并未进入spilling中,所以仍然获取到周围地颜色)
+    /// 每次选择cost 最小的节点进行着色
     pub fn color_k_graph(&mut self) -> ActionResult {
         // 对最后的k个节点进行着色
         assert!(true);

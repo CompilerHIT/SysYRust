@@ -1,3 +1,5 @@
+use std::collections::btree_map::IterMut;
+
 use super::*;
 
 // 调参池
@@ -9,9 +11,17 @@ impl Allocator {
     /// 时间复杂度O(logn)
     pub fn push_to_tocolor(&mut self, reg: &Reg) {
         self.dump_action("tocolor", reg);
+        // let item = self.draw_spill_div_nln_item(reg);
+        let item = self.draw_nln_div_na_item(reg);
         // let item = self.draw_na_div_nln_item(reg);
         // let item = self.draw_nln_div_na_item(reg);
-        let item = self.draw_nln_item(reg);
+        // let item = self.draw_nln_item(reg);
+        self.info.as_mut().unwrap().to_color.push(item);
+    }
+
+    pub fn push_to_tocolor_for_rescue(&mut self, reg: &Reg) {
+        self.dump_action("tocolor", reg);
+        let item = self.draw_spill_div_nln_item(reg);
         self.info.as_mut().unwrap().to_color.push(item);
     }
 
@@ -22,7 +32,8 @@ impl Allocator {
     pub fn push_to_tosimpilfy(&mut self, reg: &Reg) {
         self.dump_action("tosimplify", reg);
         // 把一个节点加入待着色列表中
-        let item = self.draw_spill_div_nln_item(reg);
+        let item = self.draw_nln_item(reg);
+        // let item = self.draw_spill_div_nln_item(reg);
         self.info.as_mut().unwrap().to_simplify.push(item);
     }
 
@@ -35,6 +46,21 @@ impl Allocator {
         let item = self.draw_spill_cost_item(reg);
         // let item = self.draw_spill_div_nln_item(reg);
         self.get_mut_tospill().push(item);
+    }
+
+    // 把一个虚拟寄存器加入 k_graph
+    pub fn push_to_k_graph(&mut self, reg: &Reg) {
+        // 加入虚拟寄存器的k_graph item 以 num_available/num live neighbor为权重
+        // 检查的时候优先检查权重小的
+        // 这样可以优先检查到不在k-graph的节点
+        let item = self.draw_nln_item(reg);
+        self.info.as_mut().unwrap().k_graph.0.push(item);
+        self.info
+            .as_mut()
+            .unwrap()
+            .k_graph
+            .1
+            .insert(reg.bit_code() as usize);
     }
 
     /// 选择spill节点
@@ -92,6 +118,16 @@ impl Allocator {
         // 如果节点有颜色，而且spill掉节点后能够让自己作色,且收益更高，则选择节点
         for neighbor in all_live_neigbhors.get(reg).unwrap() {
             let neigbor = *neighbor;
+            // TOCHECK,只选择已经 colored的节点
+            if !self.if_has_been_colored(&neigbor) {
+                continue;
+            }
+            // TOCHEK,排除spill后不能够救自己的邻居节点
+            let color = self.get_color(&neigbor).unwrap();
+            if self.get_num_neighbor_color(&reg).get(color).unwrap() != &1 {
+                continue;
+            }
+
             if !bitmap.contains(neigbor.bit_code() as usize) {
                 continue;
             }

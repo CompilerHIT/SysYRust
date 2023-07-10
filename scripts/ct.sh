@@ -1,6 +1,3 @@
-# 测试输入的若干个项目
-
-
 sudo rm ./data/*log
 sudo rm ./data/*.txt
 

@@ -80,6 +80,7 @@ impl Allocator {
         }
     }
 
+    /// despill 函数是为了给 rescue提供支持使用的
     #[inline]
     pub fn despill_one(&mut self, reg: &Reg) {
         self.dump_action("despill", reg);
@@ -90,7 +91,6 @@ impl Allocator {
         }
         // 首先从spill移除
         self.info.as_mut().unwrap().spillings.remove(&reg.get_id());
-
         //然后刷新available和 nums_neighbor_color
         let (available, nnc) = self.draw_available_and_num_neigbhor_color(reg);
         self.info
@@ -175,6 +175,5 @@ impl Allocator {
             .unwrap()
             .all_live_neighbors
             .insert(*reg, new_live_neighbors);
-        self.push_to_tocolor(reg);
     }
 }

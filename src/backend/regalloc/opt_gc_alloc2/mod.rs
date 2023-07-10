@@ -40,8 +40,15 @@ impl Regalloc for Allocator {
 
         loop {
             let mut stat = self.color();
-            if stat == ActionResult::Success {
-                continue;
+            while stat == ActionResult::Success || stat == ActionResult::Fail {
+                if stat == ActionResult::Fail {
+                    if self.simpilfy() == ActionResult::Success {
+                        continue;
+                    } else {
+                        break;
+                    }
+                }
+                stat = self.color();
             }
             while self.simpilfy() != ActionResult::Finish {
                 continue;

@@ -4,6 +4,7 @@ use crate::{
     ir::{
         analysis::loop_tree::{loop_recognize::loop_recognize, LoopInfo, LoopList},
         basicblock::BasicBlock,
+        dump_now,
         instruction::Inst,
         module::Module,
         tools::{func_process, inst_process_in_bb},

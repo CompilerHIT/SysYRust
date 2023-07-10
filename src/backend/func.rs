@@ -8,7 +8,10 @@ pub use std::io::Result;
 use std::io::Write;
 use std::vec::Vec;
 
+use biheap::BiHeap;
+
 use super::instrs::InstrsType;
+use super::regalloc::structs::RegUsedStat;
 use super::{structs::*, BackendPool};
 use crate::backend::asm_builder::AsmBuilder;
 use crate::backend::instrs::{LIRInst, Operand};
@@ -46,6 +49,7 @@ pub struct Func {
     pub context: ObjPtr<Context>,
 
     pub reg_alloc_info: FuncAllocStat,
+    pub physic_stack_map: HashMap<Reg, StackSlot>, //暂时存储的主人寄存器的空间
     pub spill_stack_map: HashMap<Reg, StackSlot>,
 
     pub const_array: HashSet<IntArray>,
@@ -75,6 +79,7 @@ impl Func {
             context,
 
             reg_alloc_info: FuncAllocStat::new(),
+            physic_stack_map: HashMap::new(),
             spill_stack_map: HashMap::new(),
             const_array: HashSet::new(),
             float_array: HashSet::new(),
@@ -513,6 +518,108 @@ impl Func {
         self.save_callee(pool, f);
     }
 
+    pub fn handle_spill_v2(&mut self, pool: &mut BackendPool, f: &mut File) {
+        let this = pool.put_func(self.clone());
+        // 首先给这个函数分配spill的空间
+        self.assign_stack_slot_for_spill();
+        for block in self.blocks.iter() {
+            block
+                .as_mut()
+                .handle_spill(this, &self.reg_alloc_info.spillings, pool);
+        }
+        for block in self.blocks.iter() {
+            block.as_mut().save_reg(this, pool);
+        }
+        self.update(this);
+        self.save_callee(pool, f);
+    }
+
+    fn assign_stack_slot_for_spill(&mut self) {
+        // 统计所有spill寄存器的使用次数,根据寄存器数量更新其值
+
+        // 首先给存储在物理寄存器中的值的空间
+        for reg in RegUsedStat::new().get_available_freg() {
+            let last_slot = self.stack_addr.back().unwrap();
+            let pos = last_slot.get_pos() + last_slot.get_size();
+            let stack_slot = StackSlot::new(pos, ADDR_SIZE);
+            self.stack_addr.push_back(stack_slot);
+            let reg = Reg::new(reg, ScalarType::Float);
+            self.spill_stack_map.insert(reg, stack_slot);
+            self.physic_stack_map.insert(reg, stack_slot);
+        }
+        for reg in RegUsedStat::new().get_available_ireg() {
+            let last_slot = self.stack_addr.back().unwrap();
+            let pos = last_slot.get_pos() + last_slot.get_size();
+            let stack_slot = StackSlot::new(pos, ADDR_SIZE);
+            self.stack_addr.push_back(stack_slot);
+            let reg = Reg::new(reg, ScalarType::Int);
+            self.spill_stack_map.insert(reg, stack_slot);
+            self.physic_stack_map.insert(reg, stack_slot);
+        }
+
+        // TODO tocheck 是否功能正常
+        let mut spill_coes: HashMap<i32, i32> = HashMap::new();
+        let mut id_to_regs: HashMap<i32, Reg> = HashMap::new();
+        let spillings = &self.reg_alloc_info.spillings;
+        for bb in self.blocks.iter() {
+            for inst in bb.insts.iter() {
+                for reg in inst.get_reg_use() {
+                    if reg.is_physic() {
+                        continue;
+                    }
+                    if !spillings.contains(&reg.get_id()) {
+                        continue;
+                    }
+                    id_to_regs.insert(reg.get_id(), reg);
+                    spill_coes.insert(
+                        reg.get_id(),
+                        spill_coes.get(&reg.get_id()).unwrap_or(&0) + 1,
+                    );
+                }
+                for reg in inst.get_reg_def() {
+                    if reg.is_physic() {
+                        continue;
+                    }
+                    if !spillings.contains(&reg.get_id()) {
+                        continue;
+                    }
+                    id_to_regs.insert(reg.get_id(), reg);
+                    spill_coes.insert(
+                        reg.get_id(),
+                        spill_coes.get(&reg.get_id()).unwrap_or(&0) + 1,
+                    );
+                }
+            }
+        }
+        // 桶排序
+        let mut buckets: HashMap<i32, LinkedList<Reg>> = HashMap::new();
+        let mut order: BiHeap<i32> = BiHeap::new();
+        for id in spillings {
+            if !buckets.contains_key(id) {
+                order.push(*id);
+                buckets.insert(*id, LinkedList::new());
+            }
+            let reg = id_to_regs.get(id).unwrap();
+            buckets.get_mut(id).unwrap().push_back(*reg);
+        }
+        // 优先给使用次数最多的spill寄存器分配内存空间
+        while !order.is_empty() {
+            let id = order.pop_max().unwrap();
+            let lst = buckets.get_mut(&id).unwrap();
+            while !lst.is_empty() {
+                let toassign = lst.pop_front().unwrap();
+                if self.spill_stack_map.contains_key(&toassign) {
+                    unreachable!()
+                }
+                let last_slot = self.stack_addr.back().unwrap();
+                let pos = last_slot.get_pos() + last_slot.get_size();
+                let stack_slot = StackSlot::new(pos, ADDR_SIZE);
+                self.stack_addr.push_back(stack_slot);
+                self.spill_stack_map.insert(toassign, stack_slot);
+            }
+        }
+    }
+
     pub fn handle_overflow(&mut self, pool: &mut BackendPool) {
         let this = pool.put_func(self.clone());
         for block in self.blocks.iter() {
@@ -610,21 +717,21 @@ impl Func {
                             builder.s(
                                 &reg.to_string(false),
                                 "gp",
-                                -(slot.get_pos()),
+                                -(slot.get_pos() + ADDR_SIZE),
                                 is_float,
                                 true,
                             );
-                        } else if operand::is_imm_12bs(stack_size - slot.get_pos()) {
+                        } else if operand::is_imm_12bs(stack_size - slot.get_pos() - ADDR_SIZE) {
                             builder.s(
                                 &reg.to_string(false),
                                 "sp",
-                                stack_size - slot.get_pos(),
+                                stack_size - ADDR_SIZE - slot.get_pos(),
                                 is_float,
                                 true,
                             );
                         } else {
                             if first {
-                                let offset = stack_size - slot.get_pos();
+                                let offset = stack_size - ADDR_SIZE - slot.get_pos();
                                 builder.op1("li", "gp", &offset.to_string());
                                 builder.op2("add", "gp", "gp", "sp", false, true);
                                 first = false;
@@ -670,21 +777,21 @@ impl Func {
                             builder.l(
                                 &reg.to_string(false),
                                 "sp",
-                                -(slot.get_pos()),
+                                -(slot.get_pos() + ADDR_SIZE),
                                 is_float,
                                 true,
                             );
-                        } else if operand::is_imm_12bs(stack_size - slot.get_pos()) {
+                        } else if operand::is_imm_12bs(stack_size - slot.get_pos() - ADDR_SIZE) {
                             builder.l(
                                 &reg.to_string(false),
                                 "sp",
-                                stack_size - slot.get_pos(),
+                                stack_size - slot.get_pos() - ADDR_SIZE,
                                 is_float,
                                 true,
                             );
                         } else {
                             if first {
-                                let offset = stack_size - slot.get_pos();
+                                let offset = stack_size - slot.get_pos() - ADDR_SIZE;
                                 builder.op1("li", "gp", &offset.to_string());
                                 builder.op2("add", "gp", "gp", "sp", false, true);
                                 first = false;

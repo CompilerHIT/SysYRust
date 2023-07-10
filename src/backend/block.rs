@@ -1,3 +1,4 @@
+use crate::backend::regalloc::structs::RegUsedStat;
 pub use crate::log;
 use std::cmp::max;
 use std::cmp::min;
@@ -182,7 +183,7 @@ impl BB {
                         BinOp::Div => {
                             lhs_reg = self.resolve_operand(func, lhs, true, map_info, pool);
                             match rhs.as_ref().get_kind() {
-                                InstKind::ConstInt(imm) => {
+                                InstKind::ConstInt(imm) | InstKind::GlobalConstInt(imm) => {
                                     self.resolve_opt_div(dst_reg, lhs_reg, imm, pool)
                                     // rhs_reg = self.resolve_operand(func, rhs, true, map_info, pool);
                                     // self.insts.push(pool.put_inst(LIRInst::new(
@@ -203,45 +204,41 @@ impl BB {
                             // x % y == x - (x / y) *y
                             // % 0 % 1 % 2^n 特殊判断
                             match rhs.as_ref().get_kind() {
-                                InstKind::ConstInt(imm) => match imm {
-                                    0 => {
-                                        lhs_reg =
-                                            self.resolve_operand(func, lhs, true, map_info, pool);
-                                        self.insts.push(pool.put_inst(LIRInst::new(
-                                            InstrsType::OpReg(SingleOp::Mv),
-                                            vec![dst_reg, lhs_reg],
-                                        )));
+                                InstKind::ConstInt(imm) | InstKind::GlobalConstInt(imm) => {
+                                    match imm {
+                                        0 => {
+                                            lhs_reg = self
+                                                .resolve_operand(func, lhs, true, map_info, pool);
+                                            self.insts.push(pool.put_inst(LIRInst::new(
+                                                InstrsType::OpReg(SingleOp::Mv),
+                                                vec![dst_reg, lhs_reg],
+                                            )));
+                                        }
+                                        1 | -1 => {
+                                            self.insts.push(pool.put_inst(LIRInst::new(
+                                                InstrsType::Binary(BinaryOp::Add),
+                                                vec![
+                                                    dst_reg.clone(),
+                                                    dst_reg,
+                                                    Operand::IImm(IImm::new(0)),
+                                                ],
+                                            )));
+                                        }
+                                        _ => {
+                                            // self.resolve_opt_rem(
+                                            //     func, map_info, dst_reg, lhs, imm, pool,
+                                            // );
+                                            lhs_reg = self
+                                                .resolve_operand(func, lhs, true, map_info, pool);
+                                            rhs_reg = self
+                                                .resolve_operand(func, rhs, true, map_info, pool);
+                                            self.insts.push(pool.put_inst(LIRInst::new(
+                                                InstrsType::Binary(BinaryOp::Rem),
+                                                vec![dst_reg, lhs_reg, rhs_reg],
+                                            )));
+                                        }
                                     }
-                                    1 | -1 => {
-                                        self.insts.push(pool.put_inst(LIRInst::new(
-                                            InstrsType::Binary(BinaryOp::Add),
-                                            vec![
-                                                dst_reg.clone(),
-                                                dst_reg,
-                                                Operand::IImm(IImm::new(0)),
-                                            ],
-                                        )));
-                                    }
-                                    _ => {
-                                        // self.resolve_opt_rem(
-                                        //     func,
-                                        //     map_info,
-                                        //     dst_reg,
-                                        //     lhs,
-                                        //     imm,
-                                        //     pool,
-                                        //     ir_block_inst,
-                                        // );
-                                        lhs_reg =
-                                            self.resolve_operand(func, lhs, true, map_info, pool);
-                                        rhs_reg =
-                                            self.resolve_operand(func, rhs, true, map_info, pool);
-                                        self.insts.push(pool.put_inst(LIRInst::new(
-                                            InstrsType::Binary(BinaryOp::Rem),
-                                            vec![dst_reg, lhs_reg, rhs_reg],
-                                        )));
-                                    }
-                                },
+                                }
                                 _ => {
                                     assert!(
                                         lhs.as_ref().get_ir_type() == IrType::Int
@@ -551,27 +548,96 @@ impl BB {
                     //FIXME: 认为未初始化数组也被初始化为全0
 
                     //TODO: opt: 对于出现过的数组，从寄存器中取出
-                    let mut first = false;
-                    match inst_ref.get_ir_type() {
-                        IrType::IntPtr => {
-                            let alloca = IntArray::new(
-                                label.clone(),
-                                size,
-                                true,
-                                inst_ref.get_int_init().clone(),
-                            );
-                            first = func.as_mut().const_array.insert(alloca);
+                    // 在开启ir优化后，所有的非main函数都是递归函数，需要在栈上分配空间
+                    // 而对于main函数的所有数组都可以当做全局数组使用
+                    if func.label == "main" {
+                        let mut first = false;
+                        match inst_ref.get_ir_type() {
+                            IrType::IntPtr => {
+                                let alloca = IntArray::new(
+                                    label.clone(),
+                                    size,
+                                    true,
+                                    inst_ref.get_int_init().clone(),
+                                );
+                                first = func.as_mut().const_array.insert(alloca);
+                            }
+                            IrType::FloatPtr => {
+                                let alloca = FloatArray::new(
+                                    label.clone(),
+                                    size,
+                                    true,
+                                    inst_ref.get_float_init().clone(),
+                                );
+                                first = func.as_mut().float_array.insert(alloca);
+                            }
+                            _ => unreachable!("invalid alloca type {:?}", inst_ref.get_ir_type()),
                         }
-                        IrType::FloatPtr => {
-                            let alloca = FloatArray::new(
-                                label.clone(),
-                                size,
-                                true,
-                                inst_ref.get_float_init().clone(),
-                            );
-                            first = func.as_mut().float_array.insert(alloca);
+
+                        if first {
+                            let dst_reg =
+                                self.resolve_operand(func, ir_block_inst, true, map_info, pool);
+                            // let offset = pos;
+                            self.insts.push(pool.put_inst(LIRInst::new(
+                                InstrsType::OpReg(SingleOp::LoadAddr),
+                                vec![dst_reg.clone(), Operand::Addr(label.clone())],
+                            )));
                         }
-                        _ => unreachable!("invalid alloca type {:?}", inst_ref.get_ir_type()),
+                    } else {
+                        // 遇到局部数组存到栈上，8字节对齐
+                        let array_size = (size + 1) * NUM_SIZE / 8 * 8;
+                        let pos = func.stack_addr.back().unwrap().get_pos()
+                            + func.stack_addr.back().unwrap().get_size();
+                        let offset = self.resolve_iimm(pos, pool);
+                        let dst_reg =
+                            self.resolve_operand(func, ir_block_inst, true, map_info, pool);
+                        let mut inst = LIRInst::new(
+                            InstrsType::Binary(BinaryOp::Add),
+                            vec![
+                                dst_reg.clone(),
+                                Operand::Reg(Reg::new(2, ScalarType::Int)),
+                                offset,
+                            ],
+                        );
+                        inst.set_double();
+                        self.insts.push(pool.put_inst(inst));
+
+                        match inst_ref.get_ir_type() {
+                            IrType::IntPtr => {
+                                let array = inst_ref.get_int_init();
+                                for (i, value) in array.iter().enumerate() {
+                                    let value_reg = self.load_iimm_to_ireg(*value, pool);
+                                    let offset = i as i32 * NUM_SIZE;
+                                    self.insts.push(pool.put_inst(LIRInst::new(
+                                        InstrsType::Store,
+                                        vec![
+                                            value_reg,
+                                            dst_reg.clone(),
+                                            Operand::IImm(IImm::new(offset)),
+                                        ],
+                                    )));
+                                }
+                            }
+                            IrType::FloatPtr => {
+                                let array = inst_ref.get_float_init();
+                                for (i, value) in array.iter().enumerate() {
+                                    let value_reg = self.resolve_fimm(*value, pool);
+                                    let offset = i as i32 * NUM_SIZE;
+                                    self.insts.push(pool.put_inst(LIRInst::new(
+                                        InstrsType::Store,
+                                        vec![
+                                            value_reg,
+                                            dst_reg.clone(),
+                                            Operand::IImm(IImm::new(offset)),
+                                        ],
+                                    )));
+                                }
+                            }
+                            _ => unreachable!("invalid alloca type {:?}", inst_ref.get_ir_type()),
+                        }
+                        func.as_mut()
+                            .stack_addr
+                            .push_back(StackSlot::new(pos, array_size));
                     }
 
                     // let last = func.as_ref().stack_addr.front().unwrap();
@@ -579,14 +645,15 @@ impl BB {
                     // func.as_mut()
                     //     .stack_addr
                     //     .push_front(StackSlot::new(pos, ADDR_SIZE));
-                    if first {
-                        let dst_reg = self.resolve_operand(func, ir_block_inst, true, map_info, pool);
-                        // let offset = pos;
-                        self.insts.push(pool.put_inst(LIRInst::new(
-                            InstrsType::OpReg(SingleOp::LoadAddr),
-                            vec![dst_reg.clone(), Operand::Addr(label.clone())],
-                        )));
-                    }
+                    // if first {
+                    //     let dst_reg =
+                    //         self.resolve_operand(func, ir_block_inst, true, map_info, pool);
+                    //     // let offset = pos;
+                    //     self.insts.push(pool.put_inst(LIRInst::new(
+                    //         InstrsType::OpReg(SingleOp::LoadAddr),
+                    //         vec![dst_reg.clone(), Operand::Addr(label.clone())],
+                    //     )));
+                    // }
 
                     // let mut store = LIRInst::new(
                     //     InstrsType::StoreParamToStack,
@@ -749,7 +816,6 @@ impl BB {
                                 InstrsType::Jump,
                                 vec![Operand::Addr(true_succ_block.label.to_string())],
                             )));
-
 
                             true_succ_block.as_mut().in_edge.push(ObjPtr::new(self));
                             false_succ_block.as_mut().in_edge.push(ObjPtr::new(self));
@@ -1457,6 +1523,101 @@ impl BB {
         // log!("---------------------------");
     }
 
+    pub fn handle_spill_v2(
+        &mut self,
+        func: ObjPtr<Func>,
+        spill: &HashSet<i32>,
+        pool: &mut BackendPool,
+    ) {
+        // TODO,额外开启32的空间用来保存寄存器的值
+
+        let mut index = 0;
+        // 对于一个块,先从进入寄存器开始记录寄存器使用情况
+        let mut rent_tbl: HashMap<i32, Reg> = HashMap::new(); //记录寄存器的借用情况 (只有)
+
+        // 主权表
+        let mut own_tbl: HashMap<i32, Reg> = HashMap::new(); //记录寄存器的主人(实际主人)
+
+        // hold tbl  (持有表)
+        let mut hold_tbl: HashMap<Reg, i32> = HashMap::new(); //记录寄存器的持有情况
+
+        // 当一个块结束的时候，应该把一个人的寄存器还给它的主人
+
+        //初始化own_tbl和cur_tbl
+        for reg in self.live_in.iter() {
+            // 判断哪些寄存器是被使用了的
+            if reg.is_physic() {
+                own_tbl.insert(reg.get_color(), *reg);
+                hold_tbl.insert(*reg, reg.get_color());
+                continue;
+            }
+            if spill.contains(&reg.get_id()) {
+                continue;
+            }
+            let color_map = &func.reg_alloc_info.dstr;
+            let color = *color_map.get(&reg.get_id()).unwrap();
+            own_tbl.insert(color, *reg);
+            hold_tbl.insert(*reg, color);
+        }
+
+        // todo!();
+        loop {
+            if index >= self.insts.len() {
+                break;
+            }
+            let inst = self.insts[index];
+
+            // 首先更新主权表
+            for reg in inst.get_regs() {
+                if reg.is_physic() {
+                    own_tbl.insert(reg.get_color(), reg);
+                } else if !spill.contains(&reg.get_id()) {
+                    let color = *func.reg_alloc_info.dstr.get(&reg.get_id()).unwrap();
+                    own_tbl.insert(color, reg);
+                    // 如果更新主权表的时候,有某个值正在
+                }
+            }
+            let mut pre_insert: VecDeque<Inst> = VecDeque::new(); //记录前插语句
+            let mut suf_insert: VecDeque<Inst> = VecDeque::new();
+            // 判断是否需要把实际寄存器归还主人，如果有，前面插入归还语句
+            for reg in inst.get_regs() {
+                if spill.contains(&reg.get_id()) && !reg.is_physic() {
+                    continue;
+                }
+                //
+                let color = if reg.is_physic() {
+                    reg.get_color()
+                } else {
+                    *func.reg_alloc_info.dstr.get(&reg.get_id()).unwrap()
+                };
+                // 判断当前该寄存器是否持有该颜色,如果该寄存器未持有该颜色
+                // 则颜色被借取或者是被前任持有
+                // 也就是不是被借取就是被前任持有
+                // 如果是被借取,插入归还指令
+                if rent_tbl.contains_key(&color) {
+                    todo!("插入归还指令,把借取的内容传回栈上");
+
+                    // 如果之前没有人使用这个寄存器则不需要归还
+                    if own_tbl.contains_key(&color) {
+                        //之前有人使用这个寄存器，进行归还
+                        todo!();
+                    }
+                }
+                // 如果是被前任持有,直接交接
+                else {
+                    hold_tbl.insert(reg, color);
+                    // 根据颜色更新颜色的主人
+                }
+                own_tbl.insert(color, reg);
+            }
+
+            //判断是否需要出借寄存器给spill寄存器，如果需要,前面加入借取操作
+
+            todo!();
+        }
+        todo!()
+    }
+
     pub fn handle_overflow(&mut self, func: ObjPtr<Func>, pool: &mut BackendPool) {
         let mut pos = 0;
         // log!("{}, len: {}", self.label, self.insts.len());
@@ -1692,29 +1853,30 @@ impl BB {
     ) -> Operand {
         if is_left {
             match src.as_ref().get_kind() {
-                InstKind::ConstInt(iimm) => return self.load_iimm_to_ireg(iimm, pool),
+                InstKind::ConstInt(iimm) | InstKind::GlobalConstInt(iimm) => {
+                    return self.load_iimm_to_ireg(iimm, pool)
+                }
                 _ => {}
             }
         }
 
         match src.as_ref().get_kind() {
-            InstKind::ConstInt(iimm) => {
+            InstKind::ConstInt(iimm) | InstKind::GlobalConstInt(iimm) => {
                 if map.val_map.contains_key(&src) {
                     return map.val_map.get(&src).unwrap().clone();
                 }
                 self.resolve_iimm(iimm, pool)
             }
-            InstKind::ConstFloat(fimm) => {
+            InstKind::ConstFloat(fimm) | InstKind::GlobalConstFloat(fimm) => {
                 if map.val_map.contains_key(&src) {
                     return map.val_map.get(&src).unwrap().clone();
                 }
                 self.resolve_fimm(fimm, pool)
             }
             InstKind::Parameter => self.resolve_param(src, func, map, pool),
-            InstKind::GlobalConstInt(_)
-            | InstKind::GlobalInt(..)
-            | InstKind::GlobalConstFloat(_)
-            | InstKind::GlobalFloat(..) => self.resolve_global(src, map, pool),
+            InstKind::GlobalInt(..) | InstKind::GlobalFloat(..) => {
+                self.resolve_global(src, map, pool)
+            }
             _ => {
                 if map.val_map.contains_key(&src) {
                     return map.val_map.get(&src).unwrap().clone();
@@ -2196,43 +2358,26 @@ impl BB {
             }
             _ => {
                 if is_opt_num(abs) {
+                    let bits = log2(abs);
+                    let tmp = Operand::Reg(Reg::init(ScalarType::Int));
                     self.insts.push(pool.put_inst(LIRInst::new(
                         InstrsType::Binary(BinaryOp::Sar),
-                        vec![dst, src, Operand::IImm(IImm::new(log2(abs)))],
+                        vec![tmp.clone(), src.clone(), Operand::IImm(IImm::new(bits - 1))],
+                    )));
+                    self.insts.push(pool.put_inst(LIRInst::new(
+                        InstrsType::Binary(BinaryOp::Shr),
+                        vec![tmp.clone(), tmp.clone(), Operand::IImm(IImm::new(32 - bits))],
+                    )));
+                    self.insts.push(pool.put_inst(LIRInst::new(
+                        InstrsType::Binary(BinaryOp::Add),
+                        vec![tmp.clone(), tmp.clone(), src.clone()],
+                    )));
+                    self.insts.push(pool.put_inst(LIRInst::new(
+                        InstrsType::Binary(BinaryOp::Sar),
+                        vec![dst, tmp, Operand::IImm(IImm::new(log2(abs)))],
                     )))
                 } else {
-                    let (two31, uabs, mut p, mut delta) =
-                        (1 << 31 as u32, abs as u32, 31, 0 as u32);
-                    let t = two31 + (uabs >> 31);
-                    let anc = t - 1 - t % uabs;
-                    let (mut q1, mut q2) = (two31 / anc, two31 / uabs);
-                    let (mut r1, mut r2) = (two31 - q1 * anc, two31 - q2 * uabs);
-
-                    loop {
-                        p += 1;
-                        q1 *= 2;
-                        r1 *= 2;
-
-                        if r1 >= anc {
-                            q1 += 1;
-                            r1 -= anc;
-                        }
-                        q2 *= 2;
-                        r2 *= 2;
-                        if r2 >= uabs {
-                            q2 += 1;
-                            r2 -= uabs;
-                        }
-                        delta = uabs - r2;
-                        if !(q1 < delta || (q1 == delta && r1 == 0)) {
-                            break;
-                        }
-                    }
-                    let mut magic = (q2 + 1) as i64;
-                    if is_neg {
-                        magic = -magic;
-                    }
-                    let shift = p - 32;
+                    let (magic, shift) = get_magic(is_neg, abs);
                     let tmp = Operand::Reg(Reg::init(ScalarType::Int));
                     // load magic number M
                     self.insts.push(pool.put_inst(LIRInst::new(
@@ -2283,11 +2428,10 @@ impl BB {
         lhs: ObjPtr<Inst>,
         imm: i32,
         pool: &mut BackendPool,
-        ir_inst: ObjPtr<Inst>,
     ) {
         let lhs_reg = self.resolve_operand(func, lhs, true, map, pool);
         let abs = imm.abs();
-        let is_neg = imm < 0;
+        // let is_neg = imm < 0;
         if is_opt_num(abs) {
             let k = log2(abs);
             // r = ((n + t) & (2^k - 1)) - t
@@ -2318,26 +2462,14 @@ impl BB {
                 vec![dst.clone(), dst.clone(), tmp.clone()],
             )));
         } else {
-            let prev_inst = ir_inst.get_prev();
-            match prev_inst.get_kind() {
-                InstKind::Binary(BinOp::Div) => {
-                    let prev_lhs = prev_inst.get_lhs();
-                    let prev_rhs = prev_inst.get_rhs();
-                    let rhs_imm = match prev_rhs.get_kind() {
-                        InstKind::ConstInt(..) => true,
-                        _ => false,
-                    };
-                    if lhs == prev_lhs && rhs_imm && imm == prev_rhs.get_int_bond() {
-                        let div_res = self.resolve_operand(func, prev_inst, true, map, pool);
-                        self.has_div_rem(imm, div_res, dst, lhs_reg, pool);
-                        return;
-                    }
-                }
-                _ => {}
-            }
-            let tmp = Operand::Reg(Reg::init(ScalarType::Int));
-            self.resolve_opt_div(tmp.clone(), lhs_reg.clone(), imm, pool);
-            self.has_div_rem(imm, tmp, dst, lhs_reg, pool);
+            let tmp1 = Operand::Reg(Reg::init(ScalarType::Int));
+            let tmp2 = Operand::Reg(Reg::init(ScalarType::Int));
+            self.resolve_opt_div(tmp1.clone(), lhs_reg.clone(), imm, pool);
+            self.resolve_opt_mul(tmp2.clone(), tmp1, imm, pool);
+            self.insts.push(pool.put_inst(LIRInst::new(
+                InstrsType::Binary(BinaryOp::Sub),
+                vec![dst, lhs_reg, tmp2],
+            )));
         }
     }
 
@@ -2427,4 +2559,39 @@ fn is_cond_op(cond: ObjPtr<Inst>) -> Option<BinOp> {
         },
         _ => None,
     }
+}
+
+fn get_magic(is_neg: bool, abs: i32) -> (i64, i32) {
+    let (two31, uabs, mut p, mut delta) = (1 << 31 as u32, abs as u32, 31, 0 as u32);
+    let t = two31 + (uabs >> 31);
+    let anc = t - 1 - t % uabs;
+    let (mut q1, mut q2) = (two31 / anc, two31 / uabs);
+    let (mut r1, mut r2) = (two31 - q1 * anc, two31 - q2 * uabs);
+
+    loop {
+        p += 1;
+        q1 *= 2;
+        r1 *= 2;
+
+        if r1 >= anc {
+            q1 += 1;
+            r1 -= anc;
+        }
+        q2 *= 2;
+        r2 *= 2;
+        if r2 >= uabs {
+            q2 += 1;
+            r2 -= uabs;
+        }
+        delta = uabs - r2;
+        if !(q1 < delta || (q1 == delta && r1 == 0)) {
+            break;
+        }
+    }
+    let mut magic = (q2 + 1) as i64;
+    if is_neg {
+        magic = -magic;
+    }
+    let shift = p - 32;
+    (magic, shift)
 }

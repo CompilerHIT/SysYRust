@@ -76,7 +76,7 @@ fn mul_livo(
         (inst.get_operands()[1], inst.get_operands()[0])
     };
 
-    if loop_info.is_in_loop(&other.get_parent_bb()) {
+    if !other.is_param() && loop_info.is_in_loop(&other.get_parent_bb()) {
         return false;
     }
 
@@ -84,12 +84,14 @@ fn mul_livo(
     let start = rec_exp.get_add_rec_start();
     let step = rec_exp.get_add_rec_step();
 
-    // 在preheader中插入start乘other的指令
-    let init = pools.1.make_mul(start, other);
+    // 在preheader中插入start-step乘other的指令
+    let sub = pools.1.make_sub(start, step);
+    let mut init = pools.1.make_mul(sub, other);
     loop_info
         .get_preheader()
         .get_tail_inst()
         .insert_before(init);
+    init.insert_before(sub);
 
     // 在inst前插入step乘other指令
     let temp = pools.1.make_mul(step, other);
@@ -112,6 +114,7 @@ fn mul_livo(
         let index = user.get_operand_index(inst);
         user.set_operand(phi_add, index);
     });
+
     inst.remove_self();
 
     scev_analyzer.clear();

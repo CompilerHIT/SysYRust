@@ -157,12 +157,15 @@ impl Allocator {
 
         let spill_cost = *self.info.as_ref().unwrap().spill_cost.get(&reg).unwrap();
         // 暂时先尝试交换最少的两种颜色的交换
-        for i in 0..2 {
+        for i in 0..35 {
             if i >= order.len() {
                 break;
             }
             let color = *order.get(i).unwrap();
             let times_to_remove = *self.get_num_neighbor_color(&reg).get(&color).unwrap();
+            if times_to_remove > self.get_num_of_live_neighbors(&reg) as i32 / 4 {
+                continue;
+            }
             // 判断这个颜色是否是合理的颜色
             if !tmp_regusestat.is_available_reg(color) {
                 continue;
