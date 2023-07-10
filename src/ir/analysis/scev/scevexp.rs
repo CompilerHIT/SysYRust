@@ -1,5 +1,7 @@
 use std::fmt::Debug;
 
+use crate::ir::analysis::loop_tree::LoopInfo;
+
 use super::*;
 
 pub struct SCEVExp {
@@ -66,10 +68,16 @@ impl SCEVExp {
         self.get_operands()[1]
     }
 
-    /// 获得SCEVAddRecExpr的end值
-    pub fn get_add_rec_end(&self) -> ObjPtr<Inst> {
+    /// 获得SCEVAddRecExpr的end条件
+    /// 动态计算
+    pub fn get_add_rec_end_cond(&self, mut loop_info: ObjPtr<LoopInfo>) -> Vec<ObjPtr<Inst>> {
         debug_assert_eq!(self.get_kind(), SCEVExpKind::SCEVAddRecExpr);
-        self.get_operands()[2]
+        let exit_block = loop_info.get_exit_blocks();
+        loop_info
+            .get_exit_blocks()
+            .iter()
+            .map(|bb| bb.get_tail_inst().get_br_cond())
+            .collect()
     }
 
     /// 获得SCEVSubRecExpr的start值
