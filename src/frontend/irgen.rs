@@ -30,17 +30,7 @@ pub fn irgen(
     kit_mut.init_external_funcs();
     compunit.process(1, &mut kit_mut).unwrap();
     kit_mut.phi_padding_allfunctions();
-
-    // let vec = kit_mut.context_mut.module_mut.get_all_func().clone();
-    // for (func_name, func) in vec {
-    //     if func.is_empty_bb() {
-    //         continue;
-    //     }
-    //     kit_mut.merge_function(func_name.to_string(), func.clone());
-    // }
     kit_mut.merge_allfunctions();
-
-    // merge_allfunctions(&mut kit_mut);
 }
 
 pub trait Process {
