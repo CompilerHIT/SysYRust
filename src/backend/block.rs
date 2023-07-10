@@ -2287,7 +2287,7 @@ impl BB {
         let abs = imm.abs();
         let is_neg = imm < 0;
         let (mut power, mut opt_abs, mut do_add, mut can_opt) = (0, 0, false, false);
-        while (1 << power) <= abs {
+        while (1 << power) <= abs  && ((abs as u32 + (1 << power)) <= 2147483647) {
             if is_opt_num(abs + (1 << power)) {
                 do_add = true;
                 opt_abs = abs + (1 << power);
@@ -2474,6 +2474,7 @@ impl BB {
         } else {
             let tmp1 = Operand::Reg(Reg::init(ScalarType::Int));
             let tmp2 = Operand::Reg(Reg::init(ScalarType::Int));
+            log!("{imm}");
             self.resolve_opt_div(tmp1.clone(), lhs_reg.clone(), imm, pool);
             self.resolve_opt_mul(tmp2.clone(), tmp1, imm, pool);
             self.insts.push(pool.put_inst(LIRInst::new(
