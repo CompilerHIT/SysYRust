@@ -2462,9 +2462,10 @@ impl BB {
                 InstrsType::Binary(BinaryOp::Add),
                 vec![dst.clone(), lhs_reg.clone(), tmp.clone()],
             )));
+            let abs_reg = self.resolve_iimm(abs - 1, pool);
             self.insts.push(pool.put_inst(LIRInst::new(
                 InstrsType::Binary(BinaryOp::And),
-                vec![dst.clone(), dst.clone(), Operand::IImm(IImm::new(abs - 1))],
+                vec![dst.clone(), dst.clone(), abs_reg],
             )));
             self.insts.push(pool.put_inst(LIRInst::new(
                 InstrsType::Binary(BinaryOp::Sub),
