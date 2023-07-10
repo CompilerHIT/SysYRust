@@ -16,6 +16,8 @@ pub struct LoopInfo {
     parent: Option<ObjPtr<LoopInfo>>,
     pre_header: Option<ObjPtr<BasicBlock>>,
     header: ObjPtr<BasicBlock>,
+    latchs: Option<Vec<ObjPtr<BasicBlock>>>,
+    exit_blocks: Option<Vec<ObjPtr<BasicBlock>>>,
     blocks: Vec<ObjPtr<BasicBlock>>,
     sub_loops: Vec<ObjPtr<LoopInfo>>,
 }
@@ -67,6 +69,8 @@ impl LoopInfo {
             parent: None,
             pre_header: None,
             header,
+            latchs: None,
+            exit_blocks: None,
             blocks: Vec::new(),
             sub_loops: Vec::new(),
         }
@@ -140,5 +144,39 @@ impl LoopInfo {
     /// 获得当前循环的子循环
     pub fn get_sub_loops(&self) -> &Vec<ObjPtr<LoopInfo>> {
         &self.sub_loops
+    }
+
+    /// 获得当前循环的出口块
+    /// 动态计算，当exit_blocks为空时，计算一次
+    pub fn get_exit_blocks(&mut self) -> Vec<ObjPtr<BasicBlock>> {
+        if let Some(exit_blocks) = &self.exit_blocks {
+            exit_blocks.clone()
+        } else {
+            let mut exit_blocks = Vec::new();
+            self.get_header().get_up_bb().iter().for_each(|bb| {
+                if !self.is_in_current_loop(bb) {
+                    exit_blocks.push(*bb);
+                }
+            });
+            self.exit_blocks = Some(exit_blocks.clone());
+            exit_blocks
+        }
+    }
+
+    /// 获得当前循环的latch块
+    /// 动态计算，当latchs为空时，计算一次
+    pub fn get_latch_blocks(&mut self) -> Vec<ObjPtr<BasicBlock>> {
+        if let Some(latchs) = &self.latchs {
+            latchs.clone()
+        } else {
+            let mut latchs = Vec::new();
+            self.get_header().get_up_bb().iter().for_each(|bb| {
+                if self.is_in_current_loop(bb) {
+                    latchs.push(*bb);
+                }
+            });
+            self.latchs = Some(latchs.clone());
+            latchs
+        }
     }
 }
