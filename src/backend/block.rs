@@ -225,13 +225,7 @@ impl BB {
                                         }
                                         _ => {
                                             // self.resolve_opt_rem(
-                                            //     func,
-                                            //     map_info,
-                                            //     dst_reg,
-                                            //     lhs,
-                                            //     imm,
-                                            //     pool,
-                                            //     ir_block_inst,
+                                            //     func, map_info, dst_reg, lhs, imm, pool,
                                             // );
                                             lhs_reg = self
                                                 .resolve_operand(func, lhs, true, map_info, pool);
@@ -2268,43 +2262,26 @@ impl BB {
             }
             _ => {
                 if is_opt_num(abs) {
+                    let bits = log2(abs);
+                    let tmp = Operand::Reg(Reg::init(ScalarType::Int));
                     self.insts.push(pool.put_inst(LIRInst::new(
                         InstrsType::Binary(BinaryOp::Sar),
-                        vec![dst, src, Operand::IImm(IImm::new(log2(abs)))],
+                        vec![tmp.clone(), src.clone(), Operand::IImm(IImm::new(bits - 1))],
+                    )));
+                    self.insts.push(pool.put_inst(LIRInst::new(
+                        InstrsType::Binary(BinaryOp::Shr),
+                        vec![tmp.clone(), tmp.clone(), Operand::IImm(IImm::new(32 - bits))],
+                    )));
+                    self.insts.push(pool.put_inst(LIRInst::new(
+                        InstrsType::Binary(BinaryOp::Add),
+                        vec![tmp.clone(), tmp.clone(), src.clone()],
+                    )));
+                    self.insts.push(pool.put_inst(LIRInst::new(
+                        InstrsType::Binary(BinaryOp::Sar),
+                        vec![dst, tmp, Operand::IImm(IImm::new(log2(abs)))],
                     )))
                 } else {
-                    let (two31, uabs, mut p, mut delta) =
-                        (1 << 31 as u32, abs as u32, 31, 0 as u32);
-                    let t = two31 + (uabs >> 31);
-                    let anc = t - 1 - t % uabs;
-                    let (mut q1, mut q2) = (two31 / anc, two31 / uabs);
-                    let (mut r1, mut r2) = (two31 - q1 * anc, two31 - q2 * uabs);
-
-                    loop {
-                        p += 1;
-                        q1 *= 2;
-                        r1 *= 2;
-
-                        if r1 >= anc {
-                            q1 += 1;
-                            r1 -= anc;
-                        }
-                        q2 *= 2;
-                        r2 *= 2;
-                        if r2 >= uabs {
-                            q2 += 1;
-                            r2 -= uabs;
-                        }
-                        delta = uabs - r2;
-                        if !(q1 < delta || (q1 == delta && r1 == 0)) {
-                            break;
-                        }
-                    }
-                    let mut magic = (q2 + 1) as i64;
-                    if is_neg {
-                        magic = -magic;
-                    }
-                    let shift = p - 32;
+                    let (magic, shift) = get_magic(is_neg, abs);
                     let tmp = Operand::Reg(Reg::init(ScalarType::Int));
                     // load magic number M
                     self.insts.push(pool.put_inst(LIRInst::new(
@@ -2355,11 +2332,10 @@ impl BB {
         lhs: ObjPtr<Inst>,
         imm: i32,
         pool: &mut BackendPool,
-        ir_inst: ObjPtr<Inst>,
     ) {
         let lhs_reg = self.resolve_operand(func, lhs, true, map, pool);
         let abs = imm.abs();
-        let is_neg = imm < 0;
+        // let is_neg = imm < 0;
         if is_opt_num(abs) {
             let k = log2(abs);
             // r = ((n + t) & (2^k - 1)) - t
@@ -2390,26 +2366,14 @@ impl BB {
                 vec![dst.clone(), dst.clone(), tmp.clone()],
             )));
         } else {
-            let prev_inst = ir_inst.get_prev();
-            match prev_inst.get_kind() {
-                InstKind::Binary(BinOp::Div) => {
-                    let prev_lhs = prev_inst.get_lhs();
-                    let prev_rhs = prev_inst.get_rhs();
-                    let rhs_imm = match prev_rhs.get_kind() {
-                        InstKind::ConstInt(..) => true,
-                        _ => false,
-                    };
-                    if lhs == prev_lhs && rhs_imm && imm == prev_rhs.get_int_bond() {
-                        let div_res = self.resolve_operand(func, prev_inst, true, map, pool);
-                        self.has_div_rem(imm, div_res, dst, lhs_reg, pool);
-                        return;
-                    }
-                }
-                _ => {}
-            }
-            let tmp = Operand::Reg(Reg::init(ScalarType::Int));
-            self.resolve_opt_div(tmp.clone(), lhs_reg.clone(), imm, pool);
-            self.has_div_rem(imm, tmp, dst, lhs_reg, pool);
+            let tmp1 = Operand::Reg(Reg::init(ScalarType::Int));
+            let tmp2 = Operand::Reg(Reg::init(ScalarType::Int));
+            self.resolve_opt_div(tmp1.clone(), lhs_reg.clone(), imm, pool);
+            self.resolve_opt_mul(tmp2.clone(), tmp1, imm, pool);
+            self.insts.push(pool.put_inst(LIRInst::new(
+                InstrsType::Binary(BinaryOp::Sub),
+                vec![dst, lhs_reg, tmp2],
+            )));
         }
     }
 
@@ -2499,4 +2463,39 @@ fn is_cond_op(cond: ObjPtr<Inst>) -> Option<BinOp> {
         },
         _ => None,
     }
+}
+
+fn get_magic(is_neg: bool, abs: i32) -> (i64, i32) {
+    let (two31, uabs, mut p, mut delta) = (1 << 31 as u32, abs as u32, 31, 0 as u32);
+    let t = two31 + (uabs >> 31);
+    let anc = t - 1 - t % uabs;
+    let (mut q1, mut q2) = (two31 / anc, two31 / uabs);
+    let (mut r1, mut r2) = (two31 - q1 * anc, two31 - q2 * uabs);
+
+    loop {
+        p += 1;
+        q1 *= 2;
+        r1 *= 2;
+
+        if r1 >= anc {
+            q1 += 1;
+            r1 -= anc;
+        }
+        q2 *= 2;
+        r2 *= 2;
+        if r2 >= uabs {
+            q2 += 1;
+            r2 -= uabs;
+        }
+        delta = uabs - r2;
+        if !(q1 < delta || (q1 == delta && r1 == 0)) {
+            break;
+        }
+    }
+    let mut magic = (q2 + 1) as i64;
+    if is_neg {
+        magic = -magic;
+    }
+    let shift = p - 32;
+    (magic, shift)
 }
