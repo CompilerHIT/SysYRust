@@ -54,8 +54,7 @@ pub fn has_val(
         | InstKind::GlobalConstInt(_)
         | InstKind::GlobalFloat(_)
         | InstKind::GlobalInt(_)
-        | InstKind::Phi => {
-        } //todo:phi可以被优化吗
+        | InstKind::Phi => {} //todo:phi可以被优化吗
         _ => {
             if let Some(_index) = congrunce.map.get(&inst) {
                 return false;
@@ -64,7 +63,6 @@ pub fn has_val(
                 if compare_two_inst(inst, vec_congruent[0], &congrunce) {
                     if dominator_tree
                         .is_dominate(&vec_congruent[0].get_parent_bb(), &inst.get_parent_bb())
-                        
                     {
                         replace_inst(inst, vec_congruent[0]);
                         return true;
@@ -73,8 +71,7 @@ pub fn has_val(
                             if dominator_tree.is_dominate(
                                 &vec_congruent[i].get_parent_bb(),
                                 &inst.get_parent_bb(),
-                            ) 
-                            {
+                            ) {
                                 replace_inst(inst, vec_congruent[i]);
                                 return true;
                             }
@@ -235,6 +232,10 @@ pub fn compare_two_inst_with_index(
     inst2: ObjPtr<Inst>,
     congrunce: &Congruence,
 ) -> bool {
+    if inst1 == inst2 {
+        //针对全局指针
+        return true;
+    }
     if let Some(index1) = congrunce.map.get(&inst1) {
         if let Some(index2) = congrunce.map.get(&inst2) {
             if index1 == index2 {
