@@ -133,7 +133,6 @@ pub fn delete_inst(
                                     if tgep.get_kind() == InstKind::Gep {
                                         let operands_temp = tgep.get_operands();
                                         if operands_temp[0] == ptr {
-                                            println!("数组{:?}", tgep.get_kind());
                                             map.remove(&tgep);
                                         }
                                     }
@@ -155,7 +154,6 @@ pub fn delete_inst(
                                     if tgep.get_kind() == InstKind::Gep {
                                         let operands_temp = tgep.get_operands();
                                         if operands_temp[0] == ptr {
-                                            println!("数组{:?}", tgep.get_kind());
                                             map.remove(&tgep);
                                         }
                                     }
