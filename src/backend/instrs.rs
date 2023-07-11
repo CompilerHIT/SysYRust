@@ -8,6 +8,7 @@ pub use crate::backend::block::BB;
 pub use crate::backend::func::Func;
 use crate::backend::operand::*;
 pub use crate::backend::structs::{Context, GenerateAsm};
+use crate::ir::instruction::Inst;
 use crate::log_file;
 pub use crate::utility::{ObjPtr, ScalarType};
 
@@ -508,6 +509,17 @@ impl LIRInst {
                 Operand::Addr(ref name) => name.clone(),
                 _ => unreachable!("only support global var"),
             }
+        }
+    }
+}
+
+impl Operand {
+    // 增加直接导出reg的接口
+    #[inline]
+    pub fn drop_reg(&self) -> Reg {
+        match self {
+            Operand::Reg(reg) => *reg,
+            _ => unreachable!(),
         }
     }
 }
