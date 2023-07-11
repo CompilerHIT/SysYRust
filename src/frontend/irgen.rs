@@ -1191,6 +1191,7 @@ impl Process for InitVal {
 
                 let mut index = 0; //当前相对位移
                 for init in initvec {
+                    // println!("进来了");
                     match init {
                         InitVal::Exp(_) => {
                             let (vec_val_temp, vec_inst_temp) = init

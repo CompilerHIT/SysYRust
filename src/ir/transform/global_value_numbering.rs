@@ -1,8 +1,11 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::{
     ir::{
-        analysis::dominator_tree::{calculate_dominator, DominatorTree},
+        analysis::{
+            call_optimize::call_optimize,
+            dominator_tree::{calculate_dominator, DominatorTree},
+        },
         instruction::{BinOp, Inst, InstKind},
         ir_type::IrType,
         module::Module,
@@ -21,13 +24,13 @@ pub fn easy_gvn(module: &mut Module) {
         vec_class: vec![],
         map: HashMap::new(),
     };
-
+    let set = call_optimize(module);
     func_process(module, |_, func| {
         let dominator_tree = calculate_dominator(func.get_head());
         loop {
             let mut changed = false;
             bfs_inst_process(func.get_head(), |inst| {
-                changed |= has_val(&mut congruence, inst, &dominator_tree)
+                changed |= has_val(&mut congruence, inst, &dominator_tree, set.clone())
             });
             if !changed {
                 break;
@@ -40,11 +43,11 @@ pub fn has_val(
     congrunce: &mut Congruence,
     inst: ObjPtr<Inst>,
     dominator_tree: &DominatorTree,
+    set: HashSet<String>,
 ) -> bool {
     match inst.get_kind() {
         InstKind::Alloca(_)
         | InstKind::Branch
-        | InstKind::Call(_)
         | InstKind::Head(_)
         | InstKind::Parameter
         | InstKind::Return
@@ -55,6 +58,40 @@ pub fn has_val(
         | InstKind::GlobalFloat(_)
         | InstKind::GlobalInt(_)
         | InstKind::Phi => {} //todo:phi可以被优化吗
+        InstKind::Call(funcname) => {
+            if set.contains(&funcname) {
+                //纯函数，可复用
+                if let Some(_index) = congrunce.map.get(&inst) {
+                    return false;
+                }
+                for vec_congruent in congrunce.vec_class.clone() {
+                    if compare_two_inst(inst, vec_congruent[0], &congrunce) {
+                        if dominator_tree
+                            .is_dominate(&vec_congruent[0].get_parent_bb(), &inst.get_parent_bb())
+                        {
+                            replace_inst(inst, vec_congruent[0]);
+                            return true;
+                        } else {
+                            for i in 1..vec_congruent.len() {
+                                if dominator_tree.is_dominate(
+                                    &vec_congruent[i].get_parent_bb(),
+                                    &inst.get_parent_bb(),
+                                ) {
+                                    replace_inst(inst, vec_congruent[i]);
+                                    return true;
+                                }
+                            }
+                        }
+                        //都没有可以替代这条指令的congruent inst,将这条指令加入congruent inst中
+                        if let Some(index) = congrunce.map.get(&vec_congruent[0]) {
+                            congrunce.vec_class[*index].push(inst);
+                            congrunce.map.insert(inst, *index);
+                        }
+                        return false;
+                    }
+                }
+            }
+        }
         _ => {
             if let Some(_index) = congrunce.map.get(&inst) {
                 return false;
