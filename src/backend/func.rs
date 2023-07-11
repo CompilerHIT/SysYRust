@@ -511,10 +511,22 @@ impl Func {
                 .as_mut()
                 .handle_spill(this, &self.reg_alloc_info.spillings, pool);
         }
+        self.update(this);
+    }
+
+    /// save caller会改变func，所以需要更新
+    /// 记录需要保存的caller与caller saved寄存器，并对caller saved进行sl
+    pub fn handle_caller(&mut self, pool: &mut BackendPool) {
+        let this = pool.put_func(self.clone());
         for block in self.blocks.iter() {
             block.as_mut().save_reg(this, pool);
         }
         self.update(this);
+    }
+
+    /// save callee不会改变func，所以不需要更新
+    /// 对callee saved寄存器进行sl
+    pub fn handle_callee(&mut self, pool: &mut BackendPool, f: &mut File) {
         self.save_callee(pool, f);
     }
 

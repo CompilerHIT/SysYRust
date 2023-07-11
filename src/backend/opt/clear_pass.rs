@@ -20,20 +20,19 @@ impl BackendPass {
                 });
 
                 self.rm_useless_def(func.clone());
-                // self.rm_repeated_sl(func.clone());
-                let mut bf = OpenOptions::new()
-                    .create(true)
-                    .append(true)
-                    .open("before_rmls.txt")
-                    .unwrap();
-                let mut sf = OpenOptions::new()
-                    .create(true)
-                    .append(true)
-                    .open("after_rmls.txt")
-                    .unwrap();
-                func.as_mut().generate_row(func.context, &mut bf);
                 self.rm_repeated_sl(func.clone());
-                func.as_mut().generate_row(func.context, &mut sf);
+                // let mut bf = OpenOptions::new()
+                //     .create(true)
+                //     .append(true)
+                //     .open("before_rmls.txt")
+                //     .unwrap();
+                // let mut sf = OpenOptions::new()
+                //     .create(true)
+                //     .append(true)
+                //     .open("after_rmls.txt")
+                //     .unwrap();
+                // func.as_mut().generate_row(func.context, &mut bf);
+                // func.as_mut().generate_row(func.context, &mut sf);
             }
         });
     }
