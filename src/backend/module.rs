@@ -70,8 +70,8 @@ impl AsmModule {
         self.allocate_reg();
         self.handle_spill(pool, f); //yjh: i am going to adjust
                                     // self.print_model();
+                                    self.handle_call_reg(pool, f);
         self.map_v_to_p();
-        self.handle_call_reg(pool, f);
         self.remove_unuse_inst_suf_alloc(); //yjh:i am going to do
     }
 
