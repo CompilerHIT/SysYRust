@@ -4,7 +4,6 @@ use crate::{
     ir::{
         analysis::store_map::get_store_map,
         instruction::{Inst, InstKind},
-        ir_type::IrType,
         module::Module,
         tools::{bfs_bb_proceess, func_process, replace_inst},
     },
