@@ -663,11 +663,11 @@ impl BB {
                         if array.len() == 0 {
                             self.insts.push(pool.put_inst(LIRInst::new(
                                 InstrsType::OpReg(SingleOp::Li),
-                                vec![Operand::Reg(a1), Operand::IImm(IImm::new(size * NUM_SIZE))],
+                                vec![Operand::Reg(a1), Operand::IImm(IImm::new(0))],
                             )));
                             self.insts.push(pool.put_inst(LIRInst::new(
                                 InstrsType::OpReg(SingleOp::Li),
-                                vec![Operand::Reg(a2), Operand::IImm(IImm::new(0))],
+                                vec![Operand::Reg(a2), Operand::IImm(IImm::new(size * NUM_SIZE))],
                             )));
                             self.insts.push(pool.put_inst(LIRInst::new(
                                 InstrsType::Call,
@@ -683,7 +683,7 @@ impl BB {
                             func.as_mut().const_array.insert(alloca);
                             self.insts.push(pool.put_inst(LIRInst::new(
                                 InstrsType::OpReg(SingleOp::Li),
-                                vec![Operand::Reg(a2), Operand::IImm(IImm::new(size * NUM_SIZE))],
+                                vec![Operand::Reg(a2), Operand::IImm(IImm::new((size+1) * NUM_SIZE))],
                             )));
                             self.insts.push(pool.put_inst(LIRInst::new(
                                 InstrsType::Call,
