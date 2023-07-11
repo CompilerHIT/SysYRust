@@ -723,7 +723,20 @@ impl Process for VarDecl {
                                 .unwrap(); //获得初始值
                             match init_vec {
                                 RetInitVec::Int(ivec) => {
-                                    let inst = kit_mut.pool_inst_mut.make_int_array(length, ivec);
+                                    let mut fffflag = false;
+                                    for i in &ivec {
+                                        if *i != 0 {
+                                            fffflag = true;
+                                            break;
+                                        }
+                                    }
+                                    let mut inst = kit_mut.pool_inst_mut.make_int_const(-1129);
+                                    if fffflag {
+                                        inst = kit_mut.pool_inst_mut.make_int_array(length, ivec);
+                                    } else {
+                                        inst = kit_mut.pool_inst_mut.make_int_array(length, vec![]);
+                                    }
+                                    // let inst = kit_mut.pool_inst_mut.make_int_array(length, ivec);
                                     if !kit_mut.context_mut.add_var(
                                         &id,
                                         Type::Int,
@@ -951,7 +964,21 @@ impl Process for VarDecl {
                                 .unwrap(); //获得初始值
                             match init_vec {
                                 RetInitVec::Float(fvec) => {
-                                    let inst = kit_mut.pool_inst_mut.make_float_array(length, fvec);
+                                    let mut fffflag = false;
+                                    for i in &fvec {
+                                        if *i != 0.0 {
+                                            fffflag = true;
+                                            break;
+                                        }
+                                    }
+                                    let mut inst = kit_mut.pool_inst_mut.make_float_const(-1129.0);
+                                    if fffflag {
+                                        inst = kit_mut.pool_inst_mut.make_float_array(length, fvec);
+                                    } else {
+                                        inst =
+                                            kit_mut.pool_inst_mut.make_float_array(length, vec![]);
+                                    }
+                                    // let inst = kit_mut.pool_inst_mut.make_float_array(length, fvec);
                                     if !kit_mut.context_mut.add_var(
                                         &id,
                                         Type::Float,
@@ -1113,6 +1140,7 @@ impl Process for InitVal {
 
                 let mut index = 0; //当前相对位移
                 for init in initvec {
+                    // println!("进来了");
                     match init {
                         InitVal::Exp(_) => {
                             let (vec_val_temp, vec_inst_temp) = init
