@@ -1,5 +1,10 @@
 ### 测试镜像版本:
 
+(ps现在最新可以在项目根目录下使用 ./ci/reload.sh <mount_path> 来更新ci)
+
+`10.249.12.83:5000/compilerhit/sysy-rv64-cpci:5.0` :
+实现对 -O参数的支持 ,使用-O参数能够 指定 ci中使用compiler的-O1优化
+
 `10.249.12.83:5000/compilerhit/sysy-rv64-cpci:4.0` :
 提供样例原文件名作为我们编译器的输入，方便定位
 
