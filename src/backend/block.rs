@@ -1,5 +1,6 @@
 use crate::backend::regalloc::structs::RegUsedStat;
 pub use crate::log;
+use crate::log_file;
 use std::cmp::max;
 use std::cmp::min;
 pub use std::collections::{HashSet, VecDeque};
@@ -1781,6 +1782,14 @@ impl BB {
                         pos += 1;
                         continue;
                     }
+                    // TODO 检查overflow
+                    log_file!(
+                        "branch_overflow.txt",
+                        "func:{},block:{}",
+                        func.label,
+                        self.label
+                    );
+
                     let (st, ed) = (min(start, end), max(start, end));
                     let rev = start > end;
                     for i in st + 1..=ed - 1 {
@@ -2287,7 +2296,7 @@ impl BB {
         let abs = imm.abs();
         let is_neg = imm < 0;
         let (mut power, mut opt_abs, mut do_add, mut can_opt) = (0, 0, false, false);
-        while (1 << power) <= abs  && ((abs as u32 + (1 << power)) <= 2147483647) {
+        while (1 << power) <= abs && ((abs as u32 + (1 << power)) <= 2147483647) {
             if is_opt_num(abs + (1 << power)) {
                 do_add = true;
                 opt_abs = abs + (1 << power);
@@ -2368,7 +2377,11 @@ impl BB {
                     )));
                     self.insts.push(pool.put_inst(LIRInst::new(
                         InstrsType::Binary(BinaryOp::Shr),
-                        vec![tmp.clone(), tmp.clone(), Operand::IImm(IImm::new(32 - bits))],
+                        vec![
+                            tmp.clone(),
+                            tmp.clone(),
+                            Operand::IImm(IImm::new(32 - bits)),
+                        ],
                     )));
                     self.insts.push(pool.put_inst(LIRInst::new(
                         InstrsType::Binary(BinaryOp::Add),
@@ -2442,7 +2455,11 @@ impl BB {
             if k == 1 {
                 self.insts.push(pool.put_inst(LIRInst::new(
                     InstrsType::Binary(BinaryOp::Shr),
-                    vec![tmp.clone(), lhs_reg.clone(), Operand::IImm(IImm::new(32 - k))],
+                    vec![
+                        tmp.clone(),
+                        lhs_reg.clone(),
+                        Operand::IImm(IImm::new(32 - k)),
+                    ],
                 )));
             } else {
                 self.insts.push(pool.put_inst(LIRInst::new(
