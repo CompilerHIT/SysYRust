@@ -71,6 +71,7 @@ impl AsmModule {
         self.handle_spill(pool, f); //yjh: i am going to adjust
                                     // self.print_model();
         self.map_v_to_p();
+        self.handle_call_reg(pool, f);
         self.remove_unuse_inst_suf_alloc(); //yjh:i am going to do
     }
 
@@ -80,6 +81,15 @@ impl AsmModule {
                 func.as_mut().handle_overflow(pool);
             }
         });
+    }
+
+    pub fn handle_call_reg(&mut self, pool: &mut BackendPool, f: &mut File) {
+        self.func_map.iter().for_each(|(_, func)| {
+            if !func.is_extern {
+                func.as_mut().handle_caller(pool);
+                func.as_mut().handle_callee(pool, f);
+            }
+        })
     }
 
     fn map_v_to_p(&mut self) {
