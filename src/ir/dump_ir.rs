@@ -73,7 +73,7 @@ fn dump_global_var(var_name: &str, var: ObjPtr<Inst>) -> String {
                 if value > init.1.len() as i32 {
                     let mut value_type = String::new();
                     let mut value_init = String::new();
-                    for v in init.1 {
+                    for v in init.1.iter() {
                         value_type += " i32,";
                         value_init += format!(" i32 {},", v.1).as_str();
                     }
@@ -84,7 +84,7 @@ fn dump_global_var(var_name: &str, var: ObjPtr<Inst>) -> String {
                     text = format!("{} <{{{}}}> <{{{}}}>", text, value_type, value_init);
                 } else {
                     let mut value_init = String::new();
-                    for v in init.1 {
+                    for v in init.1.iter() {
                         value_init += format!(" i32 {},", v.1).as_str();
                     }
                     value_init.truncate(value_init.len() - 1);
@@ -101,7 +101,7 @@ fn dump_global_var(var_name: &str, var: ObjPtr<Inst>) -> String {
                 if value > init.1.len() as i32 {
                     let mut value_type = String::new();
                     let mut value_init = String::new();
-                    for v in init.1 {
+                    for v in init.1.iter() {
                         value_type += " float,";
                         value_init += format!(" float {},", v.1).as_str();
                     }
@@ -112,7 +112,7 @@ fn dump_global_var(var_name: &str, var: ObjPtr<Inst>) -> String {
                     text = format!("{} <{{{}}}> <{{{}}}", text, value_type, value_init);
                 } else {
                     let mut value_init = String::new();
-                    for v in init.1 {
+                    for v in init.1.iter() {
                         value_init += format!(" float {},", v.1).as_str();
                     }
                     text = format!("{} [{} x float] [{}]", text, value, value_init);

@@ -193,4 +193,4 @@ List结构如下：
 对于b型指令，如果j对应的目标块只有一个来源，则可以将其向上合并
 
 # callee & caller saved regs
-需要
+取决于上层函数。callee saved是被调用函数需要保存的寄存器，取决于上层函数
