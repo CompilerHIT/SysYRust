@@ -10,19 +10,21 @@ use crate::{
     utility::ObjPtr,
 };
 
-pub fn load_store_opt(module: &mut Module) {
+pub fn load_store_opt(module: &mut Module) ->bool {
     let mut func_map = get_store_map(module);
+    let mut changed = false;
     func_process(module, |func_name, func| {
         bfs_bb_proceess(func.get_head(), |bb| {
             let mut map = HashMap::new();
             let mut inst = bb.get_head_inst();
             while !inst.is_tail() {
                 let next = inst.get_next();
-                delete_inst(&mut func_map, &mut map, inst, func_name.clone());
+                changed |= delete_inst(&mut func_map, &mut map, inst, func_name.clone());
                 inst = next;
             }
         });
     });
+    changed
 }
 
 pub fn get_global_array_ptr(inst: ObjPtr<Inst>) -> Option<ObjPtr<Inst>> {
@@ -106,7 +108,7 @@ pub fn delete_inst(
                 match inst_old.get_kind() {
                     InstKind::Load => {
                         map.insert(operands[0], inst);
-                        return true;
+                        return false;
                     }
                     InstKind::Store => {
                         replace_inst(inst_old.clone(), inst);

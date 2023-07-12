@@ -14,17 +14,20 @@ use crate::{
     utility::ObjPtr,
 };
 
+use super::delete_redundant_load_store::load_store_opt;
+
 pub struct Congruence {
     pub vec_class: Vec<Vec<ObjPtr<Inst>>>,
     pub map: HashMap<ObjPtr<Inst>, usize>,
 }
 
-pub fn easy_gvn(module: &mut Module) {
+pub fn easy_gvn(module: &mut Module) ->bool{
     let mut congruence = Congruence {
         vec_class: vec![],
         map: HashMap::new(),
     };
     let set = call_optimize(module);
+    let mut flag = false;
     func_process(module, |_, func| {
         let dominator_tree = calculate_dominator(func.get_head());
         loop {
@@ -32,11 +35,24 @@ pub fn easy_gvn(module: &mut Module) {
             bfs_inst_process(func.get_head(), |inst| {
                 changed |= has_val(&mut congruence, inst, &dominator_tree, set.clone())
             });
+            flag |= changed;
             if !changed {
                 break;
             }
         }
     });
+    flag
+}
+
+pub fn gvn(module: &mut Module){
+    loop{
+        let mut changed = false;
+        changed |= easy_gvn(module);
+        changed |= load_store_opt(module);
+        if !changed {
+            break;
+        }
+    }
 }
 
 pub fn has_val(

@@ -1,3 +1,4 @@
+
 use super::{basicblock::BasicBlock, instruction::Inst, module::Module};
 use super::{dump_now, tools::*};
 use crate::utility::ObjPool;
@@ -34,7 +35,11 @@ pub fn optimizer_run(
         func_inline::inline_run(module, &mut pools);
         functional_optimizer(module, &mut pools, optimize_flag);
 
-        // 全局值编号
+        //gvn
+        // global_value_numbering::gvn(module);
+        // functional_optimizer(module, &mut pools, optimize_flag);
+
+        // // 全局值编号
         global_value_numbering::easy_gvn(module);
         functional_optimizer(module, &mut pools, optimize_flag);
 
