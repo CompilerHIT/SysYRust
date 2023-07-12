@@ -554,20 +554,22 @@ impl BB {
                         let mut first = false;
                         match inst_ref.get_ir_type() {
                             IrType::IntPtr => {
+                                let array: Vec<i32> = inst_ref.get_int_init().1.iter().map(|(_, x)| *x).collect();
                                 let alloca = IntArray::new(
                                     label.clone(),
                                     size,
                                     true,
-                                    inst_ref.get_int_init().clone(),
+                                    array.clone()
                                 );
                                 first = func.as_mut().const_array.insert(alloca);
                             }
                             IrType::FloatPtr => {
+                                let array: Vec<f32> = inst_ref.get_float_init().1.iter().map(|(_, x)| *x).collect();
                                 let alloca = FloatArray::new(
                                     label.clone(),
                                     size,
                                     true,
-                                    inst_ref.get_float_init().clone(),
+                                    array.clone()
                                 );
                                 first = func.as_mut().float_array.insert(alloca);
                             }
