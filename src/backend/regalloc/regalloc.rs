@@ -277,72 +277,23 @@ pub fn build_interference_into_lst(
 // 获取可分配表
 pub fn build_availables(
     func: &Func,
-    ends_index_bb: &HashMap<(i32, ObjPtr<BB>), HashSet<Reg>>,
+    interference_graph: &HashMap<Reg, HashSet<Reg>>,
 ) -> HashMap<Reg, RegUsedStat> {
     let mut availables: HashMap<Reg, RegUsedStat> = HashMap::new();
-    let process =
-        |cur_bb: ObjPtr<BB>, availables: &mut HashMap<Reg, RegUsedStat>, kind: ScalarType| {
-            let mut livenow: HashSet<Reg> = HashSet::new();
-            // 冲突分析
-            cur_bb.live_in.iter().for_each(|reg| {
-                if reg.get_type() != kind {
-                    return;
-                }
-                if let None = availables.get(reg) {
-                    availables.insert(*reg, RegUsedStat::new());
-                }
-                if reg.is_physic() {
-                    livenow.iter().for_each(|live| {
-                        availables.get_mut(live).unwrap().use_reg(reg.get_color());
-                    });
-                }
-                for live in livenow.iter() {
-                    if live.is_physic() {
-                        availables.get_mut(reg).unwrap().use_reg(live.get_color());
-                    }
-                }
-                livenow.insert(*reg);
-            });
-            for (index, inst) in cur_bb.insts.iter().enumerate() {
-                // 先与reg use冲突,然后消去终结的,然后与reg def冲突,并加上新的reg def
-                if let Some(finishes) = ends_index_bb.get(&(index as i32, cur_bb)) {
-                    for finish in finishes {
-                        livenow.remove(finish);
-                    }
-                }
-                for reg in inst.get_reg_def() {
-                    if reg.get_type() != kind {
-                        continue;
-                    }
-                    if let None = availables.get(&reg) {
-                        availables.insert(reg, RegUsedStat::new());
-                    }
-                    if reg.is_physic() {
-                        livenow.iter().for_each(|live| {
-                            availables.get_mut(&live).unwrap().use_reg(reg.get_color());
-                        });
-                    }
-                    for live in livenow.iter() {
-                        if *live == reg {
-                            continue;
-                        }
-                        if live.is_physic() {
-                            availables.get_mut(&reg).unwrap().use_reg(live.get_color());
-                        }
-                    }
-
-                    livenow.insert(reg);
-                }
+    for (reg, neighbors) in interference_graph.iter() {
+        let mut available = RegUsedStat::new();
+        for neighbor in neighbors {
+            if neighbor.is_physic() {
+                available.use_reg(neighbor.get_color());
             }
-        };
-    // 遍历所有块，分析冲突关系
-    for cur_bb in func.blocks.iter() {
-        let cur_bb = *cur_bb;
-        // 把不同类型寄存器统计加入表中
-        //分别处理浮点寄存器的情况和通用寄存器的情况
-        process(cur_bb, &mut availables, ScalarType::Float);
-        process(cur_bb, &mut availables, ScalarType::Int);
-        // 加入还没有处理过的bb
+        }
+        availables.insert(*reg, available);
+    }
+    for reg in func.draw_all_virtual_regs() {
+        if availables.contains_key(&reg) {
+            continue;
+        }
+        availables.insert(reg, RegUsedStat::new());
     }
     return availables;
 }
@@ -906,6 +857,92 @@ pub fn check_alloc(
         }
     }
     out
+}
+
+///检查寄存器分配结果是否正确
+pub fn check_alloc_v2(func: &Func, dstr: &HashMap<i32, i32>, spillings: &HashSet<i32>) {
+    for bb in func.blocks.iter() {
+        let mut livenow: HashSet<Reg> = HashSet::new();
+        let mut live_color: HashSet<i32> = HashSet::new();
+        let mut last_use: HashMap<i32, Reg> = HashMap::new();
+        bb.live_out.iter().for_each(|reg| {
+            if livenow.contains(reg) {
+                unreachable!()
+            }
+            if reg.is_physic() {
+                let color = reg.get_color();
+                if last_use.contains_key(&color) && live_color.contains(&color) {
+                    panic!(
+                        "inter:{} ,{} :({})",
+                        last_use.get(&color).unwrap(),
+                        reg,
+                        color
+                    );
+                }
+                last_use.insert(color, *reg);
+                live_color.insert(color);
+            } else if dstr.contains_key(&reg.get_id()) {
+                let color = *dstr.get(&reg.get_id()).unwrap();
+                if last_use.contains_key(&color) && live_color.contains(&color) {
+                    panic!(
+                        "inter:{} ,{} :({})",
+                        last_use.get(&color).unwrap(),
+                        reg,
+                        color
+                    );
+                }
+                live_color.insert(color);
+                last_use.insert(color, *reg);
+            }
+            livenow.insert(*reg);
+        });
+        for inst in bb.insts.iter().rev() {
+            for reg in inst.get_reg_def() {
+                livenow.remove(&reg);
+                let color = if reg.is_physic() {
+                    Some(reg.get_color())
+                } else if dstr.contains_key(&reg.get_id()) {
+                    Some(*dstr.get(&reg.get_id()).unwrap())
+                } else {
+                    None
+                };
+                if color.is_some() {
+                    live_color.remove(&color.unwrap());
+                }
+            }
+            for reg in inst.get_reg_use() {
+                if livenow.contains(&reg) {
+                    continue;
+                }
+                if reg.is_physic() {
+                    let color = reg.get_color();
+                    if last_use.contains_key(&color) && live_color.contains(&color) {
+                        panic!(
+                            "inter:{} ,{} :({})",
+                            last_use.get(&color).unwrap(),
+                            reg,
+                            color
+                        );
+                    }
+                    last_use.insert(color, reg);
+                    live_color.insert(color);
+                } else if dstr.contains_key(&reg.get_id()) {
+                    let color = *dstr.get(&reg.get_id()).unwrap();
+                    if last_use.contains_key(&color) && live_color.contains(&color) {
+                        panic!(
+                            "inter:{} ,{} :({})",
+                            last_use.get(&color).unwrap(),
+                            reg,
+                            color
+                        );
+                    }
+                    live_color.insert(color);
+                    last_use.insert(color, reg);
+                }
+                livenow.insert(reg);
+            }
+        }
+    }
 }
 
 // 对分配结果的评估

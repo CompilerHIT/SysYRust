@@ -33,7 +33,7 @@ impl Regalloc for Allocator {
         let mut spillings: HashSet<i32> = HashSet::new();
         let ends_index_bb = regalloc::regalloc::build_ends_index_bb(func);
         let interference_graph = regalloc::regalloc::build_interference(func, &ends_index_bb);
-        let availables = regalloc::regalloc::build_availables(func, &ends_index_bb);
+        let availables = regalloc::regalloc::build_availables(func, &interference_graph);
         // 获取周围的颜色,
 
         let (stackSize, bb_stack_sizes) = regalloc::regalloc::countStackSize(func, &spillings);

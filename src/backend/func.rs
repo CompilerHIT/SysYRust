@@ -428,6 +428,7 @@ impl Func {
         }
         let check_alloc_path = "./check_alloc.txt";
         log_file!(check_alloc_path, "{:?}", self.label);
+        regalloc::check_alloc_v2(&self, &alloc_stat.dstr, &alloc_stat.spillings);
         // log_file!(
         //     check_alloc_path,
         //     "{:?}",

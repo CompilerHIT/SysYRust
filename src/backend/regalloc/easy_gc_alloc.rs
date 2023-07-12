@@ -54,7 +54,7 @@ impl Allocator {
         self.ends_index_bb = regalloc::build_ends_index_bb(func);
         let ends_index_bb = &self.ends_index_bb;
         self.interference_graph = regalloc::build_interference(func, &ends_index_bb);
-        self.availables = regalloc::build_availables(func, &ends_index_bb);
+        self.availables = regalloc::build_availables(func, &self.interference_graph);
         self.nums_neighbor_color = regalloc::build_nums_neighbor_color(func, ends_index_bb);
         let mut bitmap: Bitmap = Bitmap::with_cap(5000);
         let tmp_set: HashSet<Reg> = HashSet::new();
