@@ -441,9 +441,9 @@ impl Func {
         // log!("dstr map info{:?}", self.reg_alloc_info.dstr);
         // log!("spills:{:?}", self.reg_alloc_info.spillings);
 
-        let stack_size = self.max_params * ADDR_SIZE;
+        // let stack_size = self.max_params * ADDR_SIZE;
         // log!("set stack size:{}", stack_size);
-        self.context.as_mut().set_offset(stack_size);
+        // self.context.as_mut().set_offset(stack_size);
     }
 
     pub fn remove_unuse_inst(&mut self) {
@@ -667,14 +667,17 @@ impl Func {
         };
         let mut stack_size = self.context.get_offset();
 
+        log!("stack size: {}", stack_size);
+
         if let Some(addition_stack_info) = self.stack_addr.front() {
             stack_size += addition_stack_info.get_pos();
         }
         if let Some(slot) = self.stack_addr.back() {
             stack_size += slot.get_pos() + slot.get_size();
         };
+        log!("stack: {:?}", self.stack_addr);
         stack_size += self.caller_saved.len() as i32 * ADDR_SIZE;
-
+        log!("caller saved: {}", self.caller_saved.len());
         //栈对齐 - 调用func时sp需按16字节对齐
         stack_size = stack_size / 16 * 16 + 16;
         let (icnt, fcnt) = self.param_cnt;

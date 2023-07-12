@@ -589,12 +589,6 @@ impl BB {
                         let array_size = (size + 1) * NUM_SIZE / 8 * 8;
                         let p = func.stack_addr.back().unwrap().get_pos()
                             + func.stack_addr.back().unwrap().get_size();
-                        log!(
-                            "{last_pos}, {last_size}, {pos}",
-                            last_pos = func.stack_addr.back().unwrap().get_pos(),
-                            last_size = func.stack_addr.back().unwrap().get_size(),
-                            pos = p
-                        );
                         let offset = self.resolve_iimm(p, pool);
                         let dst_reg =
                             self.resolve_operand(func, ir_block_inst, true, map_info, pool);
@@ -770,7 +764,6 @@ impl BB {
 
                                 // self.push_back_list(&mut set);
                             } else {
-                                log!("array: {size}, {len}", len = array_info.len());
                                 for i in (array_info.len() as i32)..size {
                                     self.insts.push(pool.put_inst(LIRInst::new(
                                         InstrsType::Store,
@@ -1532,26 +1525,28 @@ impl BB {
                     let (mut icnt, mut fcnt) = inst.get_param_cnts();
                     icnt = min(icnt, ARG_REG_COUNT);
                     fcnt = min(fcnt, ARG_REG_COUNT);
-                    log!("func_name: {:?}, icnt: {icnt}, fcnt: {fcnt}", inst.get_label());
                     for (op, reg) in func.caller_saved.iter() {
                         if inst.get_reg_def().len() != 0 && op.get_id() == inst.get_reg_def()[0].get_id() {
+                            func.as_mut().caller_saved.remove(op);
                             continue;
                         }
                         if op.get_type() == ScalarType::Int
                         && op.get_id() - 10 < icnt
                         && op.get_id() >= 10
                         {
+                            func.as_mut().caller_saved.remove(op);
                             continue;
                         }
-                        log!("{id}", id = op.get_id());
                         if op.get_type() == ScalarType::Float
                             && (op.get_id() - 10 - FLOAT_BASE < fcnt
                             && op.get_id() >= 10 + FLOAT_BASE)
                         {
+                            func.as_mut().caller_saved.remove(op);
                             continue;
                         }
                         caller_regs.insert(*reg);
                     }
+
                     let mut pos = func.stack_addr.back().unwrap().get_pos();
                     pos += func.stack_addr.back().unwrap().get_size();
                     for (i, reg) in caller_regs.iter().enumerate() {
