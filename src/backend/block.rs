@@ -1190,10 +1190,17 @@ impl BB {
                         vec![Operand::Addr(func_label.to_string())],
                     );
                     lir_inst.set_param_cnts(int_param_cnt, float_param_cnt);
+                    let call_type = match inst_ref.get_ir_type() {
+                        IrType::Int => ScalarType::Int,
+                        IrType::Float => ScalarType::Float,
+                        IrType::Void => ScalarType::Void,
+                        _ => unreachable!("call type not match"),
+                    };
+                    lir_inst.set_call_type(call_type);
                     self.insts.push(pool.put_inst(lir_inst));
 
-                    match inst_ref.get_ir_type() {
-                        IrType::Int => {
+                    match call_type {
+                        ScalarType::Int => {
                             let dst_reg =
                                 self.resolve_operand(func, ir_block_inst, true, map_info, pool);
                             self.insts.push(pool.put_inst(LIRInst::new(
@@ -1201,7 +1208,7 @@ impl BB {
                                 vec![dst_reg, Operand::Reg(Reg::new(10, ScalarType::Int))],
                             )));
                         }
-                        IrType::Float => {
+                        ScalarType::Float => {
                             let dst_reg =
                                 self.resolve_operand(func, ir_block_inst, true, map_info, pool);
                             self.insts.push(pool.put_inst(LIRInst::new(
@@ -1212,8 +1219,7 @@ impl BB {
                                 ],
                             )));
                         }
-                        IrType::Void => {}
-                        _ => unreachable!("call return type not match, must be int, float or void"),
+                        ScalarType::Void => {}
                     }
 
                     // restore stack slot
