@@ -519,6 +519,7 @@ impl Func {
         self.save_callee(pool, f);
     }
 
+    // 为spilling 寄存器预先分配空间 的 handle spill
     pub fn handle_spill_v2(&mut self, pool: &mut BackendPool, f: &mut File) {
         let this = pool.put_func(self.clone());
         // 首先给这个函数分配spill的空间
@@ -535,30 +536,76 @@ impl Func {
         self.save_callee(pool, f);
     }
 
+    // 为了分配spill的虚拟寄存器所需的栈空间使用的而构建冲突图
+    fn build_interferench_for_assign_stack_slot_for_spill(&mut self) -> HashMap<Reg, HashSet<Reg>> {
+        let mut out: HashMap<Reg, HashSet<Reg>> = HashMap::new();
+        self.calc_live();
+        for bb in self.blocks.iter() {
+            //
+            let bb = *bb;
+            let mut live_now: HashSet<Reg> = HashSet::new();
+            for reg in bb.live_out.iter() {
+                if !self.reg_alloc_info.spillings.contains(&reg.get_id()) {
+                    continue;
+                }
+                if !out.contains_key(reg) {
+                    out.insert(*reg, HashSet::new());
+                }
+                live_now.insert(*reg);
+            }
+            for inst in bb.insts.iter().rev() {
+                for reg in inst.get_reg_def() {
+                    if !self.reg_alloc_info.spillings.contains(&reg.get_id()) {
+                        continue;
+                    }
+                    if !out.contains_key(&reg) {
+                        out.insert(reg, HashSet::new());
+                    }
+                    for live in live_now.iter() {
+                        if reg == *live {
+                            continue;
+                        }
+                        out.get_mut(&reg).unwrap().insert(*live);
+                        out.get_mut(live).unwrap().insert(reg);
+                    }
+                }
+                for reg in inst.get_reg_def() {
+                    live_now.remove(&reg);
+                }
+                for reg in inst.get_reg_use() {
+                    if !self.reg_alloc_info.spillings.contains(&reg.get_id()) {
+                        continue;
+                    }
+                    live_now.insert(reg);
+                }
+            }
+        }
+        out
+    }
+
     fn assign_stack_slot_for_spill(&mut self) {
         // 统计所有spill寄存器的使用次数,根据寄存器数量更新其值
-
         // 首先给存储在物理寄存器中的值的空间
-        for reg in RegUsedStat::new().get_available_freg() {
-            let last_slot = self.stack_addr.back().unwrap();
-            let pos = last_slot.get_pos() + last_slot.get_size();
-            let stack_slot = StackSlot::new(pos, ADDR_SIZE);
-            self.stack_addr.push_back(stack_slot);
-            let reg = Reg::new(reg, ScalarType::Float);
-            self.spill_stack_map.insert(reg, stack_slot);
-            self.physic_stack_map.insert(reg, stack_slot);
-        }
-        for reg in RegUsedStat::new().get_available_ireg() {
-            let last_slot = self.stack_addr.back().unwrap();
-            let pos = last_slot.get_pos() + last_slot.get_size();
-            let stack_slot = StackSlot::new(pos, ADDR_SIZE);
-            self.stack_addr.push_back(stack_slot);
-            let reg = Reg::new(reg, ScalarType::Int);
-            self.spill_stack_map.insert(reg, stack_slot);
-            self.physic_stack_map.insert(reg, stack_slot);
-        }
-
-        // TODO tocheck 是否功能正常
+        // for reg in RegUsedStat::new().get_available_freg() {
+        //     let last_slot = self.stack_addr.back().unwrap();
+        //     let pos = last_slot.get_pos() + last_slot.get_size();
+        //     let stack_slot = StackSlot::new(pos, ADDR_SIZE);
+        //     self.stack_addr.push_back(stack_slot);
+        //     let reg = Reg::new(reg, ScalarType::Float);
+        //     self.spill_stack_map.insert(reg, stack_slot);
+        //     self.physic_stack_map.insert(reg, stack_slot);
+        // }
+        // for reg in RegUsedStat::new().get_available_ireg() {
+        //     let last_slot = self.stack_addr.back().unwrap();
+        //     let pos = last_slot.get_pos() + last_slot.get_size();
+        //     let stack_slot = StackSlot::new(pos, ADDR_SIZE);
+        //     self.stack_addr.push_back(stack_slot);
+        //     let reg = Reg::new(reg, ScalarType::Int);
+        //     self.spill_stack_map.insert(reg, stack_slot);
+        //     self.physic_stack_map.insert(reg, stack_slot);
+        // }
+        // 给spill的寄存器空间,如果出现重复的情况,则说明后端可能空间存在冲突
+        // 建立spill寄存器之间的冲突关系(如果两个spill的寄存器之间是相互冲突的,则它们不能够共享相同内存)
         let mut spill_coes: HashMap<i32, i32> = HashMap::new();
         let mut id_to_regs: HashMap<i32, Reg> = HashMap::new();
         let spillings = &self.reg_alloc_info.spillings;
@@ -603,6 +650,12 @@ impl Func {
             let reg = id_to_regs.get(id).unwrap();
             buckets.get_mut(id).unwrap().push_back(*reg);
         }
+
+        // 使用一个表记录之前使用过的空间,每次分配空间的时候可以复用之前使用过的空间,只要没有冲突
+        // 如果有冲突则 需要开辟新的空间
+        let mut slots: LinkedList<StackSlot> = LinkedList::new();
+        let inter_graph: HashMap<Reg, HashSet<Reg>> =
+            self.build_interferench_for_assign_stack_slot_for_spill();
         // 优先给使用次数最多的spill寄存器分配内存空间
         while !order.is_empty() {
             let id = order.pop_max().unwrap();
@@ -612,11 +665,39 @@ impl Func {
                 if self.spill_stack_map.contains_key(&toassign) {
                     unreachable!()
                 }
-                let last_slot = self.stack_addr.back().unwrap();
-                let pos = last_slot.get_pos() + last_slot.get_size();
-                let stack_slot = StackSlot::new(pos, ADDR_SIZE);
-                self.stack_addr.push_back(stack_slot);
-                self.spill_stack_map.insert(toassign, stack_slot);
+                // 首先在已经分配的空间里面寻找可复用的空间
+                // 首先记录冲突的空间
+                let mut inter_slots: HashSet<StackSlot> = HashSet::new();
+                for reg in inter_graph.get(&toassign).unwrap() {
+                    if !self.spill_stack_map.contains_key(reg) {
+                        continue;
+                    }
+                    let stack_slot = self.spill_stack_map.get(reg).unwrap();
+                    inter_slots.insert(*stack_slot);
+                }
+
+                // 然后遍历已经分配的空间
+                let mut num = slots.len();
+                let mut slot_for_toassign: Option<StackSlot> = Option::None;
+                while num > 0 {
+                    num -= 1;
+                    let old_slot = slots.pop_front().unwrap();
+                    slots.push_back(old_slot);
+                    if inter_slots.contains(&old_slot) {
+                        continue;
+                    }
+                    slot_for_toassign = Some(old_slot);
+                }
+                if slot_for_toassign.is_none() {
+                    let last_slot = self.stack_addr.back().unwrap();
+                    let pos = last_slot.get_pos() + last_slot.get_size();
+                    let stack_slot = StackSlot::new(pos, ADDR_SIZE);
+                    self.stack_addr.push_back(stack_slot);
+                    slot_for_toassign = Some(stack_slot);
+                    slots.push_back(stack_slot);
+                }
+                self.spill_stack_map
+                    .insert(toassign, slot_for_toassign.unwrap());
             }
         }
     }

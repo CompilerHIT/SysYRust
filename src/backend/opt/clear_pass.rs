@@ -19,8 +19,8 @@ impl BackendPass {
                     self.rm_useless(*block);
                 });
 
-                self.rm_useless_def(func.clone());
-                self.rm_repeated_sl(func.clone());
+                // self.rm_useless_def(func.clone());
+                // self.rm_repeated_sl(func.clone());
                 // let mut bf = OpenOptions::new()
                 //     .create(true)
                 //     .append(true)
@@ -32,6 +32,7 @@ impl BackendPass {
                 //     .open("after_rmls.txt")
                 //     .unwrap();
                 // func.as_mut().generate_row(func.context, &mut bf);
+                // self.rm_useless_def(func.clone());
                 // func.as_mut().generate_row(func.context, &mut sf);
             }
         });
@@ -102,45 +103,45 @@ impl BackendPass {
     }
 
     fn rm_useless_def(&self, func: ObjPtr<Func>) {
-        let ends_index_bb = regalloc::regalloc::build_ends_index_bb(func.as_ref());
+        func.as_mut().calc_live();
+        let mut ifUsed: HashSet<Reg> = HashSet::new();
         for bb in func.blocks.iter() {
-            let mut rm_num = 0; //已经删除掉的指令
-            let mut index = 0; //当前到达的指令的位置
-            loop {
-                if index >= bb.insts.len() {
-                    break;
-                }
-                // 获取当前指令实际对应的下标
-                let real_index = index + rm_num;
-                let inst = bb.insts.get(index).unwrap();
-                // 如果是call指令或者是ret指令则不能删除
-                match inst.get_type() {
-                    InstrsType::Call | InstrsType::Ret(_) => {
-                        index += 1;
-                        continue;
-                    }
-                    _ => (),
-                };
-
-                let reg = inst.get_reg_def();
-                if reg.is_empty() {
-                    index += 1;
-                    continue;
-                }
-                let reg = reg.get(0).unwrap();
-                let ends = ends_index_bb.get(&(real_index as i32, *bb));
-                if ends.is_none() {
-                    index += 1;
-                    continue;
-                }
-                let ends = ends.unwrap();
-                if !ends.contains(reg) {
-                    index += 1;
-                    continue;
-                }
-                bb.as_mut().insts.remove(index);
-                rm_num += 1;
+            for reg in bb.live_out.iter() {
+                ifUsed.insert(*reg);
             }
+            let mut to_rm: HashSet<usize> = HashSet::new();
+            for (index, inst) in bb.insts.iter().enumerate().rev() {
+                // 寻找到def,如果def不在ifUsed中,删掉
+                for reg in inst.get_reg_def() {
+                    if ifUsed.contains(&reg) {
+                        ifUsed.remove(&reg);
+                    } else {
+                        to_rm.insert(index);
+                    }
+                }
+                if to_rm.contains(&index) {
+                    continue;
+                }
+                for reg in inst.get_reg_use() {
+                    ifUsed.insert(reg);
+                }
+            }
+            log_file!(
+                "rmd.txt",
+                "func:{},bb:{},torm:{:?}",
+                func.label,
+                bb.label,
+                to_rm
+            );
+            let mut new_insts: Vec<ObjPtr<LIRInst>> =
+                Vec::with_capacity(bb.insts.len() - to_rm.len());
+            for (index, inst) in bb.insts.iter().enumerate() {
+                if to_rm.contains(&index) {
+                    continue;
+                }
+                new_insts.push(*inst);
+            }
+            bb.as_mut().insts = new_insts;
         }
     }
 

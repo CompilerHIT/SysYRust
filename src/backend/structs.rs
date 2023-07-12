@@ -47,7 +47,7 @@ impl GlobalVar {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Debug)]
+#[derive(Clone, Copy, PartialEq, Debug, Hash, Eq)]
 pub struct StackSlot {
     is_fixed: bool,
     pos: i32,

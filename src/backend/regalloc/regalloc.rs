@@ -432,19 +432,19 @@ pub fn build_ends_index_bb(func: &Func) -> HashMap<(i32, ObjPtr<BB>), HashSet<Re
                       // TODO 更换新的build ends
                       // let a = build_ends_index_bb_old(func);
     let b = build_ends_index_bb_new(func);
-    // log_file!("ends.txt", "func:{}", func.label.to_owned());
+    log_file!("ends.txt", "func:{}", func.label.to_owned());
     // log_file!("ends.txt", "old:");
     // a.iter().for_each(|((index, bb), sets)| {
     //     sets.iter().for_each(|reg| {
     //         log_file!("ends.txt", "{},{},{}", index, bb.label, reg);
     //     });
     // });
-    // log_file!("ends.txt", "new:");
-    // b.iter().for_each(|((index, bb), sets)| {
-    //     sets.iter().for_each(|reg| {
-    //         log_file!("ends.txt", "{},{},{}", index, bb.label, reg);
-    //     });
-    // });
+    log_file!("ends.txt", "new:");
+    b.iter().for_each(|((index, bb), sets)| {
+        sets.iter().for_each(|reg| {
+            log_file!("ends.txt", "{},{},{}", index, bb.label, reg);
+        });
+    });
     // log_file!("ends.txt");
     return b;
     // return a;
