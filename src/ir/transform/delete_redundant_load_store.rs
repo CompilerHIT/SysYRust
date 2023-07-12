@@ -160,7 +160,6 @@ pub fn delete_inst(
                                 }
                             }
                             _ => {
-                                println!("{:?}", ptr.get_kind());
                                 unreachable!()
                             }
                         }
