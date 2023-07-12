@@ -26,7 +26,7 @@ pub struct Inst {
     user: User,
     list: IList<Inst>,
     kind: InstKind,
-    init: (Vec<i32>, Vec<f32>),
+    init: ((bool, Vec<(bool, i32)>), (bool, Vec<(bool, f32)>)),
 }
 
 #[derive(Clone)]
@@ -166,7 +166,7 @@ impl Inst {
                 next: None,
             },
             kind,
-            init: (vec![], vec![]),
+            init: ((false, vec![]), (false, vec![])),
         }
     }
 

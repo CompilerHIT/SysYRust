@@ -315,13 +315,20 @@ impl Process for ConstDecl {
                                 unreachable!()
                             }
                             RetInitVec::Int(ivec) => {
-                                let mut inst = kit_mut.pool_inst_mut.make_int_array(length, ivec);
+                                let mut vec_init = vec![];
+                                for i in ivec {
+                                    vec_init.push((false, i));
+                                }
+                                let mut inst =
+                                    kit_mut.pool_inst_mut.make_int_array(length, true, vec_init);
                                 match &def.const_init_val {
                                     ConstInitVal::ConstInitValVec(vec_temp) => {
                                         if vec_temp.is_empty() {
-                                            inst = kit_mut
-                                                .pool_inst_mut
-                                                .make_int_array(length, vec![]);
+                                            inst = kit_mut.pool_inst_mut.make_int_array(
+                                                length,
+                                                true,
+                                                vec![],
+                                            );
                                         }
                                     }
                                     _ => {}
@@ -432,14 +439,22 @@ impl Process for ConstDecl {
                             .unwrap(); //获得初始值
                         match init_vec {
                             RetInitVec::Float(fvec) => {
-                                let mut inst = kit_mut.pool_inst_mut.make_float_array(length, fvec);
+                                let mut vec_init = vec![];
+                                for f in fvec {
+                                    vec_init.push((false, f));
+                                }
+                                let mut inst = kit_mut
+                                    .pool_inst_mut
+                                    .make_float_array(length, true, vec_init);
                                 match &def.const_init_val {
                                     //这里,加个判断，为空则放个空的
                                     ConstInitVal::ConstInitValVec(vec_temp) => {
                                         if vec_temp.is_empty() {
-                                            inst = kit_mut
-                                                .pool_inst_mut
-                                                .make_float_array(length, vec![]);
+                                            inst = kit_mut.pool_inst_mut.make_float_array(
+                                                length,
+                                                true,
+                                                vec![],
+                                            );
                                         }
                                     }
                                     _ => {}
@@ -745,10 +760,15 @@ impl Process for VarDecl {
                                         for i in (last_index - 1)..ivec.len() {
                                             vec_init.remove(i);
                                         }
-                                        inst =
-                                            kit_mut.pool_inst_mut.make_int_array(length, vec_init);
+                                        inst = kit_mut
+                                            .pool_inst_mut
+                                            .make_int_array(length, true, vec_init);
                                     } else {
-                                        inst = kit_mut.pool_inst_mut.make_int_array(length, vec![]);
+                                        inst = kit_mut.pool_inst_mut.make_int_array(
+                                            length,
+                                            true,
+                                            vec![],
+                                        );
                                     }
                                     if !kit_mut.context_mut.add_var(
                                         &id,
@@ -808,7 +828,7 @@ impl Process for VarDecl {
                                 length = length * dm;
                             }
                             let ivec = vec![];
-                            let inst = kit_mut.pool_inst_mut.make_int_array(length, ivec);
+                            let inst = kit_mut.pool_inst_mut.make_int_array(length, false, ivec);
                             if !kit_mut.context_mut.add_var(
                                 &id,
                                 Type::Int,
@@ -1001,10 +1021,13 @@ impl Process for VarDecl {
                                         }
                                         inst = kit_mut
                                             .pool_inst_mut
-                                            .make_float_array(length, vec_init);
+                                            .make_float_array(length, true, vec_init);
                                     } else {
-                                        inst =
-                                            kit_mut.pool_inst_mut.make_float_array(length, vec![]);
+                                        inst = kit_mut.pool_inst_mut.make_float_array(
+                                            length,
+                                            true,
+                                            vec![],
+                                        );
                                     }
                                     // let inst = kit_mut.pool_inst_mut.make_float_array(length, fvec);
                                     if !kit_mut.context_mut.add_var(
@@ -1066,7 +1089,7 @@ impl Process for VarDecl {
                                 length = length * dm;
                             }
                             let fvec = vec![];
-                            let inst = kit_mut.pool_inst_mut.make_float_array(length, fvec);
+                            let inst = kit_mut.pool_inst_mut.make_float_array(length, true, fvec);
                             if !kit_mut.context_mut.add_var(
                                 &id,
                                 Type::Float,

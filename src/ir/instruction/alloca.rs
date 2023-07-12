@@ -8,7 +8,12 @@ impl ObjPool<Inst> {
     /// * 'length' - 要申请的数组的长度
     /// # Returns
     /// 构造好的数组指令，其值为Intptr
-    pub fn make_int_array(&mut self, length: i32, init: Vec<i32>) -> ObjPtr<Inst> {
+    pub fn make_int_array(
+        &mut self,
+        length: i32,
+        is_init: bool,
+        init_array: Vec<(bool, i32)>,
+    ) -> ObjPtr<Inst> {
         // 正确性检查
         // 数组长度必须为整数
 
@@ -17,7 +22,7 @@ impl ObjPool<Inst> {
             InstKind::Alloca(length),
             vec![],
         ));
-        inst.set_int_init(init);
+        inst.set_int_init(is_init, init_array);
 
         // 设置use list
         inst
@@ -29,13 +34,18 @@ impl ObjPool<Inst> {
     /// * 'length' - 要申请的数组的长度
     /// # Returns
     /// 构造好的数组指令，其值为Floatptr
-    pub fn make_float_array(&mut self, length: i32, init: Vec<f32>) -> ObjPtr<Inst> {
+    pub fn make_float_array(
+        &mut self,
+        length: i32,
+        is_init: bool,
+        init_array: Vec<(bool, f32)>,
+    ) -> ObjPtr<Inst> {
         let mut inst = self.put(Inst::new(
             crate::ir::ir_type::IrType::FloatPtr,
             InstKind::Alloca(length),
             vec![],
         ));
-        inst.set_float_init(init);
+        inst.set_float_init(is_init, init_array);
 
         // 设置use list
         inst
@@ -44,7 +54,7 @@ impl ObjPool<Inst> {
 
 impl Inst {
     /// 设置整型数组的初始值,只允许在初始化的时候调用
-    pub fn set_int_init(&mut self, init: Vec<i32>) {
+    pub fn set_int_init(&mut self, is_init: bool, init: Vec<(bool, i32)>) {
         if let InstKind::Alloca(_) = self.get_kind() {
             if let IrType::IntPtr = self.get_ir_type() {
             } else {
@@ -55,11 +65,11 @@ impl Inst {
         }
 
         // 设置use list
-        self.init = (init, vec![]);
+        self.init = ((is_init, init), (false, vec![]));
     }
 
     /// 设置浮点型数组的初始值,只允许在初始化的时候调用
-    pub fn set_float_init(&mut self, init: Vec<f32>) {
+    pub fn set_float_init(&mut self, is_init: bool, init: Vec<(bool, f32)>) {
         if let InstKind::Alloca(_) = self.get_kind() {
             if let IrType::FloatPtr = self.get_ir_type() {
             } else {
@@ -70,11 +80,11 @@ impl Inst {
         }
 
         // 设置use list
-        self.init = (vec![], init);
+        self.init = ((false, vec![]), (is_init, init));
     }
 
     /// 获得整型数组的初始值
-    pub fn get_int_init(&self) -> &Vec<i32> {
+    pub fn get_int_init(&self) -> &(bool, Vec<(bool, i32)>) {
         // 正确性检查
         if let InstKind::Alloca(_) = self.get_kind() {
             debug_assert!(self.get_ir_type() == IrType::IntPtr);
@@ -86,7 +96,7 @@ impl Inst {
     }
 
     /// 获得浮点型数组的初始值
-    pub fn get_float_init(&self) -> &Vec<f32> {
+    pub fn get_float_init(&self) -> &(bool, Vec<(bool, f32)>) {
         // 正确性检查
         if let InstKind::Alloca(_) = self.get_kind() {
             debug_assert!(self.get_ir_type() == IrType::FloatPtr);
