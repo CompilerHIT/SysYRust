@@ -18,6 +18,8 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::io::Result;
 
+use super::block::NUM_SIZE;
+
 /// Assembly builder.
 pub struct AsmBuilder<'f> {
     f: &'f File,
@@ -227,26 +229,24 @@ impl<'f> AsmBuilder<'f> {
 
     pub fn print_array(&mut self, array: &Vec<i32>, name: String, size: i32) -> Result<()> {
         writeln!(self.f, "{name}:")?;
-        if array.len() == 0 {
-            for i in 0..size {
-                writeln!(self.f, "	.word	0")?;
-            }
-        }
         for i in array {
             writeln!(self.f, "	.word	{i}")?;
+        }
+        let zeros = size - array.len() as i32;
+        if zeros > 0 {
+            writeln!(self.f, "	.zero	{n}", n = zeros * NUM_SIZE)?;
         }
         Ok(())
     }
 
     pub fn print_farray(&mut self, array: &Vec<f32>, name: String, size: i32) -> Result<()> {
         writeln!(self.f, "{name}:")?;
-        if array.len() == 0 {
-            for i in 0..size {
-                writeln!(self.f, "	.word	0")?;
-            }
-        }
         for i in array {
             writeln!(self.f, "	.word	{i}")?;
+        }
+        let zeros = size - array.len() as i32;
+        if zeros > 0 {
+            writeln!(self.f, "	.zero	{n}", n = zeros * NUM_SIZE)?;
         }
         Ok(())
     }

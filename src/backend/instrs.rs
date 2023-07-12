@@ -367,6 +367,7 @@ impl LIRInst {
                 } else {
                     vec![]
                 }
+                // vec![]
             }
             InstrsType::StoreToStack
             | InstrsType::StoreParamToStack

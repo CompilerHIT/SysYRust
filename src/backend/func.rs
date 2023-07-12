@@ -428,11 +428,11 @@ impl Func {
         }
         let check_alloc_path = "./check_alloc.txt";
         log_file!(check_alloc_path, "{:?}", self.label);
-        log_file!(
-            check_alloc_path,
-            "{:?}",
-            regalloc::check_alloc(self, &alloc_stat.dstr, &alloc_stat.spillings)
-        );
+        // log_file!(
+        //     check_alloc_path,
+        //     "{:?}",
+        //     regalloc::check_alloc(self, &alloc_stat.dstr, &alloc_stat.spillings)
+        // );
         // TODO
         // simulate_assign::Simulator::simulate(&self, &alloc_stat);
 

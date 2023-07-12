@@ -2,6 +2,7 @@ use std::fs::File;
 use std::io::Write;
 
 use crate::backend::func::Func;
+use crate::backend::block::NUM_SIZE;
 use crate::backend::operand::ToString;
 use crate::backend::structs::{FGlobalVar, FloatArray, GlobalVar, IGlobalVar, IntArray};
 use crate::backend::BackendPool;
@@ -190,24 +191,23 @@ impl AsmModule {
                 GlobalVar::GlobalConstIntArray(array) => {
                     writeln!(f, "   .globl {name}\n    .align  3\n     .type   {name}, @object\n   .size   {name}, {num}", name = array.name, num = array.size * 4);
                     writeln!(f, "{name}:", name = array.name);
-                    let is_empty = array.value.iter().all(|x| *x == 0);
-                    if !is_empty {
-                        for value in array.value.iter() {
-                            writeln!(f, "    .word   {value}");
-                        }
-                    } else {
-                        writeln!(f, "    .zero   {num}", num = array.size * 4);
+                    for value in array.value.iter() {
+                        writeln!(f, "    .word   {value}");
+                    }
+                    let zeros = array.size - array.value.len() as i32;
+                    if zeros > 0 {
+                        writeln!(f, "	.zero	{n}", n = zeros * NUM_SIZE);
                     }
                 }
                 GlobalVar::GlobalConstFloatArray(array) => {
                     writeln!(f, "   .globl {name}\n    .align  3\n     .type   {name}, @object\n   .size   {name}, {num}", name = array.name, num = array.size * 4);
                     writeln!(f, "{name}:", name = array.name);
-                    if array.value.len() != 0 {
-                        for value in array.value.iter() {
-                            writeln!(f, "    .word   {value}");
-                        }
-                    } else {
-                        writeln!(f, "    .zero   {num}", num = array.size * 4);
+                    for value in array.value.iter() {
+                        writeln!(f, "    .word   {value}");
+                    }
+                    let zeros = array.size - array.value.len() as i32;
+                    if zeros > 0 {
+                        writeln!(f, "	.zero	{n}", n = zeros * NUM_SIZE);
                     }
                 }
             }
