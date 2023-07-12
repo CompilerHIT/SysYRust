@@ -430,15 +430,15 @@ pub fn build_nums_neighbor_color(
 pub fn build_ends_index_bb(func: &Func) -> HashMap<(i32, ObjPtr<BB>), HashSet<Reg>> {
     func.calc_live(); //首先重新计算依赖到的calc_live
                       // TODO 更换新的build ends
-    let a = build_ends_index_bb_old(func);
-    // let b = build_ends_index_bb_new(func);
-    log_file!("ends.txt", "func:{}", func.label.to_owned());
-    log_file!("ends.txt", "old:");
-    a.iter().for_each(|((index, bb), sets)| {
-        sets.iter().for_each(|reg| {
-            log_file!("ends.txt", "{},{},{}", index, bb.label, reg);
-        });
-    });
+                      // let a = build_ends_index_bb_old(func);
+    let b = build_ends_index_bb_new(func);
+    // log_file!("ends.txt", "func:{}", func.label.to_owned());
+    // log_file!("ends.txt", "old:");
+    // a.iter().for_each(|((index, bb), sets)| {
+    //     sets.iter().for_each(|reg| {
+    //         log_file!("ends.txt", "{},{},{}", index, bb.label, reg);
+    //     });
+    // });
     // log_file!("ends.txt", "new:");
     // b.iter().for_each(|((index, bb), sets)| {
     //     sets.iter().for_each(|reg| {
@@ -446,8 +446,8 @@ pub fn build_ends_index_bb(func: &Func) -> HashMap<(i32, ObjPtr<BB>), HashSet<Re
     //     });
     // });
     // log_file!("ends.txt");
-    // return b;
-    return a;
+    return b;
+    // return a;
 }
 // todo,进行替换尝试，更精确地分析
 fn build_ends_index_bb_old(func: &Func) -> HashMap<(i32, ObjPtr<BB>), HashSet<Reg>> {
@@ -887,7 +887,7 @@ pub fn check_alloc(
                 if spillings.contains(&reg.get_id()) {
                     continue;
                 }
-                if end_regs.contains(&reg) && !bb.live_out.contains(&reg) {
+                if end_regs.contains(&reg) {
                     let color = if reg.is_physic() {
                         reg.get_color()
                     } else {
