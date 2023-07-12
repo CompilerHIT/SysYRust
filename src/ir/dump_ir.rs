@@ -70,21 +70,22 @@ fn dump_global_var(var_name: &str, var: ObjPtr<Inst>) -> String {
             IrType::IntPtr => {
                 let init = var.get_int_init();
                 let mut text = format!("@{} = dso_local global ", var_name);
-                if value > init.len() as i32 {
+                if value > init.1.len() as i32 {
                     let mut value_type = String::new();
                     let mut value_init = String::new();
-                    for v in init {
+                    for v in init.1 {
                         value_type += " i32,";
-                        value_init += format!(" i32 {},", v).as_str();
+                        value_init += format!(" i32 {},", v.1).as_str();
                     }
-                    value_type += format!(" [{} x i32] ", value - init.len() as i32).as_str();
+                    value_type += format!(" [{} x i32] ", value - init.1.len() as i32).as_str();
                     value_init +=
-                        format!(" [{} x i32] zeroinitializer", value - init.len() as i32).as_str();
+                        format!(" [{} x i32] zeroinitializer", value - init.1.len() as i32)
+                            .as_str();
                     text = format!("{} <{{{}}}> <{{{}}}>", text, value_type, value_init);
                 } else {
                     let mut value_init = String::new();
-                    for v in init {
-                        value_init += format!(" i32 {},", v).as_str();
+                    for v in init.1 {
+                        value_init += format!(" i32 {},", v.1).as_str();
                     }
                     value_init.truncate(value_init.len() - 1);
                     text = format!("{} [{} x i32] [{}]", text, value, value_init);
@@ -97,22 +98,22 @@ fn dump_global_var(var_name: &str, var: ObjPtr<Inst>) -> String {
             IrType::FloatPtr => {
                 let init = var.get_float_init();
                 let mut text = format!("@{} = dso_local global ", var_name);
-                if value > init.len() as i32 {
+                if value > init.1.len() as i32 {
                     let mut value_type = String::new();
                     let mut value_init = String::new();
-                    for v in init {
+                    for v in init.1 {
                         value_type += " float,";
-                        value_init += format!(" float {},", v).as_str();
+                        value_init += format!(" float {},", v.1).as_str();
                     }
-                    value_type += format!(" [{} x float] ", value - init.len() as i32).as_str();
+                    value_type += format!(" [{} x float] ", value - init.1.len() as i32).as_str();
                     value_init +=
-                        format!(" [{} x float] zeroinitializer", value - init.len() as i32)
+                        format!(" [{} x float] zeroinitializer", value - init.1.len() as i32)
                             .as_str();
                     text = format!("{} <{{{}}}> <{{{}}}", text, value_type, value_init);
                 } else {
                     let mut value_init = String::new();
-                    for v in init {
-                        value_init += format!(" float {},", v).as_str();
+                    for v in init.1 {
+                        value_init += format!(" float {},", v.1).as_str();
                     }
                     text = format!("{} [{} x float] [{}]", text, value, value_init);
                 }
@@ -289,10 +290,10 @@ fn dump_inst(
                 // 数组初始化
                 text += format!("  ; init array begin!!!!\n").as_str();
                 let init = inst.get_int_init();
-                for (i, v) in init.iter().enumerate() {
+                for (i, v) in init.1.iter().enumerate() {
                     text += format!("  %val_{} = getelementptr inbounds [{} x i32], [{} x i32]* {}, i32 0, i32 {}\n", name_index, len, len, local_map.get(&inst).unwrap(), i).as_str();
-                    text +=
-                        format!("  store i32 {}, i32* %val_{}, align 4\n", v, name_index).as_str();
+                    text += format!("  store i32 {}, i32* %val_{}, align 4\n", v.1, name_index)
+                        .as_str();
                     name_index += 1;
                 }
                 text += format!("  ; init array end!!!!\n").as_str();
@@ -307,10 +308,10 @@ fn dump_inst(
                 // 数组初始化
                 text += format!("  ; init array begin!!!!\n").as_str();
                 let init = inst.get_float_init();
-                for (i, v) in init.iter().enumerate() {
+                for (i, v) in init.1.iter().enumerate() {
                     text += format!("  %{} = getelementptr inbounds [{} x float], [{} x float]* {}, i32 0, i32 {}\n", name_index, len, len, local_map.get(&inst).unwrap(), i).as_str();
-                    text +=
-                        format!("  store float {}, float* %{}, align 4\n", v, name_index).as_str();
+                    text += format!("  store float {}, float* %{}, align 4\n", v.1, name_index)
+                        .as_str();
                 }
             }
         }
