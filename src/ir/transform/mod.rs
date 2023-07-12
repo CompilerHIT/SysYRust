@@ -38,12 +38,16 @@ pub fn optimizer_run(
         global_value_numbering::easy_gvn(module);
         functional_optimizer(module, &mut pools, optimize_flag);
 
-        //冗余load,store删除
+        // //冗余load,store删除
         delete_redundant_load_store::load_store_opt(module);
         functional_optimizer(module, &mut pools, optimize_flag);
 
         // 全局值编号
         global_value_numbering::easy_gvn(module);
+        functional_optimizer(module, &mut pools, optimize_flag);
+
+        // //冗余load,store删除
+        delete_redundant_load_store::load_store_opt(module);
         functional_optimizer(module, &mut pools, optimize_flag);
 
         // TODO: 性能优化
