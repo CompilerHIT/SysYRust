@@ -757,8 +757,8 @@ impl Process for VarDecl {
                                         }
                                     }
                                     if last_index > 0 {
-                                        for i in (last_index - 1)..ivec.len() {
-                                            vec_init.remove(i);
+                                        for _i in (last_index)..ivec.len() {
+                                            vec_init.remove(last_index);
                                         }
                                         inst = kit_mut
                                             .pool_inst_mut
@@ -1013,11 +1013,10 @@ impl Process for VarDecl {
                                             vec_init[*offset_val as usize] = (true, 0.0);
                                         }
                                     }
-
                                     let mut inst = kit_mut.pool_inst_mut.make_float_const(-1129.0);
                                     if last_index > 0 {
-                                        for i in last_index - 1..fvec.len() {
-                                            vec_init.remove(i);
+                                        for _i in (last_index)..fvec.len() {
+                                            vec_init.remove(last_index);
                                         }
                                         inst = kit_mut
                                             .pool_inst_mut
