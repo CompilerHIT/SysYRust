@@ -1,4 +1,3 @@
-
 use super::{basicblock::BasicBlock, instruction::Inst, module::Module};
 use super::{dump_now, tools::*};
 use crate::utility::ObjPool;
@@ -36,23 +35,7 @@ pub fn optimizer_run(
         functional_optimizer(module, &mut pools, optimize_flag);
 
         //gvn
-        // global_value_numbering::gvn(module);
-        // functional_optimizer(module, &mut pools, optimize_flag);
-
-        // // 全局值编号
-        global_value_numbering::easy_gvn(module);
-        functional_optimizer(module, &mut pools, optimize_flag);
-
-        // //冗余load,store删除
-        delete_redundant_load_store::load_store_opt(module);
-        functional_optimizer(module, &mut pools, optimize_flag);
-
-        // 全局值编号
-        global_value_numbering::easy_gvn(module);
-        functional_optimizer(module, &mut pools, optimize_flag);
-
-        // //冗余load,store删除
-        delete_redundant_load_store::load_store_opt(module);
+        global_value_numbering::gvn(module);
         functional_optimizer(module, &mut pools, optimize_flag);
 
         // TODO: 性能优化

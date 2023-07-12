@@ -10,7 +10,7 @@ use crate::{
     utility::ObjPtr,
 };
 
-pub fn load_store_opt(module: &mut Module) ->bool {
+pub fn load_store_opt(module: &mut Module) -> bool {
     let mut func_map = get_store_map(module);
     let mut changed = false;
     func_process(module, |func_name, func| {
@@ -123,6 +123,7 @@ pub fn delete_inst(
         }
         InstKind::Call(funcname) => {
             let args = inst.get_args();
+            println!("调用函数{:?}", funcname);
             for arg in args {
                 match arg.get_kind() {
                     InstKind::Gep => {
@@ -131,6 +132,7 @@ pub fn delete_inst(
                         match ptr.get_kind() {
                             InstKind::Alloca(_) => {
                                 //todo:对于局部数组
+                                // println!("该参数为局部数组");
                                 for (tgep, _) in map.clone() {
                                     if tgep.get_kind() == InstKind::Gep {
                                         let operands_temp = tgep.get_operands();
@@ -142,16 +144,34 @@ pub fn delete_inst(
                             }
                             InstKind::Load => {
                                 //todo:对于全局数组
-                                let operands_temp = ptr.get_operands();
-                                for (pptr, j) in map.clone() {
-                                    if let Some(ptr2) = get_global_array_ptr(j) {
-                                        if ptr2 == operands_temp[0] {
-                                            map.remove(&pptr);
+                                // println!("该参数为全局数组");
+                                // let operands_temp = ptr.get_operands();
+                                // for (pptr, j) in map.clone() {
+                                // if let Some(ptr2) = get_global_array_ptr(j) {
+                                //     if ptr2 == operands_temp[0] {
+                                //         map.remove(&pptr);
+                                //     }
+                                // }
+                                // }
+                                for (tgep, _) in map.clone() {
+                                    if tgep.get_kind() == InstKind::Gep {
+                                        let operands_temp = tgep.get_operands();
+                                        if operands_temp[0] == ptr {
+                                            map.remove(&tgep);
                                         }
                                     }
                                 }
                             }
                             InstKind::Parameter => {
+                                // println!("该参数为输入参数");
+                                // for (tgep, _) in map.clone() {
+                                //     if tgep.get_kind() == InstKind::Gep {
+                                //         let operands_temp = tgep.get_operands();
+                                //         if operands_temp[0] == ptr {
+                                //             map.remove(&tgep);
+                                //         }
+                                //     }
+                                // }
                                 for (tgep, _) in map.clone() {
                                     if tgep.get_kind() == InstKind::Gep {
                                         let operands_temp = tgep.get_operands();
