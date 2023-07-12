@@ -362,12 +362,13 @@ impl LIRInst {
                 //     n -= 1;
                 // }
                 // set
-                if self.func_type != ScalarType::Void {
+                if self.func_type == ScalarType::Int {
                     vec![Reg::new(10, self.func_type)]
+                } else if self.func_type == ScalarType::Float {
+                    vec![Reg::new(10 + FLOAT_BASE, self.func_type)]
                 } else {
                     vec![]
                 }
-                // vec![]
             }
             InstrsType::StoreToStack
             | InstrsType::StoreParamToStack
@@ -420,13 +421,13 @@ impl LIRInst {
                 let mut set = Vec::new();
                 let (iarg_cnt, farg_cnt) = self.param_cnt;
                 let mut ni = 0;
-                while ni < min(iarg_cnt, REG_COUNT) {
+                while ni < min(iarg_cnt, ARG_REG_COUNT) {
                     // if
                     set.push(Reg::new(ni + 10, ScalarType::Int));
                     ni += 1;
                 }
                 let mut nf = 0;
-                while nf < min(farg_cnt, REG_COUNT) {
+                while nf < min(farg_cnt, ARG_REG_COUNT) {
                     set.push(Reg::new(nf + FLOAT_BASE + 10, ScalarType::Float));
                     nf += 1;
                 }

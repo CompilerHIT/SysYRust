@@ -1,8 +1,8 @@
 use std::fs::File;
 use std::io::Write;
 
-use crate::backend::func::Func;
 use crate::backend::block::NUM_SIZE;
+use crate::backend::func::Func;
 use crate::backend::operand::ToString;
 use crate::backend::structs::{FGlobalVar, FloatArray, GlobalVar, IGlobalVar, IntArray};
 use crate::backend::BackendPool;
@@ -72,6 +72,7 @@ impl AsmModule {
         self.handle_spill(pool, f); //yjh: i am going to adjust
                                     // self.print_model();
         self.map_v_to_p();
+        
         self.remove_unuse_inst_suf_alloc(); //yjh:i am going to do
     }
 

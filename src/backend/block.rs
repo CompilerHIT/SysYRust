@@ -740,7 +740,6 @@ impl BB {
                                     call_inst.set_param_cnts(3, 0);
                                     self.insts.push(pool.put_inst(call_inst));
                                 }
-
                                 // let mut set = Vec::new();
                                 // let mut inst = LIRInst::new(
                                 //     InstrsType::LoadParamFromStack,
@@ -770,6 +769,18 @@ impl BB {
                                 // set.push(pool.put_inst(inst));
 
                                 // self.push_back_list(&mut set);
+                            } else {
+                                log!("array: {size}, {len}", len = array_info.len());
+                                for i in (array_info.len() as i32)..size {
+                                    self.insts.push(pool.put_inst(LIRInst::new(
+                                        InstrsType::Store,
+                                        vec![
+                                            Operand::Reg(Reg::new(0, ScalarType::Int)),
+                                            dst_reg.clone(),
+                                            Operand::IImm(IImm::new(i * NUM_SIZE)),
+                                        ],
+                                    )))
+                                }
                             }
                         }
                         func.as_mut()
@@ -1516,24 +1527,29 @@ impl BB {
                 }
             }
             let mut caller_regs: HashSet<Reg> = HashSet::new();
-            let (icnt, fcnt) = inst.get_param_cnts();
-            //FIXME: solve float regs
-
             match inst.get_type() {
                 InstrsType::Call => {
+                    let (mut icnt, mut fcnt) = inst.get_param_cnts();
+                    icnt = min(icnt, ARG_REG_COUNT);
+                    fcnt = min(fcnt, ARG_REG_COUNT);
+                    log!("func_name: {:?}, icnt: {icnt}, fcnt: {fcnt}", inst.get_label());
                     for (op, reg) in func.caller_saved.iter() {
-                        // if op.get_type() == ScalarType::Int
-                        //     && op.get_id() - 10 < icnt
-                        //     && op.get_id() >= 10
-                        // {
-                        //     continue;
-                        // }
-                        // if op.get_type() == ScalarType::Float
-                        //     && op.get_id() - 10 - FLOAT_BASE < fcnt
-                        //     && op.get_id() >= 10 + FLOAT_BASE
-                        // {
-                        //     continue;
-                        // }
+                        if inst.get_reg_def().len() != 0 && op.get_id() == inst.get_reg_def()[0].get_id() {
+                            continue;
+                        }
+                        if op.get_type() == ScalarType::Int
+                        && op.get_id() - 10 < icnt
+                        && op.get_id() >= 10
+                        {
+                            continue;
+                        }
+                        log!("{id}", id = op.get_id());
+                        if op.get_type() == ScalarType::Float
+                            && (op.get_id() - 10 - FLOAT_BASE < fcnt
+                            && op.get_id() >= 10 + FLOAT_BASE)
+                        {
+                            continue;
+                        }
                         caller_regs.insert(*reg);
                     }
                     let mut pos = func.stack_addr.back().unwrap().get_pos();
