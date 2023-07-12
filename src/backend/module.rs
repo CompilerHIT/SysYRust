@@ -135,7 +135,13 @@ impl AsmModule {
                                 name.to_string(),
                                 size,
                                 true,
-                                iter.as_ref().get_int_init().clone(),
+                                iter.as_ref()
+                                    .get_int_init()
+                                    .1
+                                    .iter()
+                                    .map(|(_, value)| *value)
+                                    .collect::<Vec<_>>()
+                                    .clone(),
                             );
                             list.push((*iter, GlobalVar::GlobalConstIntArray(alloca)));
                         }
@@ -144,7 +150,13 @@ impl AsmModule {
                                 name.to_string(),
                                 size,
                                 true,
-                                iter.as_ref().get_float_init().clone(),
+                                iter.as_ref()
+                                    .get_float_init()
+                                    .1
+                                    .iter()
+                                    .map(|(_, value)| *value)
+                                    .collect::<Vec<_>>()
+                                    .clone(),
                             );
                             list.push((*iter, GlobalVar::GlobalConstFloatArray(alloca)));
                         }

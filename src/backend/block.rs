@@ -555,21 +555,21 @@ impl BB {
                         let mut first = false;
                         match inst_ref.get_ir_type() {
                             IrType::IntPtr => {
-                                let alloca = IntArray::new(
-                                    label.clone(),
-                                    size,
-                                    true,
-                                    inst_ref.get_int_init().clone(),
-                                );
+                                let array: Vec<i32> =
+                                    inst_ref.get_int_init().1.iter().map(|(_, x)| *x).collect();
+                                let alloca =
+                                    IntArray::new(label.clone(), size, true, array.clone());
                                 first = func.as_mut().const_array.insert(alloca);
                             }
                             IrType::FloatPtr => {
-                                let alloca = FloatArray::new(
-                                    label.clone(),
-                                    size,
-                                    true,
-                                    inst_ref.get_float_init().clone(),
-                                );
+                                let array: Vec<f32> = inst_ref
+                                    .get_float_init()
+                                    .1
+                                    .iter()
+                                    .map(|(_, x)| *x)
+                                    .collect();
+                                let alloca =
+                                    FloatArray::new(label.clone(), size, true, array.clone());
                                 first = func.as_mut().float_array.insert(alloca);
                             }
                             _ => unreachable!("invalid alloca type {:?}", inst_ref.get_ir_type()),
@@ -589,7 +589,12 @@ impl BB {
                         let array_size = (size + 1) * NUM_SIZE / 8 * 8;
                         let p = func.stack_addr.back().unwrap().get_pos()
                             + func.stack_addr.back().unwrap().get_size();
-                        log!("{last_pos}, {last_size}, {pos}", last_pos = func.stack_addr.back().unwrap().get_pos(), last_size = func.stack_addr.back().unwrap().get_size(), pos = p);
+                        log!(
+                            "{last_pos}, {last_size}, {pos}",
+                            last_pos = func.stack_addr.back().unwrap().get_pos(),
+                            last_size = func.stack_addr.back().unwrap().get_size(),
+                            pos = p
+                        );
                         let offset = self.resolve_iimm(p, pool);
                         let dst_reg =
                             self.resolve_operand(func, ir_block_inst, true, map_info, pool);
@@ -604,122 +609,165 @@ impl BB {
                         inst.set_double();
                         self.insts.push(pool.put_inst(inst));
 
-                        let a0 = Reg::new(10, ScalarType::Int);
-                        let a1 = Reg::new(11, ScalarType::Int);
-                        let a2 = Reg::new(12, ScalarType::Int);
-
-                        let stack_addr = &func.as_ref().stack_addr;
-                        let last = stack_addr.front().unwrap();
-                        let pos = last.get_pos() + ADDR_SIZE * 3;
-
-                        let slot = StackSlot::new(pos, ADDR_SIZE);
-                        let mut set = Vec::new();
-                        func.as_mut().stack_addr.push_front(slot);
-                        // save a0
-                        let mut inst = LIRInst::new(
-                            InstrsType::StoreParamToStack,
-                            vec![
-                                Operand::Reg(a0).clone(),
-                                Operand::IImm(IImm::new(pos - 2 * ADDR_SIZE)),
-                            ],
-                        );
-                        inst.set_double();
-                        set.push(pool.put_inst(inst));
-                        //save a1
-                        let mut inst = LIRInst::new(
-                            InstrsType::StoreParamToStack,
-                            vec![
-                                Operand::Reg(a1).clone(),
-                                Operand::IImm(IImm::new(pos - ADDR_SIZE)),
-                            ],
-                        );
-                        inst.set_double();
-                        set.push(pool.put_inst(inst));
-                        // save a2
-                        let mut inst = LIRInst::new(
-                            InstrsType::StoreParamToStack,
-                            vec![Operand::Reg(a2).clone(), Operand::IImm(IImm::new(pos))],
-                        );
-                        inst.set_double();
-                        set.push(pool.put_inst(inst));
-
-                        self.push_back_list(&mut set);
-
-                        // a0 = label in stack
-                        self.insts.push(pool.put_inst(LIRInst::new(
-                            InstrsType::OpReg(SingleOp::Mv),
-                            vec![Operand::Reg(a0), dst_reg.clone()],
-                        )));
-                        let array: Vec<_> = match inst_ref.get_ir_type() {
+                        let (is_init, array_info) = match inst_ref.get_ir_type() {
                             IrType::IntPtr => inst_ref.get_int_init().clone(),
-                            IrType::FloatPtr => inst_ref
-                                .get_float_init()
-                                .iter()
-                                .map(|x| FImm::new(*x).to_string().parse::<i32>().unwrap())
-                                .collect(),
+                            IrType::Float => (
+                                inst_ref.get_float_init().0,
+                                inst_ref
+                                    .get_float_init()
+                                    .1
+                                    .iter()
+                                    .map(|(flag, x)| {
+                                        (*flag, FImm::new(*x).to_string().parse::<i32>().unwrap())
+                                    })
+                                    .collect::<Vec<_>>()
+                                    .clone(),
+                            ),
                             _ => unreachable!("invalid alloca type {:?}", inst_ref.get_ir_type()),
                         };
-                        if array.len() == 0 {
-                            self.insts.push(pool.put_inst(LIRInst::new(
-                                InstrsType::OpReg(SingleOp::Li),
-                                vec![Operand::Reg(a1), Operand::IImm(IImm::new(0))],
-                            )));
-                            self.insts.push(pool.put_inst(LIRInst::new(
-                                InstrsType::OpReg(SingleOp::Li),
-                                vec![Operand::Reg(a2), Operand::IImm(IImm::new(size * NUM_SIZE))],
-                            )));
-                            self.insts.push(pool.put_inst(LIRInst::new(
-                                InstrsType::Call,
-                                vec![Operand::Addr("memset@plt".to_string())],
-                            )));
-                        } else {
-                            let alloca = IntArray::new(label.clone(), size, true, array.clone());
-                            // let offset = pos;
-                            self.insts.push(pool.put_inst(LIRInst::new(
-                                InstrsType::OpReg(SingleOp::LoadAddr),
-                                vec![Operand::Reg(a1), Operand::Addr(label.clone())],
-                            )));
-                            func.as_mut().const_array.insert(alloca);
-                            self.insts.push(pool.put_inst(LIRInst::new(
-                                InstrsType::OpReg(SingleOp::Li),
-                                vec![Operand::Reg(a2), Operand::IImm(IImm::new(size * NUM_SIZE))],
-                            )));
-                            self.insts.push(pool.put_inst(LIRInst::new(
-                                InstrsType::Call,
-                                vec![Operand::Addr("memcpy@plt".to_string())],
-                            )));
+
+                        // 若进行了初始化
+                        if is_init {
+                            // 若没有不确定变量，则memcopy
+                            let do_memcopy = array_info.iter().any(|(flag, _)| !*flag)
+                                && (array_info
+                                    .iter()
+                                    .map(|(_, value)| (*value).abs())
+                                    .sum::<i32>()
+                                    != 0);
+                            // 若装填因子小于一半，或长度为0，则memset
+                            // memset优先级高于memcopy
+                            let do_memset = (array_info
+                                .iter()
+                                .filter(|(flag, value)| *flag || *value != 0)
+                                .count()
+                                <= (size as usize / 2))
+                                || array_info.len() == 0;
+
+                            if do_memcopy || do_memset {
+                                let a0 = Reg::new(10, ScalarType::Int);
+                                let a1 = Reg::new(11, ScalarType::Int);
+                                let a2 = Reg::new(12, ScalarType::Int);
+
+                                let stack_addr = &func.as_ref().stack_addr;
+                                let last = stack_addr.front().unwrap();
+                                let pos = last.get_pos() + ADDR_SIZE * 3;
+
+                                let slot = StackSlot::new(pos, ADDR_SIZE);
+                                let mut set = Vec::new();
+                                func.as_mut().stack_addr.push_front(slot);
+                                // save a0
+                                let mut inst = LIRInst::new(
+                                    InstrsType::StoreParamToStack,
+                                    vec![
+                                        Operand::Reg(a0).clone(),
+                                        Operand::IImm(IImm::new(pos - 2 * ADDR_SIZE)),
+                                    ],
+                                );
+                                inst.set_double();
+                                set.push(pool.put_inst(inst));
+                                //save a1
+                                let mut inst = LIRInst::new(
+                                    InstrsType::StoreParamToStack,
+                                    vec![
+                                        Operand::Reg(a1).clone(),
+                                        Operand::IImm(IImm::new(pos - ADDR_SIZE)),
+                                    ],
+                                );
+                                inst.set_double();
+                                set.push(pool.put_inst(inst));
+                                // save a2
+                                let mut inst = LIRInst::new(
+                                    InstrsType::StoreParamToStack,
+                                    vec![Operand::Reg(a2).clone(), Operand::IImm(IImm::new(pos))],
+                                );
+                                inst.set_double();
+                                set.push(pool.put_inst(inst));
+
+                                self.push_back_list(&mut set);
+
+                                // a0 = label in stack
+                                self.insts.push(pool.put_inst(LIRInst::new(
+                                    InstrsType::OpReg(SingleOp::Mv),
+                                    vec![Operand::Reg(a0), dst_reg.clone()],
+                                )));
+                                if do_memset {
+                                    self.insts.push(pool.put_inst(LIRInst::new(
+                                        InstrsType::OpReg(SingleOp::Li),
+                                        vec![Operand::Reg(a1), Operand::IImm(IImm::new(0))],
+                                    )));
+                                    self.insts.push(pool.put_inst(LIRInst::new(
+                                        InstrsType::OpReg(SingleOp::Li),
+                                        vec![
+                                            Operand::Reg(a2),
+                                            Operand::IImm(IImm::new(size * NUM_SIZE)),
+                                        ],
+                                    )));
+                                    self.insts.push(pool.put_inst(LIRInst::new(
+                                        InstrsType::Call,
+                                        vec![Operand::Addr("memset@plt".to_string())],
+                                    )));
+                                } else if do_memcopy {
+                                    let alloca = IntArray::new(
+                                        label.clone(),
+                                        size,
+                                        true,
+                                        array_info
+                                            .iter()
+                                            .map(|(_, value)| *value)
+                                            .collect::<Vec<_>>()
+                                            .clone(),
+                                    );
+                                    // let offset = pos;
+                                    self.insts.push(pool.put_inst(LIRInst::new(
+                                        InstrsType::OpReg(SingleOp::LoadAddr),
+                                        vec![Operand::Reg(a1), Operand::Addr(label.clone())],
+                                    )));
+                                    func.as_mut().const_array.insert(alloca);
+                                    self.insts.push(pool.put_inst(LIRInst::new(
+                                        InstrsType::OpReg(SingleOp::Li),
+                                        vec![
+                                            Operand::Reg(a2),
+                                            Operand::IImm(IImm::new(size * NUM_SIZE)),
+                                        ],
+                                    )));
+                                    self.insts.push(pool.put_inst(LIRInst::new(
+                                        InstrsType::Call,
+                                        vec![Operand::Addr("memcpy@plt".to_string())],
+                                    )));
+                                }
+
+                                let mut set = Vec::new();
+                                let mut inst = LIRInst::new(
+                                    InstrsType::LoadParamFromStack,
+                                    vec![
+                                        Operand::Reg(a0).clone(),
+                                        Operand::IImm(IImm::new(pos - 2 * ADDR_SIZE)),
+                                    ],
+                                );
+                                inst.set_double();
+                                set.push(pool.put_inst(inst));
+
+                                let mut inst = LIRInst::new(
+                                    InstrsType::LoadParamFromStack,
+                                    vec![
+                                        Operand::Reg(a1).clone(),
+                                        Operand::IImm(IImm::new(pos - ADDR_SIZE)),
+                                    ],
+                                );
+                                inst.set_double();
+                                set.push(pool.put_inst(inst));
+
+                                let mut inst = LIRInst::new(
+                                    InstrsType::LoadParamFromStack,
+                                    vec![Operand::Reg(a2).clone(), Operand::IImm(IImm::new(pos))],
+                                );
+                                inst.set_double();
+                                set.push(pool.put_inst(inst));
+
+                                self.push_back_list(&mut set);
+                            }
                         }
-
-                        let mut set = Vec::new();
-                        let mut inst = LIRInst::new(
-                            InstrsType::LoadParamFromStack,
-                            vec![
-                                Operand::Reg(a0).clone(),
-                                Operand::IImm(IImm::new(pos - 2 * ADDR_SIZE)),
-                            ],
-                        );
-                        inst.set_double();
-                        set.push(pool.put_inst(inst));
-
-                        let mut inst = LIRInst::new(
-                            InstrsType::LoadParamFromStack,
-                            vec![
-                                Operand::Reg(a1).clone(),
-                                Operand::IImm(IImm::new(pos - ADDR_SIZE)),
-                            ],
-                        );
-                        inst.set_double();
-                        set.push(pool.put_inst(inst));
-
-                        let mut inst = LIRInst::new(
-                            InstrsType::LoadParamFromStack,
-                            vec![Operand::Reg(a2).clone(), Operand::IImm(IImm::new(pos))],
-                        );
-                        inst.set_double();
-                        set.push(pool.put_inst(inst));
-                        
-                        self.push_back_list(&mut set);
-
                         func.as_mut()
                             .stack_addr
                             .push_back(StackSlot::new(p, array_size));
