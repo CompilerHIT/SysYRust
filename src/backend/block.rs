@@ -611,7 +611,7 @@ impl BB {
 
                         let (is_init, array_info) = match inst_ref.get_ir_type() {
                             IrType::IntPtr => inst_ref.get_int_init().clone(),
-                            IrType::Float => (
+                            IrType::FloatPtr => (
                                 inst_ref.get_float_init().0,
                                 inst_ref
                                     .get_float_init()
@@ -654,37 +654,37 @@ impl BB {
                                 let pos = last.get_pos() + ADDR_SIZE * 3;
 
                                 let slot = StackSlot::new(pos, ADDR_SIZE);
-                                let mut set = Vec::new();
+                                // let mut set = Vec::new();
                                 func.as_mut().stack_addr.push_front(slot);
                                 // save a0
-                                let mut inst = LIRInst::new(
-                                    InstrsType::StoreParamToStack,
-                                    vec![
-                                        Operand::Reg(a0).clone(),
-                                        Operand::IImm(IImm::new(pos - 2 * ADDR_SIZE)),
-                                    ],
-                                );
-                                inst.set_double();
-                                set.push(pool.put_inst(inst));
-                                //save a1
-                                let mut inst = LIRInst::new(
-                                    InstrsType::StoreParamToStack,
-                                    vec![
-                                        Operand::Reg(a1).clone(),
-                                        Operand::IImm(IImm::new(pos - ADDR_SIZE)),
-                                    ],
-                                );
-                                inst.set_double();
-                                set.push(pool.put_inst(inst));
-                                // save a2
-                                let mut inst = LIRInst::new(
-                                    InstrsType::StoreParamToStack,
-                                    vec![Operand::Reg(a2).clone(), Operand::IImm(IImm::new(pos))],
-                                );
-                                inst.set_double();
-                                set.push(pool.put_inst(inst));
+                                // let mut inst = LIRInst::new(
+                                //     InstrsType::StoreParamToStack,
+                                //     vec![
+                                //         Operand::Reg(a0).clone(),
+                                //         Operand::IImm(IImm::new(pos - 2 * ADDR_SIZE)),
+                                //     ],
+                                // );
+                                // inst.set_double();
+                                // set.push(pool.put_inst(inst));
+                                // //save a1
+                                // let mut inst = LIRInst::new(
+                                //     InstrsType::StoreParamToStack,
+                                //     vec![
+                                //         Operand::Reg(a1).clone(),
+                                //         Operand::IImm(IImm::new(pos - ADDR_SIZE)),
+                                //     ],
+                                // );
+                                // inst.set_double();
+                                // set.push(pool.put_inst(inst));
+                                // // save a2
+                                // let mut inst = LIRInst::new(
+                                //     InstrsType::StoreParamToStack,
+                                //     vec![Operand::Reg(a2).clone(), Operand::IImm(IImm::new(pos))],
+                                // );
+                                // inst.set_double();
+                                // set.push(pool.put_inst(inst));
 
-                                self.push_back_list(&mut set);
+                                // self.push_back_list(&mut set);
 
                                 // a0 = label in stack
                                 self.insts.push(pool.put_inst(LIRInst::new(
@@ -703,10 +703,12 @@ impl BB {
                                             Operand::IImm(IImm::new(size * NUM_SIZE)),
                                         ],
                                     )));
-                                    self.insts.push(pool.put_inst(LIRInst::new(
+                                    let mut call_inst = LIRInst::new(
                                         InstrsType::Call,
                                         vec![Operand::Addr("memset@plt".to_string())],
-                                    )));
+                                    );
+                                    call_inst.set_param_cnts(3, 0);
+                                    self.insts.push(pool.put_inst(call_inst));
                                 } else if do_memcopy {
                                     let alloca = IntArray::new(
                                         label.clone(),
@@ -731,41 +733,43 @@ impl BB {
                                             Operand::IImm(IImm::new(size * NUM_SIZE)),
                                         ],
                                     )));
-                                    self.insts.push(pool.put_inst(LIRInst::new(
+                                    let mut call_inst = LIRInst::new(
                                         InstrsType::Call,
                                         vec![Operand::Addr("memcpy@plt".to_string())],
-                                    )));
+                                    );
+                                    call_inst.set_param_cnts(3, 0);
+                                    self.insts.push(pool.put_inst(call_inst));
                                 }
 
-                                let mut set = Vec::new();
-                                let mut inst = LIRInst::new(
-                                    InstrsType::LoadParamFromStack,
-                                    vec![
-                                        Operand::Reg(a0).clone(),
-                                        Operand::IImm(IImm::new(pos - 2 * ADDR_SIZE)),
-                                    ],
-                                );
-                                inst.set_double();
-                                set.push(pool.put_inst(inst));
+                                // let mut set = Vec::new();
+                                // let mut inst = LIRInst::new(
+                                //     InstrsType::LoadParamFromStack,
+                                //     vec![
+                                //         Operand::Reg(a0).clone(),
+                                //         Operand::IImm(IImm::new(pos - 2 * ADDR_SIZE)),
+                                //     ],
+                                // );
+                                // inst.set_double();
+                                // set.push(pool.put_inst(inst));
 
-                                let mut inst = LIRInst::new(
-                                    InstrsType::LoadParamFromStack,
-                                    vec![
-                                        Operand::Reg(a1).clone(),
-                                        Operand::IImm(IImm::new(pos - ADDR_SIZE)),
-                                    ],
-                                );
-                                inst.set_double();
-                                set.push(pool.put_inst(inst));
+                                // let mut inst = LIRInst::new(
+                                //     InstrsType::LoadParamFromStack,
+                                //     vec![
+                                //         Operand::Reg(a1).clone(),
+                                //         Operand::IImm(IImm::new(pos - ADDR_SIZE)),
+                                //     ],
+                                // );
+                                // inst.set_double();
+                                // set.push(pool.put_inst(inst));
 
-                                let mut inst = LIRInst::new(
-                                    InstrsType::LoadParamFromStack,
-                                    vec![Operand::Reg(a2).clone(), Operand::IImm(IImm::new(pos))],
-                                );
-                                inst.set_double();
-                                set.push(pool.put_inst(inst));
+                                // let mut inst = LIRInst::new(
+                                //     InstrsType::LoadParamFromStack,
+                                //     vec![Operand::Reg(a2).clone(), Operand::IImm(IImm::new(pos))],
+                                // );
+                                // inst.set_double();
+                                // set.push(pool.put_inst(inst));
 
-                                self.push_back_list(&mut set);
+                                // self.push_back_list(&mut set);
                             }
                         }
                         func.as_mut()
@@ -1107,22 +1111,23 @@ impl BB {
                                         }
                                     };
 
-                                    let stack_addr = &func.as_ref().stack_addr;
-                                    let last = stack_addr.front().unwrap();
-                                    let pos = last.get_pos() + ADDR_SIZE;
+                                    // 避免覆盖
+                                    // let stack_addr = &func.as_ref().stack_addr;
+                                    // let last = stack_addr.front().unwrap();
+                                    // let pos = last.get_pos() + ADDR_SIZE;
 
-                                    let slot = StackSlot::new(pos, ADDR_SIZE);
-                                    func.as_mut().stack_addr.push_front(slot);
-                                    func.as_mut()
-                                        .spill_stack_map
-                                        .insert(Reg::new(10 + icnt, ScalarType::Int), slot);
-                                    let mut inst = LIRInst::new(
-                                        InstrsType::StoreParamToStack,
-                                        vec![dst_reg.clone(), Operand::IImm(IImm::new(pos))],
-                                    );
-                                    inst.set_double();
-                                    //避免覆盖
-                                    self.insts.push(pool.put_inst(inst));
+                                    // let slot = StackSlot::new(pos, ADDR_SIZE);
+                                    // func.as_mut().stack_addr.push_front(slot);
+                                    // func.as_mut()
+                                    //     .spill_stack_map
+                                    //     .insert(Reg::new(10 + icnt, ScalarType::Int), slot);
+                                    // let mut inst = LIRInst::new(
+                                    //     InstrsType::StoreParamToStack,
+                                    //     vec![dst_reg.clone(), Operand::IImm(IImm::new(pos))],
+                                    // );
+                                    // inst.set_double();
+                                    // self.insts.push(pool.put_inst(inst));
+
                                     let tmp = Operand::Reg(Reg::init(ScalarType::Int));
                                     self.insts.push(pool.put_inst(LIRInst::new(
                                         InstrsType::OpReg(SingleOp::Mv),
@@ -1198,23 +1203,24 @@ impl BB {
                                         }
                                     };
 
-                                    let stack_addr = &func.as_ref().stack_addr;
-                                    let last = stack_addr.front().unwrap();
-                                    let pos = last.get_pos() + ADDR_SIZE;
+                                    // 避免覆盖
+                                    // let stack_addr = &func.as_ref().stack_addr;
+                                    // let last = stack_addr.front().unwrap();
+                                    // let pos = last.get_pos() + ADDR_SIZE;
 
-                                    let slot = StackSlot::new(pos, ADDR_SIZE);
-                                    func.as_mut().stack_addr.push_front(slot);
-                                    func.as_mut().spill_stack_map.insert(
-                                        Reg::new(FLOAT_BASE + 10 + fcnt, ScalarType::Float),
-                                        slot,
-                                    );
-                                    let mut inst = LIRInst::new(
-                                        InstrsType::StoreParamToStack,
-                                        vec![dst_reg.clone(), Operand::IImm(IImm::new(pos))],
-                                    );
-                                    inst.set_double();
-                                    //避免覆盖
-                                    self.insts.push(pool.put_inst(inst));
+                                    // let slot = StackSlot::new(pos, ADDR_SIZE);
+                                    // func.as_mut().stack_addr.push_front(slot);
+                                    // func.as_mut().spill_stack_map.insert(
+                                    //     Reg::new(FLOAT_BASE + 10 + fcnt, ScalarType::Float),
+                                    //     slot,
+                                    // );
+                                    // let mut inst = LIRInst::new(
+                                    //     InstrsType::StoreParamToStack,
+                                    //     vec![dst_reg.clone(), Operand::IImm(IImm::new(pos))],
+                                    // );
+                                    // inst.set_double();
+                                    // self.insts.push(pool.put_inst(inst));
+
                                     let tmp = Operand::Reg(Reg::init(ScalarType::Float));
                                     self.insts.push(pool.put_inst(LIRInst::new(
                                         InstrsType::OpReg(SingleOp::Mv),
@@ -1269,34 +1275,34 @@ impl BB {
                     }
 
                     // restore stack slot
-                    let mut i = 0;
-                    while i < ARG_REG_COUNT {
-                        let iarg = Reg::new(i + 10, ScalarType::Int);
-                        let farg = Reg::new(FLOAT_BASE + i + 10, ScalarType::Float);
-                        if let Some(slot) = func.as_ref().spill_stack_map.get(&iarg) {
-                            let mut inst = LIRInst::new(
-                                InstrsType::LoadParamFromStack,
-                                vec![
-                                    Operand::Reg(Reg::new(i + 10, ScalarType::Int)),
-                                    Operand::IImm(IImm::new(slot.get_pos())),
-                                ],
-                            );
-                            inst.set_double();
-                            self.insts.push(pool.put_inst(inst));
-                        }
-                        if let Some(slot) = func.as_ref().spill_stack_map.get(&farg) {
-                            let mut inst = LIRInst::new(
-                                InstrsType::LoadParamFromStack,
-                                vec![
-                                    Operand::Reg(Reg::new(FLOAT_BASE + i + 10, ScalarType::Float)),
-                                    Operand::IImm(IImm::new(slot.get_pos())),
-                                ],
-                            );
-                            inst.set_double();
-                            self.insts.push(pool.put_inst(inst));
-                        }
-                        i += 1;
-                    }
+                    // let mut i = 0;
+                    // while i < ARG_REG_COUNT {
+                    //     let iarg = Reg::new(i + 10, ScalarType::Int);
+                    //     let farg = Reg::new(FLOAT_BASE + i + 10, ScalarType::Float);
+                    //     if let Some(slot) = func.as_ref().spill_stack_map.get(&iarg) {
+                    //         let mut inst = LIRInst::new(
+                    //             InstrsType::LoadParamFromStack,
+                    //             vec![
+                    //                 Operand::Reg(Reg::new(i + 10, ScalarType::Int)),
+                    //                 Operand::IImm(IImm::new(slot.get_pos())),
+                    //             ],
+                    //         );
+                    //         inst.set_double();
+                    //         self.insts.push(pool.put_inst(inst));
+                    //     }
+                    //     if let Some(slot) = func.as_ref().spill_stack_map.get(&farg) {
+                    //         let mut inst = LIRInst::new(
+                    //             InstrsType::LoadParamFromStack,
+                    //             vec![
+                    //                 Operand::Reg(Reg::new(FLOAT_BASE + i + 10, ScalarType::Float)),
+                    //                 Operand::IImm(IImm::new(slot.get_pos())),
+                    //             ],
+                    //         );
+                    //         inst.set_double();
+                    //         self.insts.push(pool.put_inst(inst));
+                    //     }
+                    //     i += 1;
+                    // }
                 }
                 InstKind::Return => match inst_ref.get_ir_type() {
                     IrType::Void => self.insts.push(
@@ -1516,18 +1522,18 @@ impl BB {
             match inst.get_type() {
                 InstrsType::Call => {
                     for (op, reg) in func.caller_saved.iter() {
-                        if op.get_type() == ScalarType::Int
-                            && op.get_id() - 10 < icnt
-                            && op.get_id() >= 10
-                        {
-                            continue;
-                        }
-                        if op.get_type() == ScalarType::Float
-                            && op.get_id() - 10 - FLOAT_BASE < fcnt
-                            && op.get_id() >= 10 + FLOAT_BASE
-                        {
-                            continue;
-                        }
+                        // if op.get_type() == ScalarType::Int
+                        //     && op.get_id() - 10 < icnt
+                        //     && op.get_id() >= 10
+                        // {
+                        //     continue;
+                        // }
+                        // if op.get_type() == ScalarType::Float
+                        //     && op.get_id() - 10 - FLOAT_BASE < fcnt
+                        //     && op.get_id() >= 10 + FLOAT_BASE
+                        // {
+                        //     continue;
+                        // }
                         caller_regs.insert(*reg);
                     }
                     let mut pos = func.stack_addr.back().unwrap().get_pos();
