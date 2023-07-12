@@ -123,7 +123,6 @@ pub fn delete_inst(
         }
         InstKind::Call(funcname) => {
             let args = inst.get_args();
-            println!("调用函数{:?}", funcname);
             for arg in args {
                 match arg.get_kind() {
                     InstKind::Gep => {

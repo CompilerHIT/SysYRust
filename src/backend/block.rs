@@ -1003,8 +1003,6 @@ impl BB {
                     }
                     let int_param_cnt = icnt;
                     let float_param_cnt = fcnt;
-                    let reg_cnt = min(icnt, ARG_REG_COUNT);
-                    func.as_mut().max_params = max(reg_cnt, func.max_params);
                     let mut final_args: Vec<_> = arg_list
                         .iter()
                         .filter(|arg| arg.get_ir_type() == IrType::Float)
@@ -1525,28 +1523,29 @@ impl BB {
                     let (mut icnt, mut fcnt) = inst.get_param_cnts();
                     icnt = min(icnt, ARG_REG_COUNT);
                     fcnt = min(fcnt, ARG_REG_COUNT);
+                    let mut caller_reg_cnts = func.caller_saved.len() as i32;
                     for (op, reg) in func.caller_saved.iter() {
                         if inst.get_reg_def().len() != 0 && op.get_id() == inst.get_reg_def()[0].get_id() {
-                            func.as_mut().caller_saved.remove(op);
+                            caller_reg_cnts -= 1;
                             continue;
                         }
                         if op.get_type() == ScalarType::Int
                         && op.get_id() - 10 < icnt
                         && op.get_id() >= 10
                         {
-                            func.as_mut().caller_saved.remove(op);
+                            caller_reg_cnts -= 1;
                             continue;
                         }
                         if op.get_type() == ScalarType::Float
                             && (op.get_id() - 10 - FLOAT_BASE < fcnt
                             && op.get_id() >= 10 + FLOAT_BASE)
                         {
-                            func.as_mut().caller_saved.remove(op);
+                            caller_reg_cnts -= 1;
                             continue;
                         }
                         caller_regs.insert(*reg);
                     }
-
+                    func.as_mut().caller_saved_len = max(func.caller_saved_len, caller_reg_cnts);
                     let mut pos = func.stack_addr.back().unwrap().get_pos();
                     pos += func.stack_addr.back().unwrap().get_size();
                     for (i, reg) in caller_regs.iter().enumerate() {
