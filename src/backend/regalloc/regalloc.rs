@@ -119,12 +119,12 @@ pub fn build_interference(
 ) -> HashMap<Reg, HashSet<Reg>> {
     // todo,修改逻辑，以能够处理多定义的情况
     let mut interference_graph: HashMap<Reg, HashSet<Reg>> = HashMap::new();
-    let tmp_set = HashSet::new();
+    // let tmp_set = HashSet::new();
     let process =
         |cur_bb: ObjPtr<BB>, interef_graph: &mut HashMap<Reg, HashSet<Reg>>, kind: ScalarType| {
             let mut livenow: HashSet<Reg> = HashSet::new();
             // 冲突分析
-            cur_bb.live_in.iter().for_each(|reg| {
+            cur_bb.live_out.iter().for_each(|reg| {
                 if reg.get_type() != kind {
                     return;
                 }
@@ -140,15 +140,19 @@ pub fn build_interference(
                 }
                 livenow.insert(*reg);
             });
-            for (index, inst) in cur_bb.insts.iter().enumerate() {
+            for (index, inst) in cur_bb.insts.iter().enumerate().rev() {
                 // 先与reg use冲突,然后消去终结的,然后与reg def冲突,并加上新的reg def
-                let finishes = ends_index_bb
-                    .get(&(index as i32, cur_bb))
-                    .unwrap_or(&tmp_set);
-                for finish in finishes {
-                    livenow.remove(finish);
-                }
+                // let finishes = ends_index_bb
+                //     .get(&(index as i32, cur_bb))
+                //     .unwrap_or(&tmp_set);
+                // for finish in finishes {
+                //     livenow.remove(finish);
+                // }
+
                 for reg in inst.get_reg_def() {
+                    livenow.remove(&reg);
+                }
+                for reg in inst.get_reg_use() {
                     if reg.get_type() != kind {
                         continue;
                     }
@@ -164,9 +168,7 @@ pub fn build_interference(
                         interef_graph.get_mut(live).unwrap().insert(reg);
                         interef_graph.get_mut(&reg).unwrap().insert(*live);
                     }
-                    if finishes.contains(&reg) {
-                        continue;
-                    } //fixme,修复增加这里的bug
+
                     livenow.insert(reg);
                 }
             }
