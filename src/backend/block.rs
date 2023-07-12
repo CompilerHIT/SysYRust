@@ -589,9 +589,10 @@ impl BB {
                     } else {
                         // 遇到局部数组存到栈上，8字节对齐
                         let array_size = (size + 1) * NUM_SIZE / 8 * 8;
-                        let pos = func.stack_addr.back().unwrap().get_pos()
+                        let p = func.stack_addr.back().unwrap().get_pos()
                             + func.stack_addr.back().unwrap().get_size();
-                        let offset = self.resolve_iimm(pos, pool);
+                        log!("{last_pos}, {last_size}, {pos}", last_pos = func.stack_addr.back().unwrap().get_pos(), last_size = func.stack_addr.back().unwrap().get_size(), pos = p);
+                        let offset = self.resolve_iimm(p, pool);
                         let dst_reg =
                             self.resolve_operand(func, ir_block_inst, true, map_info, pool);
                         let mut inst = LIRInst::new(
@@ -683,7 +684,7 @@ impl BB {
                             func.as_mut().const_array.insert(alloca);
                             self.insts.push(pool.put_inst(LIRInst::new(
                                 InstrsType::OpReg(SingleOp::Li),
-                                vec![Operand::Reg(a2), Operand::IImm(IImm::new((size+1) * NUM_SIZE))],
+                                vec![Operand::Reg(a2), Operand::IImm(IImm::new(size * NUM_SIZE))],
                             )));
                             self.insts.push(pool.put_inst(LIRInst::new(
                                 InstrsType::Call,
@@ -723,7 +724,7 @@ impl BB {
 
                         func.as_mut()
                             .stack_addr
-                            .push_back(StackSlot::new(pos, array_size));
+                            .push_back(StackSlot::new(p, array_size));
                     }
 
                     // let last = func.as_ref().stack_addr.front().unwrap();
