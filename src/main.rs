@@ -81,7 +81,6 @@ fn run_main() {
     // ir优化
     sysylib::ir::optimizer_run(&mut module, (&mut pool_bb, &mut pool_inst), o1_option);
     let output2 = "row_asm.log";
-    dump_now(&module, "dump.ll");
 
     // 后端解析
     let is_opt = true;

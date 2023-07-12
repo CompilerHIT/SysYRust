@@ -587,9 +587,10 @@ impl BB {
                     } else {
                         // 遇到局部数组存到栈上，8字节对齐
                         let array_size = (size + 1) * NUM_SIZE / 8 * 8;
-                        let pos = func.stack_addr.back().unwrap().get_pos()
+                        let p = func.stack_addr.back().unwrap().get_pos()
                             + func.stack_addr.back().unwrap().get_size();
-                        let offset = self.resolve_iimm(pos, pool);
+                        log!("{last_pos}, {last_size}, {pos}", last_pos = func.stack_addr.back().unwrap().get_pos(), last_size = func.stack_addr.back().unwrap().get_size(), pos = p);
+                        let offset = self.resolve_iimm(p, pool);
                         let dst_reg =
                             self.resolve_operand(func, ir_block_inst, true, map_info, pool);
                         let mut inst = LIRInst::new(
@@ -681,7 +682,7 @@ impl BB {
                             func.as_mut().const_array.insert(alloca);
                             self.insts.push(pool.put_inst(LIRInst::new(
                                 InstrsType::OpReg(SingleOp::Li),
-                                vec![Operand::Reg(a2), Operand::IImm(IImm::new((size+1) * NUM_SIZE))],
+                                vec![Operand::Reg(a2), Operand::IImm(IImm::new(size * NUM_SIZE))],
                             )));
                             self.insts.push(pool.put_inst(LIRInst::new(
                                 InstrsType::Call,
@@ -721,7 +722,7 @@ impl BB {
 
                         func.as_mut()
                             .stack_addr
-                            .push_back(StackSlot::new(pos, array_size));
+                            .push_back(StackSlot::new(p, array_size));
                     }
 
                     // let last = func.as_ref().stack_addr.front().unwrap();
@@ -1187,10 +1188,17 @@ impl BB {
                         vec![Operand::Addr(func_label.to_string())],
                     );
                     lir_inst.set_param_cnts(int_param_cnt, float_param_cnt);
+                    let call_type = match inst_ref.get_ir_type() {
+                        IrType::Int => ScalarType::Int,
+                        IrType::Float => ScalarType::Float,
+                        IrType::Void => ScalarType::Void,
+                        _ => unreachable!("call type not match"),
+                    };
+                    lir_inst.set_call_type(call_type);
                     self.insts.push(pool.put_inst(lir_inst));
 
-                    match inst_ref.get_ir_type() {
-                        IrType::Int => {
+                    match call_type {
+                        ScalarType::Int => {
                             let dst_reg =
                                 self.resolve_operand(func, ir_block_inst, true, map_info, pool);
                             self.insts.push(pool.put_inst(LIRInst::new(
@@ -1198,7 +1206,7 @@ impl BB {
                                 vec![dst_reg, Operand::Reg(Reg::new(10, ScalarType::Int))],
                             )));
                         }
-                        IrType::Float => {
+                        ScalarType::Float => {
                             let dst_reg =
                                 self.resolve_operand(func, ir_block_inst, true, map_info, pool);
                             self.insts.push(pool.put_inst(LIRInst::new(
@@ -1209,8 +1217,7 @@ impl BB {
                                 ],
                             )));
                         }
-                        IrType::Void => {}
-                        _ => unreachable!("call return type not match, must be int, float or void"),
+                        ScalarType::Void => {}
                     }
 
                     // restore stack slot

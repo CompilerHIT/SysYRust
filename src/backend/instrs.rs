@@ -115,6 +115,7 @@ pub struct LIRInst {
     // call指令的跳转到函数
     double: bool,
     float: bool,
+    func_type: ScalarType,
 }
 
 // 实现个fmt display trait
@@ -202,6 +203,7 @@ impl LIRInst {
             param_cnt: (0, 0),
             double: false,
             float: false,
+            func_type: ScalarType::Void,
         }
     }
     pub fn get_type(&self) -> InstrsType {
@@ -360,7 +362,11 @@ impl LIRInst {
                 //     n -= 1;
                 // }
                 // set
-                vec![]
+                if self.func_type != ScalarType::Void {
+                    vec![Reg::new(10, self.func_type)]
+                } else {
+                    vec![]
+                }
             }
             InstrsType::StoreToStack
             | InstrsType::StoreParamToStack
@@ -410,21 +416,21 @@ impl LIRInst {
                 res
             }
             InstrsType::Call => {
-                // let mut set = Vec::new();
-                // let (iarg_cnt, farg_cnt) = self.param_cnt;
-                // let mut ni = 0;
-                // while ni < min(iarg_cnt, REG_COUNT) {
-                //     // if
-                //     set.push(Reg::new(ni + 10, ScalarType::Int));
-                //     ni += 1;
-                // }
-                // let mut nf = 0;
-                // while nf < min(farg_cnt, REG_COUNT) {
-                //     set.push(Reg::new(nf + FLOAT_BASE + 10, ScalarType::Float));
-                //     nf += 1;
-                // }
-                // set
-                vec![]
+                let mut set = Vec::new();
+                let (iarg_cnt, farg_cnt) = self.param_cnt;
+                let mut ni = 0;
+                while ni < min(iarg_cnt, REG_COUNT) {
+                    // if
+                    set.push(Reg::new(ni + 10, ScalarType::Int));
+                    ni += 1;
+                }
+                let mut nf = 0;
+                while nf < min(farg_cnt, REG_COUNT) {
+                    set.push(Reg::new(nf + FLOAT_BASE + 10, ScalarType::Float));
+                    nf += 1;
+                }
+                set
+                // vec![]
             }
             InstrsType::Ret(re_type) => match re_type {
                 ScalarType::Float => vec![Reg::new(10 + FLOAT_BASE, ScalarType::Float)],
@@ -442,6 +448,10 @@ impl LIRInst {
 
     pub fn get_param_cnts(&self) -> (i32, i32) {
         self.param_cnt
+    }
+
+    pub fn set_call_type(&mut self, func_type: ScalarType) {
+        self.func_type = func_type;
     }
 
     // // ChangeSp:
