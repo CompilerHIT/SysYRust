@@ -15,32 +15,35 @@ use super::{
 };
 
 pub fn dump_now(module: &Module, path: &str) {
-    let mut global_map = HashMap::new();
-    let mut text = String::new();
+    #[cfg(debug_assertions)]
+    {
+        let mut global_map = HashMap::new();
+        let mut text = String::new();
 
-    // dump global variables
-    for (name, var) in module.get_all_var() {
-        global_map.insert(var, format!("@{}", name));
-        text = format!("{}{}", text, dump_global_var(name, var));
-    }
-
-    text += "\n";
-
-    // dump functions
-    for (name, func) in module.get_all_func() {
-        if func.is_empty_bb() {
-            continue;
+        // dump global variables
+        for (name, var) in module.get_all_var() {
+            global_map.insert(var, format!("@{}", name));
+            text = format!("{}{}", text, dump_global_var(name, var));
         }
 
-        text = format!("{}{}\n\n\n", text, dump_func(name, func, &mut global_map));
+        text += "\n";
+
+        // dump functions
+        for (name, func) in module.get_all_func() {
+            if func.is_empty_bb() {
+                continue;
+            }
+
+            text = format!("{}{}\n\n\n", text, dump_func(name, func, &mut global_map));
+        }
+
+        // dump extern functions
+        text += format!("{}\n", dump_external_func()).as_str();
+
+        // write to file
+        let mut file = File::create(path).unwrap();
+        file.write_all(text.as_bytes()).unwrap();
     }
-
-    // dump extern functions
-    text += format!("{}\n", dump_external_func()).as_str();
-
-    // write to file
-    let mut file = File::create(path).unwrap();
-    file.write_all(text.as_bytes()).unwrap();
 }
 
 fn dump_global_var(var_name: &str, var: ObjPtr<Inst>) -> String {
