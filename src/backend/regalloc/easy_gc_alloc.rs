@@ -27,7 +27,6 @@ pub struct Allocator {
     pub costs_reg: HashMap<Reg, f32>,          //记录虚拟寄存器的使用次数(作为代价)
     pub availables: HashMap<Reg, RegUsedStat>, // 保存每个点的可用寄存器集合
     pub nums_neighbor_color: HashMap<Reg, HashMap<i32, i32>>,
-    pub ends_index_bb: HashMap<(i32, ObjPtr<BB>), HashSet<Reg>>,
     pub interference_regs: HashSet<Reg>,
     pub interference_graph: HashMap<Reg, HashSet<Reg>>, //浮点寄存器冲突图
     pub spillings: HashSet<i32>,                        //记录溢出寄存器
@@ -44,18 +43,16 @@ impl Allocator {
             interference_regs: HashSet::new(),
             spillings: HashSet::new(),
             nums_neighbor_color: HashMap::new(),
-            ends_index_bb: HashMap::new(),
         }
     }
 
     // 判断两个虚拟寄存器是否是通用寄存器分配冲突
     // 建立虚拟寄存器之间的冲突图
     pub fn build_interference_graph(&mut self, func: &Func) {
-        self.ends_index_bb = regalloc::build_ends_index_bb(func);
-        let ends_index_bb = &self.ends_index_bb;
-        self.interference_graph = regalloc::build_interference(func, &ends_index_bb);
+        self.interference_graph = regalloc::build_interference(func);
         self.availables = regalloc::build_availables(func, &self.interference_graph);
-        self.nums_neighbor_color = regalloc::build_nums_neighbor_color(func, ends_index_bb);
+        self.nums_neighbor_color =
+            regalloc::build_nums_neighbor_color(func, &self.interference_graph);
         let mut bitmap: Bitmap = Bitmap::with_cap(5000);
         let tmp_set: HashSet<Reg> = HashSet::new();
         // 建立待分配寄存器图 和 并统计悬挂点

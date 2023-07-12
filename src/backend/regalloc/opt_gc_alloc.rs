@@ -190,7 +190,6 @@ impl Regalloc for Allocator {
                 func,
                 &mut out.dstr,
                 &mut out.spillings,
-                &self.easy_gc_allocator.ends_index_bb,
                 &mut self.easy_gc_allocator.nums_neighbor_color,
                 &mut self.easy_gc_allocator.availables,
                 &self.easy_gc_allocator.costs_reg,

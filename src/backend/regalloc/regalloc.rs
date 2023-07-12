@@ -113,10 +113,7 @@ pub fn estimate_spill_cost(func: &Func) -> HashMap<Reg, f32> {
 }
 
 // 获取冲突表
-pub fn build_interference(
-    func: &Func,
-    ends_index_bb: &HashMap<(i32, ObjPtr<BB>), HashSet<Reg>>,
-) -> HashMap<Reg, HashSet<Reg>> {
+pub fn build_interference(func: &Func) -> HashMap<Reg, HashSet<Reg>> {
     // todo,修改逻辑，以能够处理多定义的情况
     let mut interference_graph: HashMap<Reg, HashSet<Reg>> = HashMap::new();
     // let tmp_set = HashSet::new();
@@ -168,7 +165,6 @@ pub fn build_interference(
                         interef_graph.get_mut(live).unwrap().insert(reg);
                         interef_graph.get_mut(&reg).unwrap().insert(*live);
                     }
-
                     livenow.insert(reg);
                 }
             }
@@ -300,79 +296,19 @@ pub fn build_availables(
 
 pub fn build_nums_neighbor_color(
     func: &Func,
-    ends_index_bb: &HashMap<(i32, ObjPtr<BB>), HashSet<Reg>>,
+    interference_graph: &HashMap<Reg, HashSet<Reg>>,
 ) -> HashMap<Reg, HashMap<i32, i32>> {
-    let mut nums_neighbor_color = HashMap::new();
-    let process_one = |livenow: &HashSet<Reg>,
-                       nums_neighbor_color: &mut HashMap<Reg, HashMap<i32, i32>>,
-                       reg: Reg,
-                       kind: ScalarType| {
-        log_file!("tmp.txt", "{reg}");
-        if reg.get_type() != kind {
-            return;
-        }
-        if reg.is_physic() {
-            // 跟live now内部有冲突
-            let color = reg.get_color();
-            for live in livenow.iter() {
-                let nnc = nums_neighbor_color.get_mut(live);
-                if nnc.is_none() {
-                    panic!("gg{}", live);
-                }
-                let nnc = nnc.unwrap();
-                nnc.insert(color, nnc.get(&color).unwrap_or(&0) + 1);
+    let mut nums_neighbor_color: HashMap<Reg, HashMap<i32, i32>> = HashMap::new();
+    for (reg, neighbors) in interference_graph.iter() {
+        let mut num_neighbor_color = HashMap::new();
+        // 遍历reg周围的颜色
+        for neighbor in neighbors.iter() {
+            if neighbor.is_physic() {
+                let color = neighbor.get_color();
+                num_neighbor_color.insert(color, *num_neighbor_color.get(&color).unwrap_or(&0) + 1);
             }
         }
-        if !nums_neighbor_color.contains_key(&reg) {
-            nums_neighbor_color.insert(reg, HashMap::with_capacity(32));
-        }
-        let nnc = nums_neighbor_color.get_mut(&reg).unwrap();
-        for live in livenow.iter() {
-            if live.is_physic() {
-                let live_color = live.get_color();
-                nnc.insert(live_color, nnc.get(&live_color).unwrap_or(&0) + 1);
-            }
-        }
-    };
-
-    let process = |cur_bb: ObjPtr<BB>,
-                   nums_neighbor_color: &mut HashMap<Reg, HashMap<i32, i32>>,
-                   kind: ScalarType| {
-        let mut livenow: HashSet<Reg> = HashSet::new();
-        let tmp_set = HashSet::new();
-        log_file!("tmp.txt", "{},kind:{:?}", cur_bb.label, kind);
-        // 冲突分析
-        cur_bb.live_in.iter().for_each(|reg| {
-            process_one(&mut livenow, nums_neighbor_color, *reg, kind);
-            if reg.get_type() == kind {
-                livenow.insert(*reg);
-            }
-        });
-        for (index, inst) in cur_bb.insts.iter().enumerate() {
-            // 先与reg use冲突,然后消去终结的,然后与reg def冲突,并加上新的reg def
-            let finishes = ends_index_bb
-                .get(&(index as i32, cur_bb))
-                .unwrap_or(&tmp_set);
-            for finish in finishes {
-                livenow.remove(finish);
-            }
-            for reg in inst.get_reg_def() {
-                process_one(&mut livenow, nums_neighbor_color, reg, kind);
-                if finishes.contains(&reg) || reg.get_type() != kind {
-                    continue;
-                }
-                livenow.insert(reg);
-            }
-        }
-    };
-    // 遍历所有块，分析冲突关系
-    for cur_bb in func.blocks.iter() {
-        let cur_bb = *cur_bb;
-        // 把不同类型寄存器统计加入表中
-        //分别处理浮点寄存器的情况和通用寄存器的情况
-        process(cur_bb, &mut nums_neighbor_color, ScalarType::Float);
-        process(cur_bb, &mut nums_neighbor_color, ScalarType::Int);
-        // 加入还没有处理过的bb
+        nums_neighbor_color.insert(*reg, num_neighbor_color);
     }
     nums_neighbor_color
 }
@@ -477,7 +413,6 @@ pub fn merge_alloc(
     func: &Func,
     dstr: &mut HashMap<i32, i32>,
     spillings: &mut HashSet<i32>,
-    ends_index_bb: &HashMap<(i32, ObjPtr<BB>), HashSet<Reg>>,
     nums_neighbor_color: &mut HashMap<Reg, HashMap<i32, i32>>,
     availables: &mut HashMap<Reg, RegUsedStat>,
     spill_cost: &HashMap<Reg, f32>,
@@ -485,7 +420,7 @@ pub fn merge_alloc(
 ) -> bool {
     // 合并条件,如果一个mv x55 x66指令， 后面 x66指令不再使用了,
     // 则x55(color1),x66(color2)可以进行合并，
-
+    let ends_index_bb: HashMap<(i32, ObjPtr<BB>), HashSet<Reg>> = build_ends_index_bb(func);
     let tmp_set = HashSet::new();
     // 计算价值函数,统计一个指令的价值
     let mut base_count_merge_val = |reg: &Reg,
@@ -734,7 +669,7 @@ pub fn merge_alloc(
             *block,
             dstr,
             spillings,
-            ends_index_bb,
+            &ends_index_bb,
             nums_neighbor_color,
             availables,
             interference_graph,
