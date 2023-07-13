@@ -828,7 +828,8 @@ impl Process for VarDecl {
                                 length = length * dm;
                             }
                             let ivec = vec![];
-                            let inst = kit_mut.pool_inst_mut.make_int_array(length, false, ivec);
+                            if kit_mut.context_mut.get_layer()<0{
+                                let inst = kit_mut.pool_inst_mut.make_int_array(length, true, ivec);
                             if !kit_mut.context_mut.add_var(
                                 &id,
                                 Type::Int,
@@ -842,6 +843,23 @@ impl Process for VarDecl {
                             } //添加该变量，但没有生成实际的指令
                             kit_mut.context_mut.update_var_scope_now(&id, inst);
                             kit_mut.context_mut.push_inst_bb(inst);
+                            }else{
+                                let inst = kit_mut.pool_inst_mut.make_int_array(length, false, ivec);
+                            if !kit_mut.context_mut.add_var(
+                                &id,
+                                Type::Int,
+                                true,
+                                false,
+                                Some(inst),
+                                None,
+                                dimension_vec_in.clone(),
+                            ) {
+                                return Err(Error::MultipleDeclaration);
+                            } //添加该变量，但没有生成实际的指令
+                            kit_mut.context_mut.update_var_scope_now(&id, inst);
+                            kit_mut.context_mut.push_inst_bb(inst);
+                            }
+                            
                         }
                     }
                 }
@@ -1088,7 +1106,8 @@ impl Process for VarDecl {
                                 length = length * dm;
                             }
                             let fvec = vec![];
-                            let inst = kit_mut.pool_inst_mut.make_float_array(length, true, fvec);
+                            if kit_mut.context_mut.get_layer()<0{
+                                let inst = kit_mut.pool_inst_mut.make_float_array(length, true, fvec);
                             if !kit_mut.context_mut.add_var(
                                 &id,
                                 Type::Float,
@@ -1102,6 +1121,22 @@ impl Process for VarDecl {
                             } //添加该变量，但没有生成实际的指令
                             kit_mut.context_mut.update_var_scope_now(&id, inst);
                             kit_mut.context_mut.push_inst_bb(inst);
+                            }else{
+                                let inst = kit_mut.pool_inst_mut.make_float_array(length, false, fvec);
+                            if !kit_mut.context_mut.add_var(
+                                &id,
+                                Type::Float,
+                                true,
+                                false,
+                                Some(inst),
+                                None,
+                                dimension_vec_in.clone(),
+                            ) {
+                                return Err(Error::MultipleDeclaration);
+                            } //添加该变量，但没有生成实际的指令
+                            kit_mut.context_mut.update_var_scope_now(&id, inst);
+                            kit_mut.context_mut.push_inst_bb(inst);
+                            }
                         }
                     }
                 }

@@ -92,7 +92,7 @@ pub fn convert_add_inst(inst: ObjPtr<Inst>, pool: &mut ObjPool<Inst>){
                         let inst_const = pool.make_int_const(2);
                         inst.as_mut().insert_before(inst_const);
                         let inst_new = pool.make_mul(inst_const, operands[0]);
-                        inst.as_mut().insert_before(pool.make_mul(inst_const, operands[0]));
+                        inst.as_mut().insert_before(inst_new);
                         replace_inst(inst, inst_new);
                     }else{
                         if !check_mul_inst(inst, operands[0], operands[1], pool){
