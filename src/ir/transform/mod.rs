@@ -2,11 +2,13 @@ use super::{basicblock::BasicBlock, instruction::Inst, module::Module};
 use super::{dump_now, tools::*};
 use crate::utility::ObjPool;
 
+mod array_transform;
 mod constant_folding;
 mod dead_code_eliminate;
 mod delete_redundant_load_store;
 mod func_inline;
 mod global_value_numbering;
+mod global_var_transform;
 mod loop_operation;
 mod meaningless_insts_folding;
 mod phi_optimizer;
@@ -64,4 +66,7 @@ fn functional_optimizer(
 
     // 全局死代码删除
     dead_code_eliminate::global_eliminate(module);
+
+    // 全局变量转换
+    global_var_transform::global_var_transform(module, &mut pools);
 }

@@ -66,7 +66,7 @@ impl RegUsedStat {
 
         unusable.insert(4); //保留tp寄存器
         unusable.extend(5..=7); //三个临时寄存器用来处理spill逻辑
-                                // unusable.insert(8); //保留fp/s0寄存器
+        unusable.insert(8); //保留s0寄存器
         unusable.insert(10); //保留a0
                              // unusable.extend(11..=17);   //保留a1-a7
         if unusable.contains(&ireg) {
@@ -276,9 +276,9 @@ mod test_regusestat {
         // TODO
         let a = RegUsedStat::new();
         assert_eq!(a.num_available_fregs(), 32);
-        assert_eq!(a.num_avialable_iregs(), 23); //保留t0-t2三个临时寄存器,sp,a0,tp,x0,gp五个个特殊寄存器,保留a0用作返回值
+        assert_eq!(a.num_avialable_iregs(), 22); //保留t0-t2三个临时寄存器,sp,a0,tp,x0,gp, s0六个特殊寄存器,保留a0用作返回值
         assert_eq!(a.num_available_regs(crate::utility::ScalarType::Float), 32);
-        assert_eq!(a.num_available_regs(crate::utility::ScalarType::Int), 23);
+        assert_eq!(a.num_available_regs(crate::utility::ScalarType::Int), 22);
     }
 
     #[test]

@@ -168,12 +168,12 @@ impl Reg {
     }
 
     // sp for both callee and special
-    // zero, sp, tp, ra, gp
+    // zero, sp, tp, ra, gp, t0-2, s0
     pub fn is_special(&self) -> bool {
         if self.r_type == ScalarType::Float {
             return false;
         }
-        self.id >= 0 && self.id <= 7
+        self.id >= 0 && self.id <= 8
     }
 
     pub fn is_allocable(&self) -> bool {

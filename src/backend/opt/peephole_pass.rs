@@ -46,20 +46,20 @@ impl BackendPass {
                 }
                 if insts.len() > 1 {
                     // l/s offset(sp) -> li offset gp. add gp gp sp. l/s 0(gp).
-                    let gp = Operand::Reg(Reg::new(3, ScalarType::Int));
+                    let s0 = Operand::Reg(Reg::new(8, ScalarType::Int));
                     block.as_mut().insts.insert(
                         index,
                         pool.put_inst(LIRInst::new(
                             InstrsType::OpReg(SingleOp::Li),
-                            vec![gp.clone(), Operand::IImm(of)],
+                            vec![s0.clone(), Operand::IImm(of)],
                         )),
                     );
                     index += 1;
                     let mut add = LIRInst::new(
                         InstrsType::Binary(BinaryOp::Add),
                         vec![
-                            gp.clone(),
-                            gp.clone(),
+                            s0.clone(),
+                            s0.clone(),
                             Operand::Reg(Reg::new(2, ScalarType::Int)),
                         ],
                     );
@@ -78,7 +78,7 @@ impl BackendPass {
                         ls.as_mut().replace_kind(kind);
                         ls.as_mut().replace_op(vec![
                             ls.get_dst().clone(),
-                            gp.clone(),
+                            s0.clone(),
                             Operand::IImm(IImm::new(ls_offset)),
                         ]);
                     }
@@ -128,21 +128,21 @@ impl BackendPass {
                 log!("inst: {:?}", insts);
                 if insts.len() > 1 {
                     // l/s offset(sp) -> li offset gp. add gp gp sp. l/s 0(gp).
-                    let gp = Operand::Reg(Reg::new(3, ScalarType::Int));
+                    let s0 = Operand::Reg(Reg::new(8, ScalarType::Int));
                     let true_offset = func.context.get_offset() - offset;
                     block.as_mut().insts.insert(
                         index,
                         pool.put_inst(LIRInst::new(
                             InstrsType::OpReg(SingleOp::Li),
-                            vec![gp.clone(), Operand::IImm(IImm::new(true_offset))],
+                            vec![s0.clone(), Operand::IImm(IImm::new(true_offset))],
                         )),
                     );
                     index += 1;
                     let mut add = LIRInst::new(
                         InstrsType::Binary(BinaryOp::Add),
                         vec![
-                            gp.clone(),
-                            gp.clone(),
+                            s0.clone(),
+                            s0.clone(),
                             Operand::Reg(Reg::new(2, ScalarType::Int)),
                         ],
                     );
@@ -161,7 +161,7 @@ impl BackendPass {
                         ls.as_mut().replace_kind(kind);
                         ls.as_mut().replace_op(vec![
                             ls.get_dst().clone(),
-                            gp.clone(),
+                            s0.clone(),
                             Operand::IImm(IImm::new(ls_offset)),
                         ]);
                     }
