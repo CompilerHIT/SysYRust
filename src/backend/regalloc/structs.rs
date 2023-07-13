@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fmt::Display;
 use std::ops::Range;
+use std::vec;
 
 use crate::backend::block::BB;
 use crate::utility::ObjPtr;
@@ -115,12 +116,31 @@ impl RegUsedStat {
         // 对于通用寄存器来说，x0-x4有特殊用途
         // x10-x17用来传递函数参数
 
-        // TODO, 检查
-        for i in 0..=31 {
-            if self.is_available_ireg(i) {
-                return Some(i);
+        // TODO,检查使用优先级
+        // 修改为优先使用参数寄存器
+        // 其次使用callee save寄存器
+        // 然后使用剩余 caller save寄存器
+        let mut args = (11..=17);
+        let other_caller_save = vec![1, 5, 6, 7, 28, 29, 30, 31];
+        let mut callees = vec![2, 8, 9];
+        callees.extend(18..=27);
+        for reg in args {
+            if self.is_available_ireg(reg) {
+                return Some(reg);
             }
         }
+        for reg in callees {
+            if self.is_available_ireg(reg) {
+                return Some(reg);
+            }
+        }
+
+        for reg in other_caller_save {
+            if self.is_available_ireg(reg) {
+                return Some(reg);
+            }
+        }
+
         None
     }
 
