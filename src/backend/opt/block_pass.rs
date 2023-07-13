@@ -9,13 +9,14 @@ impl BackendPass {
         self.merge_br_jump();
         self.clear_empty_block();
         self.resolve_merge_br();
+        self.clear_useless_jump();
     }
 
     fn merge_br_jump(&mut self) {
         self.module.func_map.iter().for_each(|(_, func)| {
             if !func.is_extern {
                 let mut jumps: Vec<ObjPtr<BB>> = vec![];
-                func.blocks.iter().for_each(|block| { 
+                func.blocks.iter().for_each(|block| {
                     if block.get_prev().len() == 1 && is_br(block.get_prev()[0]) {
                         let prev_tail = block.get_prev()[0].get_tail_inst();
                         let jump_label = prev_tail.get_label();
@@ -127,7 +128,11 @@ impl BackendPass {
                                         last_two_tail.as_mut().replace_label(after_label.clone());
                                     }
                                 }
-                                adjust_prev_out(prev.clone(), block.get_after().clone(), &block.label);
+                                adjust_prev_out(
+                                    prev.clone(),
+                                    block.get_after().clone(),
+                                    &block.label,
+                                );
                             });
 
                             block.as_mut().in_edge.clear();
@@ -166,18 +171,41 @@ impl BackendPass {
                         let tail = block.get_tail_inst();
                         match last_not_tail.get_type() {
                             InstrsType::Branch(..) => {
-                                if tail.get_type() == InstrsType::Jump && tail.get_label() == last_not_tail.get_label() {
+                                if tail.get_type() == InstrsType::Jump
+                                    && tail.get_label() == last_not_tail.get_label()
+                                {
                                     block.as_mut().insts.pop();
                                     block.as_mut().insts.pop();
                                     block.as_mut().push_back(tail);
                                 }
-                            },
+                            }
                             _ => {}
                         }
                     }
                 })
             }
         });
+    }
+
+    fn clear_useless_jump(&mut self) {
+        self.module.func_map.iter().for_each(|(_, func)| {
+            if !func.is_extern {
+                for (i, block) in func.blocks.iter().enumerate() {
+                    if block.insts.len() > 0 && i < func.blocks.len() - 1 {
+                        let tail = block.get_tail_inst();
+                        if tail.get_type() == InstrsType::Jump {
+                            let label = match tail.get_label() {
+                                Operand::Addr(label) => label,
+                                _ => panic!("jump label error"),
+                            };
+                            if *label == func.blocks[i + 1].label {
+                                block.as_mut().insts.pop();
+                            }
+                        }
+                    }
+                }
+            }
+        })
     }
 }
 
@@ -251,7 +279,7 @@ fn replace_first_block(block: ObjPtr<BB>, func: ObjPtr<Func>) {
         if func.blocks[index].label == after.label {
             break;
         }
-        index +=1;
+        index += 1;
     }
     func.as_mut().blocks.remove(index);
     func.as_mut().blocks.remove(0);
