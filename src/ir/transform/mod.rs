@@ -37,6 +37,9 @@ pub fn optimizer_run(
         functional_optimizer(module, &mut pools, optimize_flag);
 
         // TODO: 性能优化
+
+        // 再做一次
+        functional_optimizer(module, &mut pools, optimize_flag);
     }
 }
 

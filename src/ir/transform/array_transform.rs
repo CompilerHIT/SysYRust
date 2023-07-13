@@ -77,10 +77,9 @@ fn global_inst_transform(
             .unwrap()
             .0
             .clone();
-        var.iter().enumerate().for_each(|(i, x)| {
-            println!("here i = {}, x = {:?}", i, x);
-            module.push_var(format!("{}_{}", array_name, i), x.clone())
-        });
+        var.iter()
+            .enumerate()
+            .for_each(|(i, x)| module.push_var(format!("{}_{}", array_name, i), x.clone()));
 
         let mut gep_user = Vec::new();
         inst.get_use_list().iter().for_each(|user| {
