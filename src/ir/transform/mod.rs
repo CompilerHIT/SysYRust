@@ -64,12 +64,14 @@ fn functional_optimizer(
     // 常量折叠
     constant_folding::constant_folding(module, &mut pools, optimize_flag);
 
-    // 死代码删除
-    dead_code_eliminate::dead_code_eliminate(module, optimize_flag);
-
-    // 全局死代码删除
-    dead_code_eliminate::global_eliminate(module);
+    // 数组转换
+    array_transform::array_transform(module, &mut pools);
 
     // 全局变量转换
     global_var_transform::global_var_transform(module, &mut pools);
+
+    // 死代码删除
+    dead_code_eliminate::dead_code_eliminate(module, optimize_flag);
+    // 全局死代码删除
+    dead_code_eliminate::global_eliminate(module);
 }
