@@ -49,14 +49,14 @@ fn functional_optimizer(
     optimize_flag: bool,
 ) {
     debug_assert!(verify::verify_run(module));
-    // 死代码删除
-    dead_code_eliminate::dead_code_eliminate(module, optimize_flag);
 
     // phi优化
     phi_optimizer::phi_run(module);
 
     // 常量折叠
     constant_folding::constant_folding(module, &mut pools, optimize_flag);
+    // 死代码删除
+    dead_code_eliminate::dead_code_eliminate(module, optimize_flag);
 
     // 消除不必要的指令
     meaningless_insts_folding::meaningless_inst_folding(module, &mut pools);
