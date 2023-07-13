@@ -960,9 +960,11 @@ impl Func {
 
 impl Func {
     pub fn print_func(&self) {
+        log!("func:{}", self.label);
         for block in self.blocks.iter() {
+            log!("\tblock:{}", block.label);
             for inst in block.insts.iter() {
-                log!("{:?}", inst.as_ref());
+                log!("\t\t{}", inst.to_string());
             }
         }
     }
