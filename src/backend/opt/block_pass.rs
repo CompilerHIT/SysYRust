@@ -9,7 +9,7 @@ impl BackendPass {
         self.merge_br_jump();
         self.clear_empty_block();
         self.resolve_merge_br();
-        self.clear_useless_jump();
+        // self.clear_useless_jump();
     }
 
     fn merge_br_jump(&mut self) {
