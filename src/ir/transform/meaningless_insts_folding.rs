@@ -3,7 +3,7 @@ use crate::{
         basicblock::BasicBlock,
         instruction::{BinOp, Inst, InstKind},
         module::Module,
-        tools::{bfs_inst_process, func_process, replace_inst},
+        tools::{bfs_inst_process, func_process, replace_inst}, ir_type::IrType,
     },
     utility::{ObjPool, ObjPtr},
 };
@@ -34,7 +34,9 @@ pub fn delete_useless_inst(inst: ObjPtr<Inst>, pool: &mut ObjPool<Inst>) {
                                 replace_inst(inst, operands[0]);
                             }
                         }
-                        _ => {}
+                        _ => {
+                            
+                        }
                     },
                 }
             }
