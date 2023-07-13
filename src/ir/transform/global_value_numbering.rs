@@ -44,13 +44,15 @@ pub fn easy_gvn(module: &mut Module) ->bool{
     flag
 }
 
-pub fn gvn(module: &mut Module){
-    loop{
-        let mut changed = false;
-        changed |= easy_gvn(module);
-        changed |= load_store_opt(module);
-        if !changed {
-            break;
+pub fn gvn(module: &mut Module,opt_option:bool){
+    if opt_option{
+        loop{
+            let mut changed = false;
+            changed |= easy_gvn(module);
+            changed |= load_store_opt(module);
+            if !changed {
+                break;
+            }
         }
     }
 }
