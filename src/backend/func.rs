@@ -494,9 +494,10 @@ impl Func {
         let overflow_param =
             max(0, self.param_cnt.0 - ARG_REG_COUNT) + max(0, self.param_cnt.1 - ARG_REG_COUNT);
         offset = overflow_param * ADDR_SIZE;
-        let slot = StackSlot::new(offset, offset);
+        let mut slot = StackSlot::new(offset, offset);
         assert!(self.stack_addr.is_empty());
         self.stack_addr.push_front(StackSlot::new(0, 0));
+        slot.set_fix();
         self.stack_addr.push_front(slot);
     }
 
