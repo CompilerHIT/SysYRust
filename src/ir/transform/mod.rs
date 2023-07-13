@@ -59,7 +59,10 @@ fn functional_optimizer(
     meaningless_insts_folding::meaningless_inst_folding(module, &mut pools);
 
     // gvn
-    global_value_numbering::gvn(module,optimize_flag);
+    global_value_numbering::gvn(module, optimize_flag);
+
+    // 常量折叠
+    constant_folding::constant_folding(module, &mut pools, optimize_flag);
 
     // 死代码删除
     dead_code_eliminate::dead_code_eliminate(module, optimize_flag);

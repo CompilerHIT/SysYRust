@@ -1,4 +1,5 @@
 use crate::{
+    backend::operand,
     frontend::context::Type,
     ir::basicblock::BasicBlock,
     ir::instruction::Inst,
@@ -9,7 +10,7 @@ use crate::{
         tools::{bfs_inst_process, func_process},
     },
     ir::{module::Module, tools::replace_inst},
-    utility::{ObjPool, ObjPtr}, backend::operand,
+    utility::{ObjPool, ObjPtr},
 };
 
 pub fn constant_folding(
@@ -34,81 +35,88 @@ pub fn constant_folding(
                 break;
             }
         });
-        func_process(module, |_, func| 
+        func_process(module, |_, func| {
             bfs_inst_process(func.get_head(), |inst| {
                 convert_add_inst(inst, pools.1);
             })
-        )
+        })
     }
 }
 
-pub fn check_mul_inst(inst_old: ObjPtr<Inst>,inst1: ObjPtr<Inst>,inst2: ObjPtr<Inst>,pool: &mut ObjPool<Inst>)->bool{
+pub fn check_mul_inst(
+    inst_old: ObjPtr<Inst>,
+    inst1: ObjPtr<Inst>,
+    inst2: ObjPtr<Inst>,
+    pool: &mut ObjPool<Inst>,
+) -> bool {
     match inst1.get_kind() {
-        InstKind::Binary(binop) =>{
-            match binop {
-                BinOp::Mul =>{
-                    let operands1 = inst1.get_operands();
-                    if operands1[0]==inst2{
-                        match operands1[1].get_kind() {
-                            InstKind::ConstInt(i) =>{
-                                let inst_const = pool.make_int_const(i+1);
-                                inst_old.as_mut().insert_before(inst_const);
-                                let inst_new = pool.make_mul(inst2, inst_const);
-                                inst_old.as_mut().insert_before(inst_new);
-                                replace_inst(inst_old, inst_new);
-                                return true;
-                            }
-                            _=>{}
+        InstKind::Binary(binop) => match binop {
+            BinOp::Mul => {
+                let operands1 = inst1.get_operands();
+                if operands1[0] == inst2 {
+                    match operands1[1].get_kind() {
+                        InstKind::ConstInt(i) => {
+                            let inst_const = pool.make_int_const(i + 1);
+                            inst_old.as_mut().insert_before(inst_const);
+                            let inst_new = pool.make_mul(inst2, inst_const);
+                            inst_old.as_mut().insert_before(inst_new);
+                            // println!("replace");
+                            replace_inst(inst_old, inst_new);
+                            return true;
                         }
-                    }else if operands1[1]==inst2{
-                        match operands1[0].get_kind() {
-                            InstKind::ConstInt(i) =>{
-                                let inst_const = pool.make_int_const(i+1);
-                                inst_old.as_mut().insert_before(inst_const);
-                                let inst_new = pool.make_mul(inst2, inst_const);
-                                inst_old.as_mut().insert_before(inst_new);
-                                replace_inst(inst_old, inst_new);
-                                return true;
-                            }
-                            _=>{}
+                        _ => {}
+                    }
+                } else if operands1[1] == inst2 {
+                    match operands1[0].get_kind() {
+                        InstKind::ConstInt(i) => {
+                            let inst_const = pool.make_int_const(i + 1);
+                            inst_old.as_mut().insert_before(inst_const);
+                            let inst_new = pool.make_mul(inst2, inst_const);
+                            inst_old.as_mut().insert_before(inst_new);
+                            // println!("replace");
+                            replace_inst(inst_old, inst_new);
+                            return true;
                         }
+                        _ => {}
                     }
                 }
-                _=>{}
             }
-        }
-        _=>{}
+            _ => {}
+        },
+        _ => {}
     }
     false
 }
 
-pub fn convert_add_inst(inst: ObjPtr<Inst>, pool: &mut ObjPool<Inst>){
-    match inst.get_kind(){
-        InstKind::Binary(binop) =>{
+pub fn convert_add_inst(inst: ObjPtr<Inst>, pool: &mut ObjPool<Inst>) {
+    match inst.get_kind() {
+        InstKind::Binary(binop) => {
             match binop {
-                BinOp::Add =>{
+                BinOp::Add => {
                     let operands = inst.get_operands();
-                    if operands[0]==operands[1] && inst.get_ir_type()==IrType::Int{//同一操作数的整数加法改为乘法指令
+                    // if operands[0] == operands[1] {
+                    //     println!("true");
+                    // }
+                    if operands[0] == operands[1] && inst.get_ir_type() == IrType::Int {
+                        //同一操作数的整数加法改为乘法指令
+                        // println!("加");
                         let inst_const = pool.make_int_const(2);
                         inst.as_mut().insert_before(inst_const);
                         let inst_new = pool.make_mul(inst_const, operands[0]);
                         inst.as_mut().insert_before(inst_new);
                         replace_inst(inst, inst_new);
-                    }else{
-                        if !check_mul_inst(inst, operands[0], operands[1], pool){
+                    } else {
+                        if !check_mul_inst(inst, operands[0], operands[1], pool) {
                             check_mul_inst(inst, operands[1], operands[0], pool);
                         }
                     }
                 }
-                _=>{}
+                _ => {}
             }
         }
-        _=>{
-
-        }
-    }   
+        _ => {}
+    }
 }
-
 
 /// 折叠操作数之一为常量的指令流
 pub fn fold_mixed_binst(inst_old: ObjPtr<Inst>, pool: &mut ObjPool<Inst>) -> bool {
