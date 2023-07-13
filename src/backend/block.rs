@@ -1244,12 +1244,17 @@ impl BB {
                         vec![Operand::Addr(func_label.to_string())],
                     );
                     lir_inst.set_param_cnts(int_param_cnt, float_param_cnt);
-                    let call_type = match inst_ref.get_ir_type() {
-                        IrType::Int => ScalarType::Int,
-                        IrType::Float => ScalarType::Float,
-                        IrType::Void => ScalarType::Void,
-                        _ => unreachable!("call type not match"),
+                    let call_type = if inst_ref.get_use_list().len() == 0 {
+                        ScalarType::Void
+                    } else {
+                        match inst_ref.get_ir_type() {
+                            IrType::Int => ScalarType::Int,
+                            IrType::Float => ScalarType::Float,
+                            IrType::Void => ScalarType::Void,
+                            _ => unreachable!("call type not match"),
+                        }
                     };
+                   
                     lir_inst.set_call_type(call_type);
                     self.insts.push(pool.put_inst(lir_inst));
 
