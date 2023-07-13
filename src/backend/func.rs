@@ -57,7 +57,7 @@ pub struct Func {
     //FIXME: resolve float regs
     pub callee_saved: HashSet<Reg>,
     pub caller_saved: HashMap<Reg, Reg>,
-    pub max_params: i32,
+    pub caller_saved_len: i32,
 }
 
 /// reg_num, stack_addr, caller_stack_addr考虑借助回填实现
@@ -85,7 +85,7 @@ impl Func {
             float_array: HashSet::new(),
             callee_saved: HashSet::new(),
             caller_saved: HashMap::new(),
-            max_params: 0,
+            caller_saved_len: 0,
         }
     }
 
@@ -441,9 +441,9 @@ impl Func {
         // log!("dstr map info{:?}", self.reg_alloc_info.dstr);
         // log!("spills:{:?}", self.reg_alloc_info.spillings);
 
-        let stack_size = self.max_params * ADDR_SIZE;
+        // let stack_size = self.max_params * ADDR_SIZE;
         // log!("set stack size:{}", stack_size);
-        self.context.as_mut().set_offset(stack_size);
+        // self.context.as_mut().set_offset(stack_size);
     }
 
     pub fn remove_unuse_inst(&mut self) {
@@ -637,7 +637,7 @@ impl Func {
         self.float_array = func_ref.float_array.clone();
         self.callee_saved = func_ref.callee_saved.clone();
         self.caller_saved = func_ref.caller_saved.clone();
-        self.max_params = func_ref.max_params;
+        self.caller_saved_len = func_ref.caller_saved_len;
     }
 
     fn save_callee(&mut self, pool: &mut BackendPool, f: &mut File) {
@@ -667,14 +667,17 @@ impl Func {
         };
         let mut stack_size = self.context.get_offset();
 
+        // log!("stack size: {}", stack_size);
+
         if let Some(addition_stack_info) = self.stack_addr.front() {
             stack_size += addition_stack_info.get_pos();
         }
         if let Some(slot) = self.stack_addr.back() {
             stack_size += slot.get_pos() + slot.get_size();
         };
-        stack_size += self.caller_saved.len() as i32 * ADDR_SIZE;
-
+        // log!("stack: {:?}", self.stack_addr);
+        stack_size += self.caller_saved_len * ADDR_SIZE;
+        // log!("caller saved: {}", self.caller_saved.len());
         //栈对齐 - 调用func时sp需按16字节对齐
         stack_size = stack_size / 16 * 16 + 16;
         let (icnt, fcnt) = self.param_cnt;
