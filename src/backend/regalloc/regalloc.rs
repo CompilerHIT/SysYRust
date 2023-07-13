@@ -289,6 +289,7 @@ pub fn build_availables(
         if availables.contains_key(&reg) {
             continue;
         }
+        unreachable!();
         availables.insert(reg, RegUsedStat::new());
     }
     return availables;

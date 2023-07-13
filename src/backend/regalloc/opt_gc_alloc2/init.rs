@@ -15,7 +15,6 @@ impl Allocator {
         let nums_neighbor_color = regalloc::build_nums_neighbor_color(func, &inter_ference_graph);
         let availables = regalloc::build_availables(func, &inter_ference_graph);
         let spill_cost = regalloc::estimate_spill_cost(func);
-        let mut to_color: BiHeap<OperItem> = BiHeap::new();
 
         let (last_colors, last_colors_lst, all_live_neighbors_bitmap, all_live_neigbhors) =
             Allocator::build_live_graph_and_last_colors(&all_neighbors, &availables);
@@ -26,7 +25,6 @@ impl Allocator {
             "count last colors num:{}",
             last_colors.len()
         );
-
         // TOCHECK,根据live_graph初始化to_color
         // for (reg, live_neighbors) in &all_live_neigbhors {
         //     to_color.push(OperItem::new(
@@ -35,7 +33,7 @@ impl Allocator {
         //     ));
         // }
         let info = AllocatorInfo {
-            to_color: to_color,
+            to_color: BiHeap::new(),
             to_simplify: BiHeap::new(),
             to_spill: BiHeap::new(),
             to_rescue: BiHeap::new(),
