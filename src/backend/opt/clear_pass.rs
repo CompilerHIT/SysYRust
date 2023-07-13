@@ -18,8 +18,7 @@ impl BackendPass {
                 func.blocks.iter().for_each(|block| {
                     self.rm_useless(*block);
                 });
-
-                self.rm_useless_def(func.clone());
+                func.as_mut().remove_unuse_def();
                 self.rm_repeated_sl(func.clone());
                 // let mut bf = OpenOptions::new()
                 //     .create(true)
@@ -100,49 +99,6 @@ impl BackendPass {
         }
         // 删除
         // todo!()
-    }
-
-    fn rm_useless_def(&self, func: ObjPtr<Func>) {
-        func.as_mut().calc_live();
-        let mut ifUsed: HashSet<Reg> = HashSet::new();
-        for bb in func.blocks.iter() {
-            for reg in bb.live_out.iter() {
-                ifUsed.insert(*reg);
-            }
-            let mut to_rm: HashSet<usize> = HashSet::new();
-            for (index, inst) in bb.insts.iter().enumerate().rev() {
-                // 寻找到def,如果def不在ifUsed中,删掉
-                for reg in inst.get_reg_def() {
-                    if ifUsed.contains(&reg) {
-                        ifUsed.remove(&reg);
-                    } else {
-                        to_rm.insert(index);
-                    }
-                }
-                if to_rm.contains(&index) {
-                    continue;
-                }
-                for reg in inst.get_reg_use() {
-                    ifUsed.insert(reg);
-                }
-            }
-            log_file!(
-                "rmd.txt",
-                "func:{},bb:{},torm:{:?}",
-                func.label,
-                bb.label,
-                to_rm
-            );
-            let mut new_insts: Vec<ObjPtr<LIRInst>> =
-                Vec::with_capacity(bb.insts.len() - to_rm.len());
-            for (index, inst) in bb.insts.iter().enumerate() {
-                if to_rm.contains(&index) {
-                    continue;
-                }
-                new_insts.push(*inst);
-            }
-            bb.as_mut().insts = new_insts;
-        }
     }
 
     fn rm_useless(&self, block: ObjPtr<BB>) {

@@ -447,9 +447,9 @@ impl Func {
         // self.context.as_mut().set_offset(stack_size);
     }
 
+    ///移除无用指令
     pub fn remove_unuse_inst(&mut self) {
         //TOCHECK
-
         // 移除mv va va 类型指令
         for bb in self.blocks.iter() {
             let mut index = 0;
@@ -466,6 +466,59 @@ impl Func {
                 } else {
                     index += 1;
                 }
+            }
+        }
+        // 移除无用def
+        self.remove_unuse_def();
+    }
+
+    ///移除无用def指令
+    pub fn remove_unuse_def(&mut self) {
+        //
+        loop {
+            self.calc_live();
+            let mut ifFinish = true;
+            for bb in self.blocks.iter() {
+                let mut new_insts: Vec<ObjPtr<LIRInst>> = Vec::with_capacity(bb.insts.len());
+                let mut to_removed: HashSet<usize> = HashSet::new();
+                let mut live_now: HashSet<Reg> = HashSet::new();
+                bb.live_out.iter().for_each(|reg| {
+                    live_now.insert(*reg);
+                });
+                for (index, inst) in bb.insts.iter().enumerate().rev() {
+                    for reg in inst.get_reg_def() {
+                        if !live_now.contains(&reg) {
+                            to_removed.insert(index);
+                            ifFinish = false;
+                            break;
+                        }
+                        live_now.remove(&reg);
+                    }
+                    if to_removed.contains(&index) {
+                        continue;
+                    }
+                    for reg in inst.get_reg_use() {
+                        live_now.insert(reg);
+                    }
+                }
+                for (index, inst) in bb.insts.iter().enumerate() {
+                    if to_removed.contains(&index) {
+                        log_file!(
+                            "remove_unusedef.txt",
+                            ":{}-{}:{}",
+                            self.label,
+                            bb.label,
+                            inst.to_string()
+                        );
+                        continue;
+                    }
+                    new_insts.push(*inst);
+                }
+                bb.as_mut().insts = new_insts;
+            }
+
+            if ifFinish {
+                break;
             }
         }
     }
