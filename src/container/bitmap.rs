@@ -1,3 +1,5 @@
+use std::hash::{Hash, Hasher};
+
 // 一个简单的bitmap,用来统计spilling情况,用位图
 pub struct Bitmap {
     arr: Vec<u64>,
@@ -40,7 +42,7 @@ impl Bitmap {
     }
 }
 
-// FIXME 编写单元测试检查
+//  编写单元测试检查
 impl Bitmap {
     pub fn new() -> Bitmap {
         Bitmap {
@@ -136,6 +138,34 @@ impl Bitmap {
     }
 }
 
+// 为Bitmap实现Hash 和Eq trait ,等待测试
+impl Hash for Bitmap {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.len.hash(state);
+        self.arr.hash(state);
+    }
+}
+
+impl Eq for Bitmap {
+    fn assert_receiver_is_total_eq(&self) {}
+}
+impl PartialEq for Bitmap {
+    fn eq(&self, other: &Self) -> bool {
+        if self.cap() != other.cap() {
+            false
+        } else {
+            for i in 0..self.cap() {
+                let v1 = self.arr[i];
+                let v2 = other.arr[i];
+                if v1 != v2 {
+                    return false;
+                }
+            }
+            true
+        }
+    }
+}
+
 #[cfg(test)]
 mod test_bitmap {
     use std::collections::HashSet;
@@ -210,5 +240,16 @@ mod test_bitmap {
         for value in set.iter() {
             assert!(bitmap.contains(*value));
         }
+    }
+
+    #[test]
+    fn test_eq() {
+        let mut bp1 = Bitmap::new();
+        let mut bp2 = Bitmap::new();
+        bp1.insert(33);
+        bp2.insert(33);
+        let mut set = HashSet::new();
+        set.insert(bp1);
+        assert!(set.contains(&bp2));
     }
 }

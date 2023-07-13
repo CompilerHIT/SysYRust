@@ -1,15 +1,15 @@
-use crate::backend::module::AsmModule;
-pub use crate::utility::ObjPtr;
 pub use crate::backend::block::BB;
 use crate::backend::instrs::*;
+use crate::backend::module::AsmModule;
 use crate::backend::operand;
 use crate::backend::operand::*;
 use crate::backend::BackendPool;
 use crate::log;
+pub use crate::utility::ObjPtr;
 
-mod peephole_pass;
-mod clear_pass;
 mod block_pass;
+mod clear_pass;
+mod peephole_pass;
 
 pub struct BackendPass {
     pub module: ObjPtr<AsmModule>,
@@ -23,6 +23,8 @@ impl BackendPass {
     pub fn run_pass(&mut self, pool: &mut BackendPool) {
         self.peephole_pass(pool);
         self.clear_pass();
+        // 清除无用指令之后开始栈空间重排
+        // self.rearrange_stack_slot();
         self.block_pass(pool);
     }
 

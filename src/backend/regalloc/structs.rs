@@ -114,6 +114,8 @@ impl RegUsedStat {
     pub fn get_available_ireg(&self) -> Option<i32> {
         // 对于通用寄存器来说，x0-x4有特殊用途
         // x10-x17用来传递函数参数
+
+        // TODO, 检查
         for i in 0..=31 {
             if self.is_available_ireg(i) {
                 return Some(i);

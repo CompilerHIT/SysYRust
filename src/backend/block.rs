@@ -1254,7 +1254,7 @@ impl BB {
                             _ => unreachable!("call type not match"),
                         }
                     };
-                   
+
                     lir_inst.set_call_type(call_type);
                     self.insts.push(pool.put_inst(lir_inst));
 
@@ -1496,6 +1496,7 @@ impl BB {
         self.insts[self.insts.len() - 1]
     }
 
+    ///粗糙分析需要保存的caller save寄存器的信息,并且进行前后的保存和恢复的指令插入
     pub fn save_reg(&mut self, func: ObjPtr<Func>, pool: &mut BackendPool) {
         let mut index = 0;
         loop {
@@ -1530,20 +1531,22 @@ impl BB {
                     fcnt = min(fcnt, ARG_REG_COUNT);
                     let mut caller_reg_cnts = func.caller_saved.len() as i32;
                     for (op, reg) in func.caller_saved.iter() {
-                        if inst.get_reg_def().len() != 0 && op.get_id() == inst.get_reg_def()[0].get_id() {
+                        if inst.get_reg_def().len() != 0
+                            && op.get_id() == inst.get_reg_def()[0].get_id()
+                        {
                             caller_reg_cnts -= 1;
                             continue;
                         }
                         if op.get_type() == ScalarType::Int
-                        && op.get_id() - 10 < icnt
-                        && op.get_id() >= 10
+                            && op.get_id() - 10 < icnt
+                            && op.get_id() >= 10
                         {
                             caller_reg_cnts -= 1;
                             continue;
                         }
                         if op.get_type() == ScalarType::Float
                             && (op.get_id() - 10 - FLOAT_BASE < fcnt
-                            && op.get_id() >= 10 + FLOAT_BASE)
+                                && op.get_id() >= 10 + FLOAT_BASE)
                         {
                             caller_reg_cnts -= 1;
                             continue;
@@ -1582,6 +1585,7 @@ impl BB {
         }
     }
 
+    ///使用t0-t3以及 栈操作 来处理之前spill了的没有分配到专有物理寄存器的寄存器的使用
     pub fn handle_spill(
         &mut self,
         func: ObjPtr<Func>,
@@ -1681,101 +1685,6 @@ impl BB {
         // log!("---------------------------");
         // log!("{:?}", func.spill_stack_map);
         // log!("---------------------------");
-    }
-
-    pub fn handle_spill_v2(
-        &mut self,
-        func: ObjPtr<Func>,
-        spill: &HashSet<i32>,
-        pool: &mut BackendPool,
-    ) {
-        // TODO,额外开启32的空间用来保存寄存器的值
-
-        let mut index = 0;
-        // 对于一个块,先从进入寄存器开始记录寄存器使用情况
-        let mut rent_tbl: HashMap<i32, Reg> = HashMap::new(); //记录寄存器的借用情况 (只有)
-
-        // 主权表
-        let mut own_tbl: HashMap<i32, Reg> = HashMap::new(); //记录寄存器的主人(实际主人)
-
-        // hold tbl  (持有表)
-        let mut hold_tbl: HashMap<Reg, i32> = HashMap::new(); //记录寄存器的持有情况
-
-        // 当一个块结束的时候，应该把一个人的寄存器还给它的主人
-
-        //初始化own_tbl和cur_tbl
-        for reg in self.live_in.iter() {
-            // 判断哪些寄存器是被使用了的
-            if reg.is_physic() {
-                own_tbl.insert(reg.get_color(), *reg);
-                hold_tbl.insert(*reg, reg.get_color());
-                continue;
-            }
-            if spill.contains(&reg.get_id()) {
-                continue;
-            }
-            let color_map = &func.reg_alloc_info.dstr;
-            let color = *color_map.get(&reg.get_id()).unwrap();
-            own_tbl.insert(color, *reg);
-            hold_tbl.insert(*reg, color);
-        }
-
-        // todo!();
-        loop {
-            if index >= self.insts.len() {
-                break;
-            }
-            let inst = self.insts[index];
-
-            // 首先更新主权表
-            for reg in inst.get_regs() {
-                if reg.is_physic() {
-                    own_tbl.insert(reg.get_color(), reg);
-                } else if !spill.contains(&reg.get_id()) {
-                    let color = *func.reg_alloc_info.dstr.get(&reg.get_id()).unwrap();
-                    own_tbl.insert(color, reg);
-                    // 如果更新主权表的时候,有某个值正在
-                }
-            }
-            let mut pre_insert: VecDeque<Inst> = VecDeque::new(); //记录前插语句
-            let mut suf_insert: VecDeque<Inst> = VecDeque::new();
-            // 判断是否需要把实际寄存器归还主人，如果有，前面插入归还语句
-            for reg in inst.get_regs() {
-                if spill.contains(&reg.get_id()) && !reg.is_physic() {
-                    continue;
-                }
-                //
-                let color = if reg.is_physic() {
-                    reg.get_color()
-                } else {
-                    *func.reg_alloc_info.dstr.get(&reg.get_id()).unwrap()
-                };
-                // 判断当前该寄存器是否持有该颜色,如果该寄存器未持有该颜色
-                // 则颜色被借取或者是被前任持有
-                // 也就是不是被借取就是被前任持有
-                // 如果是被借取,插入归还指令
-                if rent_tbl.contains_key(&color) {
-                    todo!("插入归还指令,把借取的内容传回栈上");
-
-                    // 如果之前没有人使用这个寄存器则不需要归还
-                    if own_tbl.contains_key(&color) {
-                        //之前有人使用这个寄存器，进行归还
-                        todo!();
-                    }
-                }
-                // 如果是被前任持有,直接交接
-                else {
-                    hold_tbl.insert(reg, color);
-                    // 根据颜色更新颜色的主人
-                }
-                own_tbl.insert(color, reg);
-            }
-
-            //判断是否需要出借寄存器给spill寄存器，如果需要,前面加入借取操作
-
-            todo!();
-        }
-        todo!()
     }
 
     pub fn handle_overflow(&mut self, func: ObjPtr<Func>, pool: &mut BackendPool) {

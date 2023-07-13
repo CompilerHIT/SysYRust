@@ -11,6 +11,7 @@ use std::vec::Vec;
 use biheap::BiHeap;
 
 use super::instrs::InstrsType;
+use super::operand::IImm;
 use super::regalloc::structs::RegUsedStat;
 use super::{structs::*, BackendPool};
 use crate::backend::asm_builder::AsmBuilder;
@@ -52,6 +53,8 @@ pub struct Func {
     pub physic_stack_map: HashMap<Reg, StackSlot>, //暂时存储的主人寄存器的空间
     pub spill_stack_map: HashMap<Reg, StackSlot>,
 
+    pub stack_map: HashMap<IImm, StackSlot>,
+
     pub const_array: HashSet<IntArray>,
     pub float_array: HashSet<FloatArray>,
     //FIXME: resolve float regs
@@ -81,6 +84,8 @@ impl Func {
             reg_alloc_info: FuncAllocStat::new(),
             physic_stack_map: HashMap::new(),
             spill_stack_map: HashMap::new(),
+            stack_map: HashMap::new(),
+
             const_array: HashSet::new(),
             float_array: HashSet::new(),
             callee_saved: HashSet::new(),
@@ -447,82 +452,6 @@ impl Func {
         // self.context.as_mut().set_offset(stack_size);
     }
 
-    ///移除无用指令
-    pub fn remove_unuse_inst(&mut self) {
-        //TOCHECK
-        // 移除mv va va 类型指令
-        for bb in self.blocks.iter() {
-            let mut index = 0;
-            while index < bb.insts.len() {
-                let inst = bb.insts[index];
-                if inst.operands.len() < 2 {
-                    index += 1;
-                    continue;
-                }
-                let dst = inst.get_dst();
-                let src = inst.get_lhs();
-                if inst.get_type() == InstrsType::OpReg(super::instrs::SingleOp::Mv) && dst == src {
-                    bb.as_mut().insts.remove(index);
-                } else {
-                    index += 1;
-                }
-            }
-        }
-        // 移除无用def
-        self.remove_unuse_def();
-    }
-
-    ///移除无用def指令
-    pub fn remove_unuse_def(&mut self) {
-        //
-        loop {
-            self.calc_live();
-            let mut ifFinish = true;
-            for bb in self.blocks.iter() {
-                let mut new_insts: Vec<ObjPtr<LIRInst>> = Vec::with_capacity(bb.insts.len());
-                let mut to_removed: HashSet<usize> = HashSet::new();
-                let mut live_now: HashSet<Reg> = HashSet::new();
-                bb.live_out.iter().for_each(|reg| {
-                    live_now.insert(*reg);
-                });
-                for (index, inst) in bb.insts.iter().enumerate().rev() {
-                    for reg in inst.get_reg_def() {
-                        if !live_now.contains(&reg) {
-                            to_removed.insert(index);
-                            ifFinish = false;
-                            break;
-                        }
-                        live_now.remove(&reg);
-                    }
-                    if to_removed.contains(&index) {
-                        continue;
-                    }
-                    for reg in inst.get_reg_use() {
-                        live_now.insert(reg);
-                    }
-                }
-                for (index, inst) in bb.insts.iter().enumerate() {
-                    if to_removed.contains(&index) {
-                        log_file!(
-                            "remove_unusedef.txt",
-                            ":{}-{}:{}",
-                            self.label,
-                            bb.label,
-                            inst.to_string()
-                        );
-                        continue;
-                    }
-                    new_insts.push(*inst);
-                }
-                bb.as_mut().insts = new_insts;
-            }
-
-            if ifFinish {
-                break;
-            }
-        }
-    }
-
     fn handle_parameters(&mut self, ir_func: &Function) {
         let mut iparam: Vec<_> = ir_func
             .get_parameter_list()
@@ -559,6 +488,7 @@ impl Func {
         self.blocks[1].clone()
     }
 
+    ///做了 spill操作以及caller save和callee save的保存和恢复
     pub fn handle_spill(&mut self, pool: &mut BackendPool, f: &mut File) {
         let this = pool.put_func(self.clone());
         for block in self.blocks.iter() {
@@ -573,6 +503,365 @@ impl Func {
         self.save_callee(pool, f);
     }
 
+    pub fn handle_overflow(&mut self, pool: &mut BackendPool) {
+        let this = pool.put_func(self.clone());
+        for block in self.blocks.iter() {
+            block.as_mut().handle_overflow(this, pool);
+        }
+        self.update(this);
+    }
+
+    fn update(&mut self, func: ObjPtr<Func>) {
+        let func_ref = func.as_ref();
+        self.blocks = func_ref.blocks.clone();
+        self.stack_addr = func_ref.stack_addr.clone();
+        self.spill_stack_map = func_ref.spill_stack_map.clone();
+        self.const_array = func_ref.const_array.clone();
+        self.float_array = func_ref.float_array.clone();
+        self.callee_saved = func_ref.callee_saved.clone();
+        self.caller_saved = func_ref.caller_saved.clone();
+        self.caller_saved_len = func_ref.caller_saved_len;
+    }
+
+    /// 为要保存的callee save寄存器开栈,然后开栈以及处理 callee save的保存和恢复
+    fn save_callee(&mut self, pool: &mut BackendPool, f: &mut File) {
+        let mut callee_map: HashMap<Reg, StackSlot> = HashMap::new();
+        if self.label == "main" {
+            self.build_stack_info(f, callee_map, true);
+            return;
+        }
+        for id in self.callee_saved.iter() {
+            let pos = self.stack_addr.front().unwrap().get_pos() + ADDR_SIZE;
+            let slot = StackSlot::new(pos, ADDR_SIZE);
+            self.stack_addr.push_front(slot);
+            //FIXME: resolve float regs
+            callee_map.insert(*id, slot);
+        }
+        self.build_stack_info(f, callee_map, false);
+    }
+
+    ///进行开栈操作和callee的save和restore操作
+    fn build_stack_info(&mut self, f: &mut File, map: HashMap<Reg, StackSlot>, is_main: bool) {
+        // 当完成callee save寄存器存栈后，可以得知开栈大小
+        let mut f1 = match f.try_clone() {
+            Ok(f) => f,
+            Err(e) => panic!("Error: {}", e),
+        };
+        let mut f2 = match f.try_clone() {
+            Ok(f) => f,
+            Err(e) => panic!("Error: {}", e),
+        };
+        let mut stack_size = self.context.get_offset();
+
+        // log!("stack size: {}", stack_size);
+
+        if let Some(addition_stack_info) = self.stack_addr.front() {
+            stack_size += addition_stack_info.get_pos();
+        }
+        if let Some(slot) = self.stack_addr.back() {
+            stack_size += slot.get_pos() + slot.get_size();
+        };
+        // log!("stack: {:?}", self.stack_addr);
+        stack_size += self.caller_saved_len * ADDR_SIZE;
+        // log!("caller saved: {}", self.caller_saved.len());
+        //栈对齐 - 调用func时sp需按16字节对齐
+        stack_size = stack_size / 16 * 16 + 16;
+        let (icnt, fcnt) = self.param_cnt;
+        self.context.as_mut().set_offset(stack_size - ADDR_SIZE);
+
+        let ra = Reg::new(1, ScalarType::Int);
+        let map_clone = map.clone();
+
+        self.context.as_mut().set_prologue_event(move || {
+            let mut builder = AsmBuilder::new(&mut f1);
+            // addi sp -stack_size
+            if operand::is_imm_12bs(stack_size) {
+                builder.addi("sp", "sp", -stack_size);
+                builder.s(
+                    &ra.to_string(false),
+                    "sp",
+                    stack_size - ADDR_SIZE,
+                    false,
+                    true,
+                );
+                if !is_main {
+                    for (reg, slot) in map.iter() {
+                        let is_float = reg.get_type() == ScalarType::Float;
+                        let of = stack_size - ADDR_SIZE - slot.get_pos();
+                        builder.s(&reg.to_string(false), "sp", of, is_float, true);
+                    }
+                }
+            } else {
+                builder.op1("li", "s0", &stack_size.to_string());
+                builder.op2("sub", "sp", "sp", "s0", false, true);
+                builder.op2("add", "s0", "s0", "sp", false, true);
+                builder.s(&ra.to_string(false), "s0", -ADDR_SIZE, false, true);
+
+                let mut first = true;
+                let mut start = 0;
+                if !is_main {
+                    for (reg, slot) in map.iter() {
+                        let is_float = reg.get_type() == ScalarType::Float;
+                        if operand::is_imm_12bs(slot.get_pos()) {
+                            builder.s(
+                                &reg.to_string(false),
+                                "s0",
+                                -(slot.get_pos() + ADDR_SIZE),
+                                is_float,
+                                true,
+                            );
+                        } else if operand::is_imm_12bs(stack_size - slot.get_pos() - ADDR_SIZE) {
+                            builder.s(
+                                &reg.to_string(false),
+                                "sp",
+                                stack_size - ADDR_SIZE - slot.get_pos(),
+                                is_float,
+                                true,
+                            );
+                        } else {
+                            if first {
+                                let offset = stack_size - ADDR_SIZE - slot.get_pos();
+                                builder.op1("li", "s0", &offset.to_string());
+                                builder.op2("add", "s0", "s0", "sp", false, true);
+                                first = false;
+                            }
+                            builder.s(&reg.to_string(false), "s0", -start, is_float, true);
+                            start += ADDR_SIZE;
+                        }
+                    }
+                }
+            }
+        });
+
+        self.context.as_mut().set_epilogue_event(move || {
+            let mut builder = AsmBuilder::new(&mut f2);
+
+            if operand::is_imm_12bs(stack_size) {
+                if !is_main {
+                    for (reg, slot) in map_clone.iter() {
+                        let is_float = reg.get_type() == ScalarType::Float;
+                        let of = stack_size - ADDR_SIZE - slot.get_pos();
+                        builder.l(&reg.to_string(false), "sp", of, is_float, true);
+                    }
+                }
+                builder.l(
+                    &ra.to_string(false),
+                    "sp",
+                    stack_size - ADDR_SIZE,
+                    false,
+                    true,
+                );
+                builder.addi("sp", "sp", stack_size);
+            } else {
+                builder.op1("li", "s0", &stack_size.to_string());
+                builder.op2("add", "sp", "s0", "sp", false, true);
+                builder.l(&ra.to_string(false), "sp", -ADDR_SIZE, false, true);
+
+                let mut first = true;
+                let mut start = 0;
+                if !is_main {
+                    for (reg, slot) in map_clone.iter() {
+                        let is_float = reg.get_type() == ScalarType::Float;
+                        if operand::is_imm_12bs(slot.get_pos()) {
+                            builder.l(
+                                &reg.to_string(false),
+                                "sp",
+                                -(slot.get_pos() + ADDR_SIZE),
+                                is_float,
+                                true,
+                            );
+                        } else if operand::is_imm_12bs(stack_size - slot.get_pos() - ADDR_SIZE) {
+                            builder.l(
+                                &reg.to_string(false),
+                                "sp",
+                                stack_size - slot.get_pos() - ADDR_SIZE,
+                                is_float,
+                                true,
+                            );
+                        } else {
+                            if first {
+                                let offset = stack_size - slot.get_pos() - ADDR_SIZE;
+                                builder.op1("li", "s0", &offset.to_string());
+                                builder.op2("add", "s0", "s0", "sp", false, true);
+                                first = false;
+                            }
+                            builder.l(&reg.to_string(false), "sp", -start, is_float, true);
+                            start += ADDR_SIZE;
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    pub fn generate_row(&mut self, _: ObjPtr<Context>, f: &mut File) -> Result<()> {
+        AsmBuilder::new(f).show_func(&self.label)?;
+        // self.context.as_mut().call_prologue_event();
+        let mut size = 0;
+        for block in self.blocks.iter() {
+            size += block.insts.len();
+        }
+        for block in self.blocks.iter() {
+            block.as_mut().generate_row(self.context, f)?;
+        }
+        Ok(())
+    }
+}
+
+/// 把信息的构造和 具体指令插入 分离 并且使用贪心决策的 handel spill,handle cal操作
+/// 为实现 "函数分裂" 做准备
+impl Func {
+    ///p_to_v
+    /// 把函数中分配到物理寄存器的虚拟寄存器改为使用虚拟寄存器
+    pub fn p2v(&mut self) {}
+
+    ///精细化的handle spill
+    ///遇到spilling寄存器的时候:
+    /// * 优先使用available的寄存器
+    ///     其中,优先使用caller save的寄存器
+    ///     ,再考虑使用callee save的寄存器.
+    /// * 如果要使用unavailable的寄存器,才需要进行spill操作来保存和恢复原值
+    ///     优先使用caller save的寄存器,
+    pub fn handle_spill_v3(&mut self) {}
+
+    ///在handle spill之后调用
+    /// 返回该函数使用了哪些callee saved的寄存器
+    pub fn draw_used_callees(&self) -> HashSet<Reg> {
+        let mut callees: HashSet<Reg> = HashSet::new();
+        for bb in self.blocks.iter() {
+            for inst in bb.insts.iter() {
+                for reg in inst.get_regs() {
+                    if reg.is_callee_save() {
+                        callees.insert(reg);
+                    }
+                }
+            }
+        }
+        callees
+    }
+
+    /// 在handle spill之后调用
+    /// 生成call前后需要保存的caller save寄存器的信息
+    /// 是否需要保存caller save,在于被调用函数是否使用了caller save寄存器
+    /// 所以被调用函数应该尽量地不使用需要保存地caller save寄存器
+    /// 遇到新的函数返回新的函数
+    pub fn analyse_for_handle_call(
+        &mut self,
+        pool: &mut BackendPool,
+        base_funcs: &HashMap<String, ObjPtr<Func>>,
+        call_info: &mut HashMap<String, HashMap<Bitmap, ObjPtr<Func>>>,
+    ) -> Vec<ObjPtr<Func>> {
+        let mut new_funcs: Vec<ObjPtr<Func>> = Vec::new();
+        todo!();
+        new_funcs
+    }
+
+    /// 根据信息进行call的插入
+    pub fn handle_call(&mut self, call_info: &HashMap<String, HashMap<Bitmap, ObjPtr<Func>>>) {
+        self.calc_live();
+    }
+}
+
+/// 打印函数当前的汇编形式
+impl Func {
+    pub fn print_func(&self) {
+        log!("func:{}", self.label);
+        for block in self.blocks.iter() {
+            log!("\tblock:{}", block.label);
+            for inst in block.insts.iter() {
+                log!("\t\t{}", inst.to_string());
+            }
+        }
+    }
+}
+
+impl GenerateAsm for Func {
+    fn generate(&mut self, _: ObjPtr<Context>, f: &mut File) -> Result<()> {
+        if self.const_array.len() > 0 || self.float_array.len() > 0 {
+            writeln!(f, "	.data\n   .align  3")?;
+        }
+        for mut a in self.const_array.clone() {
+            a.generate(self.context, f)?;
+        }
+        for mut a in self.float_array.clone() {
+            a.generate(self.context, f)?;
+        }
+        AsmBuilder::new(f).show_func(&self.label)?;
+        self.context.as_mut().call_prologue_event();
+        let mut size = 0;
+        for block in self.blocks.iter() {
+            size += block.insts.len();
+        }
+        // log!("tatol {}", size);
+        for block in self.blocks.iter() {
+            block.as_mut().generate(self.context, f)?;
+        }
+        writeln!(f, "	.size	{}, .-{}", self.label, self.label)?;
+        Ok(())
+    }
+}
+
+/// 从函数中提取信息
+impl Func {
+    // 实现一些关于函数信息的估计和获取的方法
+
+    // 估计寄存器数量
+    pub fn estimate_num_regs(&self) -> usize {
+        let mut out = 0;
+        self.blocks.iter().for_each(|bb| out += bb.insts.len());
+        return out;
+    }
+    // 获取指令数量
+    pub fn num_insts(&self) -> usize {
+        let mut out = 0;
+        self.blocks.iter().for_each(|bb| out += bb.insts.len());
+        return out;
+    }
+
+    // 获取寄存器数量
+    pub fn num_regs(&self) -> usize {
+        let mut passed: Bitmap = Bitmap::with_cap(1000);
+        let mut out = 0;
+        self.blocks.iter().for_each(|bb| {
+            bb.insts.iter().for_each(|inst| {
+                for reg in inst.get_reg_def() {
+                    let id = reg.get_id() << 1
+                        | match reg.get_type() {
+                            ScalarType::Float => 0,
+                            ScalarType::Int => 1,
+                            _ => panic!("unleagal"),
+                        };
+                    if passed.contains(id as usize) {
+                        continue;
+                    }
+                    passed.insert(id as usize);
+                    out += 1;
+                }
+            })
+        });
+        return out;
+    }
+
+    // 获取所有虚拟寄存器和用到的物理寄存器
+    pub fn draw_all_virtual_regs(&self) -> HashSet<Reg> {
+        let mut passed = HashSet::new();
+        let mut out = self.blocks.iter().for_each(|bb| {
+            bb.insts.iter().for_each(|inst| {
+                for reg in inst.get_regs() {
+                    if reg.is_physic() {
+                        continue;
+                    }
+                    passed.insert(reg);
+                }
+            })
+        });
+        passed
+    }
+}
+
+/// handle spill2: handle spill过程中对spill寄存器用到的栈进行重排
+/// func的handle spill v2能够与v1 完美替换
+impl Func {
     // 为spilling 寄存器预先分配空间 的 handle spill
     pub fn handle_spill_v2(&mut self, pool: &mut BackendPool, f: &mut File) {
         let this = pool.put_func(self.clone());
@@ -755,308 +1044,131 @@ impl Func {
             }
         }
     }
+}
 
-    pub fn handle_overflow(&mut self, pool: &mut BackendPool) {
-        let this = pool.put_func(self.clone());
-        for block in self.blocks.iter() {
-            block.as_mut().handle_overflow(this, pool);
+//关于无用指令消除的实现
+impl Func {
+    ///移除无用指令
+    pub fn remove_unuse_inst(&mut self) {
+        //TOCHECK
+        // 移除mv va va 类型指令
+        for bb in self.blocks.iter() {
+            let mut index = 0;
+            while index < bb.insts.len() {
+                let inst = bb.insts[index];
+                if inst.operands.len() < 2 {
+                    index += 1;
+                    continue;
+                }
+                let dst = inst.get_dst();
+                let src = inst.get_lhs();
+                if inst.get_type() == InstrsType::OpReg(super::instrs::SingleOp::Mv) && dst == src {
+                    bb.as_mut().insts.remove(index);
+                } else {
+                    index += 1;
+                }
+            }
         }
-        self.update(this);
+        // 移除无用def
+        self.remove_unuse_def();
     }
 
-    fn update(&mut self, func: ObjPtr<Func>) {
-        let func_ref = func.as_ref();
-        self.blocks = func_ref.blocks.clone();
-        self.stack_addr = func_ref.stack_addr.clone();
-        self.spill_stack_map = func_ref.spill_stack_map.clone();
-        self.const_array = func_ref.const_array.clone();
-        self.float_array = func_ref.float_array.clone();
-        self.callee_saved = func_ref.callee_saved.clone();
-        self.caller_saved = func_ref.caller_saved.clone();
-        self.caller_saved_len = func_ref.caller_saved_len;
-    }
-
-    fn save_callee(&mut self, pool: &mut BackendPool, f: &mut File) {
-        let mut callee_map: HashMap<Reg, StackSlot> = HashMap::new();
-        if self.label == "main" {
-            self.build_stack_info(f, callee_map, true);
-            return;
-        }
-        for id in self.callee_saved.iter() {
-            let pos = self.stack_addr.front().unwrap().get_pos() + ADDR_SIZE;
-            let slot = StackSlot::new(pos, ADDR_SIZE);
-            self.stack_addr.push_front(slot);
-            //FIXME: resolve float regs
-            callee_map.insert(*id, slot);
-        }
-        self.build_stack_info(f, callee_map, false);
-    }
-    fn build_stack_info(&mut self, f: &mut File, map: HashMap<Reg, StackSlot>, is_main: bool) {
-        // 当完成callee save寄存器存栈后，可以得知开栈大小
-        let mut f1 = match f.try_clone() {
-            Ok(f) => f,
-            Err(e) => panic!("Error: {}", e),
-        };
-        let mut f2 = match f.try_clone() {
-            Ok(f) => f,
-            Err(e) => panic!("Error: {}", e),
-        };
-        let mut stack_size = self.context.get_offset();
-
-        // log!("stack size: {}", stack_size);
-
-        if let Some(addition_stack_info) = self.stack_addr.front() {
-            stack_size += addition_stack_info.get_pos();
-        }
-        if let Some(slot) = self.stack_addr.back() {
-            stack_size += slot.get_pos() + slot.get_size();
-        };
-        // log!("stack: {:?}", self.stack_addr);
-        stack_size += self.caller_saved_len * ADDR_SIZE;
-        // log!("caller saved: {}", self.caller_saved.len());
-        //栈对齐 - 调用func时sp需按16字节对齐
-        stack_size = stack_size / 16 * 16 + 16;
-        let (icnt, fcnt) = self.param_cnt;
-        self.context.as_mut().set_offset(stack_size - ADDR_SIZE);
-
-        let ra = Reg::new(1, ScalarType::Int);
-        let map_clone = map.clone();
-
-        self.context.as_mut().set_prologue_event(move || {
-            let mut builder = AsmBuilder::new(&mut f1);
-            // addi sp -stack_size
-            if operand::is_imm_12bs(stack_size) {
-                builder.addi("sp", "sp", -stack_size);
-                builder.s(
-                    &ra.to_string(false),
-                    "sp",
-                    stack_size - ADDR_SIZE,
-                    false,
-                    true,
-                );
-                if !is_main {
-                    for (reg, slot) in map.iter() {
-                        let is_float = reg.get_type() == ScalarType::Float;
-                        let of = stack_size - ADDR_SIZE - slot.get_pos();
-                        builder.s(&reg.to_string(false), "sp", of, is_float, true);
+    ///移除无用def指令
+    pub fn remove_unuse_def(&mut self) {
+        //
+        loop {
+            self.calc_live();
+            let mut ifFinish = true;
+            for bb in self.blocks.iter() {
+                let mut new_insts: Vec<ObjPtr<LIRInst>> = Vec::with_capacity(bb.insts.len());
+                let mut to_removed: HashSet<usize> = HashSet::new();
+                let mut live_now: HashSet<Reg> = HashSet::new();
+                bb.live_out.iter().for_each(|reg| {
+                    live_now.insert(*reg);
+                });
+                for (index, inst) in bb.insts.iter().enumerate().rev() {
+                    for reg in inst.get_reg_def() {
+                        if !live_now.contains(&reg) {
+                            to_removed.insert(index);
+                            ifFinish = false;
+                            break;
+                        }
+                        live_now.remove(&reg);
+                    }
+                    if to_removed.contains(&index) {
+                        continue;
+                    }
+                    for reg in inst.get_reg_use() {
+                        live_now.insert(reg);
                     }
                 }
-            } else {
-                builder.op1("li", "s0", &stack_size.to_string());
-                builder.op2("sub", "sp", "sp", "s0", false, true);
-                builder.op2("add", "s0", "s0", "sp", false, true);
-                builder.s(&ra.to_string(false), "s0", -ADDR_SIZE, false, true);
+                for (index, inst) in bb.insts.iter().enumerate() {
+                    if to_removed.contains(&index) {
+                        log_file!(
+                            "remove_unusedef.txt",
+                            ":{}-{}:{}",
+                            self.label,
+                            bb.label,
+                            inst.to_string()
+                        );
+                        continue;
+                    }
+                    new_insts.push(*inst);
+                }
+                bb.as_mut().insts = new_insts;
+            }
 
-                let mut first = true;
-                let mut start = 0;
-                if !is_main {
-                    for (reg, slot) in map.iter() {
-                        let is_float = reg.get_type() == ScalarType::Float;
-                        if operand::is_imm_12bs(slot.get_pos()) {
-                            builder.s(
-                                &reg.to_string(false),
-                                "s0",
-                                -(slot.get_pos() + ADDR_SIZE),
-                                is_float,
-                                true,
-                            );
-                        } else if operand::is_imm_12bs(stack_size - slot.get_pos() - ADDR_SIZE) {
-                            builder.s(
-                                &reg.to_string(false),
-                                "sp",
-                                stack_size - ADDR_SIZE - slot.get_pos(),
-                                is_float,
-                                true,
-                            );
-                        } else {
-                            if first {
-                                let offset = stack_size - ADDR_SIZE - slot.get_pos();
-                                builder.op1("li", "s0", &offset.to_string());
-                                builder.op2("add", "s0", "s0", "sp", false, true);
-                                first = false;
-                            }
-                            builder.s(&reg.to_string(false), "s0", -start, is_float, true);
-                            start += ADDR_SIZE;
+            if ifFinish {
+                break;
+            }
+        }
+    }
+}
+
+///handle call v3的实现
+impl Func {
+    ///配合v3系列的module.build
+    /// 实现了自适应函数调用
+    pub fn handle_call_v3(
+        &mut self,
+        pool: &mut BackendPool,
+        call_info: &HashMap<String, ObjPtr<Func>>,
+    ) {
+        ///
+        self.calc_live();
+        ///
+        for bb in self.blocks.iter() {
+            let mut new_insts: Vec<ObjPtr<LIRInst>> = Vec::new();
+            let mut live_now: HashSet<Reg> = HashSet::new();
+            bb.live_out.iter().for_each(|reg| {
+                live_now.insert(*reg);
+            });
+            for inst in bb.insts.iter().rev() {
+                if inst.get_type() == InstrsType::Call {
+                    ///找出 caller saved
+                    let mut to_saved: HashSet<Reg> = HashSet::new();
+                    for reg in live_now.iter() {
+                        if reg.is_caller_save() {
+                            to_saved.insert(*reg);
                         }
                     }
+                    // 对于每个caller save寄存器插入一对load store
+
+                    todo!()
                 }
-            }
-        });
-
-        self.context.as_mut().set_epilogue_event(move || {
-            let mut builder = AsmBuilder::new(&mut f2);
-
-            if operand::is_imm_12bs(stack_size) {
-                if !is_main {
-                    for (reg, slot) in map_clone.iter() {
-                        let is_float = reg.get_type() == ScalarType::Float;
-                        let of = stack_size - ADDR_SIZE - slot.get_pos();
-                        builder.l(&reg.to_string(false), "sp", of, is_float, true);
-                    }
-                }
-                builder.l(
-                    &ra.to_string(false),
-                    "sp",
-                    stack_size - ADDR_SIZE,
-                    false,
-                    true,
-                );
-                builder.addi("sp", "sp", stack_size);
-            } else {
-                builder.op1("li", "s0", &stack_size.to_string());
-                builder.op2("add", "sp", "s0", "sp", false, true);
-                builder.l(&ra.to_string(false), "sp", -ADDR_SIZE, false, true);
-
-                let mut first = true;
-                let mut start = 0;
-                if !is_main {
-                    for (reg, slot) in map_clone.iter() {
-                        let is_float = reg.get_type() == ScalarType::Float;
-                        if operand::is_imm_12bs(slot.get_pos()) {
-                            builder.l(
-                                &reg.to_string(false),
-                                "sp",
-                                -(slot.get_pos() + ADDR_SIZE),
-                                is_float,
-                                true,
-                            );
-                        } else if operand::is_imm_12bs(stack_size - slot.get_pos() - ADDR_SIZE) {
-                            builder.l(
-                                &reg.to_string(false),
-                                "sp",
-                                stack_size - slot.get_pos() - ADDR_SIZE,
-                                is_float,
-                                true,
-                            );
-                        } else {
-                            if first {
-                                let offset = stack_size - slot.get_pos() - ADDR_SIZE;
-                                builder.op1("li", "s0", &offset.to_string());
-                                builder.op2("add", "s0", "s0", "sp", false, true);
-                                first = false;
-                            }
-                            builder.l(&reg.to_string(false), "sp", -start, is_float, true);
-                            start += ADDR_SIZE;
-                        }
-                    }
-                }
-            }
-        });
-    }
-
-    pub fn generate_row(&mut self, _: ObjPtr<Context>, f: &mut File) -> Result<()> {
-        AsmBuilder::new(f).show_func(&self.label)?;
-        // self.context.as_mut().call_prologue_event();
-        let mut size = 0;
-        for block in self.blocks.iter() {
-            size += block.insts.len();
-        }
-        for block in self.blocks.iter() {
-            block.as_mut().generate_row(self.context, f)?;
-        }
-        Ok(())
-    }
-}
-
-impl Func {
-    pub fn print_func(&self) {
-        log!("func:{}", self.label);
-        for block in self.blocks.iter() {
-            log!("\tblock:{}", block.label);
-            for inst in block.insts.iter() {
-                log!("\t\t{}", inst.to_string());
-            }
-        }
-    }
-}
-
-impl GenerateAsm for Func {
-    fn generate(&mut self, _: ObjPtr<Context>, f: &mut File) -> Result<()> {
-        if self.const_array.len() > 0 || self.float_array.len() > 0 {
-            writeln!(f, "	.data\n   .align  3")?;
-        }
-        for mut a in self.const_array.clone() {
-            a.generate(self.context, f)?;
-        }
-        for mut a in self.float_array.clone() {
-            a.generate(self.context, f)?;
-        }
-        AsmBuilder::new(f).show_func(&self.label)?;
-        self.context.as_mut().call_prologue_event();
-        let mut size = 0;
-        for block in self.blocks.iter() {
-            size += block.insts.len();
-        }
-        // log!("tatol {}", size);
-        for block in self.blocks.iter() {
-            block.as_mut().generate(self.context, f)?;
-        }
-        writeln!(f, "	.size	{}, .-{}", self.label, self.label)?;
-        Ok(())
-    }
-}
-
-fn set_append(blocks: &Vec<ObjPtr<BasicBlock>>) -> HashSet<ObjPtr<BasicBlock>> {
-    let mut set = HashSet::new();
-    for block in blocks.iter() {
-        set.insert(block.clone());
-    }
-    set
-}
-
-impl Func {
-    // 实现一些关于函数信息的估计和获取的方法
-
-    // 估计寄存器数量
-    pub fn estimate_num_regs(&self) -> usize {
-        let mut out = 0;
-        self.blocks.iter().for_each(|bb| out += bb.insts.len());
-        return out;
-    }
-    // 获取指令数量
-    pub fn num_insts(&self) -> usize {
-        let mut out = 0;
-        self.blocks.iter().for_each(|bb| out += bb.insts.len());
-        return out;
-    }
-
-    // 获取寄存器数量
-    pub fn num_regs(&self) -> usize {
-        let mut passed: Bitmap = Bitmap::with_cap(1000);
-        let mut out = 0;
-        self.blocks.iter().for_each(|bb| {
-            bb.insts.iter().for_each(|inst| {
                 for reg in inst.get_reg_def() {
-                    let id = reg.get_id() << 1
-                        | match reg.get_type() {
-                            ScalarType::Float => 0,
-                            ScalarType::Int => 1,
-                            _ => panic!("unleagal"),
-                        };
-                    if passed.contains(id as usize) {
-                        continue;
+                    if !live_now.contains(&reg) {
+                        unreachable!()
                     }
-                    passed.insert(id as usize);
-                    out += 1;
+                    live_now.remove(&reg);
                 }
-            })
-        });
-        return out;
-    }
-
-    // 获取所有虚拟寄存器和用到的物理寄存器
-    pub fn draw_all_virtual_regs(&self) -> HashSet<Reg> {
-        let mut passed = HashSet::new();
-        let mut out = self.blocks.iter().for_each(|bb| {
-            bb.insts.iter().for_each(|inst| {
-                for reg in inst.get_regs() {
-                    if reg.is_physic() {
-                        continue;
-                    }
-                    passed.insert(reg);
+                for reg in inst.get_reg_use() {
+                    live_now.insert(reg);
                 }
-            })
-        });
-        passed
+                new_insts.push(*inst);
+            }
+            new_insts.reverse();
+            bb.as_mut().insts = new_insts;
+        }
     }
 }

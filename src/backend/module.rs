@@ -1,3 +1,4 @@
+use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::Write;
 
@@ -6,6 +7,7 @@ use crate::backend::func::Func;
 use crate::backend::operand::ToString;
 use crate::backend::structs::{FGlobalVar, FloatArray, GlobalVar, IGlobalVar, IntArray};
 use crate::backend::BackendPool;
+use crate::container::bitmap::Bitmap;
 use crate::ir::function::Function;
 use crate::ir::instruction::{Inst, InstKind};
 use crate::ir::ir_type::IrType;
@@ -15,12 +17,15 @@ use crate::utility::ObjPtr;
 
 use super::instrs::Context;
 use super::opt::BackendPass;
+use super::regalloc::structs::FuncAllocStat;
 use super::structs::GenerateAsm;
 
 pub struct AsmModule {
     pub global_var_list: Vec<(ObjPtr<Inst>, GlobalVar)>,
 
     pub func_map: Vec<(ObjPtr<Function>, ObjPtr<Func>)>,
+    call_info: HashMap<String, HashMap<Bitmap, String>>, //每个base func name 对应调用的 不同callee need save函数
+    name_func: HashMap<String, ObjPtr<Func>>,            //记录实际函数名和实际函数
     pub upper_module: Module,
 }
 
@@ -32,6 +37,8 @@ impl AsmModule {
             // global_fvar_list,
             func_map: Vec::new(),
             upper_module: ir_module,
+            call_info: HashMap::new(),
+            name_func: HashMap::new(),
         }
     }
 
@@ -66,14 +73,12 @@ impl AsmModule {
     pub fn build(&mut self, f: &mut File, f2: &mut File, pool: &mut BackendPool) {
         self.build_lir(pool);
         // TOCHECK 寄存器分配和handlespill前无用指令删除,比如删除mv指令方便寄存器分配
-        self.remove_unuse_inst_pre_alloc(); //fixme: to imporve
+        self.remove_unuse_inst_pre_alloc();
         self.generate_row_asm(f2, pool); //注释
         self.allocate_reg();
-        self.handle_spill(pool, f); //yjh: i am going to adjust
-                                    // self.print_model();
+        self.handle_spill(pool, f);
         self.map_v_to_p();
-        
-        self.remove_unuse_inst_suf_alloc(); //yjh:i am going to do
+        self.remove_unuse_inst_suf_alloc();
     }
 
     pub fn handle_overflow(&mut self, pool: &mut BackendPool) {
@@ -109,8 +114,6 @@ impl AsmModule {
         self.func_map.iter_mut().for_each(|(_, func)| {
             if !func.is_extern {
                 func.as_mut().handle_spill(pool, f);
-                //TODO CHECK!
-                // func.as_mut().handle_spill_v2(pool, f);
             }
         });
     }
@@ -241,5 +244,54 @@ impl AsmModule {
                 func.print_func();
             }
         });
+    }
+}
+
+impl AsmModule {
+    ///TODO!
+    pub fn build_v3(&mut self, f: &mut File, f2: &mut File, pool: &mut BackendPool) {
+        self.build_lir(pool);
+        self.remove_unuse_inst_pre_alloc();
+        self.generate_row_asm(f2, pool);
+        self.allocate_reg();
+        self.map_v_to_p();
+        self.handle_spill_v3(pool);
+        self.handle_call_v3(pool);
+        self.rearrange_stack_slot();
+        self.remove_useless_func();
+        self.build_stack_info(f, pool);
+        //删除无用的函数
+    }
+    pub fn handle_spill_v3(&mut self, pool: &mut BackendPool) {}
+
+    ///准备 callee save和caller save需要的信息
+    /// 1. 准备每个函数需要的callee save,以及进行函数分裂
+    /// 2. 针对性地让函数自我转变 , 调整每个函数中使用到的寄存器分布等等
+    pub fn anaylyse_for_handle_spill_v3(&mut self, pool: &mut BackendPool) {}
+
+    ///对于caller save 和 handle spill  使用到的栈空间 进行紧缩
+    pub fn rearrange_stack_slot(&mut self) {}
+
+    ///处理 函数调用前后的保存和恢复
+    /// 1. 插入保存和恢复caller save的指令
+    pub fn handle_call_v3(&mut self, pool: &mut BackendPool) {
+        // 分析并刷新每个函数的call指令前后需要保存的caller save信息,以及call内部的函数需要保存的callee save信息
+        self.anaylyse_for_handle_spill_v3(pool);
+        for (_, func) in self.func_map.iter() {
+            func.as_mut().handle_call_v3(pool, &self.name_func);
+        }
+    }
+
+    pub fn build_stack_info(&mut self, f: &mut File, pool: &mut BackendPool) {}
+
+    ///删除进行函数分裂后的剩余无用函数
+    pub fn remove_useless_func(&mut self) {
+        let mut new_func_map = Vec::new();
+        for (f, func) in self.func_map.iter() {
+            if self.name_func.contains_key(&func.label) {
+                new_func_map.push((*f, *func));
+            }
+        }
+        self.func_map = new_func_map;
     }
 }
