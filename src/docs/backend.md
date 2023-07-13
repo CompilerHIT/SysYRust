@@ -11,9 +11,9 @@
 
 如何尽可能保证程序顺序执行？
 
-## gp优化
+## s0优化
 
-使用gp相对寻址(+- 2K)代替auipc + addi label
+使用s0相对寻址(+- 2K)代替auipc + addi label
 
 ## stack structure
 

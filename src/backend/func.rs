@@ -706,10 +706,10 @@ impl Func {
                     }
                 }
             } else {
-                builder.op1("li", "gp", &stack_size.to_string());
-                builder.op2("sub", "sp", "sp", "gp", false, true);
-                builder.op2("add", "gp", "gp", "sp", false, true);
-                builder.s(&ra.to_string(false), "gp", -ADDR_SIZE, false, true);
+                builder.op1("li", "s0", &stack_size.to_string());
+                builder.op2("sub", "sp", "sp", "s0", false, true);
+                builder.op2("add", "s0", "s0", "sp", false, true);
+                builder.s(&ra.to_string(false), "s0", -ADDR_SIZE, false, true);
 
                 let mut first = true;
                 let mut start = 0;
@@ -719,7 +719,7 @@ impl Func {
                         if operand::is_imm_12bs(slot.get_pos()) {
                             builder.s(
                                 &reg.to_string(false),
-                                "gp",
+                                "s0",
                                 -(slot.get_pos() + ADDR_SIZE),
                                 is_float,
                                 true,
@@ -735,11 +735,11 @@ impl Func {
                         } else {
                             if first {
                                 let offset = stack_size - ADDR_SIZE - slot.get_pos();
-                                builder.op1("li", "gp", &offset.to_string());
-                                builder.op2("add", "gp", "gp", "sp", false, true);
+                                builder.op1("li", "s0", &offset.to_string());
+                                builder.op2("add", "s0", "s0", "sp", false, true);
                                 first = false;
                             }
-                            builder.s(&reg.to_string(false), "gp", -start, is_float, true);
+                            builder.s(&reg.to_string(false), "s0", -start, is_float, true);
                             start += ADDR_SIZE;
                         }
                     }
@@ -767,8 +767,8 @@ impl Func {
                 );
                 builder.addi("sp", "sp", stack_size);
             } else {
-                builder.op1("li", "gp", &stack_size.to_string());
-                builder.op2("add", "sp", "gp", "sp", false, true);
+                builder.op1("li", "s0", &stack_size.to_string());
+                builder.op2("add", "sp", "s0", "sp", false, true);
                 builder.l(&ra.to_string(false), "sp", -ADDR_SIZE, false, true);
 
                 let mut first = true;
@@ -795,8 +795,8 @@ impl Func {
                         } else {
                             if first {
                                 let offset = stack_size - slot.get_pos() - ADDR_SIZE;
-                                builder.op1("li", "gp", &offset.to_string());
-                                builder.op2("add", "gp", "gp", "sp", false, true);
+                                builder.op1("li", "s0", &offset.to_string());
+                                builder.op2("add", "s0", "s0", "sp", false, true);
                                 first = false;
                             }
                             builder.l(&reg.to_string(false), "sp", -start, is_float, true);
