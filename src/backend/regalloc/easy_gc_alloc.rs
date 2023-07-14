@@ -54,7 +54,6 @@ impl Allocator {
         self.nums_neighbor_color =
             regalloc::build_nums_neighbor_color(func, &self.interference_graph);
         let mut bitmap: Bitmap = Bitmap::with_cap(5000);
-        let tmp_set: HashSet<Reg> = HashSet::new();
         // 建立待分配寄存器图 和 并统计悬挂点
         for cur_bb in func.blocks.iter() {
             for inst in cur_bb.insts.iter() {
@@ -259,6 +258,7 @@ impl Allocator {
                 }
             }
         }
+        self.spillings.insert(reg.get_id());
         true
     }
 
@@ -277,23 +277,24 @@ impl Allocator {
         let mut tospill: Reg = reg;
         let mut heuoristic_of_spill = cost(&tospill); //待消解节点的启发函数值
         let inters = interference_graph.get(&tospill).unwrap();
-        for reg in inters {
-            if !reg.is_virtual() {
+        for neighbor in inters {
+            if !neighbor.is_virtual() {
                 continue;
             }
-            if spillings.contains(&reg.get_id()) {
+            if spillings.contains(&neighbor.get_id()) {
                 continue;
             }
 
             // TODO ,比较效果，判断是否应该把有颜色的寄存器也纳入spill范围内
-            if !colors.contains_key(&reg.get_id()) {
+            if !colors.contains_key(&neighbor.get_id()) {
                 continue;
-            } //没有着色的寄存器无法选择溢出
-              //物理寄存器无法溢出
-            let tmp_cost = cost(reg);
+            }
+            //没有着色的寄存器无法选择溢出
+            //物理寄存器无法溢出
+            let tmp_cost = cost(neighbor);
             if tmp_cost < heuoristic_of_spill {
                 heuoristic_of_spill = tmp_cost;
-                tospill = *reg;
+                tospill = *neighbor;
             }
         }
         // TODO，使用更好的启发函数
@@ -382,6 +383,8 @@ impl Regalloc for Allocator {
     fn alloc(&mut self, func: &crate::backend::func::Func) -> super::structs::FuncAllocStat {
         self.build_interference_graph(func);
         self.count_spill_costs(func);
+
+        log_file!("tocolor.txt", "{:?}", self.regs);
         // 打印冲突图
         let intereref_path = "interference_graph.txt";
         self.interference_graph.iter().for_each(|(reg, neighbors)| {
