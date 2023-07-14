@@ -48,8 +48,67 @@ impl Regalloc for Allocator {
         });
         let spill_costs = regalloc::regalloc::estimate_spill_cost(func);
 
+        let mut blocks: Vec<ObjPtr<BB>> = func.blocks.iter().cloned().collect();
         ///基础着色,
-        for bb in func.blocks.iter() {
+        Allocator::alloc_one_opt(
+            &blocks,
+            &ends_index_bb,
+            &mut spillings,
+            &mut colors,
+            &spill_costs,
+        );
+        loop {
+            spillings.clear();
+            blocks.reverse();
+            let mut if_opt = Allocator::alloc_one_fixed(
+                &blocks,
+                &ends_index_bb,
+                &mut spillings,
+                &mut colors,
+                &spill_costs,
+            );
+            if if_opt {
+                continue;
+            }
+            blocks.reverse();
+            if_opt = Allocator::alloc_one_fixed(
+                &blocks,
+                &ends_index_bb,
+                &mut spillings,
+                &mut colors,
+                &spill_costs,
+            );
+            if if_opt {
+                continue;
+            }
+            break;
+        }
+        // TODO,循环裂变着色
+        let (stackSize, bb_stack_sizes) = regalloc::regalloc::countStackSize(func, &spillings);
+        FuncAllocStat {
+            stack_size: stackSize,
+            bb_stack_sizes: bb_stack_sizes,
+            spillings: spillings,
+            dstr: colors,
+        }
+    }
+}
+
+impl Allocator {
+    ///每次产生新的colored的时候就返回true
+    pub fn alloc_one_fixed(
+        blocks: &Vec<ObjPtr<BB>>,
+        ends_index_bb: &HashMap<(usize, ObjPtr<BB>), HashSet<Reg>>,
+        spillings: &mut HashSet<i32>,
+        colors: &mut HashMap<i32, i32>,
+        spill_costs: &HashMap<Reg, f32>,
+    ) -> bool {
+        ///基础着色
+        let mut fixed: HashSet<i32> = HashSet::new();
+        for (reg, _) in colors.iter() {
+            fixed.insert(*reg);
+        }
+        for bb in blocks.iter() {
             // 对于bb,首先从 live in中找出已用颜色
             let mut reg_use_stat: RegUsedStat = RegUsedStat::new();
             let mut live_now: HashSet<Reg> = HashSet::new();
@@ -57,14 +116,100 @@ impl Regalloc for Allocator {
             log_file!(easy_ls_path, "{},live in:{:?}", bb.label, bb.live_in);
             bb.live_in.iter().for_each(|reg| {
                 if reg.is_physic() || colors.contains_key(&reg.get_id()) {
-                    Allocator::process_one_reg_opt(
+                    Allocator::process_one_reg_fixed(
                         reg,
                         &mut live_now,
                         &mut last_used,
                         &mut reg_use_stat,
-                        &mut colors,
+                        colors,
                         &spill_costs,
-                        &mut spillings,
+                        spillings,
+                        &mut fixed,
+                    );
+                } else if !spillings.contains(&reg.get_id()) {
+                    Allocator::color_one(reg, &mut reg_use_stat, spillings, colors, &mut last_used);
+                }
+                live_now.insert(*reg);
+            });
+            let tmp_set = HashSet::new();
+            for (index, inst) in bb.insts.iter().enumerate() {
+                // 首先找出在这里终结的寄存器,把它们从live now中取出
+                let finished = ends_index_bb.get(&(index, *bb)).unwrap_or(&tmp_set);
+                for reg in finished {
+                    debug_assert!(live_now.contains(reg));
+                    live_now.remove(reg);
+                    if reg.is_physic() {
+                        reg_use_stat.release_reg(reg.get_color());
+                        last_used.remove(&reg.get_color());
+                    } else if colors.contains_key(&reg.get_id()) {
+                        let color = colors.get(&reg.get_id()).unwrap();
+                        reg_use_stat.release_reg(*color);
+                        last_used.remove(color);
+                    }
+                }
+                //然后对于新发现的def的寄存器,给它选择一个可用颜色,或者加上它的可用颜色情况
+                for reg in inst.get_reg_def() {
+                    if reg.is_physic() || colors.contains_key(&reg.get_id()) {
+                        Allocator::process_one_reg_fixed(
+                            &reg,
+                            &mut live_now,
+                            &mut last_used,
+                            &mut reg_use_stat,
+                            colors,
+                            &spill_costs,
+                            spillings,
+                            &mut fixed,
+                        );
+                    } else if !spillings.contains(&reg.get_id()) {
+                        Allocator::color_one(
+                            &reg,
+                            &mut reg_use_stat,
+                            spillings,
+                            colors,
+                            &mut last_used,
+                        );
+                    }
+                    live_now.insert(reg);
+                }
+            }
+        }
+
+        if colors.len() > fixed.len() {
+            return true;
+        }
+        return false;
+    }
+
+    // 不断每次采用opt方式进行选择,直到spill cost减少为止
+    pub fn alloc_one_opt(
+        blocks: &Vec<ObjPtr<BB>>,
+        ends_index_bb: &HashMap<(usize, ObjPtr<BB>), HashSet<Reg>>,
+        spillings: &mut HashSet<i32>,
+        colors: &mut HashMap<i32, i32>,
+        spill_costs: &HashMap<Reg, f32>,
+    ) {
+        ///基础着色
+        let mut fixed: HashSet<i32> = HashSet::new();
+        for (reg, _) in colors.iter() {
+            fixed.insert(*reg);
+        }
+        for bb in blocks.iter() {
+            // 对于bb,首先从 live in中找出已用颜色
+            let mut reg_use_stat: RegUsedStat = RegUsedStat::new();
+            let mut live_now: HashSet<Reg> = HashSet::new();
+            let mut last_used: HashMap<i32, Reg> = HashMap::new();
+            log_file!(easy_ls_path, "{},live in:{:?}", bb.label, bb.live_in);
+            bb.live_in.iter().for_each(|reg| {
+                if reg.is_physic() || colors.contains_key(&reg.get_id()) {
+                    Allocator::process_one_reg_fixed(
+                        reg,
+                        &mut live_now,
+                        &mut last_used,
+                        &mut reg_use_stat,
+                        colors,
+                        &spill_costs,
+                        spillings,
+                        &mut fixed,
                     );
                 }
                 live_now.insert(*reg);
@@ -88,17 +233,17 @@ impl Regalloc for Allocator {
                 //然后对于新发现的def的寄存器,给它选择一个可用颜色,或者加上它的可用颜色情况
                 for reg in inst.get_reg_def() {
                     if reg.is_physic() || colors.contains_key(&reg.get_id()) {
-                        Allocator::process_one_reg_opt(
+                        Allocator::process_one_reg_fixed(
                             &reg,
                             &mut live_now,
                             &mut last_used,
                             &mut reg_use_stat,
-                            &mut colors,
+                            colors,
                             &spill_costs,
-                            &mut spillings,
+                            spillings,
+                            &mut fixed,
                         );
                     } else if !spillings.contains(&reg.get_id()) {
-                        //否则进行分配
                         let color = reg_use_stat.get_available_reg(reg.get_type());
                         if color.is_none() {
                             spillings.insert(reg.get_id());
@@ -114,89 +259,6 @@ impl Regalloc for Allocator {
                 }
             }
         }
-
-        // TODO,循环裂变着色
-
-        let (stackSize, bb_stack_sizes) = regalloc::regalloc::countStackSize(func, &spillings);
-        FuncAllocStat {
-            stack_size: stackSize,
-            bb_stack_sizes: bb_stack_sizes,
-            spillings: spillings,
-            dstr: colors,
-        }
-    }
-}
-
-impl Allocator {
-    ///每次产生新的colored的时候就返回true
-    pub fn alloc_one_fixed(
-        func: &Func,
-        ends_index_bb: &HashMap<(usize, ObjPtr<BB>), HashSet<Reg>>,
-        spillings: &mut HashSet<i32>,
-        colors: &mut HashMap<i32, i32>,
-        spill_costs: &HashMap<Reg, f32>,
-    ) -> bool {
-        let mut out = false;
-        ///基础着色
-        let mut fixed: HashSet<i32> = HashSet::new();
-        for (reg, _) in colors.iter() {
-            fixed.insert(*reg);
-        }
-        for bb in func.blocks.iter() {
-            // 对于bb,首先从 live in中找出已用颜色
-            let mut reg_use_stat: RegUsedStat = RegUsedStat::new();
-            let mut live_now: HashSet<Reg> = HashSet::new();
-            let mut last_used: HashMap<i32, Reg> = HashMap::new();
-            log_file!(easy_ls_path, "{},live in:{:?}", bb.label, bb.live_in);
-            bb.live_in.iter().for_each(|reg| {
-                if reg.is_physic() || colors.contains_key(&reg.get_id()) {
-                    Allocator::process_one_reg_opt(
-                        reg,
-                        &mut live_now,
-                        &mut last_used,
-                        &mut reg_use_stat,
-                        colors,
-                        &spill_costs,
-                        spillings,
-                    );
-                }
-                live_now.insert(*reg);
-            });
-            let tmp_set = HashSet::new();
-            for (index, inst) in bb.insts.iter().enumerate() {
-                // 首先找出在这里终结的寄存器,把它们从live now中取出
-                let finished = ends_index_bb.get(&(index, *bb)).unwrap_or(&tmp_set);
-                for reg in finished {
-                    debug_assert!(live_now.contains(reg));
-                    live_now.remove(reg);
-                    if reg.is_physic() {
-                        reg_use_stat.release_reg(reg.get_color());
-                        last_used.remove(&reg.get_color());
-                    } else if colors.contains_key(&reg.get_id()) {
-                        let color = colors.get(&reg.get_id()).unwrap();
-                        reg_use_stat.release_reg(*color);
-                        last_used.remove(color);
-                    }
-                }
-                //然后对于新发现的def的寄存器,给它选择一个可用颜色,或者加上它的可用颜色情况
-                for reg in inst.get_reg_def() {
-                    if reg.is_physic() || colors.contains_key(&reg.get_id()) {
-                        Allocator::process_one_reg_opt(
-                            &reg,
-                            &mut live_now,
-                            &mut last_used,
-                            &mut reg_use_stat,
-                            colors,
-                            &spill_costs,
-                            spillings,
-                        );
-                    } else if !spillings.contains(&reg.get_id()) {
-                    }
-                    live_now.insert(reg);
-                }
-            }
-        }
-        out
     }
 
     ///处理遇到的有色寄存器的逻辑, (opt类型,会选择一个spill cost大的删除)
@@ -264,8 +326,8 @@ impl Allocator {
         last_used: &mut HashMap<i32, Reg>,
         reg_use_stat: &mut RegUsedStat,
         colors: &mut HashMap<i32, i32>,
-        spillings: &mut HashSet<i32>,
         spill_costs: &HashMap<Reg, f32>,
+        spillings: &mut HashSet<i32>,
         fixed: &mut HashSet<i32>,
     ) {
         debug_assert!(reg.is_physic() || colors.contains_key(&reg.get_id()));
@@ -325,5 +387,24 @@ impl Allocator {
         }
     }
 
-    pub fn color_one() {}
+    pub fn color_one(
+        reg: &Reg,
+        reg_use_stat: &mut RegUsedStat,
+        spillings: &mut HashSet<i32>,
+        colors: &mut HashMap<i32, i32>,
+        last_used: &mut HashMap<i32, Reg>,
+    ) -> bool {
+        let color = reg_use_stat.get_available_reg(reg.get_type());
+        if color.is_none() {
+            spillings.insert(reg.get_id());
+            return false;
+        } else {
+            let color = color.unwrap();
+            log_file!(easy_ls_path, "color:{}({})", reg, color);
+            colors.insert(reg.get_id(), color);
+            reg_use_stat.use_reg(color);
+            last_used.insert(color, *reg);
+            return true;
+        }
+    }
 }
