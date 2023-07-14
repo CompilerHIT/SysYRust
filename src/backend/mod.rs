@@ -85,7 +85,7 @@ pub fn generate_asm(
         BackendPass::new(ObjPtr::new(module)).run_pass(&mut pool);
     }
     // module.generate_row_asm(&mut file2, &mut pool);
-
+    // module.generate_row_asm(&mut file2, &mut pool);
     // 检查地址溢出，插入间接寻址
     module.handle_overflow(&mut pool);
     //TODO: 块重排

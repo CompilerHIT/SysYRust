@@ -78,12 +78,19 @@ impl AsmModule {
     pub fn build(&mut self, f: &mut File, f2: &mut File, pool: &mut BackendPool) {
         self.build_lir(pool);
         // TOCHECK 寄存器分配和handlespill前无用指令删除,比如删除mv指令方便寄存器分配
+        self.generate_row_asm(f2, pool); //注释
         self.remove_unuse_inst_pre_alloc();
         self.generate_row_asm(f2, pool); //注释
+
         self.allocate_reg();
+        // self.generate_row_asm(f2, pool); //注释
+
         self.handle_spill(pool, f);
+        // self.generate_row_asm(f2, pool); //注释
         self.map_v_to_p();
+        // self.generate_row_asm(f2, pool); //注释
         self.remove_unuse_inst_suf_alloc();
+        // self.generate_row_asm(f2, pool); //注释
     }
 
     pub fn handle_overflow(&mut self, pool: &mut BackendPool) {
