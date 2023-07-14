@@ -22,6 +22,7 @@ use super::instrs;
 use super::instrs::AsmBuilder;
 use super::operand::ARG_REG_COUNT;
 use super::operand::{FImm, ToString};
+use super::regalloc::structs::FuncAllocStat;
 use super::{structs::*, BackendPool};
 use crate::backend::operand;
 
@@ -2688,4 +2689,13 @@ fn get_magic(is_neg: bool, abs: i32) -> (i64, i32) {
     }
     let shift = p - 32;
     (magic, shift)
+}
+
+impl BB {
+    pub fn handle_spill_v3(&mut self, reg_alloc_info: &FuncAllocStat, pool: &mut BackendPool) {
+        //维护一个表,表里面记录了能够使用的寄存器
+        // 从后往前分析,判断某个寄存器是否还在某个地方活着
+        // 如果mv x88 x88,则该指令前后x88连续活着
+        // 如果add x89 x88 x89,则该指令前后x89连续活着
+    }
 }

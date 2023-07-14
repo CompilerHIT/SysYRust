@@ -296,10 +296,18 @@ impl AsmModule {
         self.build_stack_info(f, pool);
         //删除无用的函数
     }
-    pub fn handle_spill_v3(&mut self, pool: &mut BackendPool) {}
+    pub fn handle_spill_v3(&mut self, pool: &mut BackendPool) {
+        self.func_map
+            .iter()
+            .for_each(|(_, func)| func.as_mut().handle_spill_v3(pool));
+    }
 
     ///对于caller save 和 handle spill  使用到的栈空间 进行紧缩
-    pub fn rearrange_stack_slot(&mut self) {}
+    pub fn rearrange_stack_slot(&mut self) {
+        self.func_map
+            .iter()
+            .for_each(|(_, func)| func.as_mut().rearrange_stack_slot());
+    }
 
     ///处理 函数调用前后的保存和恢复
     /// 1. 插入保存和恢复caller save的指令
@@ -313,7 +321,9 @@ impl AsmModule {
     ///准备 callee save和caller save需要的信息
     /// 1. 准备每个函数需要的callee save,以及进行函数分裂
     /// 2. 针对性地让函数自我转变 , 调整每个函数中使用到的寄存器分布等等
-    fn anaylyse_for_handle_call_v3(&mut self, pool: &mut BackendPool) {}
+    fn anaylyse_for_handle_call_v3(&mut self, pool: &mut BackendPool) {
+        todo!()
+    }
 
     /// 计算栈空间,进行ra,sp,callee 的保存和恢复
     pub fn build_stack_info(&mut self, f: &mut File, pool: &mut BackendPool) {

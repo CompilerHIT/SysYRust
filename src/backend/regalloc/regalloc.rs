@@ -318,54 +318,7 @@ pub fn build_nums_neighbor_color(
 ///  获取 （下标,块)->失效寄存器集合  表
 /// 注意！！！！ 该函数依赖于func的cal live的结果，内部并不会调用func的cal live
 pub fn build_ends_index_bb(func: &Func) -> HashMap<(i32, ObjPtr<BB>), HashSet<Reg>> {
-    func.calc_live(); //首先重新计算依赖到的calc_live
-                      // TODO 更换新的build ends
-                      // let a = build_ends_index_bb_old(func);
-    let b = build_ends_index_bb_new(func);
-    log_file!("ends.txt", "func:{}", func.label.to_owned());
-    // log_file!("ends.txt", "old:");
-    // a.iter().for_each(|((index, bb), sets)| {
-    //     sets.iter().for_each(|reg| {
-    //         log_file!("ends.txt", "{},{},{}", index, bb.label, reg);
-    //     });
-    // });
-    log_file!("ends.txt", "new:");
-    b.iter().for_each(|((index, bb), sets)| {
-        sets.iter().for_each(|reg| {
-            log_file!("ends.txt", "{},{},{}", index, bb.label, reg);
-        });
-    });
-    // log_file!("ends.txt");
-    return b;
-    // return a;
-}
-// todo,进行替换尝试，更精确地分析
-fn build_ends_index_bb_old(func: &Func) -> HashMap<(i32, ObjPtr<BB>), HashSet<Reg>> {
-    // 获取reg
-    let mut out: HashMap<(i32, ObjPtr<BB>), HashSet<Reg>> = HashMap::new();
-    let mut passed_regs: HashSet<Reg> = HashSet::new();
-    for bb in func.blocks.iter() {
-        for (index, inst) in bb.insts.iter().enumerate().rev() {
-            if let None = out.get(&(index as i32, *bb)) {
-                out.insert((index as i32, *bb), HashSet::new());
-            }
-            for reg in inst.get_regs() {
-                if bb.live_out.contains(&reg) {
-                    continue;
-                }
-                if passed_regs.contains(&reg) {
-                    continue;
-                }
-                passed_regs.insert(reg);
-                out.get_mut(&(index as i32, *bb)).unwrap().insert(reg);
-            }
-        }
-    }
-    out
-}
-
-fn build_ends_index_bb_new(func: &Func) -> HashMap<(i32, ObjPtr<BB>), HashSet<Reg>> {
-    // 获取reg
+    func.calc_live();
     let mut out: HashMap<(i32, ObjPtr<BB>), HashSet<Reg>> = HashMap::new();
     for bb in func.blocks.iter() {
         let mut livenow: HashSet<Reg> = HashSet::new();
@@ -376,7 +329,7 @@ fn build_ends_index_bb_new(func: &Func) -> HashMap<(i32, ObjPtr<BB>), HashSet<Re
             if let None = out.get(&(index as i32, *bb)) {
                 out.insert((index as i32, *bb), HashSet::new());
             }
-            for reg in inst.get_regs() {
+            for reg in inst.get_reg_use() {
                 if livenow.contains(&reg) {
                     continue;
                 }
@@ -384,6 +337,9 @@ fn build_ends_index_bb_new(func: &Func) -> HashMap<(i32, ObjPtr<BB>), HashSet<Re
                 livenow.insert(reg);
             }
             for reg in inst.get_reg_def() {
+                if livenow.contains(&reg) {
+                    out.get_mut(&(index as i32, *bb)).unwrap().remove(&reg);
+                }
                 livenow.remove(&reg);
             }
         }

@@ -13,7 +13,7 @@ use biheap::BiHeap;
 use super::instrs::InstrsType;
 use super::operand::IImm;
 use super::regalloc::structs::RegUsedStat;
-use super::{structs::*, BackendPool};
+use super::{block, structs::*, BackendPool};
 use crate::backend::asm_builder::AsmBuilder;
 use crate::backend::instrs::{LIRInst, Operand};
 use crate::backend::module::AsmModule;
@@ -50,10 +50,9 @@ pub struct Func {
     pub context: ObjPtr<Context>,
 
     pub reg_alloc_info: FuncAllocStat,
-    pub physic_stack_map: HashMap<Reg, StackSlot>, //暂时存储的主人寄存器的空间
     pub spill_stack_map: HashMap<Reg, StackSlot>,
 
-    pub stack_map: HashMap<IImm, StackSlot>,
+    pub slot_to_rearrange: HashMap<IImm, StackSlot>,
 
     pub const_array: HashSet<IntArray>,
     pub float_array: HashSet<FloatArray>,
@@ -82,9 +81,8 @@ impl Func {
             context,
 
             reg_alloc_info: FuncAllocStat::new(),
-            physic_stack_map: HashMap::new(),
             spill_stack_map: HashMap::new(),
-            stack_map: HashMap::new(),
+            slot_to_rearrange: HashMap::new(),
 
             const_array: HashSet::new(),
             float_array: HashSet::new(),
@@ -1078,14 +1076,22 @@ impl Func {
     /// 把函数中分配到物理寄存器的虚拟寄存器改为使用虚拟寄存器
     pub fn p2v(&mut self) {}
 
-    ///精细化的handle spill
+    ///精细化的handle spill:
+    ///
     ///遇到spilling寄存器的时候:
     /// * 优先使用available的寄存器
     ///     其中,优先使用caller save的寄存器
     ///     ,再考虑使用callee save的寄存器.
     /// * 如果要使用unavailable的寄存器,才需要进行spill操作来保存和恢复原值
     ///     优先使用caller save的寄存器,
-    pub fn handle_spill_v3(&mut self) {}
+    /// * 一定要spill到内存上的时候,使用递增的slot,把slot记录到数组的表中,等待重排
+    pub fn handle_spill_v3(&mut self, pool: &mut BackendPool) {
+        self.calc_live();
+        let this = pool.put_func(self.clone());
+        for bb in self.blocks.iter() {
+            bb.as_mut().handle_spill_v3(&this.reg_alloc_info, pool);
+        }
+    }
 
     ///在handle spill之后调用
     /// 返回该函数使用了哪些callee saved的寄存器
@@ -1213,5 +1219,15 @@ impl Func {
             new_insts.reverse();
             bb.as_mut().insts = new_insts;
         }
+
+        slots_for_caller_saved.iter().for_each(|slot| {
+            let imm = IImm::new(slot.get_pos());
+            self.slot_to_rearrange.insert(imm, *slot);
+        });
     }
+}
+
+// rearrange slot实现 ,for module-build v3
+impl Func {
+    pub fn rearrange_stack_slot(&mut self) {}
 }
