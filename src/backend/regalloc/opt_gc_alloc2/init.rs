@@ -10,7 +10,7 @@ impl Allocator {
     pub fn init(&mut self, func: &Func) {
         let num_estimate_regs = func.num_regs();
         let ends_index_bb = regalloc::build_ends_index_bb(func);
-        let all_neighbors = regalloc::build_interference_into_lst(func, &ends_index_bb);
+        let all_neighbors = regalloc::build_interference_into_lst(func);
         let inter_ference_graph = regalloc::build_interference(func);
         let nums_neighbor_color = regalloc::build_nums_neighbor_color(func, &inter_ference_graph);
         let availables = regalloc::build_availables(func, &inter_ference_graph);

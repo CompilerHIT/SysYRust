@@ -181,93 +181,15 @@ pub fn build_interference(func: &Func) -> HashMap<Reg, HashSet<Reg>> {
     interference_graph
 }
 
-pub fn build_interference_into_lst(
-    func: &Func,
-    ends_index_bb: &HashMap<(i32, ObjPtr<BB>), HashSet<Reg>>,
-) -> HashMap<Reg, LinkedList<Reg>> {
-    let mut interference_graph: HashMap<Reg, LinkedList<Reg>> = HashMap::new();
-    let mut if_passed: HashSet<(i32, i32)> = HashSet::new();
-    let tmp_set = HashSet::new();
-    let mut process = |cur_bb: ObjPtr<BB>,
-                       interef_graph: &mut HashMap<Reg, LinkedList<Reg>>,
-                       kind: ScalarType| {
-        let mut livenow: HashSet<Reg> = HashSet::new();
-        // 冲突分析
-        cur_bb.live_in.iter().for_each(|reg| {
-            if reg.get_type() != kind {
-                return;
-            }
-            if let None = interef_graph.get(reg) {
-                interef_graph.insert(*reg, LinkedList::new());
-            }
-            for live in livenow.iter() {
-                // log_file!("tmp2.txt", "pre {} {}.", live, reg);
-                if live == reg {
-                    continue;
-                }
-                // log_file!("tmp2.txt", "suf {} {}.", live, reg);
-                // TODO:检查避免重复加入是否成功
-                if if_passed.contains(&(live.bit_code(), reg.bit_code()))
-                    || if_passed.contains(&(reg.bit_code(), live.bit_code()))
-                {
-                    continue;
-                }
-                if_passed.insert((live.bit_code(), reg.bit_code()));
-                if_passed.insert((reg.bit_code(), live.bit_code()));
-                interef_graph.get_mut(live).unwrap().push_back(*reg);
-                interef_graph.get_mut(reg).unwrap().push_back(*live);
-            }
-            livenow.insert(*reg);
-        });
-        for (index, inst) in cur_bb.insts.iter().enumerate() {
-            // 先与reg use冲突,然后消去终结的,然后与reg def冲突,并加上新的reg def
-            let finishes = ends_index_bb
-                .get(&(index as i32, cur_bb))
-                .unwrap_or(&tmp_set);
-            for finish in finishes {
-                livenow.remove(finish);
-            }
-            for reg in inst.get_reg_def() {
-                if reg.get_type() != kind {
-                    continue;
-                }
-                if let None = interef_graph.get(&reg) {
-                    interef_graph.insert(reg, LinkedList::new());
-                }
-                for live in livenow.iter() {
-                    // log_file!("tmp2.txt", "pre {} {}.", live, reg);
-                    if *live == reg {
-                        continue;
-                    }
-                    // log_file!("tmp2.txt", "suf {} {}.", live, reg);
-                    // TOTO :检查避免重复加入是否成功
-                    if if_passed.contains(&(live.bit_code(), reg.bit_code()))
-                        || if_passed.contains(&(reg.bit_code(), live.bit_code()))
-                    {
-                        continue;
-                    }
-                    if_passed.insert((live.bit_code(), reg.bit_code()));
-                    if_passed.insert((reg.bit_code(), live.bit_code()));
-                    interef_graph.get_mut(live).unwrap().push_back(reg);
-                    interef_graph.get_mut(&reg).unwrap().push_back(*live);
-                }
-                if finishes.contains(&reg) {
-                    continue;
-                } //fixme,修复增加这里的bug
-                livenow.insert(reg);
-            }
-        }
-    };
-    // 遍历所有块，分析冲突关系
-    for cur_bb in func.blocks.iter() {
-        let cur_bb = *cur_bb;
-        // 把不同类型寄存器统计加入表中
-        //分别处理浮点寄存器的情况和通用寄存器的情况
-        process(cur_bb, &mut interference_graph, ScalarType::Float);
-        process(cur_bb, &mut interference_graph, ScalarType::Int);
-        // 加入还没有处理过的bb
+pub fn build_interference_into_lst(func: &Func) -> HashMap<Reg, LinkedList<Reg>> {
+    let mut interference_graph_lst: HashMap<Reg, LinkedList<Reg>> = HashMap::new();
+    let igg = build_interference(func);
+    for (reg, neighbors) in igg.iter() {
+        let mut lst = LinkedList::new();
+        neighbors.iter().for_each(|reg| lst.push_back(*reg));
+        interference_graph_lst.insert(*reg, lst);
     }
-    interference_graph
+    interference_graph_lst
 }
 
 // 获取可分配表
@@ -285,13 +207,17 @@ pub fn build_availables(
         }
         availables.insert(*reg, available);
     }
-    for reg in func.draw_all_virtual_regs() {
-        if availables.contains_key(&reg) {
-            continue;
-        }
-        unreachable!();
-        availables.insert(reg, RegUsedStat::new());
-    }
+    debug_assert!({
+        || -> bool {
+            for reg in func.draw_all_virtual_regs() {
+                if availables.contains_key(&reg) {
+                    continue;
+                }
+                return false;
+            }
+            true
+        }()
+    });
     return availables;
 }
 
@@ -317,28 +243,28 @@ pub fn build_nums_neighbor_color(
 ///
 ///  获取 （下标,块)->失效寄存器集合  表
 /// 注意！！！！ 该函数依赖于func的cal live的结果，内部并不会调用func的cal live
-pub fn build_ends_index_bb(func: &Func) -> HashMap<(i32, ObjPtr<BB>), HashSet<Reg>> {
+pub fn build_ends_index_bb(func: &Func) -> HashMap<(usize, ObjPtr<BB>), HashSet<Reg>> {
     func.calc_live();
-    let mut out: HashMap<(i32, ObjPtr<BB>), HashSet<Reg>> = HashMap::new();
+    let mut out: HashMap<(usize, ObjPtr<BB>), HashSet<Reg>> = HashMap::new();
     for bb in func.blocks.iter() {
         let mut livenow: HashSet<Reg> = HashSet::new();
         bb.live_out.iter().for_each(|reg| {
             livenow.insert(*reg);
         });
         for (index, inst) in bb.insts.iter().enumerate().rev() {
-            if let None = out.get(&(index as i32, *bb)) {
-                out.insert((index as i32, *bb), HashSet::new());
+            if let None = out.get(&(index, *bb)) {
+                out.insert((index, *bb), HashSet::new());
             }
             for reg in inst.get_reg_use() {
                 if livenow.contains(&reg) {
                     continue;
                 }
-                out.get_mut(&(index as i32, *bb)).unwrap().insert(reg);
+                out.get_mut(&(index, *bb)).unwrap().insert(reg);
                 livenow.insert(reg);
             }
             for reg in inst.get_reg_def() {
                 if livenow.contains(&reg) {
-                    out.get_mut(&(index as i32, *bb)).unwrap().remove(&reg);
+                    out.get_mut(&(index, *bb)).unwrap().remove(&reg);
                 }
                 livenow.remove(&reg);
             }
@@ -377,7 +303,7 @@ pub fn merge_alloc(
 ) -> bool {
     // 合并条件,如果一个mv x55 x66指令， 后面 x66指令不再使用了,
     // 则x55(color1),x66(color2)可以进行合并，
-    let ends_index_bb: HashMap<(i32, ObjPtr<BB>), HashSet<Reg>> = build_ends_index_bb(func);
+    let ends_index_bb: HashMap<(usize, ObjPtr<BB>), HashSet<Reg>> = build_ends_index_bb(func);
     let tmp_set = HashSet::new();
     // 计算价值函数,统计一个指令的价值
     let mut base_count_merge_val = |reg: &Reg,
@@ -470,7 +396,7 @@ pub fn merge_alloc(
     let mut merge = |bb: ObjPtr<BB>,
                      dstr: &mut HashMap<i32, i32>,
                      spillings: &mut HashSet<i32>,
-                     ends_index_bb: &HashMap<(i32, ObjPtr<BB>), HashSet<Reg>>,
+                     ends_index_bb: &HashMap<(usize, ObjPtr<BB>), HashSet<Reg>>,
                      nums_neighbor_color: &mut HashMap<Reg, HashMap<i32, i32>>,
                      availables: &mut HashMap<Reg, RegUsedStat>,
                      interference_graph: &HashMap<Reg, HashSet<Reg>>| {
@@ -707,7 +633,7 @@ pub fn check_alloc(
         }
         for (index, inst) in bb.insts.iter().enumerate() {
             // 先處理生命周期結束的寄存器
-            let end_regs = ends_index_bb.get(&(index as i32, *bb)).unwrap_or(&tmp_set);
+            let end_regs = ends_index_bb.get(&(index, *bb)).unwrap_or(&tmp_set);
 
             for reg in end_regs {
                 if spillings.contains(&reg.get_id()) {
