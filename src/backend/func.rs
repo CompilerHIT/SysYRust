@@ -341,6 +341,7 @@ impl Func {
             for reg in block.as_ref().live_use.iter() {
                 queue.push_back((block.clone(), reg.clone()));
             }
+
             block.as_mut().live_in = block.as_ref().live_use.clone();
             block.as_mut().live_out.clear();
         }
@@ -367,6 +368,15 @@ impl Func {
                         queue.push_back((pred.clone(), reg));
                     }
                 }
+            }
+        }
+
+        //把sp和ra寄存器加入到所有的块的live out,live in中，表示这些寄存器永远不能在函数中自由分配使用
+        for bb in self.blocks.iter() {
+            //0:zero, 1:ra, 2:sp
+            for id in 0..=2 {
+                bb.as_mut().live_in.insert(Reg::new(id, ScalarType::Int));
+                bb.as_mut().live_out.insert(Reg::new(id, ScalarType::Int));
             }
         }
 
