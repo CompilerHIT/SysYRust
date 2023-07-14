@@ -133,7 +133,7 @@ fn variable_get(
         map.get(&k).unwrap().clone()
     } else {
         if let IrType::IntPtr = array.get_ir_type() {
-            let bonding = if index > array.get_int_init().1.len() {
+            let bonding = if index >= array.get_int_init().1.len() {
                 0
             } else {
                 array.get_int_init().1[index].1
@@ -143,7 +143,7 @@ fn variable_get(
             map.insert(k, var);
             var
         } else {
-            let bondind = if index > array.get_float_init().1.len() {
+            let bondind = if index >= array.get_float_init().1.len() {
                 0.0
             } else {
                 array.get_float_init().1[index].1
