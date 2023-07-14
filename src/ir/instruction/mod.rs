@@ -174,6 +174,10 @@ impl Inst {
         self.user.get_ir_type()
     }
 
+    pub fn set_ir_type(&mut self, ir_type: IrType) {
+        self.user.set_ir_type(ir_type);
+    }
+
     pub fn get_kind(&self) -> InstKind {
         self.kind.clone()
     }

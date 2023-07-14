@@ -13,4 +13,8 @@ impl Value {
     pub fn get_ir_type(&self) -> IrType {
         self.ir_type
     }
+
+    pub fn set_ir_type(&mut self, ir_type: IrType) {
+        self.ir_type = ir_type
+    }
 }

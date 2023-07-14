@@ -36,6 +36,10 @@ impl User {
         self.value.get_ir_type()
     }
 
+    pub fn set_ir_type(&mut self, ir_type: IrType) {
+        self.value.set_ir_type(ir_type);
+    }
+
     pub fn set_operand(&mut self, index: usize, operand: ObjPtr<Inst>) {
         self.operands[index] = operand;
     }
