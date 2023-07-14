@@ -80,8 +80,7 @@ impl RegUsedStat {
     }
     pub fn is_available_freg(&self, freg: i32) -> bool {
         let freg = freg - 32;
-        let mut unusable: HashSet<i32> = HashSet::from([18, 19, 20]);
-        // unusable.extend(0..20);
+        let unusable: HashSet<i32> = HashSet::from([18, 19, 20]);
         if unusable.contains(&freg) {
             return false;
         }
@@ -147,9 +146,30 @@ impl RegUsedStat {
     // 获取一个可用的浮点寄存器
     pub fn get_available_freg(&self) -> Option<i32> {
         // f0作为特殊浮点寄存器保持0
-        for i in 32..=63 {
-            if self.is_available_freg(i) {
-                return Some(i);
+        // 对于 freg,同样先使用 参数寄存器,然后再使用 callee save寄存器
+        // 最后再使用其他caller save寄存器
+        let args = (10..=17);
+        let mut other_caller_save = vec![];
+        other_caller_save.extend(0..=7);
+        other_caller_save.extend(28..=31);
+        let mut callees = vec![8, 9];
+        callees.extend(18..=27);
+        for reg in args {
+            let reg = reg + 32;
+            if self.is_available_freg(reg) {
+                return Some(reg);
+            }
+        }
+        for reg in callees {
+            let reg = reg + 32;
+            if self.is_available_freg(reg) {
+                return Some(reg);
+            }
+        }
+        for reg in other_caller_save {
+            let reg = reg + 32;
+            if self.is_available_freg(reg) {
+                return Some(reg);
             }
         }
         None
