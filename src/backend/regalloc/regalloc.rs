@@ -137,7 +137,7 @@ pub fn build_interference(func: &Func) -> HashMap<Reg, HashSet<Reg>> {
                 }
                 livenow.insert(*reg);
             });
-            for (index, inst) in cur_bb.insts.iter().enumerate().rev() {
+            for inst in cur_bb.insts.iter().rev() {
                 // 先与reg use冲突,然后消去终结的,然后与reg def冲突,并加上新的reg def
                 // let finishes = ends_index_bb
                 //     .get(&(index as i32, cur_bb))

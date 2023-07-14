@@ -2,6 +2,7 @@
 
 use crate::{
     backend::{
+        func,
         instrs::{Func, BB},
         operand::Reg,
     },
@@ -27,7 +28,8 @@ pub struct Allocator {
     pub costs_reg: HashMap<Reg, f32>,          //记录虚拟寄存器的使用次数(作为代价)
     pub availables: HashMap<Reg, RegUsedStat>, // 保存每个点的可用寄存器集合
     pub nums_neighbor_color: HashMap<Reg, HashMap<i32, i32>>,
-    pub interference_regs: HashSet<Reg>,
+    pub tosimplifys: VecDeque<Reg>,
+    pub tospills: VecDeque<Reg>,
     pub interference_graph: HashMap<Reg, HashSet<Reg>>, //浮点寄存器冲突图
     pub spillings: HashSet<i32>,                        //记录溢出寄存器
 }
@@ -40,9 +42,10 @@ impl Allocator {
             costs_reg: HashMap::new(),
             availables: HashMap::new(),
             interference_graph: HashMap::new(),
-            interference_regs: HashSet::new(),
+            tosimplifys: VecDeque::new(),
             spillings: HashSet::new(),
             nums_neighbor_color: HashMap::new(),
+            tospills: VecDeque::new(),
         }
     }
 
@@ -93,25 +96,23 @@ impl Allocator {
         // 对通用虚拟寄存器进行着色 (已经着色的点不用着色)
         // FIXME,使用自定义的Deque的cursor api重构
         while !self.regs.is_empty() {
-            let reg = *self.regs.front().unwrap();
+            let reg = self.regs.pop_front().unwrap();
             if !reg.is_virtual()
                 || self.spillings.contains(&reg.get_id())
                 || self.colors.contains_key(&reg.get_id())
             {
-                self.regs.pop_front();
                 continue;
             }
             let ok = self.color_one(reg);
             if ok {
-                self.regs.pop_front();
+                continue;
             } else {
                 out = false;
                 Allocator::debug("interef", [&reg].into_iter().collect());
-                self.interference_regs.insert(reg);
+                self.tosimplifys.push_back(reg);
                 break;
             }
         }
-
         out
     }
 
@@ -120,49 +121,24 @@ impl Allocator {
         // 简化方式
         // 处理产生冲突的寄存器
         // 方式,周围的寄存器变换颜色,直到该寄存器有不冲突颜色
-        let mut out = false;
-
-        // 不断化简,直到不能化简
-        while !self.regs.is_empty() {
-            let reg = *self.regs.front().unwrap();
-            if !reg.is_virtual()
-                || self.spillings.contains(&reg.get_id())
-                || self.colors.contains_key(&reg.get_id())
-            {
-                self.regs.pop_front();
-                continue;
-            }
-            if self.interference_regs.contains(&reg) {
-                let ok = self.simplify_one(&reg);
-                if ok {
-                    self.regs.pop_front();
-                    self.interference_regs.remove(&reg);
-                    return true;
-                }
-            }
-            break;
+        let mut ok = false;
+        ///对interference
+        let tosimplify = self.tosimplifys.pop_front().unwrap();
+        ok = self.simplify_one(&tosimplify);
+        if ok {
+            self.regs.push_front(tosimplify);
+        } else {
+            self.tospills.push_back(tosimplify);
         }
-        out //化简失败
+        ok
     }
 
     // 简化失败后执行溢出操作,选择一个节点进行溢出,然后对已经作色节点进行重新分配
     pub fn spill(&mut self) {
         // 溢出寄存器之后更新节点周围节点颜色
-        while !self.regs.is_empty() {
-            let reg = *self.regs.front().unwrap();
-            if !reg.is_virtual()
-                || self.spillings.contains(&reg.get_id())
-                || self.colors.contains_key(&reg.get_id())
-            {
-                self.regs.pop_front();
-                continue;
-            }
-            if self.interference_regs.contains(&reg) {
-                self.spill_one(reg);
-                self.interference_regs.clear();
-            }
-            break;
-        }
+        ///对interference
+        let to_spill_one = self.tospills.pop_front().unwrap();
+        self.spill_one(&to_spill_one);
     }
 
     // 返回分配结果
@@ -191,6 +167,7 @@ impl Allocator {
         let available = availables.get(&reg).unwrap();
         let color = available.get_available_reg(reg.get_type());
         if color.is_none() {
+            // println!("{}", reg);
             return false;
         }
         let color = color.unwrap();
@@ -214,9 +191,14 @@ impl Allocator {
     }
 
     pub fn color_one_with_certain_color(&mut self, reg: Reg, color: i32) {
-        if self.spillings.contains(&reg.get_id()) {
-            panic!("gg");
-        }
+        debug_assert!(
+            !self.spillings.contains(&reg.get_id()),
+            "try to color spilled reg"
+        );
+        debug_assert!(
+            !self.colors.contains_key(&reg.get_id()),
+            "try to color colored reg"
+        );
         self.colors.insert(reg.get_id(), color);
         if let Some(neighbors) = self.interference_graph.get(&reg) {
             for neighbor in neighbors {
@@ -230,12 +212,11 @@ impl Allocator {
 
     // 移除一个节点的颜色
     pub fn decolor_one(&mut self, reg: Reg) -> bool {
-        if !reg.is_virtual() {
-            panic!("try to color un virtual reg");
-        }
-        if self.spillings.contains(&reg.get_id()) {
-            panic!("try to color spilling v reg");
-        }
+        debug_assert!(!reg.is_physic());
+        debug_assert!(
+            !self.spillings.contains(&reg.get_id()),
+            "try to  decolor spilled reg"
+        );
         let color = *self.colors.get(&reg.get_id()).unwrap();
         //
         self.colors.remove(&reg.get_id());
@@ -256,14 +237,14 @@ impl Allocator {
                         .unwrap()
                         .release_reg(color);
                 }
+                debug_assert!(new_num >= 0, "num neighbor color can not be negative");
             }
         }
-        self.spillings.insert(reg.get_id());
         true
     }
 
     //
-    pub fn spill_one(&mut self, reg: Reg) {
+    pub fn spill_one(&mut self, reg: &Reg) {
         // 选择冲突寄存器或者是周围寄存器中的一个进行溢出,
         // 溢出的选择贪心: f=cost/degree.
         // 选择使得贪心函数最小的一个
@@ -274,7 +255,7 @@ impl Allocator {
             return *self.costs_reg.get(reg).unwrap()
                 / interference_graph.get(reg).unwrap_or(&HashSet::new()).len() as f32;
         };
-        let mut tospill: Reg = reg;
+        let mut tospill: Reg = *reg;
         let mut heuoristic_of_spill = cost(&tospill); //待消解节点的启发函数值
         let inters = interference_graph.get(&tospill).unwrap();
         for neighbor in inters {
@@ -287,6 +268,16 @@ impl Allocator {
 
             // TODO ,比较效果，判断是否应该把有颜色的寄存器也纳入spill范围内
             if !colors.contains_key(&neighbor.get_id()) {
+                continue;
+            }
+            let color = colors.get(&neighbor.get_id()).unwrap();
+            let num = self
+                .nums_neighbor_color
+                .get(&reg)
+                .unwrap()
+                .get(color)
+                .unwrap();
+            if *num != 1 {
                 continue;
             }
             //没有着色的寄存器无法选择溢出
@@ -303,6 +294,9 @@ impl Allocator {
             self.decolor_one(tospill);
         }
         self.spillings.insert(tospill.get_id());
+        if tospill != *reg {
+            self.regs.push_back(*reg);
+        }
     }
 
     pub fn simplify_one(&mut self, target_reg: &Reg) -> bool {
@@ -311,12 +305,13 @@ impl Allocator {
         // 遍历目标寄存器的周围寄存器
         let neighbors = interference_graph.get(&target_reg).unwrap();
         let nums_colors = self.nums_neighbor_color.get_mut(&target_reg).unwrap();
+
+        let mut tosimplify_with = None;
         //统计目标寄存器周围寄存器的颜色
         // 对周围的寄存器进行颜色更换,
         // TODO,使用贪心算法选择最适合用来颜色替换的节点
         for neighbor in neighbors {
             let neighbor = *neighbor;
-            let target_reg = *target_reg;
             if !neighbor.is_virtual() {
                 continue;
             }
@@ -327,25 +322,29 @@ impl Allocator {
                 continue;
             }
             let color = colors.get(&neighbor.get_id()).unwrap();
-            if *nums_colors.get(color).unwrap() > 1 {
+            if *nums_colors.get(color).unwrap() != 1 {
                 continue;
             }
             if self
                 .availables
                 .get(&neighbor)
                 .unwrap()
-                .num_available_regs(target_reg.get_type())
-                <= 1
+                .num_available_regs(neighbor.get_type())
+                < 2
             {
                 continue;
             }
             // TODO, 检查,
             out = true;
-            self.decolor_one(neighbor);
-            self.color_one(target_reg);
-            self.color_one(neighbor);
+            tosimplify_with = Some(neighbor);
             break;
         }
+        if let Some(neighbor) = tosimplify_with {
+            self.decolor_one(neighbor);
+            debug_assert!(self.color_one(*target_reg));
+            debug_assert!(self.color_one(neighbor));
+        }
+
         out
     }
 
@@ -381,6 +380,7 @@ impl Allocator {
 
 impl Regalloc for Allocator {
     fn alloc(&mut self, func: &crate::backend::func::Func) -> super::structs::FuncAllocStat {
+        println!("{}", func.label);
         self.build_interference_graph(func);
         self.count_spill_costs(func);
 

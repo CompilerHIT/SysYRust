@@ -120,7 +120,7 @@ impl RegUsedStat {
         // 修改为优先使用参数寄存器
         // 其次使用callee save寄存器
         // 然后使用剩余 caller save寄存器
-        let mut args = (11..=17);
+        let mut args = (10..=17);
         let other_caller_save = vec![1, 5, 6, 7, 28, 29, 30, 31];
         let mut callees = vec![2, 8, 9];
         callees.extend(18..=27);
