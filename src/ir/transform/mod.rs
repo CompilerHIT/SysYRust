@@ -12,6 +12,7 @@ mod global_var_transform;
 mod loop_operation;
 mod meaningless_insts_folding;
 mod phi_optimizer;
+mod return_unused;
 mod simplify_cfg;
 mod verify;
 
@@ -73,8 +74,11 @@ fn functional_optimizer(
     // 全局变量转换
     global_var_transform::global_var_transform(module, &mut pools);
 
+    // 函数返回值优化
+    return_unused::return_unused(module);
+
     // 死代码删除
-    dead_code_eliminate::dead_code_eliminate(module, optimize_flag);
+    dead_code_eliminate::dead_code_eliminate(module, true);
     // 全局死代码删除
     dead_code_eliminate::global_eliminate(module);
 }
