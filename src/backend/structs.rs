@@ -196,7 +196,11 @@ impl Hash for CurInstrInfo {
 
 impl StackSlot {
     pub fn new(pos: i32, size: i32) -> Self {
-        Self { pos, size, is_fixed: false }
+        Self {
+            pos,
+            size,
+            is_fixed: false,
+        }
     }
     pub fn get_pos(&self) -> i32 {
         self.pos
@@ -348,3 +352,12 @@ impl PartialEq for FloatArray {
 }
 
 impl Eq for FloatArray {}
+
+impl Operand {
+    pub fn get_func_name(&self) -> String {
+        match self {
+            Operand::Addr(func_name) => func_name.to_owned(),
+            _ => unreachable!(),
+        }
+    }
+}

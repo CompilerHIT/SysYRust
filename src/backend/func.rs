@@ -524,7 +524,7 @@ impl Func {
     }
 
     /// 为要保存的callee save寄存器开栈,然后开栈以及处理 callee save的保存和恢复
-    fn save_callee(&mut self, pool: &mut BackendPool, f: &mut File) {
+    pub fn save_callee(&mut self, pool: &mut BackendPool, f: &mut File) {
         let mut callee_map: HashMap<Reg, StackSlot> = HashMap::new();
         if self.label == "main" {
             self.build_stack_info(f, callee_map, true);
@@ -708,60 +708,6 @@ impl Func {
     }
 }
 
-/// 把信息的构造和 具体指令插入 分离 并且使用贪心决策的 handel spill,handle cal操作
-/// 为实现 "函数分裂" 做准备
-impl Func {
-    ///p_to_v
-    /// 把函数中分配到物理寄存器的虚拟寄存器改为使用虚拟寄存器
-    pub fn p2v(&mut self) {}
-
-    ///精细化的handle spill
-    ///遇到spilling寄存器的时候:
-    /// * 优先使用available的寄存器
-    ///     其中,优先使用caller save的寄存器
-    ///     ,再考虑使用callee save的寄存器.
-    /// * 如果要使用unavailable的寄存器,才需要进行spill操作来保存和恢复原值
-    ///     优先使用caller save的寄存器,
-    pub fn handle_spill_v3(&mut self) {}
-
-    ///在handle spill之后调用
-    /// 返回该函数使用了哪些callee saved的寄存器
-    pub fn draw_used_callees(&self) -> HashSet<Reg> {
-        let mut callees: HashSet<Reg> = HashSet::new();
-        for bb in self.blocks.iter() {
-            for inst in bb.insts.iter() {
-                for reg in inst.get_regs() {
-                    if reg.is_callee_save() {
-                        callees.insert(reg);
-                    }
-                }
-            }
-        }
-        callees
-    }
-
-    /// 在handle spill之后调用
-    /// 生成call前后需要保存的caller save寄存器的信息
-    /// 是否需要保存caller save,在于被调用函数是否使用了caller save寄存器
-    /// 所以被调用函数应该尽量地不使用需要保存地caller save寄存器
-    /// 遇到新的函数返回新的函数
-    pub fn analyse_for_handle_call(
-        &mut self,
-        pool: &mut BackendPool,
-        base_funcs: &HashMap<String, ObjPtr<Func>>,
-        call_info: &mut HashMap<String, HashMap<Bitmap, ObjPtr<Func>>>,
-    ) -> Vec<ObjPtr<Func>> {
-        let mut new_funcs: Vec<ObjPtr<Func>> = Vec::new();
-        todo!();
-        new_funcs
-    }
-
-    /// 根据信息进行call的插入
-    pub fn handle_call(&mut self, call_info: &HashMap<String, HashMap<Bitmap, ObjPtr<Func>>>) {
-        self.calc_live();
-    }
-}
-
 /// 打印函数当前的汇编形式
 impl Func {
     pub fn print_func(&self) {
@@ -862,7 +808,7 @@ impl Func {
 /// handle spill2: handle spill过程中对spill寄存器用到的栈进行重排
 /// func的handle spill v2能够与v1 完美替换
 impl Func {
-    // 为spilling 寄存器预先分配空间 的 handle spill
+    /// 为spilling 寄存器预先分配空间 的 handle spill
     pub fn handle_spill_v2(&mut self, pool: &mut BackendPool, f: &mut File) {
         let this = pool.put_func(self.clone());
         // 首先给这个函数分配spill的空间
@@ -879,7 +825,7 @@ impl Func {
         self.save_callee(pool, f);
     }
 
-    // 为了分配spill的虚拟寄存器所需的栈空间使用的而构建冲突图
+    /// 为了分配spill的虚拟寄存器所需的栈空间使用的而构建冲突图
     fn build_interferench_for_assign_stack_slot_for_spill(&mut self) -> HashMap<Reg, HashSet<Reg>> {
         let mut out: HashMap<Reg, HashSet<Reg>> = HashMap::new();
         self.calc_live();
@@ -926,6 +872,7 @@ impl Func {
         out
     }
 
+    /// 分析spill空间之间的冲突关系,进行紧缩
     fn assign_stack_slot_for_spill(&mut self) {
         // 统计所有spill寄存器的使用次数,根据寄存器数量更新其值
         // 首先给存储在物理寄存器中的值的空间
@@ -1125,6 +1072,59 @@ impl Func {
     }
 }
 
+/// handle spill v3实现
+impl Func {
+    ///p_to_v
+    /// 把函数中分配到物理寄存器的虚拟寄存器改为使用虚拟寄存器
+    pub fn p2v(&mut self) {}
+
+    ///精细化的handle spill
+    ///遇到spilling寄存器的时候:
+    /// * 优先使用available的寄存器
+    ///     其中,优先使用caller save的寄存器
+    ///     ,再考虑使用callee save的寄存器.
+    /// * 如果要使用unavailable的寄存器,才需要进行spill操作来保存和恢复原值
+    ///     优先使用caller save的寄存器,
+    pub fn handle_spill_v3(&mut self) {}
+
+    ///在handle spill之后调用
+    /// 返回该函数使用了哪些callee saved的寄存器
+    pub fn draw_used_callees(&self) -> HashSet<Reg> {
+        let mut callees: HashSet<Reg> = HashSet::new();
+        for bb in self.blocks.iter() {
+            for inst in bb.insts.iter() {
+                for reg in inst.get_regs() {
+                    if reg.is_callee_save() {
+                        callees.insert(reg);
+                    }
+                }
+            }
+        }
+        callees
+    }
+
+    /// 在handle spill之后调用
+    /// 生成call前后需要保存的caller save寄存器的信息
+    /// 是否需要保存caller save,在于被调用函数是否使用了caller save寄存器
+    /// 所以被调用函数应该尽量地不使用需要保存地caller save寄存器
+    /// 遇到新的函数返回新的函数
+    pub fn analyse_for_handle_call(
+        &mut self,
+        pool: &mut BackendPool,
+        base_funcs: &HashMap<String, ObjPtr<Func>>,
+        call_info: &mut HashMap<String, HashMap<Bitmap, ObjPtr<Func>>>,
+    ) -> Vec<ObjPtr<Func>> {
+        let mut new_funcs: Vec<ObjPtr<Func>> = Vec::new();
+        todo!();
+        new_funcs
+    }
+
+    /// 根据信息进行call的插入
+    pub fn handle_call(&mut self, call_info: &HashMap<String, HashMap<Bitmap, ObjPtr<Func>>>) {
+        self.calc_live();
+    }
+}
+
 ///handle call v3的实现
 impl Func {
     ///配合v3系列的module.build
@@ -1132,10 +1132,11 @@ impl Func {
     pub fn handle_call_v3(
         &mut self,
         pool: &mut BackendPool,
-        call_info: &HashMap<String, ObjPtr<Func>>,
+        callers_used: &HashMap<String, HashSet<Reg>>,
     ) {
         ///
         self.calc_live();
+        let mut slots_for_caller_saved: Vec<StackSlot> = Vec::new();
         ///
         for bb in self.blocks.iter() {
             let mut new_insts: Vec<ObjPtr<LIRInst>> = Vec::new();
@@ -1146,20 +1147,62 @@ impl Func {
             for inst in bb.insts.iter().rev() {
                 if inst.get_type() == InstrsType::Call {
                     ///找出 caller saved
-                    let mut to_saved: HashSet<Reg> = HashSet::new();
+                    let mut to_saved: Vec<Reg> = Vec::new();
                     for reg in live_now.iter() {
                         if reg.is_caller_save() {
-                            to_saved.insert(*reg);
+                            to_saved.push(*reg);
                         }
                     }
-                    // 对于每个caller save寄存器插入一对load store
 
-                    todo!()
+                    //TODO to_check, 根据指令判断是否使用
+                    let func_name = inst.get_label().get_func_name();
+                    let callers_used = callers_used.get(&func_name).unwrap();
+                    to_saved = to_saved
+                        .iter()
+                        .cloned()
+                        .filter(|reg| callers_used.contains(reg))
+                        .collect();
+
+                    //根据调用的函数的情况,判断这个函数使用了哪些caller save寄存器
+                    // 准备栈空间
+                    while slots_for_caller_saved.len() < to_saved.len() {
+                        let last_slot = self.stack_addr.back().unwrap();
+                        let new_pos = last_slot.get_pos() + last_slot.get_size();
+                        let new_slot = StackSlot::new(new_pos, ADDR_SIZE);
+                        self.stack_addr.push_back(new_slot);
+                        slots_for_caller_saved.push(new_slot);
+                    }
+                    //产生一条指令
+                    let build_ls = |reg: Reg, offset: i32, kind: InstrsType| -> LIRInst {
+                        debug_assert!(
+                            (kind == InstrsType::LoadFromStack || kind == InstrsType::StoreToStack)
+                        );
+                        let mut ins = LIRInst::new(
+                            kind,
+                            vec![Operand::Reg(reg), Operand::IImm(IImm::new(offset))],
+                        );
+                        ins.set_double();
+                        ins
+                    };
+                    // 插入恢复指令
+                    for (index, reg) in to_saved.iter().enumerate() {
+                        let pos = slots_for_caller_saved.get(index).unwrap().get_pos();
+                        let load_inst = build_ls(*reg, pos, InstrsType::LoadFromStack);
+                        let load_inst = pool.put_inst(load_inst);
+                        new_insts.push(load_inst);
+                    }
+                    new_insts.push(*inst);
+                    //插入保存指令
+                    for (index, reg) in to_saved.iter().enumerate() {
+                        let pos = slots_for_caller_saved.get(index).unwrap().get_pos();
+                        let store_inst = build_ls(*reg, pos, InstrsType::StoreToStack);
+                        let store_inst = pool.put_inst(store_inst);
+                        new_insts.push(store_inst);
+                    }
+                    continue;
                 }
                 for reg in inst.get_reg_def() {
-                    if !live_now.contains(&reg) {
-                        unreachable!()
-                    }
+                    debug_assert!(live_now.contains(&reg));
                     live_now.remove(&reg);
                 }
                 for reg in inst.get_reg_use() {
