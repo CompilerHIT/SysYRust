@@ -25,4 +25,8 @@ impl BackendPass {
         self.clear_pass();
         self.block_pass(pool);
     }
+
+    pub fn run_addition_block_pass(&mut self) {
+        self.clear_useless_jump();
+    }
 }
