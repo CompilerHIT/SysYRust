@@ -89,7 +89,9 @@ pub fn generate_asm(
     // 检查地址溢出，插入间接寻址
     module.handle_overflow(&mut pool);
     //TODO: 块重排
-
+    if is_opt {
+        BackendPass::new(ObjPtr::new(module)).run_addition_block_pass();
+    }
     //生成抽象汇编
 
     //生成汇编

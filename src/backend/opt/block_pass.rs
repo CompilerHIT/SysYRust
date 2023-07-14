@@ -9,7 +9,6 @@ impl BackendPass {
         self.merge_br_jump();
         self.clear_empty_block();
         self.resolve_merge_br();
-        // self.clear_useless_jump();
     }
 
     fn merge_br_jump(&mut self) {
@@ -187,7 +186,7 @@ impl BackendPass {
         });
     }
 
-    fn clear_useless_jump(&mut self) {
+    pub fn clear_useless_jump(&mut self) {
         self.module.func_map.iter().for_each(|(_, func)| {
             if !func.is_extern {
                 for (i, block) in func.blocks.iter().enumerate() {
@@ -199,6 +198,8 @@ impl BackendPass {
                                 _ => panic!("jump label error"),
                             };
                             if *label == func.blocks[i + 1].label {
+                                let labels: Vec<_> = block.get_after().iter().map(|b| b.label.clone()).collect();
+                                // log!("jump label: {:?}, next blocks label: {:?}", tail.get_label(), labels);
                                 block.as_mut().insts.pop();
                             }
                         }
