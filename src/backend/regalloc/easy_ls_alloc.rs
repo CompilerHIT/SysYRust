@@ -1,9 +1,11 @@
 // 或者可以认为是没有启发的线性扫描寄存器分配
 
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{HashMap, HashSet, VecDeque},
     fs,
 };
+
+use biheap::BiHeap;
 
 use crate::{
     backend::{
@@ -20,6 +22,8 @@ use crate::{
 use super::structs::FuncAllocStat;
 
 const easy_ls_path: &str = "easyls.txt";
+
+struct BlocksVec(Vec<ObjPtr<BB>>);
 
 pub struct Allocator {}
 
@@ -49,6 +53,7 @@ impl Regalloc for Allocator {
         let spill_costs = regalloc::regalloc::estimate_spill_cost(func);
 
         let mut blocks: Vec<ObjPtr<BB>> = func.blocks.iter().cloned().collect();
+        blocks.sort_by_key(|bb| bb.live_in.len());
         ///基础着色,
         Allocator::alloc_one_opt(
             &blocks,
@@ -57,32 +62,33 @@ impl Regalloc for Allocator {
             &mut colors,
             &spill_costs,
         );
-        loop {
-            spillings.clear();
-            blocks.reverse();
-            let mut if_opt = Allocator::alloc_one_fixed(
-                &blocks,
-                &ends_index_bb,
-                &mut spillings,
-                &mut colors,
-                &spill_costs,
-            );
-            if if_opt {
-                continue;
-            }
-            blocks.reverse();
-            if_opt = Allocator::alloc_one_fixed(
-                &blocks,
-                &ends_index_bb,
-                &mut spillings,
-                &mut colors,
-                &spill_costs,
-            );
-            if if_opt {
-                continue;
-            }
-            break;
-        }
+
+        // loop {
+        //     spillings.clear();
+        //     blocks.reverse();
+        //     let mut if_opt = Allocator::alloc_one_fixed(
+        //         &blocks,
+        //         &ends_index_bb,
+        //         &mut spillings,
+        //         &mut colors,
+        //         &spill_costs,
+        //     );
+        //     if if_opt {
+        //         continue;
+        //     }
+        //     blocks.reverse();
+        //     if_opt = Allocator::alloc_one_fixed(
+        //         &blocks,
+        //         &ends_index_bb,
+        //         &mut spillings,
+        //         &mut colors,
+        //         &spill_costs,
+        //     );
+        //     if if_opt {
+        //         continue;
+        //     }
+        //     break;
+        // }
         // TODO,循环裂变着色
         let (stackSize, bb_stack_sizes) = regalloc::regalloc::countStackSize(func, &spillings);
         FuncAllocStat {
@@ -189,10 +195,6 @@ impl Allocator {
         spill_costs: &HashMap<Reg, f32>,
     ) {
         ///基础着色
-        let mut fixed: HashSet<i32> = HashSet::new();
-        for (reg, _) in colors.iter() {
-            fixed.insert(*reg);
-        }
         for bb in blocks.iter() {
             // 对于bb,首先从 live in中找出已用颜色
             let mut reg_use_stat: RegUsedStat = RegUsedStat::new();
@@ -201,7 +203,7 @@ impl Allocator {
             log_file!(easy_ls_path, "{},live in:{:?}", bb.label, bb.live_in);
             bb.live_in.iter().for_each(|reg| {
                 if reg.is_physic() || colors.contains_key(&reg.get_id()) {
-                    Allocator::process_one_reg_fixed(
+                    Allocator::process_one_reg_opt(
                         reg,
                         &mut live_now,
                         &mut last_used,
@@ -209,8 +211,9 @@ impl Allocator {
                         colors,
                         &spill_costs,
                         spillings,
-                        &mut fixed,
                     );
+                } else {
+                    Allocator::color_one(reg, &mut reg_use_stat, spillings, colors, &mut last_used);
                 }
                 live_now.insert(*reg);
             });
@@ -233,7 +236,7 @@ impl Allocator {
                 //然后对于新发现的def的寄存器,给它选择一个可用颜色,或者加上它的可用颜色情况
                 for reg in inst.get_reg_def() {
                     if reg.is_physic() || colors.contains_key(&reg.get_id()) {
-                        Allocator::process_one_reg_fixed(
+                        Allocator::process_one_reg_opt(
                             &reg,
                             &mut live_now,
                             &mut last_used,
@@ -241,19 +244,15 @@ impl Allocator {
                             colors,
                             &spill_costs,
                             spillings,
-                            &mut fixed,
                         );
                     } else if !spillings.contains(&reg.get_id()) {
-                        let color = reg_use_stat.get_available_reg(reg.get_type());
-                        if color.is_none() {
-                            spillings.insert(reg.get_id());
-                        } else {
-                            let color = color.unwrap();
-                            log_file!(easy_ls_path, "color:{}({})", reg, color);
-                            colors.insert(reg.get_id(), color);
-                            reg_use_stat.use_reg(color);
-                            last_used.insert(color, reg);
-                        }
+                        Allocator::color_one(
+                            &reg,
+                            &mut reg_use_stat,
+                            spillings,
+                            colors,
+                            &mut last_used,
+                        );
                     }
                     live_now.insert(reg);
                 }
