@@ -730,7 +730,7 @@ fn dump_inst(
             }
         }
         InstKind::Branch => {
-            if inst.is_jmp() {
+            if inst.is_br_jmp() {
                 text += format!(
                     "  br label %{}\n",
                     format!("bb_{}", inst.get_parent_bb().get_next_bb()[0].get_name()).as_str()
