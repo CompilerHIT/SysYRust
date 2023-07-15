@@ -380,7 +380,6 @@ impl Allocator {
 
 impl Regalloc for Allocator {
     fn alloc(&mut self, func: &crate::backend::func::Func) -> super::structs::FuncAllocStat {
-        println!("{}", func.label);
         self.build_interference_graph(func);
         self.count_spill_costs(func);
 

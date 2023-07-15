@@ -59,12 +59,7 @@ pub fn is_imm_20bs(imm: i32) -> bool {
     imm >= -IMM_20_Bs - 1 && imm <= IMM_20_Bs
 }
 pub fn is_imm_12bs(imm: i32) -> bool {
-    let mut jud = imm >= -IMM_12_Bs - 1 && imm <= IMM_12_Bs;
-    debug_assert!(|| -> bool {
-        println!("{imm}{jud}");
-        true
-    }());
-    jud
+    imm >= -IMM_12_Bs - 1 && imm <= IMM_12_Bs
 }
 
 pub trait ToString {

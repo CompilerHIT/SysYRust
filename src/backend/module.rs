@@ -80,7 +80,7 @@ impl AsmModule {
         // TOCHECK 寄存器分配和handlespill前无用指令删除,比如删除mv指令方便寄存器分配
         // self.generate_row_asm(f2, pool); //注释
         self.remove_unuse_inst_pre_alloc();
-        self.generate_row_asm(f2, pool); //注释
+        // self.generate_row_asm(f2, pool); //注释
 
         self.allocate_reg();
         // self.generate_row_asm(f2, pool); //注释
@@ -267,7 +267,7 @@ impl AsmModule {
         self.build_lir(pool);
         // TOCHECK 寄存器分配和handlespill前无用指令删除,比如删除mv指令方便寄存器分配
         self.remove_unuse_inst_pre_alloc();
-        self.generate_row_asm(f2, pool); //注释
+        // self.generate_row_asm(f2, pool); //注释
         self.allocate_reg();
         self.handle_spill_v2(pool, f);
         self.map_v_to_p();
