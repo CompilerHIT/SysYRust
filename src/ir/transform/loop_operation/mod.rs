@@ -17,13 +17,13 @@ use self::{licm::licm_run, livo::livo_run, loop_simplify::loop_simplify_run};
 mod licm;
 mod livo;
 mod loop_simplify;
+mod loop_unrolling;
 
 pub fn loop_optimize(
     module: &mut Module,
     pools: &mut (&mut ObjPool<BasicBlock>, &mut ObjPool<Inst>),
 ) {
     let mut loop_map = loop_recognize(module);
-
     func_process(module, |name, _| {
         loop_simplify_run(loop_map.get_mut(&name).unwrap(), pools);
     });
@@ -34,6 +34,9 @@ pub fn loop_optimize(
     func_process(module, |name, _| {
         licm_run(loop_map.get_mut(&name).unwrap(), pools);
     });
+
+    loop_unrolling::loop_unrolling(module, &mut loop_map, pools);
+    super::functional_optimizer(module, pools, false);
 
     // 归纳变量强度削减
     func_process(module, |name, func| {

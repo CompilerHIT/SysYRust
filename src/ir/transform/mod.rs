@@ -32,6 +32,7 @@ pub fn optimizer_run(
         // 循环优化
         loop_operation::loop_optimize(module, &mut pools);
         functional_optimizer(module, &mut pools, optimize_flag);
+        simplify_cfg::simplify_cfg_run(module, &mut pools);
 
         // 函数内联
         func_inline::inline_run(module, &mut pools);
