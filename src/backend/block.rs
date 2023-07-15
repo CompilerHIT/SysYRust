@@ -1751,7 +1751,9 @@ impl BB {
                         }
                     }
                 }
+
                 InstrsType::LoadFromStack | InstrsType::StoreToStack => {
+                    
                     let temp = Operand::Reg(Reg::new(8, ScalarType::Int));
                     let offset = inst_ref.get_stack_offset().get_data();
                     if offset == 2112 {
@@ -1788,6 +1790,7 @@ impl BB {
                         Operand::IImm(IImm::new(0)),
                     ]);
                 }
+
                 InstrsType::LoadParamFromStack | InstrsType::StoreParamToStack => {
                     let temp = Operand::Reg(Reg::new(8, ScalarType::Int));
                     let offset =
@@ -1887,8 +1890,8 @@ impl BB {
                             break;
                         }
                     }
-                    pos += 1;
                 }
+
                 InstrsType::Call => {
                     // call 指令不会发生偏移量的溢出
                 }
