@@ -352,6 +352,12 @@ impl Func {
 
             block.as_mut().live_in = block.as_ref().live_use.clone();
             block.as_mut().live_out.clear();
+            match block.insts.last().unwrap().get_type() {
+                InstrsType::Ret(r_type) => {
+                    block.as_mut().live_out.insert(Reg::new(10, r_type));
+                }
+                _ => (),
+            }
         }
 
         //然后计算live in 和live out
