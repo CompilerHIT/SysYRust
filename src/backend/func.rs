@@ -303,9 +303,9 @@ impl Func {
         // 以块为遍历单位进行更新
         // TODO 重写
         // 首先计算出live def和live use
-        if self.label == "main" {
-            log!("to");
-        }
+        // if self.label == "main" {
+        //     log!("to");
+        // }
 
         let mut queue: VecDeque<(ObjPtr<BB>, Reg)> = VecDeque::new();
         for block in self.blocks.iter() {

@@ -183,9 +183,6 @@ impl BackendPass {
         if inst.get_type() == InstrsType::LoadFromStack
             || inst.get_type() == InstrsType::StoreToStack
         {
-            if inst.get_type() == InstrsType::StoreToStack {
-                log!("store: {:?}", inst.get_stack_offset().get_data());
-            }
             if !operand::is_imm_12bs(inst.get_stack_offset().get_data()) {
                 return true;
             }
