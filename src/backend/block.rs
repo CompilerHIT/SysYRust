@@ -819,7 +819,7 @@ impl BB {
                 InstKind::Branch => {
                     // if jump
                     let mut inst = LIRInst::new(InstrsType::Jump, vec![]);
-                    if inst_ref.is_jmp() {
+                    if inst_ref.is_br_jmp() {
                         let next_bb = block.as_ref().get_next_bb()[0];
                         if next_bb.is_empty() {
                             break;
