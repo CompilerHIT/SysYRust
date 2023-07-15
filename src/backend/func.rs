@@ -399,8 +399,8 @@ impl Func {
         //         })
         //     }
         // }
-        let mut allocator = crate::backend::regalloc::easy_ls_alloc::Allocator::new();
-        // let mut allocator = crate::backend::regalloc::easy_gc_alloc::Allocator::new();
+        // let mut allocator = crate::backend::regalloc::easy_ls_alloc::Allocator::new();
+        let mut allocator = crate::backend::regalloc::easy_gc_alloc::Allocator::new();
         // let mut allocator = crate::backend::regalloc::opt_gc_alloc2::Allocator::new();
         // let mut allocator = crate::backend::regalloc::opt_gc_alloc::Allocator::new();
         // let mut allocator = crate::backend::regalloc::base_alloc::Allocator::new();
@@ -850,30 +850,34 @@ impl Func {
                 if !out.contains_key(reg) {
                     out.insert(*reg, HashSet::new());
                 }
+                for live in live_now.iter() {
+                    if live == reg {
+                        continue;
+                    }
+                    out.get_mut(live).unwrap().insert(*reg);
+                    out.get_mut(reg).unwrap().insert(*live);
+                }
                 live_now.insert(*reg);
             }
             for inst in bb.insts.iter().rev() {
                 for reg in inst.get_reg_def() {
+                    live_now.remove(&reg);
+                }
+
+                for reg in inst.get_reg_use() {
                     if !self.reg_alloc_info.spillings.contains(&reg.get_id()) {
                         continue;
                     }
                     if !out.contains_key(&reg) {
                         out.insert(reg, HashSet::new());
                     }
+
                     for live in live_now.iter() {
-                        if reg == *live {
+                        if live == &reg {
                             continue;
                         }
-                        out.get_mut(&reg).unwrap().insert(*live);
                         out.get_mut(live).unwrap().insert(reg);
-                    }
-                }
-                for reg in inst.get_reg_def() {
-                    live_now.remove(&reg);
-                }
-                for reg in inst.get_reg_use() {
-                    if !self.reg_alloc_info.spillings.contains(&reg.get_id()) {
-                        continue;
+                        out.get_mut(&reg).unwrap().insert(*live);
                     }
                     live_now.insert(reg);
                 }
