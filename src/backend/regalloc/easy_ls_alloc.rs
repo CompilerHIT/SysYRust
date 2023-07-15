@@ -63,32 +63,32 @@ impl Regalloc for Allocator {
             &spill_costs,
         );
 
-        // loop {
-        //     spillings.clear();
-        //     blocks.reverse();
-        //     let mut if_opt = Allocator::alloc_one_fixed(
-        //         &blocks,
-        //         &ends_index_bb,
-        //         &mut spillings,
-        //         &mut colors,
-        //         &spill_costs,
-        //     );
-        //     if if_opt {
-        //         continue;
-        //     }
-        //     blocks.reverse();
-        //     if_opt = Allocator::alloc_one_fixed(
-        //         &blocks,
-        //         &ends_index_bb,
-        //         &mut spillings,
-        //         &mut colors,
-        //         &spill_costs,
-        //     );
-        //     if if_opt {
-        //         continue;
-        //     }
-        //     break;
-        // }
+        loop {
+            spillings.clear();
+            blocks.reverse();
+            let mut if_opt = Allocator::alloc_one_fixed(
+                &blocks,
+                &ends_index_bb,
+                &mut spillings,
+                &mut colors,
+                &spill_costs,
+            );
+            if if_opt {
+                continue;
+            }
+            blocks.reverse();
+            if_opt = Allocator::alloc_one_fixed(
+                &blocks,
+                &ends_index_bb,
+                &mut spillings,
+                &mut colors,
+                &spill_costs,
+            );
+            if if_opt {
+                continue;
+            }
+            break;
+        }
         // TODO,循环裂变着色
         let (stackSize, bb_stack_sizes) = regalloc::regalloc::countStackSize(func, &spillings);
         FuncAllocStat {

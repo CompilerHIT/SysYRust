@@ -725,7 +725,7 @@ impl Func {
         for block in self.blocks.iter() {
             log!("\tblock:{}", block.label);
             for inst in block.insts.iter() {
-                log!("\t\t{}", inst.to_string());
+                log!("\t\t{}", inst.as_ref().to_string());
             }
         }
     }
@@ -1033,6 +1033,10 @@ impl Func {
     ///移除无用def指令
     pub fn remove_unuse_def(&mut self) {
         //
+        if self.label == "func" {
+            let a = 2;
+        }
+        self.print_func();
         loop {
             self.calc_live();
             let mut ifFinish = true;
@@ -1043,11 +1047,11 @@ impl Func {
                 bb.live_out.iter().for_each(|reg| {
                     live_now.insert(*reg);
                 });
+                //标记阶段 ,标记需要清除的指令
                 for (index, inst) in bb.insts.iter().enumerate().rev() {
                     for reg in inst.get_reg_def() {
                         if !live_now.contains(&reg) {
                             to_removed.insert(index);
-                            ifFinish = false;
                             break;
                         }
                         live_now.remove(&reg);
@@ -1059,8 +1063,10 @@ impl Func {
                         live_now.insert(reg);
                     }
                 }
+                //清楚阶段, 清除之前标记的指令
                 for (index, inst) in bb.insts.iter().enumerate() {
                     if to_removed.contains(&index) {
+                        ifFinish = false;
                         log_file!(
                             "remove_unusedef.txt",
                             ":{}-{}:{}",
@@ -1074,11 +1080,11 @@ impl Func {
                 }
                 bb.as_mut().insts = new_insts;
             }
-
             if ifFinish {
                 break;
             }
         }
+        self.print_func();
     }
 }
 

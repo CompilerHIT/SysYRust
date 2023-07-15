@@ -185,10 +185,10 @@ impl fmt::Display for LIRInst {
         let mut def = HashSet::new();
         let mut use_reg_id = HashSet::new();
         self.get_reg_def().iter().for_each(|e| {
-            def.insert(e.get_id());
+            def.insert(e.to_string(false));
         });
         self.get_reg_use().iter().for_each(|e| {
-            use_reg_id.insert(e.get_id());
+            use_reg_id.insert(e.to_string(false));
         });
         write!(f, "{:?} def:{:?} use:{:?}", kind, def, use_reg_id)
     }
