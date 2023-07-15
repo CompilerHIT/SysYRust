@@ -33,6 +33,17 @@ impl LoopList {
     pub fn get_loop_list(&self) -> &Vec<ObjPtr<LoopInfo>> {
         &self.loops
     }
+
+    pub fn remove_loops(&mut self, removing_loops: &Vec<ObjPtr<LoopInfo>>) {
+        removing_loops.iter().for_each(|loop_tree| {
+            self.loops.remove(
+                self.loops
+                    .iter()
+                    .position(|loop_tree2| loop_tree2 == loop_tree)
+                    .unwrap(),
+            );
+        });
+    }
 }
 
 impl Debug for LoopList {
@@ -141,9 +152,24 @@ impl LoopInfo {
         &self.blocks
     }
 
+    /// 增加当前循环的块
+    pub fn add_bbs(&mut self, bb: Vec<ObjPtr<BasicBlock>>) {
+        self.blocks.extend(bb);
+    }
+
     /// 获得当前循环的子循环
     pub fn get_sub_loops(&self) -> &Vec<ObjPtr<LoopInfo>> {
         &self.sub_loops
+    }
+
+    /// 删除某个子循环
+    pub fn remove_sub_loop(&mut self, sub_loop: ObjPtr<LoopInfo>) {
+        self.sub_loops.retain(|loop_tree| *loop_tree != sub_loop);
+    }
+
+    /// 获得当前循环的父循环
+    pub fn get_parent_loop(&self) -> Option<ObjPtr<LoopInfo>> {
+        self.parent
     }
 
     /// 获得当前循环的出口块
