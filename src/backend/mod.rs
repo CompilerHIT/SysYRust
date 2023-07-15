@@ -88,12 +88,13 @@ pub fn generate_asm(
     // module.generate_row_asm(&mut file2, &mut pool);
     // 检查地址溢出，插入间接寻址
     module.handle_overflow(&mut pool);
+
     //TODO: 块重排
     if is_opt {
         BackendPass::new(ObjPtr::new(module)).run_addition_block_pass();
     }
     //生成抽象汇编
-
+    module.generate_row_asm(&mut file2, &mut pool);
     //生成汇编
     module.generate_asm(&mut file, &mut pool);
     //释放

@@ -1754,6 +1754,9 @@ impl BB {
                 InstrsType::LoadFromStack | InstrsType::StoreToStack => {
                     let temp = Operand::Reg(Reg::new(8, ScalarType::Int));
                     let offset = inst_ref.get_stack_offset().get_data();
+                    if offset == 2112 {
+                        let b = 4;
+                    }
                     if operand::is_imm_12bs(offset) {
                         pos += 1;
                         continue;
