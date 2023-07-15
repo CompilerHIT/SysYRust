@@ -526,7 +526,7 @@ impl Func {
         for inst in self.array_inst.iter() {
             let offset = match inst.get_rhs() {
                 Operand::IImm(imm) => imm.get_data() + base_size,
-                _ => unreachable!("array offset must be imm")
+                _ => unreachable!("array offset must be imm"),
             };
             inst.as_mut().replace_op(vec![
                 inst.get_dst().clone(),
@@ -599,13 +599,19 @@ impl Func {
             stack_size += slot.get_pos() + slot.get_size();
         };
         // log!("stack: {:?}", self.stack_addr);
+
         stack_size += self.caller_saved_len * ADDR_SIZE;
 
         // 局部数组空间
         for array_size in self.array_slot.iter() {
             stack_size += array_size
         }
-        
+
+        log_file!(
+            "stack_sizes.txt",
+            "func:{},stacksize:{stack_size}",
+            self.label
+        );
         // log!("caller saved: {}", self.caller_saved.len());
         //栈对齐 - 调用func时sp需按16字节对齐
         stack_size = stack_size / 16 * 16 + 16;

@@ -2710,12 +2710,37 @@ fn get_magic(is_neg: bool, abs: i32) -> (i64, i32) {
     (magic, shift)
 }
 
+///for build v2:
+/// 1.handle spill v2
+impl BB {
+    ///使用block_handle_spill_v2之前 应该先已经给spillings的寄存器分配了对应的空间了
+    /// 保底有三个寄存器t1,t2,t3能够使用 (x5,x6,x7)
+    /// t1,t2,t3优先分配给之前使用它们的寄存器
+    pub fn handle_spill_V2(
+        &mut self,
+        func: ObjPtr<Func>,
+        spill: &HashSet<i32>,
+        pool: &mut BackendPool,
+    ) {
+        //不维护上下文
+        let mut rents: HashMap<Reg, Option<Reg>> = HashMap::new();
+        let mut new_insts: Vec<ObjPtr<LIRInst>> = Vec::new();
+        for reg in 5..=7 {
+            rents.insert(Reg::new(reg, ScalarType::Int), None);
+        }
+
+        self.insts = new_insts;
+    }
+}
+
+//for build v3
 impl BB {
     pub fn handle_spill_v3(&mut self, reg_alloc_info: &FuncAllocStat, pool: &mut BackendPool) {
         //维护一个表,表里面记录了能够使用的寄存器
         // 从后往前分析,判断某个寄存器是否还在某个地方活着
         // 如果mv x88 x88,则该指令前后x88连续活着
         // 如果add x89 x88 x89,则该指令前后x89连续活着
+        todo!();
     }
 }
 
