@@ -32,8 +32,16 @@ impl ObjPool<Inst> {
 }
 
 impl Inst {
-    /// 判断是否为条件跳转指令
+    /// 判断是否为Branch指令
     pub fn is_br(&self) -> bool {
+        match self.kind {
+            InstKind::Branch => true,
+            _ => false,
+        }
+    }
+
+    /// 判断是否为条件跳转指令
+    pub fn is_br_cond(&self) -> bool {
         // 正确性检查
         if let InstKind::Branch = self.kind {
             debug_assert!(self.user.get_operands_size() <= 1);
@@ -45,12 +53,12 @@ impl Inst {
     }
 
     /// 判断是否为无条件跳转指令
-    pub fn is_jmp(&self) -> bool {
+    pub fn is_br_jmp(&self) -> bool {
         // 正确性检查
         if let InstKind::Branch = self.kind {
             debug_assert!(self.user.get_operands_size() <= 1);
         } else {
-            unreachable!("Inst::is_jmp")
+            unreachable!("Inst::is_br_jmp")
         };
 
         self.user.get_operands_size() == 0
@@ -60,7 +68,7 @@ impl Inst {
     pub fn get_br_cond(&self) -> ObjPtr<Inst> {
         // 正确性检查
         if let InstKind::Branch = self.kind {
-            debug_assert!(self.is_br());
+            debug_assert!(self.is_br_cond());
         } else {
             unreachable!("Inst::get_br_cond")
         };
@@ -74,7 +82,7 @@ impl Inst {
     pub fn set_br_cond(&mut self, mut cond: ObjPtr<Inst>) {
         // 正确性检查
         if let InstKind::Branch = self.kind {
-            debug_assert!(self.is_br());
+            debug_assert!(self.is_br_cond());
             debug_assert!(cond.as_ref().get_ir_type() == IrType::Int);
         } else {
             unreachable!("Inst::set_br_cond")
@@ -89,19 +97,19 @@ impl Inst {
 
     /// 获得条件为true时的bb
     pub fn get_true_bb(&self) -> ObjPtr<BasicBlock> {
-        debug_assert!(self.is_br());
+        debug_assert!(self.is_br_cond());
         self.get_parent_bb().get_next_bb()[1].clone()
     }
 
     /// 获得条件为false时的bb
     pub fn get_false_bb(&self) -> ObjPtr<BasicBlock> {
-        debug_assert!(self.is_br());
+        debug_assert!(self.is_br_cond());
         self.get_parent_bb().get_next_bb()[0].clone()
     }
 
     /// 获得jum指令的bb
     pub fn get_jump_bb(&self) -> ObjPtr<BasicBlock> {
-        debug_assert!(self.is_jmp());
+        debug_assert!(self.is_br_jmp());
         self.get_parent_bb().get_next_bb()[0].clone()
     }
 }

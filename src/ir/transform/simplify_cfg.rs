@@ -221,5 +221,5 @@ fn get_bb_list(head: ObjPtr<BasicBlock>) -> Vec<ObjPtr<BasicBlock>> {
 }
 
 fn bb_has_jump(bb: ObjPtr<BasicBlock>) -> bool {
-    bb.get_tail_inst().is_jmp()
+    bb.get_tail_inst().is_br_jmp()
 }
