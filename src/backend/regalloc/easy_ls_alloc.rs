@@ -53,7 +53,7 @@ impl Regalloc for Allocator {
         let spill_costs = regalloc::regalloc::estimate_spill_cost(func);
 
         let mut blocks: Vec<ObjPtr<BB>> = func.blocks.iter().cloned().collect();
-        blocks.sort_by_key(|bb| bb.live_in.len());
+        // blocks.sort_by_key(|bb| bb.live_in.len());
         ///基础着色,
         Allocator::alloc_one_opt(
             &blocks,
@@ -201,6 +201,15 @@ impl Allocator {
             let mut live_now: HashSet<Reg> = HashSet::new();
             let mut last_used: HashMap<i32, Reg> = HashMap::new();
             log_file!(easy_ls_path, "{},live in:{:?}", bb.label, bb.live_in);
+            log_file!(
+                easy_ls_path,
+                "insts:{:?}",
+                bb.as_ref()
+                    .insts
+                    .iter()
+                    .map(|it| it.to_string())
+                    .collect::<Vec<String>>()
+            );
             bb.live_in.iter().for_each(|reg| {
                 if reg.is_physic() || colors.contains_key(&reg.get_id()) {
                     Allocator::process_one_reg_opt(
@@ -212,7 +221,7 @@ impl Allocator {
                         &spill_costs,
                         spillings,
                     );
-                } else {
+                } else if !spillings.contains(&reg.get_id()) {
                     Allocator::color_one(reg, &mut reg_use_stat, spillings, colors, &mut last_used);
                 }
                 live_now.insert(*reg);
@@ -311,6 +320,7 @@ impl Allocator {
             let last_use_reg = *last_used.get(&color).unwrap();
             debug_assert!(!last_use_reg.is_physic());
             colors.remove(&last_use_reg.get_id());
+            log_file!(easy_ls_path, "spill:{}", last_use_reg.get_id());
             spillings.insert(last_use_reg.get_id());
             last_used.insert(color, reg);
         } else {
@@ -393,6 +403,11 @@ impl Allocator {
         colors: &mut HashMap<i32, i32>,
         last_used: &mut HashMap<i32, Reg>,
     ) -> bool {
+        if reg.get_id() == 70 {
+            let a = 2;
+        }
+        debug_assert!(!colors.contains_key(&reg.get_id()));
+        debug_assert!(!spillings.contains(&reg.get_id()));
         let color = reg_use_stat.get_available_reg(reg.get_type());
         if color.is_none() {
             spillings.insert(reg.get_id());

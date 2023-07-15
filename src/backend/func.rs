@@ -1241,3 +1241,15 @@ impl Func {
 impl Func {
     pub fn rearrange_stack_slot(&mut self) {}
 }
+
+///为函数创建寄存器活跃区间
+impl Func {
+    ///为函数创建寄存器活跃区间
+    /// 内部会调用calc_live 计算 live use live def live in live out
+    pub fn build_reg_intervals(&mut self) {
+        self.calc_live();
+        for bb in self.blocks.iter() {
+            bb.as_mut().build_reg_intervals();
+        }
+    }
+}

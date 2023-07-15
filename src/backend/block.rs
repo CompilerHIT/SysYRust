@@ -1,3 +1,5 @@
+use rand::seq::index;
+
 use crate::backend::regalloc::structs::RegUsedStat;
 pub use crate::log;
 use crate::log_file;
@@ -49,6 +51,12 @@ pub struct BB {
     pub live_in: HashSet<Reg>,
     pub live_out: HashSet<Reg>,
 
+    /// key->val : (reg,born)->(reg,die)
+    /// * 如果reg 在live in中,则对应born为-1,
+    /// * 如果reg 在下标 i1 处指令中def, 则对应 key (reg,born)=(reg, i1)
+    /// * 如果(reg,born) 在这次生命周期中最后一次使用在 i2, 则对应val (reg,die)=(reg,i2)
+    pub reg_intervals: HashMap<(Reg, i32), (Reg, i32)>,
+
     pub phis: Vec<ObjPtr<LIRInst>>,
 
     global_map: HashMap<ObjPtr<Inst>, Operand>,
@@ -68,6 +76,7 @@ impl BB {
             live_out: HashSet::new(),
             global_map: HashMap::new(),
             phis: Vec::new(),
+            reg_intervals: HashMap::new(),
         }
     }
 
@@ -2697,5 +2706,41 @@ impl BB {
         // 从后往前分析,判断某个寄存器是否还在某个地方活着
         // 如果mv x88 x88,则该指令前后x88连续活着
         // 如果add x89 x88 x89,则该指令前后x89连续活着
+    }
+}
+
+/// build reg intervals
+impl BB {
+    pub fn build_reg_intervals(&mut self) {
+        self.reg_intervals.clear();
+        let mut regs: HashMap<Reg, (i32, i32)> = HashMap::new();
+        self.live_in.iter().for_each(|reg| {
+            regs.insert(*reg, (-1, -1));
+        });
+        let mut index = 0;
+        while index < self.insts.len() {
+            let inst = self.insts.get(index).unwrap();
+            let uses = inst.get_reg_use();
+            let defs = inst.get_reg_def();
+            for reg in uses {
+                debug_assert!(regs.contains_key(&reg));
+                regs.get_mut(&reg).unwrap().1 = index as i32;
+            }
+            for reg in defs {
+                if regs.contains_key(&reg) {
+                    let (born, die) = regs.remove(&reg).unwrap();
+                    self.reg_intervals.insert((reg, born), (reg, die));
+                }
+                regs.insert(reg, (index as i32, index as i32));
+            }
+            index += 1;
+        }
+        self.live_out.iter().for_each(|reg| {
+            debug_assert!(regs.contains_key(reg));
+            regs.get_mut(&reg).unwrap().1 = index as i32;
+            let (born, die) = regs.remove(reg).unwrap();
+            self.reg_intervals.insert((*reg, born), (*reg, die));
+        });
+        debug_assert!(regs.is_empty());
     }
 }

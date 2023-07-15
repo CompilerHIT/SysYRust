@@ -76,10 +76,9 @@ impl AsmModule {
     }
 
     pub fn build(&mut self, f: &mut File, f2: &mut File, pool: &mut BackendPool) {
-        self.generate_asm(f2, pool);
         self.build_lir(pool);
         // TOCHECK 寄存器分配和handlespill前无用指令删除,比如删除mv指令方便寄存器分配
-        self.generate_row_asm(f2, pool); //注释
+        // self.generate_row_asm(f2, pool); //注释
         self.remove_unuse_inst_pre_alloc();
         self.generate_row_asm(f2, pool); //注释
 
@@ -332,7 +331,6 @@ impl AsmModule {
     fn anaylyse_for_handle_call_v3(&mut self, pool: &mut BackendPool) {
         todo!()
     }
-
     /// 计算栈空间,进行ra,sp,callee 的保存和恢复
     pub fn build_stack_info(&mut self, f: &mut File, pool: &mut BackendPool) {
         for (_, func) in self.func_map.iter() {
