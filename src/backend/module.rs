@@ -242,12 +242,15 @@ impl AsmModule {
     }
 
     pub fn generate_row_asm(&mut self, f: &mut File, pool: &mut BackendPool) {
-        self.func_map.iter_mut().for_each(|(_, func)| {
-            if !func.is_extern {
-                func.as_mut()
-                    .generate_row(pool.put_context(Context::new()), f);
-            }
-        });
+        debug_assert!(|| -> bool {
+            self.func_map.iter_mut().for_each(|(_, func)| {
+                if !func.is_extern {
+                    func.as_mut()
+                        .generate_row(pool.put_context(Context::new()), f);
+                }
+            });
+            true
+        }());
     }
 
     fn print_model(&self) {
@@ -270,6 +273,7 @@ impl AsmModule {
         // self.generate_row_asm(f2, pool); //注释
         self.allocate_reg();
         self.handle_spill_v2(pool, f);
+        // self.handle_spill(pool, f);
         self.map_v_to_p();
         self.remove_unuse_inst_suf_alloc();
     }

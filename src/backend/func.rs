@@ -896,7 +896,6 @@ impl Func {
                 for reg in inst.get_reg_def() {
                     live_now.remove(&reg);
                 }
-
                 for reg in inst.get_reg_use() {
                     if !self.reg_alloc_info.spillings.contains(&reg.get_id()) {
                         continue;
@@ -904,7 +903,6 @@ impl Func {
                     if !out.contains_key(&reg) {
                         out.insert(reg, HashSet::new());
                     }
-
                     for live in live_now.iter() {
                         if live == &reg {
                             continue;
@@ -921,26 +919,6 @@ impl Func {
 
     /// 分析spill空间之间的冲突关系,进行紧缩
     fn assign_stack_slot_for_spill(&mut self) {
-        // 统计所有spill寄存器的使用次数,根据寄存器数量更新其值
-        // 首先给存储在物理寄存器中的值的空间
-        // for reg in RegUsedStat::new().get_available_freg() {
-        //     let last_slot = self.stack_addr.back().unwrap();
-        //     let pos = last_slot.get_pos() + last_slot.get_size();
-        //     let stack_slot = StackSlot::new(pos, ADDR_SIZE);
-        //     self.stack_addr.push_back(stack_slot);
-        //     let reg = Reg::new(reg, ScalarType::Float);
-        //     self.spill_stack_map.insert(reg, stack_slot);
-        //     self.physic_stack_map.insert(reg, stack_slot);
-        // }
-        // for reg in RegUsedStat::new().get_available_ireg() {
-        //     let last_slot = self.stack_addr.back().unwrap();
-        //     let pos = last_slot.get_pos() + last_slot.get_size();
-        //     let stack_slot = StackSlot::new(pos, ADDR_SIZE);
-        //     self.stack_addr.push_back(stack_slot);
-        //     let reg = Reg::new(reg, ScalarType::Int);
-        //     self.spill_stack_map.insert(reg, stack_slot);
-        //     self.physic_stack_map.insert(reg, stack_slot);
-        // }
         // 给spill的寄存器空间,如果出现重复的情况,则说明后端可能空间存在冲突
         // 建立spill寄存器之间的冲突关系(如果两个spill的寄存器之间是相互冲突的,则它们不能够共享相同内存)
         let mut spill_coes: HashMap<i32, i32> = HashMap::new();
@@ -978,14 +956,16 @@ impl Func {
         }
         // 桶排序
         let mut buckets: HashMap<i32, LinkedList<Reg>> = HashMap::new();
-        let mut order: BiHeap<i32> = BiHeap::new();
+        let mut coe_orders: BiHeap<i32> = BiHeap::new();
         for id in spillings {
-            if !buckets.contains_key(id) {
-                order.push(*id);
-                buckets.insert(*id, LinkedList::new());
-            }
+            debug_assert!(spill_coes.contains_key(id) && id_to_regs.contains_key(id));
+            let coe = spill_coes.get(id).unwrap();
             let reg = id_to_regs.get(id).unwrap();
-            buckets.get_mut(id).unwrap().push_back(*reg);
+            if !buckets.contains_key(coe) {
+                coe_orders.push(*coe);
+                buckets.insert(*coe, LinkedList::new());
+            }
+            buckets.get_mut(coe).unwrap().push_back(*reg);
         }
 
         // 使用一个表记录之前使用过的空间,每次分配空间的时候可以复用之前使用过的空间,只要没有冲突
@@ -994,9 +974,9 @@ impl Func {
         let inter_graph: HashMap<Reg, HashSet<Reg>> =
             self.build_interferench_for_assign_stack_slot_for_spill();
         // 优先给使用次数最多的spill寄存器分配内存空间
-        while !order.is_empty() {
-            let id = order.pop_max().unwrap();
-            let lst = buckets.get_mut(&id).unwrap();
+        while !coe_orders.is_empty() {
+            let spill_coe = coe_orders.pop_max().unwrap();
+            let lst = buckets.get_mut(&spill_coe).unwrap();
             while !lst.is_empty() {
                 let toassign = lst.pop_front().unwrap();
                 if self.spill_stack_map.contains_key(&toassign) {
@@ -1013,7 +993,7 @@ impl Func {
                     inter_slots.insert(*stack_slot);
                 }
 
-                // 然后遍历已经分配的空间
+                // 然后遍历已经分配的空间,寻找到第一个可以分配的空间
                 let mut num = slots.len();
                 let mut slot_for_toassign: Option<StackSlot> = Option::None;
                 while num > 0 {
@@ -1024,6 +1004,7 @@ impl Func {
                         continue;
                     }
                     slot_for_toassign = Some(old_slot);
+                    break;
                 }
                 if slot_for_toassign.is_none() {
                     let last_slot = self.stack_addr.back().unwrap();

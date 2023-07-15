@@ -18,7 +18,7 @@ impl BackendPass {
                 func.blocks.iter().for_each(|block| {
                     self.rm_useless(*block);
                 });
-                func.as_mut().remove_unuse_def();
+                func.as_mut().remove_unuse_inst();
                 self.rm_repeated_sl(func.clone());
                 // let mut bf = OpenOptions::new()
                 //     .create(true)
