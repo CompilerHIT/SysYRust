@@ -352,23 +352,25 @@ impl Func {
             block.as_mut().live_out.clear();
             if let Some(last_isnt) = block.insts.last() {
                 match last_isnt.get_type() {
-                    InstrsType::Ret(r_type) => match r_type {
-                        ScalarType::Int => {
-                            let ret_reg = Reg::new(10, r_type);
-                            block.as_mut().live_out.insert(ret_reg);
-                            if !block.live_def.contains(&ret_reg) {
-                                queue.push_front((*block, ret_reg));
+                    InstrsType::Ret(r_type) => {
+                        match r_type {
+                            ScalarType::Int => {
+                                let ret_reg = Reg::new(10, r_type);
+                                block.as_mut().live_out.insert(ret_reg);
+                                if !block.live_def.contains(&ret_reg) {
+                                    queue.push_front((*block, ret_reg));
+                                }
                             }
-                        }
-                        ScalarType::Float => {
-                            let ret_reg = Reg::new(10 + FLOAT_BASE, r_type);
-                            block.as_mut().live_out.insert(ret_reg);
-                            if !block.live_def.contains(&ret_reg) {
-                                queue.push_front((*block, ret_reg));
+                            ScalarType::Float => {
+                                let ret_reg = Reg::new(10 + FLOAT_BASE, r_type);
+                                block.as_mut().live_out.insert(ret_reg);
+                                if !block.live_def.contains(&ret_reg) {
+                                    queue.push_front((*block, ret_reg));
+                                }
                             }
-                        }
-                        _ => (),
-                    },
+                            _ => (),
+                        };
+                    }
                     _ => (),
                 }
             }
@@ -428,7 +430,8 @@ impl Func {
         //     }
         // }
         // let mut allocator = crate::backend::regalloc::easy_ls_alloc::Allocator::new();
-        let mut allocator = crate::backend::regalloc::easy_gc_alloc::Allocator::new();
+        // let mut allocator = crate::backend::regalloc::easy_gc_alloc::Allocator::new();
+        let mut allocator = crate::backend::regalloc::opt_ls_alloc::Allocator::new();
         // let mut allocator = crate::backend::regalloc::opt_gc_alloc2::Allocator::new();
         // let mut allocator = crate::backend::regalloc::opt_gc_alloc::Allocator::new();
         // let mut allocator = crate::backend::regalloc::base_alloc::Allocator::new();

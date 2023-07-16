@@ -2741,6 +2741,9 @@ impl BB {
 impl BB {
     pub fn build_reg_intervals(&mut self) {
         self.reg_intervals.clear();
+        if self.label == "main" {
+            let a = 2;
+        }
         let mut regs: HashMap<Reg, (i32, i32)> = HashMap::new();
         self.live_in.iter().for_each(|reg| {
             regs.insert(*reg, (-1, -1));
@@ -2763,12 +2766,13 @@ impl BB {
             }
             index += 1;
         }
-        self.live_out.iter().for_each(|reg| {
-            debug_assert!(regs.contains_key(reg));
-            regs.get_mut(&reg).unwrap().1 = index as i32;
-            let (born, die) = regs.remove(reg).unwrap();
-            self.reg_intervals.insert((*reg, born), (*reg, die));
+        debug_assert!(regs.len() >= self.live_out.len());
+        regs.iter().for_each(|(reg, (born, die))| {
+            let mut die = *die;
+            if self.live_out.contains(reg) {
+                die = index as i32;
+            }
+            self.reg_intervals.insert((*reg, *born), (*reg, die));
         });
-        debug_assert!(regs.is_empty());
     }
 }

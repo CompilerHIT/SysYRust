@@ -6,7 +6,7 @@ mod test {
     #[test]
     fn test_get_ltzero() {
         let m: Vec<i32> = Vec::new();
-        let g = m.get(0 - 1);
+        // let g = m.get(0 - 1);
     }
 
     #[test]

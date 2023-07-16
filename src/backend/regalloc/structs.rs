@@ -8,7 +8,7 @@ use crate::backend::block::BB;
 use crate::utility::ObjPtr;
 use crate::utility::ScalarType;
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct RegUsedStat {
     iregs_used: u32,
     fregs_used: u32,
@@ -259,6 +259,14 @@ impl RegUsedStat {
     }
 }
 
+//
+impl RegUsedStat {
+    pub fn merge(&mut self, other: &RegUsedStat) {
+        self.fregs_used |= other.fregs_used;
+        self.iregs_used |= other.iregs_used;
+    }
+}
+
 impl Display for RegUsedStat {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
@@ -312,6 +320,17 @@ mod test_regusestat {
     use crate::backend::regalloc::regalloc::Regalloc;
 
     use super::RegUsedStat;
+
+    #[test]
+    fn test_merge() {
+        let mut reg = RegUsedStat::new();
+        let mut reg2 = RegUsedStat::new();
+        reg.use_reg(14);
+        reg2.use_reg(55);
+        assert!(reg.is_available_reg(55));
+        reg.merge(&reg2);
+        assert!(!reg.is_available_reg(55));
+    }
 
     #[test]
     fn test_num() {
