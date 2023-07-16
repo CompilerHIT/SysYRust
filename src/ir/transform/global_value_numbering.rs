@@ -30,16 +30,10 @@ pub fn easy_gvn(module: &mut Module) ->bool{
     let mut flag = false;
     func_process(module, |_, func| {
         let dominator_tree = calculate_dominator(func.get_head());
-        loop {
             let mut changed = false;
             bfs_inst_process(func.get_head(), |inst| {
                 changed |= has_val(&mut congruence, inst, &dominator_tree, set.clone())
             });
-            flag |= changed;
-            if !changed {
-                break;
-            }
-        }
     });
     flag
 }
