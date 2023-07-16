@@ -597,12 +597,8 @@ impl BB {
                     } else {
                         // 遇到局部数组存到栈上，8字节对齐
                         let array_size = (size + 1) * NUM_SIZE / 8 * 8;
-                        let p = func.stack_addr.back().unwrap().get_pos()
-                            + func.stack_addr.back().unwrap().get_size()
-                            + func.array_slot.back().unwrap();
                         // 记录数组大小
-                        func.as_mut().array_slot.push_back(array_size);
-                        let offset = self.resolve_iimm(p, pool);
+                        func.as_mut().array_slot.push(array_size);
                         let dst_reg =
                             self.resolve_operand(func, ir_block_inst, true, map_info, pool);
                         let mut add = LIRInst::new(
@@ -610,17 +606,14 @@ impl BB {
                             vec![
                                 dst_reg.clone(),
                                 Operand::Reg(Reg::new(2, ScalarType::Int)),
-                                offset,
+                                Operand::IImm(IImm::new(array_size)),
                             ],
                         );
                         add.set_double();
                         let obj_add = pool.put_inst(add);
                         self.insts.push(obj_add);
 
-                        debug_assert!(
-                            func.as_mut().array_inst.insert(obj_add),
-                            "array slot already exists"
-                        );
+                        func.as_mut().array_inst.push(obj_add);
 
                         let (is_init, array_info) = match inst_ref.get_ir_type() {
                             IrType::IntPtr => inst_ref.get_int_init().clone(),

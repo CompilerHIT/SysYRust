@@ -10,7 +10,7 @@ use std::vec::Vec;
 
 use biheap::BiHeap;
 
-use super::instrs::InstrsType;
+use super::instrs::{InstrsType, SingleOp};
 use super::operand::IImm;
 use super::regalloc::structs::RegUsedStat;
 use super::{block, structs::*, BackendPool};
@@ -61,16 +61,14 @@ pub struct Func {
     pub caller_saved: HashMap<Reg, Reg>,
     pub caller_saved_len: i32,
 
-    pub array_inst: HashSet<ObjPtr<LIRInst>>,
-    pub array_slot: LinkedList<i32>,
+    pub array_inst: Vec<ObjPtr<LIRInst>>,
+    pub array_slot: Vec<i32>,
 }
 
 /// reg_num, stack_addr, caller_stack_addr考虑借助回填实现
 /// 是否需要caller_stack_addr？caller函数sp保存在s0中
 impl Func {
     pub fn new(name: &str, context: ObjPtr<Context>) -> Self {
-        let mut list = LinkedList::new();
-        list.push_back(0);
         Self {
             is_extern: false,
             label: name.to_string(),
@@ -95,8 +93,8 @@ impl Func {
             caller_saved: HashMap::new(),
             caller_saved_len: 0,
 
-            array_inst: HashSet::new(),
-            array_slot: list,
+            array_inst: Vec::new(),
+            array_slot: Vec::new(),
         }
     }
 
@@ -538,23 +536,47 @@ impl Func {
             block.as_mut().save_reg(this, pool);
         }
         self.update(this);
-        self.update_array_offset();
+        self.update_array_offset(pool);
         self.save_callee(pool, f);
     }
 
-    pub fn update_array_offset(&mut self) {
+    pub fn update_array_offset(&mut self, pool: &mut BackendPool) {
         let slot = self.stack_addr.back().unwrap();
         let base_size = slot.get_pos() + slot.get_size() + self.caller_saved_len * ADDR_SIZE;
-        for inst in self.array_inst.iter() {
-            let offset = match inst.get_rhs() {
+        log!("{}, len {}, base {}", self.label, self.caller_saved_len, base_size);
+
+        for (i, inst) in self.array_inst.iter().enumerate() {
+            let mut offset = match inst.get_rhs() {
                 Operand::IImm(imm) => imm.get_data() + base_size,
                 _ => unreachable!("array offset must be imm"),
             };
-            inst.as_mut().replace_op(vec![
-                inst.get_dst().clone(),
-                inst.get_lhs().clone(),
-                Operand::IImm(IImm::new(offset)),
-            ]);
+            offset += self.array_slot.iter().take(i).sum::<i32>() - self.array_slot[i];
+            
+            if !operand::is_imm_12bs(offset) {
+                for block in self.blocks.iter() {
+                    let index = match block.insts.iter().position(|i| i == inst) {
+                        Some(index) => index,
+                        None => continue,
+                    };
+                    let tmp = Operand::Reg(Reg::new(8, ScalarType::Int));
+                    let i = LIRInst::new(
+                        InstrsType::OpReg(SingleOp::Li),
+                        vec![tmp.clone(), Operand::IImm(IImm::new(offset))],
+                    );
+                    block.as_mut().insts.insert(index, pool.put_inst(i));
+                    inst.as_mut().replace_op(vec![
+                        inst.get_dst().clone(),
+                        inst.get_lhs().clone(),
+                        tmp,
+                    ]);
+                }
+            } else {
+                inst.as_mut().replace_op(vec![
+                    inst.get_dst().clone(),
+                    inst.get_lhs().clone(),
+                    Operand::IImm(IImm::new(offset)),
+                ]);
+            }
         }
     }
 
@@ -629,11 +651,6 @@ impl Func {
             stack_size += array_size
         }
 
-        log_file!(
-            "stack_sizes.txt",
-            "func:{},stacksize:{stack_size}",
-            self.label
-        );
         // log!("caller saved: {}", self.caller_saved.len());
         //栈对齐 - 调用func时sp需按16字节对齐
         stack_size = stack_size / 16 * 16 + 16;
