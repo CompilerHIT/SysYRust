@@ -10,7 +10,7 @@
 
 use crate::algorithm::graphalgo;
 use crate::algorithm::graphalgo::Graph;
-use crate::backend::block::BB;
+use crate::backend::block::{self, BB};
 use crate::backend::func::Func;
 use crate::backend::operand::Reg;
 use crate::backend::regalloc::regalloc::Regalloc;
@@ -22,6 +22,9 @@ use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::collections::VecDeque;
+
+use super::regalloc;
+use super::structs::BlockAllocStat;
 
 // 摆烂的深度优先指令编码简单实现的线性扫描寄存器分配
 pub struct Allocator {}
@@ -63,7 +66,9 @@ impl Allocator {
         Allocator {}
     }
     //获取某个顺序的块结构
-    pub fn order_blocks(blocks: &Vec<ObjPtr<BB>>) {}
+    pub fn order_blocks(blocks: &Vec<ObjPtr<BB>>) -> Vec<ObjPtr<BB>> {
+        todo!()
+    }
 
     //对于某个块内进行分配
     fn alloc_block(bb: ObjPtr<BB>, colors: &mut HashMap<i32, i32>, spillings: &mut HashSet<i32>) {}
@@ -72,7 +77,11 @@ impl Allocator {
 impl Regalloc for Allocator {
     fn alloc(&mut self, func: &Func) -> FuncAllocStat {
         func.build_reg_intervals();
-
+        let mut colors: HashMap<i32, i32> = HashMap::new();
+        let mut spillings: HashSet<i32> = HashSet::new();
+        let blocks = Allocator::order_blocks(&func.blocks);
+        for bb in blocks {}
+        let (stack_size, bb_stack_sizes) = regalloc::countStackSize(func, &spillings);
         FuncAllocStat {
             stack_size: todo!(),
             bb_stack_sizes: todo!(),
