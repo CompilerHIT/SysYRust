@@ -1,5 +1,5 @@
 //! src/ir/Instruction/mod.rs
-use std::fmt::Debug;
+use std::{collections::HashSet, fmt::Debug};
 
 ///! 此模块中存放有Inst和InstKind结构体的定义，还有
 ///! 所有Inst类型的公有方法和Head的简单实现。特定的
@@ -27,6 +27,7 @@ pub struct Inst {
     list: IList<Inst>,
     kind: InstKind,
     init: ((bool, Vec<(bool, i32)>), (bool, Vec<(bool, f32)>)),
+    parent_bb: Option<ObjPtr<BasicBlock>>,
 }
 
 #[derive(Clone)]
@@ -67,7 +68,7 @@ pub enum InstKind {
     Phi,
 
     // 作为链表头存在，没有实际意义
-    Head(Option<ObjPtr<BasicBlock>>),
+    Head,
 }
 
 impl Debug for InstKind {
@@ -93,8 +94,7 @@ impl Debug for InstKind {
             InstKind::FtoI => s = format!("FtoI"),
             InstKind::ItoF => s = format!("ItoF"),
             InstKind::Phi => s = format!("Phi"),
-            InstKind::Head(Some(bb)) => s = format!("Head({})", bb.get_name()),
-            InstKind::Head(None) => s = format!("Head(None)"),
+            InstKind::Head => s = format!("Head"),
         }
         write!(f, "{}", s)
     }
@@ -102,7 +102,7 @@ impl Debug for InstKind {
 
 impl Debug for Inst {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self.kind)
+        write!(f, "{:?} in {:?}", self.kind, self.parent_bb)
     }
 }
 
@@ -128,7 +128,7 @@ impl PartialEq for InstKind {
             (Self::GlobalInt(_), Self::GlobalInt(_)) => true,
             (Self::GlobalFloat(_), Self::GlobalFloat(_)) => true,
             (Self::Phi, Self::Phi) => true,
-            (Self::Head(_), Self::Head(_)) => true,
+            (Self::Head, Self::Head) => true,
             _ => false,
         }
     }
@@ -167,6 +167,7 @@ impl Inst {
             },
             kind,
             init: ((false, vec![]), (false, vec![])),
+            parent_bb: None,
         }
     }
 
@@ -200,7 +201,7 @@ impl Inst {
     // 链表行为
     /// 判断是否为当前bb的第一条指令
     pub fn is_head(&self) -> bool {
-        if let InstKind::Head(_) = self.get_prev().get_kind() {
+        if let InstKind::Head = self.get_prev().get_kind() {
             true
         } else {
             false
@@ -209,7 +210,7 @@ impl Inst {
 
     /// 判断是否为当前bb的最后一条指令的后一条指令
     pub fn is_tail(&self) -> bool {
-        if let InstKind::Head(_) = self.get_kind() {
+        if let InstKind::Head = self.get_kind() {
             true
         } else {
             false
@@ -231,21 +232,27 @@ impl Inst {
     }
 
     /// 在当前指令之前插入一条指令
-    pub fn insert_before(&mut self, inst: ObjPtr<Inst>) {
+    pub fn insert_before(&mut self, mut inst: ObjPtr<Inst>) {
         let p = self.get_prev().as_mut();
         self.list.set_prev(inst);
         p.list.set_next(inst);
-        inst.as_mut().list.set_prev(ObjPtr::new(p));
-        inst.as_mut().list.set_next(ObjPtr::new(self));
+        inst.list.set_prev(ObjPtr::new(p));
+        inst.list.set_next(ObjPtr::new(self));
+
+        // 更新inst的parent_bb
+        inst.parent_bb = self.parent_bb;
     }
 
     /// 在当前指令之后插入一条指令
-    pub fn insert_after(&mut self, inst: ObjPtr<Inst>) {
+    pub fn insert_after(&mut self, mut inst: ObjPtr<Inst>) {
         let p = self.get_next().as_mut();
         self.list.set_next(inst);
         p.list.set_prev(inst);
-        inst.as_mut().list.set_prev(ObjPtr::new(self));
-        inst.as_mut().list.set_next(ObjPtr::new(p));
+        inst.list.set_prev(ObjPtr::new(self));
+        inst.list.set_next(ObjPtr::new(p));
+
+        // 更新inst的parent_bb
+        inst.parent_bb = self.parent_bb;
     }
 
     /// 把自己从指令中移除并删除use
@@ -262,6 +269,8 @@ impl Inst {
 
         self.list.next = None;
         self.list.prev = None;
+
+        self.parent_bb = None;
     }
 
     /// 把自己从指令序列中删除但不删除use
@@ -274,31 +283,30 @@ impl Inst {
 
         self.list.next = None;
         self.list.prev = None;
+
+        self.parent_bb = None;
     }
 
     /// 获得当前指令所在的bb
     pub fn get_parent_bb(&self) -> ObjPtr<BasicBlock> {
-        Self::find_bb(ObjPtr::new(self))
-    }
-
-    fn find_bb(inst: ObjPtr<Inst>) -> ObjPtr<BasicBlock> {
-        match inst.as_ref().get_kind() {
-            InstKind::Head(Some(bb)) => bb,
-            InstKind::Head(None) => unreachable!("Head is not init"),
-            _ => Self::find_bb(inst.as_ref().get_prev()),
+        if let Some(bb) = self.parent_bb {
+            bb
+        } else {
+            unreachable!("Inst's parent_bb is None. inst: {:?}", self);
         }
     }
 
     /// 构造一个Head
     pub fn make_head() -> Inst {
-        Inst::new(IrType::Void, InstKind::Head(None), vec![])
+        Inst::new(IrType::Void, InstKind::Head, vec![])
     }
     /// 初始化Head
     pub fn init_head(&mut self, bb: ObjPtr<BasicBlock>) {
-        if let InstKind::Head(_) = self.kind {
+        if let InstKind::Head = self.kind {
             self.list.set_prev(ObjPtr::new(self));
             self.list.set_next(ObjPtr::new(self));
-            self.kind = InstKind::Head(Some(bb));
+            self.kind = InstKind::Head;
+            self.parent_bb = Some(bb);
         } else {
             debug_assert!(false);
         }
