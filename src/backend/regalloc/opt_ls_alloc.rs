@@ -433,10 +433,10 @@ impl Regalloc for Allocator {
         for bb in blocks.iter() {
             Allocator::alloc_block(*bb, &mut colors, &mut spillings, &spill_costs);
         }
-        // spillings.clear();
-        // for bb in blocks.iter() {
-        //     Allocator::alloc_block(*bb, &mut colors, &mut spillings, &spill_costs);
-        // }
+        spillings.clear();
+        for bb in blocks.iter() {
+            Allocator::alloc_block(*bb, &mut colors, &mut spillings, &spill_costs);
+        }
 
         //TODO,寄存器分裂
         let (stack_size, bb_stack_sizes) = regalloc::countStackSize(func, &spillings);

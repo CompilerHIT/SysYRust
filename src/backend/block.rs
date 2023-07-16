@@ -2721,7 +2721,91 @@ impl BB {
         for reg in 5..=7 {
             rents.insert(Reg::new(reg, ScalarType::Int), None);
         }
+        let mut index = 0;
+        loop {
+            if index >= self.insts.len() {
+                break;
+            }
+            let inst = self.insts[index];
+            let spills = inst.is_spill(spill);
+            if spills.is_empty() {
+                new_insts.push(inst);
+                index += 1;
+                continue;
+            } else {
+                for (i, r) in spills.iter().enumerate() {
+                    let reg = match r.get_type() {
+                        ScalarType::Int => Operand::Reg(Reg::new(5 + (i as i32), ScalarType::Int)),
+                        ScalarType::Float => {
+                            Operand::Reg(Reg::new(18 + FLOAT_BASE + (i as i32), ScalarType::Float))
+                        }
+                        _ => unreachable!(),
+                    };
+                    log!("{}", r);
+                    let stack_slot = func.spill_stack_map.get(r).unwrap();
+                    let mut ins = LIRInst::new(
+                        InstrsType::LoadFromStack,
+                        vec![reg, Operand::IImm(IImm::new(stack_slot.get_pos()))],
+                    );
+                    ins.set_double();
+                    new_insts.push(pool.put_inst(ins));
+                }
+                for (i, r) in spills.iter().enumerate() {
+                    match r.get_type() {
+                        ScalarType::Int => inst.as_mut().replace(r.get_id(), 5 + (i as i32)),
+                        ScalarType::Float => inst
+                            .as_mut()
+                            .replace(r.get_id(), 18 + FLOAT_BASE + (i as i32)),
+                        _ => unreachable!(),
+                    }
+                }
+                new_insts.push(inst);
+                index += 1; //更新到下一条指令
 
+                match inst.get_dst() {
+                    Operand::Reg(_) => match inst.get_type() {
+                        InstrsType::Store
+                        | InstrsType::StoreParamToStack
+                        | InstrsType::StoreToStack => {
+                            continue;
+                        }
+                        _ => {}
+                    },
+                    _ => {
+                        continue;
+                    }
+                }
+
+                for (i, r) in spills.iter().enumerate() {
+                    let reg = match r.get_type() {
+                        ScalarType::Int => Operand::Reg(Reg::new(5 + (i as i32), ScalarType::Int)),
+                        ScalarType::Float => {
+                            Operand::Reg(Reg::new(18 + FLOAT_BASE + (i as i32), ScalarType::Float))
+                        }
+                        ScalarType::Void => unreachable!(),
+                    };
+                    match inst.get_dst() {
+                        Operand::Reg(ireg) => {
+                            if (ireg.get_type() == ScalarType::Int
+                                && ireg.get_id() != 5 + (i as i32))
+                                || (ireg.get_type() == ScalarType::Float
+                                    && ireg.get_id() != 18 + FLOAT_BASE + (i as i32))
+                            {
+                                continue;
+                            }
+                        }
+                        _ => {}
+                    }
+                    let stack_slot = func.spill_stack_map.get(&r).unwrap();
+                    let mut ins = LIRInst::new(
+                        InstrsType::StoreToStack,
+                        vec![reg, Operand::IImm(IImm::new(stack_slot.get_pos()))],
+                    );
+                    ins.set_double();
+                    new_insts.push(pool.put_inst(ins));
+                }
+            }
+        }
         self.insts = new_insts;
     }
 }

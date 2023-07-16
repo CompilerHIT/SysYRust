@@ -6,6 +6,7 @@ use std::fs::OpenOptions;
 pub use std::hash::{Hash, Hasher};
 pub use std::io::Result;
 use std::io::Write;
+use std::process::id;
 use std::vec::Vec;
 
 use biheap::BiHeap;
@@ -909,22 +910,24 @@ impl Func {
 }
 
 /// handle spill2: handle spill过程中对spill寄存器用到的栈进行重排
-/// func的handle spill v2能够与v1 完美替换
+/// 当前func的spill不能够与v1的spill完美替换
 impl Func {
     /// 为spilling 寄存器预先分配空间 的 handle spill
     pub fn handle_spill_v2(&mut self, pool: &mut BackendPool, f: &mut File) {
-        let this = pool.put_func(self.clone());
         // 首先给这个函数分配spill的空间
         self.assign_stack_slot_for_spill();
+        let this = pool.put_func(self.clone());
         for block in self.blocks.iter() {
             block
                 .as_mut()
-                .handle_spill(this, &self.reg_alloc_info.spillings, pool);
+                .handle_spill_V2(this, &self.reg_alloc_info.spillings, pool);
         }
+        let this = pool.put_func(self.clone());
         for block in self.blocks.iter() {
             block.as_mut().save_reg(this, pool);
         }
         self.update(this);
+        self.update_array_offset(pool);
         self.save_callee(pool, f);
     }
 
@@ -979,6 +982,8 @@ impl Func {
 
     /// 分析spill空间之间的冲突关系,进行紧缩
     fn assign_stack_slot_for_spill(&mut self) {
+        let path = "assign_mem.txt";
+
         // 给spill的寄存器空间,如果出现重复的情况,则说明后端可能空间存在冲突
         // 建立spill寄存器之间的冲突关系(如果两个spill的寄存器之间是相互冲突的,则它们不能够共享相同内存)
         let mut spill_coes: HashMap<i32, i32> = HashMap::new();
@@ -1027,7 +1032,7 @@ impl Func {
             }
             buckets.get_mut(coe).unwrap().push_back(*reg);
         }
-
+        log_file!(path, "{:?}", spillings);
         // 使用一个表记录之前使用过的空间,每次分配空间的时候可以复用之前使用过的空间,只要没有冲突
         // 如果有冲突则 需要开辟新的空间
         let mut slots: LinkedList<StackSlot> = LinkedList::new();
@@ -1039,6 +1044,10 @@ impl Func {
             let lst = buckets.get_mut(&spill_coe).unwrap();
             while !lst.is_empty() {
                 let toassign = lst.pop_front().unwrap();
+                log_file!(path, "assign:{}", toassign);
+                if toassign.get_id() == 776 {
+                    let a = 2;
+                }
                 if self.spill_stack_map.contains_key(&toassign) {
                     unreachable!()
                 }
@@ -1063,6 +1072,7 @@ impl Func {
                     if inter_slots.contains(&old_slot) {
                         continue;
                     }
+                    log_file!(path, "reuse one times!,{}-{:?}", toassign, old_slot);
                     slot_for_toassign = Some(old_slot);
                     break;
                 }
@@ -1078,6 +1088,8 @@ impl Func {
                     .insert(toassign, slot_for_toassign.unwrap());
             }
         }
+
+        log!("func:{}\n{:?}", self.label, self.spill_stack_map);
     }
 }
 

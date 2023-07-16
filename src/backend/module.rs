@@ -304,6 +304,8 @@ impl AsmModule {
         self.handle_call_v3(pool);
         self.remove_useless_func();
         self.rearrange_stack_slot();
+
+        self.update_array_offset(pool);
         self.build_stack_info(f, pool);
         //删除无用的函数
     }
@@ -351,5 +353,11 @@ impl AsmModule {
             }
         }
         self.func_map = new_func_map;
+    }
+
+    pub fn update_array_offset(&mut self, pool: &mut BackendPool) {
+        for (_, func) in self.func_map.iter() {
+            func.as_mut().update_array_offset(pool);
+        }
     }
 }
