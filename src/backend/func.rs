@@ -766,15 +766,18 @@ impl Func {
     }
 
     pub fn generate_row(&mut self, _: ObjPtr<Context>, f: &mut File) -> Result<()> {
-        AsmBuilder::new(f).show_func(&self.label)?;
-        // self.context.as_mut().call_prologue_event();
-        let mut size = 0;
-        for block in self.blocks.iter() {
-            size += block.insts.len();
-        }
-        for block in self.blocks.iter() {
-            block.as_mut().generate_row(self.context, f)?;
-        }
+        debug_assert!(|| -> bool {
+            AsmBuilder::new(f).show_func(&self.label);
+            // self.context.as_mut().call_prologue_event();
+            let mut size = 0;
+            for block in self.blocks.iter() {
+                size += block.insts.len();
+            }
+            for block in self.blocks.iter() {
+                block.as_mut().generate_row(self.context, f);
+            }
+            true
+        }());
         Ok(())
     }
 }
