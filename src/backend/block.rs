@@ -597,7 +597,7 @@ impl BB {
                     } else {
                         // 遇到局部数组存到栈上，8字节对齐
                         let array_size = (size + 1) * NUM_SIZE / 8 * 8;
-                        let p = func.stack_addr.front().unwrap().get_pos() + array_size;
+                        let p = func.stack_addr.back().unwrap().get_pos() + func.stack_addr.back().unwrap().get_size();
                         let offset = self.resolve_iimm(p, pool);
                         let dst_reg =
                             self.resolve_operand(func, ir_block_inst, true, map_info, pool);
@@ -787,7 +787,7 @@ impl BB {
                         }
                         func.as_mut()
                             .stack_addr
-                            .push_front(StackSlot::new(p, array_size));
+                            .push_back(StackSlot::new(p, array_size));
                     }
 
                     // let last = func.as_ref().stack_addr.front().unwrap();

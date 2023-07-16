@@ -122,7 +122,7 @@ impl Reg {
                 10..=17 => format!("fa{}", id - 10),
                 18..=27 => format!("fs{}", id - 16),
                 28..=31 => format!("ft{}", id - 20),
-                _ => panic!("Invalid Physic Float Register Id"),
+                _ => format!("fv{}", self.id),
             }
         }
     }

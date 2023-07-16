@@ -1036,11 +1036,6 @@ impl Func {
 
     ///移除无用def指令
     pub fn remove_unuse_def(&mut self) {
-        //
-        if self.label == "func" {
-            let a = 2;
-        }
-        self.print_func();
         loop {
             self.calc_live();
             let mut ifFinish = true;
