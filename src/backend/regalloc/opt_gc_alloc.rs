@@ -23,12 +23,6 @@ use std::{
 
 use super::regalloc::{self, Regalloc};
 
-// 保存用于分配加速的信息
-struct RegInfo {
-    reg: Reg,          //寄存器本身,
-    num_neighbor: i32, //与之冲突的邻居虚拟节点数量
-}
-
 pub struct Allocator {
     easy_gc_allocator: easy_gc_alloc::Allocator,
 

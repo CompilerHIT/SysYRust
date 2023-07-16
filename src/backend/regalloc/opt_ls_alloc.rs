@@ -12,6 +12,7 @@ use crate::algorithm::graphalgo;
 use crate::algorithm::graphalgo::Graph;
 use crate::backend::block::BB;
 use crate::backend::func::Func;
+use crate::backend::operand::Reg;
 use crate::backend::regalloc::regalloc::Regalloc;
 use crate::backend::regalloc::structs::{FuncAllocStat, RegUsedStat};
 use crate::utility::ObjPtr;
@@ -23,28 +24,23 @@ use std::collections::HashSet;
 use std::collections::VecDeque;
 
 // 摆烂的深度优先指令编码简单实现的线性扫描寄存器分配
-pub struct Allocator {
-    
-    passed_bbs:HashSet<ObjPtr<BB>>,
-    count_spill_cost:HashMap<i32,i32>,  //发生spill的代价
-
-}
+pub struct Allocator {}
 
 #[derive(Eq, PartialEq)]
 struct RegInterval {
-    pub id: i32,
-    pub end: usize,
+    pub reg: Reg,
+    pub die: usize,
 }
 
 impl RegInterval {
-    fn new(id: i32, end: usize) -> RegInterval {
-        RegInterval { id, end }
+    fn new(reg: Reg, die: usize) -> RegInterval {
+        RegInterval { reg: reg, die: die }
     }
 }
 
 impl PartialOrd for RegInterval {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.end.cmp(&other.end))
+        Some(self.die.cmp(&other.die))
     }
 }
 impl Ord for RegInterval {
@@ -62,27 +58,26 @@ impl Ord for RegInterval {
     }
 }
 
-
-
 impl Allocator {
     pub fn new() -> Allocator {
-        Allocator {
-            passed_bbs: HashSet::new(),
-            count_spill_cost: HashMap::new(),
-        }
+        Allocator {}
     }
+    //获取某个顺序的块结构
+    pub fn order_blocks(blocks: &Vec<ObjPtr<BB>>) {}
 
-    fn alloc_block(bb:ObjPtr<BB>){
-
-    }
-  
-    
+    //对于某个块内进行分配
+    fn alloc_block(bb: ObjPtr<BB>, colors: &mut HashMap<i32, i32>, spillings: &mut HashSet<i32>) {}
 }
 
 impl Regalloc for Allocator {
     fn alloc(&mut self, func: &Func) -> FuncAllocStat {
+        func.build_reg_intervals();
 
-
-        FuncAllocStat { stack_size:todo!(), bb_stack_sizes: todo!(), spillings: todo!(), dstr:todo!()  }
+        FuncAllocStat {
+            stack_size: todo!(),
+            bb_stack_sizes: todo!(),
+            spillings: todo!(),
+            dstr: todo!(),
+        }
     }
 }

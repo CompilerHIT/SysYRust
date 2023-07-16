@@ -352,11 +352,27 @@ impl Func {
 
             block.as_mut().live_in = block.as_ref().live_use.clone();
             block.as_mut().live_out.clear();
-            match block.insts.last().unwrap().get_type() {
-                InstrsType::Ret(r_type) => {
-                    block.as_mut().live_out.insert(Reg::new(10, r_type));
+            if let Some(last_isnt) = block.insts.last() {
+                match last_isnt.get_type() {
+                    InstrsType::Ret(r_type) => match r_type {
+                        ScalarType::Int => {
+                            let ret_reg = Reg::new(10, r_type);
+                            block.as_mut().live_out.insert(ret_reg);
+                            if !block.live_def.contains(&ret_reg) {
+                                queue.push_front((*block, ret_reg));
+                            }
+                        }
+                        ScalarType::Float => {
+                            let ret_reg = Reg::new(10 + FLOAT_BASE, r_type);
+                            block.as_mut().live_out.insert(ret_reg);
+                            if !block.live_def.contains(&ret_reg) {
+                                queue.push_front((*block, ret_reg));
+                            }
+                        }
+                        _ => (),
+                    },
+                    _ => (),
                 }
-                _ => (),
             }
         }
 
@@ -1279,7 +1295,8 @@ impl Func {
 impl Func {
     ///为函数创建寄存器活跃区间
     /// 内部会调用calc_live 计算 live use live def live in live out
-    pub fn build_reg_intervals(&mut self) {
+    /// 表面是unmut self,但是会通过内部可变性修改内部的 blocks的属性
+    pub fn build_reg_intervals(&self) {
         self.calc_live();
         for bb in self.blocks.iter() {
             bb.as_mut().build_reg_intervals();

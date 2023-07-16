@@ -29,6 +29,8 @@ impl Regalloc for Allocator {
         if func.blocks.len() != 2 {
             unreachable!();
         }
+        //当函数只有一个块的时候才会跑该优化
+
         todo!();
     }
 }
