@@ -53,7 +53,8 @@ impl Allocator {
     // 建立虚拟寄存器之间的冲突图
     pub fn build_interference_graph(&mut self, func: &Func) {
         self.interference_graph = regalloc::build_interference(func);
-        self.availables = regalloc::build_availables(func, &self.interference_graph);
+        self.availables =
+            regalloc::build_availables_with_interef_graph(func, &self.interference_graph);
         self.nums_neighbor_color =
             regalloc::build_nums_neighbor_color(func, &self.interference_graph);
         let mut bitmap: Bitmap = Bitmap::with_cap(5000);
@@ -380,6 +381,7 @@ impl Allocator {
 
 impl Regalloc for Allocator {
     fn alloc(&mut self, func: &crate::backend::func::Func) -> super::structs::FuncAllocStat {
+        func.calc_live();
         self.build_interference_graph(func);
         self.count_spill_costs(func);
 

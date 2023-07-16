@@ -4,6 +4,8 @@ use std::hash::Hash;
 use std::num;
 use std::path::Iter;
 
+use biheap::BiHeap;
+
 use crate::backend::func::Func;
 use crate::backend::instrs::{InstrsType, BB};
 use crate::backend::operand::Reg;
@@ -193,7 +195,7 @@ pub fn build_interference_into_lst(func: &Func) -> HashMap<Reg, LinkedList<Reg>>
 }
 
 // 获取可分配表
-pub fn build_availables(
+pub fn build_availables_with_interef_graph(
     func: &Func,
     interference_graph: &HashMap<Reg, HashSet<Reg>>,
 ) -> HashMap<Reg, RegUsedStat> {
@@ -780,4 +782,78 @@ pub fn eval_alloc(func: &Func, dstr: &HashMap<i32, i32>, spillings: &HashSet<i32
     });
     cost = fcost as i32;
     cost
+}
+
+///初始化所有虚拟寄存器的可用寄存器表 (应该为 num_insts 时间复杂度)
+pub fn init_availables(func: &Func) -> HashMap<Reg, RegUsedStat> {
+    let mut availables = HashMap::new();
+    // 从前往后过一遍pass ,遇到颜色才进行存活并遍历
+    let reg_use_stat = RegUsedStat::new();
+    func.build_reg_intervals();
+    //对于活着的颜色,加入颜色列表
+    #[derive(Clone, Copy, PartialEq, Eq)]
+    struct ColorInterval(i32, i32);
+    impl Ord for ColorInterval {
+        fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+            self.1.cmp(&other.1)
+        }
+    }
+    impl PartialOrd for ColorInterval {
+        fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+            self.1.partial_cmp(&other.1)
+        }
+    }
+    let mut windows: BiHeap<ColorInterval> = BiHeap::new();
+    let mut reg_use_stat: RegUsedStat = RegUsedStat::new();
+    //加入颜色和颜色的终结日期
+    //最终达到 log2(64) * n的 时间复杂度
+    for bb in func.blocks.iter() {
+        let reg_intervals = &bb.reg_intervals;
+        bb.live_in.iter().for_each(|reg| {
+            if reg.is_physic() {
+                debug_assert!(reg_use_stat.is_available_reg(reg.get_color()));
+                let color = reg.get_color();
+                reg_use_stat.use_reg(color);
+                let (_, die) = *reg_intervals.get(&(*reg, -1)).unwrap();
+                windows.push(ColorInterval(reg.get_id(), die));
+            } else {
+                if !availables.contains_key(reg) {
+                    availables.insert(*reg, reg_use_stat);
+                }
+            }
+        });
+        bb.live_in.iter().for_each(|reg| {
+            if !reg.is_physic() {
+                availables.get_mut(reg).unwrap().merge(&reg_use_stat);
+            }
+        });
+        //然后,根据指令分析颜色的到期时间
+        //然后,根据传播,对遇到的寄存器 [创建available],加入颜色
+        for (index, inst) in bb.insts.iter().enumerate() {
+            ///首先释放颜色
+            while !windows.is_empty() && windows.peek_max().unwrap().1 as usize >= index {
+                let ColorInterval(color, _) = windows.pop_max().unwrap();
+                reg_use_stat.release_reg(color);
+            }
+            for reg in inst.get_regs() {
+                if reg.is_physic() {
+                    let color = reg.get_color();
+                    reg_use_stat.use_reg(color);
+                    let (_, die) = *reg_intervals.get(&(reg, -1)).unwrap();
+                    windows.push(ColorInterval(reg.get_id(), die));
+                }
+            }
+            for reg in inst.get_regs() {
+                if reg.is_physic() {
+                    continue;
+                }
+                if availables.contains_key(&reg) {
+                    availables.get_mut(&reg).unwrap().merge(&reg_use_stat);
+                } else {
+                    availables.insert(reg, reg_use_stat);
+                }
+            }
+        }
+    }
+    availables
 }

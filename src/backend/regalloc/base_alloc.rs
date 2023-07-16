@@ -191,6 +191,7 @@ impl Allocator {
 }
 impl Regalloc for Allocator {
     fn alloc(&mut self, func: &crate::backend::instrs::Func) -> super::structs::FuncAllocStat {
+        func.calc_live();
         let calout = "calout.txt";
         // fs::remove_file(calout);
         let mut dstr: HashMap<i32, i32> = HashMap::new();

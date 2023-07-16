@@ -54,7 +54,7 @@ impl RegUsedStat {
         // TODO,使用位运算加速过程
         match kind {
             ScalarType::Float => self.num_available_fregs() != 0,
-            ScalarType::Int => self.num_avialable_iregs() != 0,
+            ScalarType::Int => self.num_available_iregs() != 0,
             _ => false,
         }
     }
@@ -94,12 +94,12 @@ impl RegUsedStat {
     pub fn num_available_regs(&self, kind: ScalarType) -> usize {
         match kind {
             ScalarType::Float => self.num_available_fregs(),
-            ScalarType::Int => self.num_avialable_iregs(),
+            ScalarType::Int => self.num_available_iregs(),
             _ => panic!("{:?}", kind),
         }
     }
 
-    pub fn num_avialable_iregs(&self) -> usize {
+    pub fn num_available_iregs(&self) -> usize {
         (0..=31)
             .filter(|ireg| self.is_available_ireg(*ireg))
             .count()
@@ -337,7 +337,7 @@ mod test_regusestat {
         // TODO
         let a = RegUsedStat::new();
         assert_eq!(a.num_available_fregs(), 32);
-        assert_eq!(a.num_avialable_iregs(), 22); //保留t0-t2三个临时寄存器,sp,a0,tp,x0,gp, s0六个特殊寄存器,保留a0用作返回值
+        assert_eq!(a.num_available_iregs(), 22); //保留t0-t2三个临时寄存器,sp,a0,tp,x0,gp, s0六个特殊寄存器,保留a0用作返回值
         assert_eq!(a.num_available_regs(crate::utility::ScalarType::Float), 32);
         assert_eq!(a.num_available_regs(crate::utility::ScalarType::Int), 22);
     }

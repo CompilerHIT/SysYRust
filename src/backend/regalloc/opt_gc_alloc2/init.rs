@@ -13,7 +13,7 @@ impl Allocator {
         let all_neighbors = regalloc::build_interference_into_lst(func);
         let inter_ference_graph = regalloc::build_interference(func);
         let nums_neighbor_color = regalloc::build_nums_neighbor_color(func, &inter_ference_graph);
-        let availables = regalloc::build_availables(func, &inter_ference_graph);
+        let availables = regalloc::build_availables_with_interef_graph(func, &inter_ference_graph);
         let spill_cost = regalloc::estimate_spill_cost(func);
 
         let (last_colors, last_colors_lst, all_live_neighbors_bitmap, all_live_neigbhors) =

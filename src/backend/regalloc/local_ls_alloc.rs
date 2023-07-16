@@ -15,6 +15,7 @@ impl Allocator {
 
 impl Regalloc for Allocator {
     fn alloc(&mut self, func: &crate::backend::instrs::Func) -> super::structs::FuncAllocStat {
+        func.calc_live();
         todo!()
     }
 }

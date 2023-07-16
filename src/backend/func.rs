@@ -381,15 +381,19 @@ impl Func {
             let (block, reg) = value;
             log_file!(
                 calc_live_file,
-                "block {} 's ins:{:?}",
+                "block {} 's ins:{:?}, transport live out:{}",
                 block.label,
                 block
                     .in_edge
                     .iter()
                     .map(|b| &b.label)
-                    .collect::<HashSet<&String>>()
+                    .collect::<HashSet<&String>>(),
+                reg
             );
             for pred in block.as_ref().in_edge.iter() {
+                if block.label == ".LBB0_5" && pred.label == ".LBB0_1" {
+                    let a = 2;
+                }
                 if pred.as_mut().live_out.insert(reg) {
                     if pred.as_mut().live_def.contains(&reg) {
                         continue;
@@ -430,8 +434,8 @@ impl Func {
         //     }
         // }
         // let mut allocator = crate::backend::regalloc::easy_ls_alloc::Allocator::new();
-        // let mut allocator = crate::backend::regalloc::easy_gc_alloc::Allocator::new();
-        let mut allocator = crate::backend::regalloc::opt_ls_alloc::Allocator::new();
+        let mut allocator = crate::backend::regalloc::easy_gc_alloc::Allocator::new();
+        // let mut allocator = crate::backend::regalloc::opt_ls_alloc::Allocator::new();
         // let mut allocator = crate::backend::regalloc::opt_gc_alloc2::Allocator::new();
         // let mut allocator = crate::backend::regalloc::opt_gc_alloc::Allocator::new();
         // let mut allocator = crate::backend::regalloc::base_alloc::Allocator::new();
@@ -546,7 +550,12 @@ impl Func {
     pub fn update_array_offset(&mut self, pool: &mut BackendPool) {
         let slot = self.stack_addr.back().unwrap();
         let base_size = slot.get_pos() + slot.get_size() + self.caller_saved_len * ADDR_SIZE;
-        log!("{}, len {}, base {}", self.label, self.caller_saved_len, base_size);
+        log!(
+            "{}, len {}, base {}",
+            self.label,
+            self.caller_saved_len,
+            base_size
+        );
 
         for (i, inst) in self.array_inst.iter().enumerate() {
             let mut offset = match inst.get_rhs() {
@@ -554,7 +563,7 @@ impl Func {
                 _ => unreachable!("array offset must be imm"),
             };
             offset += self.array_slot.iter().take(i).sum::<i32>() - self.array_slot[i];
-            
+
             if !operand::is_imm_12bs(offset) {
                 for block in self.blocks.iter() {
                     let index = match block.insts.iter().position(|i| i == inst) {

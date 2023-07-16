@@ -131,6 +131,7 @@ impl Allocator {
 }
 impl Regalloc for Allocator {
     fn alloc(&mut self, func: &crate::backend::instrs::Func) -> FuncAllocStat {
+        func.calc_live();
         self.easy_gc_allocator.build_interference_graph(func);
 
         let intereref_path = "interference_graph.txt";

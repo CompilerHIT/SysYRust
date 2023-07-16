@@ -105,6 +105,7 @@ impl Allocator {
         let mut iwindows: BiHeap<RegInterval> = BiHeap::new();
         let mut fwindows: BiHeap<RegInterval> = BiHeap::new();
         let mut ends: HashMap<i32, Vec<i32>> = HashMap::new();
+        let mut color_owners: HashMap<i32, Reg> = HashMap::new();
 
         let mut reg_use_stat = RegUsedStat::new();
         let get_color =
@@ -133,7 +134,6 @@ impl Allocator {
              spillings: &mut HashSet<i32>,
              spilling_costs: &HashMap<Reg, f32>| {
                 debug_assert!(!spillings.contains(&reg_interval.reg.get_id()));
-
                 let mut reg_interval = reg_interval;
                 let kind = reg_interval.reg.get_type();
                 let limit_num = reg_use_stat.num_available_regs(kind);
@@ -148,7 +148,11 @@ impl Allocator {
                 }
                 // unimplemented!("先替换,再轮询");
                 // let color = None;
-
+                if windows.len() == 0 {
+                    ///说明 limit_num 此时也为0
+                    spillings.insert(reg_interval.reg.get_id());
+                    return;
+                }
                 if windows.len() >= limit_num as usize {
                     let max = windows.peek_max().unwrap();
                     let cost_top = spilling_costs.get(&max.reg).unwrap();
@@ -168,33 +172,53 @@ impl Allocator {
                     spillings.insert(reg.get_id());
                 }
             };
-        let process_color = |color: i32,
-                             die: i32,
-                             reg_use_stat: &mut RegUsedStat,
-                             ends: &mut HashMap<i32, Vec<i32>>,
-                             iwindows: &mut BiHeap<RegInterval>,
-                             fwindows: &mut BiHeap<RegInterval>| {
-            log_file!(optls_path, "process color:{}(die at:{})", color, die);
-            reg_use_stat.use_reg(color);
-            if !ends.contains_key(&die) {
-                ends.insert(die, vec![color]);
-            } else {
-                ends.get_mut(&die).unwrap().push(color);
-            }
-            let windows = if color <= 31 { iwindows } else { fwindows };
-            let mut new_windows = BiHeap::new();
-            while !windows.is_empty() {
-                let mut interval = windows.pop_max().unwrap();
-                interval.available.use_reg(color);
-                new_windows.push(interval);
-            }
-            *windows = new_windows;
-        };
+        let mut process_color =
+            |color: i32,
+             die: i32,
+             owner: &Reg,
+             color_owners: &mut HashMap<i32, Reg>,
+             colors: &mut HashMap<i32, i32>,
+             spillings: &mut HashSet<i32>,
+             reg_use_stat: &mut RegUsedStat,
+             ends: &mut HashMap<i32, Vec<i32>>,
+             iwindows: &mut BiHeap<RegInterval>,
+             fwindows: &mut BiHeap<RegInterval>| {
+                log_file!(optls_path, "process color:{}(die at:{})", color, die);
+                if color_owners.contains_key(&color) {
+                    if !owner.is_physic() {
+                        colors.remove(&owner.get_id());
+                        spillings.insert(owner.get_id());
+                        return;
+                    } else {
+                        let reg = color_owners.get(&color).unwrap();
+                        colors.remove(&reg.get_id());
+                        spillings.insert(reg.get_id());
+                        color_owners.remove(&color);
+                        reg_use_stat.release_reg(color);
+                    }
+                }
+                reg_use_stat.use_reg(color);
+                color_owners.insert(color, *owner);
+                if !ends.contains_key(&die) {
+                    ends.insert(die, vec![color]);
+                } else {
+                    ends.get_mut(&die).unwrap().push(color);
+                }
+                let windows = if color <= 31 { iwindows } else { fwindows };
+                let mut new_windows = BiHeap::new();
+                while !windows.is_empty() {
+                    let mut interval = windows.pop_max().unwrap();
+                    interval.available.use_reg(color);
+                    new_windows.push(interval);
+                }
+                *windows = new_windows;
+            };
         let mut livein_comsume =
             |reg: &Reg,
              reg_use_stat: &mut RegUsedStat,
              iwindows: &mut BiHeap<RegInterval>,
              fwindows: &mut BiHeap<RegInterval>,
+             color_owners: &mut HashMap<i32, Reg>,
              colors: &mut HashMap<i32, i32>,
              spillings: &mut HashSet<i32>,
              spill_costs: &HashMap<Reg, f32>| {
@@ -207,7 +231,18 @@ impl Allocator {
                 //给该寄存器分配颜色 (或者该寄存器有颜色)
                 let color = get_color(&reg, &colors, &spillings);
                 if let Some(color) = color {
-                    process_color(color, die, reg_use_stat, &mut ends, iwindows, fwindows);
+                    process_color(
+                        color,
+                        die,
+                        &reg,
+                        color_owners,
+                        colors,
+                        spillings,
+                        reg_use_stat,
+                        &mut ends,
+                        iwindows,
+                        fwindows,
+                    );
                 } else {
                     add_reg_to_window(
                         RegInterval::new(reg, die, *reg_use_stat),
@@ -226,36 +261,49 @@ impl Allocator {
                 &mut reg_use_stat,
                 &mut iwindows,
                 &mut fwindows,
+                &mut color_owners,
                 colors,
                 spillings,
                 spill_costs,
             );
         });
 
+        let refresh_windows =
+            |index: usize, windows: &mut BiHeap<RegInterval>, spillings: &mut HashSet<i32>| {
+                while windows.len() > index {
+                    let max = windows.pop_max().unwrap().reg;
+                    spillings.insert(max.get_id());
+                }
+            };
+
         let color_and_release = |index: usize,
                                  windows: &mut BiHeap<RegInterval>,
                                  colors: &mut HashMap<i32, i32>,
                                  spillings: &mut HashSet<i32>| {
             let mut colors_used = RegUsedStat::new();
+
             while windows.len() > 0 && windows.peek_min().unwrap().die <= index as i32 {
                 let min = windows.pop_min().unwrap();
                 let mut available = min.available;
                 available.merge(&colors_used);
                 let reg = min.reg;
-
-                if reg.get_id() == 71 || reg.get_id() == 66 {
-                    log_file!(optls_path, "{}", colors_used);
-                    log_file!(optls_path, "{}", min.die);
-                    log_file!(optls_path, "{}", windows.len());
-                    windows
-                        .iter()
-                        .for_each(|ri| log_file!(optls_path, "{}", ri.reg));
-                    // log_file!(optls_path, "{:?}", );
-                }
-
+                // if reg.get_id() == 71 || reg.get_id() == 66 {
+                //     log_file!(optls_path, "{}", colors_used);
+                //     log_file!(optls_path, "{}", min.die);
+                //     log_file!(optls_path, "{}", windows.len());
+                //     windows
+                //         .iter()
+                //         .for_each(|ri| log_file!(optls_path, "{}", ri.reg));
+                //     // log_file!(optls_path, "{:?}", );
+                // }
                 let color = available.get_available_reg(reg.get_type());
+                if color.is_none() {
+                    spillings.insert(reg.get_id());
+                    continue;
+                }
                 debug_assert!(color.is_some());
                 let color = color.unwrap();
+                log_file!(optls_path, "color {} with {}", reg, color);
                 colors.insert(reg.get_id(), color);
                 colors_used.use_reg(color);
             }
@@ -264,7 +312,10 @@ impl Allocator {
             while !windows.is_empty() {
                 let mut ri = windows.pop_max().unwrap();
                 ri.available.merge(&colors_used);
-                debug_assert!(ri.available.is_available(ri.reg.get_type()));
+                if !ri.available.is_available(ri.reg.get_type()) {
+                    spillings.insert(ri.reg.get_id());
+                    continue;
+                }
                 new_windows.push(ri);
             }
             *windows = new_windows;
@@ -282,26 +333,37 @@ impl Allocator {
             //首先释放能够释放的颜色
             if let Some(colors_released) = ends.get(&(index as i32)) {
                 for color in colors_released {
+                    log_file!(optls_path, "release color:{}", color);
                     reg_use_stat.release_reg(*color);
+                    color_owners.remove(color);
+                    log_file!(optls_path, "after release:{}", reg_use_stat);
                 }
             }
-            while iwindows.len() > reg_use_stat.num_available_regs(ScalarType::Int) {
-                let reg = iwindows.pop_max().unwrap().reg;
-                spillings.insert(reg.get_id());
-            }
-            while fwindows.len() > reg_use_stat.num_available_regs(ScalarType::Float) {
-                let reg = fwindows.pop_max().unwrap().reg;
-                spillings.insert(reg.get_id());
-            }
+            refresh_windows(reg_use_stat.num_available_iregs(), iwindows, spillings);
+            refresh_windows(reg_use_stat.num_available_fregs(), fwindows, spillings);
             //释放并着色
             color_and_release(index, iwindows, colors, spillings);
             color_and_release(index, fwindows, colors, spillings);
             //对于def中的寄存器
             for reg in inst.get_reg_def() {
+                if spillings.contains(&reg.get_id()) {
+                    continue;
+                }
                 let color = get_color(&reg, &colors, &spillings);
                 let (reg, die) = *bb.reg_intervals.get(&(reg, index as i32)).unwrap();
                 if let Some(color) = color {
-                    process_color(color, die, reg_use_stat, &mut ends, iwindows, fwindows);
+                    process_color(
+                        color,
+                        die,
+                        &reg,
+                        &mut color_owners,
+                        colors,
+                        spillings,
+                        reg_use_stat,
+                        &mut ends,
+                        iwindows,
+                        fwindows,
+                    );
                 } else {
                     let new_interval = RegInterval {
                         reg: reg,
@@ -341,7 +403,10 @@ impl Allocator {
         }
 
         //对于 live out内的东西 (因为reg 一定在其他block的 live in里,所以就不会管)
-
+        refresh_windows(reg_use_stat.num_available_iregs(), &mut iwindows, spillings);
+        refresh_windows(reg_use_stat.num_available_fregs(), &mut fwindows, spillings);
+        color_and_release(bb.insts.len(), &mut iwindows, colors, spillings);
+        color_and_release(bb.insts.len(), &mut fwindows, colors, spillings);
         // unimplemented!("live out do");
     }
 }
@@ -365,9 +430,13 @@ impl Regalloc for Allocator {
             );
         });
 
-        for bb in blocks {
-            Allocator::alloc_block(bb, &mut colors, &mut spillings, &spill_costs);
+        for bb in blocks.iter() {
+            Allocator::alloc_block(*bb, &mut colors, &mut spillings, &spill_costs);
         }
+        // spillings.clear();
+        // for bb in blocks.iter() {
+        //     Allocator::alloc_block(*bb, &mut colors, &mut spillings, &spill_costs);
+        // }
 
         //TODO,寄存器分裂
         let (stack_size, bb_stack_sizes) = regalloc::countStackSize(func, &spillings);
