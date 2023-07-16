@@ -94,8 +94,6 @@ pub fn generate_asm(
     if is_opt {
         BackendPass::new(ObjPtr::new(module)).run_addition_block_pass();
     }
-    //生成抽象汇编
-    module.generate_row_asm(&mut file2, &mut pool);
     //生成汇编
     module.generate_asm(&mut file, &mut pool);
     //释放

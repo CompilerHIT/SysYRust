@@ -597,11 +597,15 @@ impl BB {
                     } else {
                         // 遇到局部数组存到栈上，8字节对齐
                         let array_size = (size + 1) * NUM_SIZE / 8 * 8;
-                        let p = func.stack_addr.back().unwrap().get_pos() + func.stack_addr.back().unwrap().get_size();
+                        let p = func.stack_addr.back().unwrap().get_pos()
+                            + func.stack_addr.back().unwrap().get_size()
+                            + func.array_slot.back().unwrap();
+                        // 记录数组大小
+                        func.as_mut().array_slot.push_back(array_size);
                         let offset = self.resolve_iimm(p, pool);
                         let dst_reg =
                             self.resolve_operand(func, ir_block_inst, true, map_info, pool);
-                        let mut inst = LIRInst::new(
+                        let mut add = LIRInst::new(
                             InstrsType::Binary(BinaryOp::Add),
                             vec![
                                 dst_reg.clone(),
@@ -609,8 +613,14 @@ impl BB {
                                 offset,
                             ],
                         );
-                        inst.set_double();
-                        self.insts.push(pool.put_inst(inst));
+                        add.set_double();
+                        let obj_add = pool.put_inst(add);
+                        self.insts.push(obj_add);
+
+                        debug_assert!(
+                            func.as_mut().array_inst.insert(obj_add),
+                            "array slot already exists"
+                        );
 
                         let (is_init, array_info) = match inst_ref.get_ir_type() {
                             IrType::IntPtr => inst_ref.get_int_init().clone(),
@@ -785,9 +795,6 @@ impl BB {
                                 }
                             }
                         }
-                        func.as_mut()
-                            .stack_addr
-                            .push_back(StackSlot::new(p, array_size));
                     }
 
                     // let last = func.as_ref().stack_addr.front().unwrap();
@@ -1753,7 +1760,6 @@ impl BB {
                 }
 
                 InstrsType::LoadFromStack | InstrsType::StoreToStack => {
-                    
                     let temp = Operand::Reg(Reg::new(8, ScalarType::Int));
                     let offset = inst_ref.get_stack_offset().get_data();
                     if offset == 2112 {
@@ -2572,7 +2578,6 @@ impl BB {
         } else {
             let tmp1 = Operand::Reg(Reg::init(ScalarType::Int));
             let tmp2 = Operand::Reg(Reg::init(ScalarType::Int));
-            log!("{imm}");
             self.resolve_opt_div(tmp1.clone(), lhs_reg.clone(), imm, pool);
             self.resolve_opt_mul(tmp2.clone(), tmp1, imm, pool);
             self.insts.push(pool.put_inst(LIRInst::new(

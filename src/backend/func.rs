@@ -60,12 +60,17 @@ pub struct Func {
     pub callee_saved: HashSet<Reg>,
     pub caller_saved: HashMap<Reg, Reg>,
     pub caller_saved_len: i32,
+
+    pub array_inst: HashSet<ObjPtr<LIRInst>>,
+    pub array_slot: LinkedList<i32>,
 }
 
 /// reg_num, stack_addr, caller_stack_addr考虑借助回填实现
 /// 是否需要caller_stack_addr？caller函数sp保存在s0中
 impl Func {
     pub fn new(name: &str, context: ObjPtr<Context>) -> Self {
+        let mut list = LinkedList::new();
+        list.push_back(0);
         Self {
             is_extern: false,
             label: name.to_string(),
@@ -89,6 +94,9 @@ impl Func {
             callee_saved: HashSet::new(),
             caller_saved: HashMap::new(),
             caller_saved_len: 0,
+
+            array_inst: HashSet::new(),
+            array_slot: list,
         }
     }
 
@@ -508,7 +516,24 @@ impl Func {
             block.as_mut().save_reg(this, pool);
         }
         self.update(this);
+        self.update_array_offset();
         self.save_callee(pool, f);
+    }
+
+    pub fn update_array_offset(&mut self) {
+        let slot = self.stack_addr.back().unwrap();
+        let base_size = slot.get_pos() + slot.get_size() + self.caller_saved_len * ADDR_SIZE;
+        for inst in self.array_inst.iter() {
+            let offset = match inst.get_rhs() {
+                Operand::IImm(imm) => imm.get_data() + base_size,
+                _ => unreachable!("array offset must be imm")
+            };
+            inst.as_mut().replace_op(vec![
+                inst.get_dst().clone(),
+                inst.get_lhs().clone(),
+                Operand::IImm(IImm::new(offset)),
+            ]);
+        }
     }
 
     pub fn handle_overflow(&mut self, pool: &mut BackendPool) {
@@ -516,9 +541,9 @@ impl Func {
         for block in self.blocks.iter() {
             block.as_mut().handle_overflow(this, pool);
         }
-        self.print_func();
+        // self.print_func();
         self.update(this);
-        self.print_func();
+        // self.print_func();
     }
 
     fn update(&mut self, func: ObjPtr<Func>) {
@@ -531,6 +556,8 @@ impl Func {
         self.callee_saved = func_ref.callee_saved.clone();
         self.caller_saved = func_ref.caller_saved.clone();
         self.caller_saved_len = func_ref.caller_saved_len;
+        self.array_inst = func_ref.array_inst.clone();
+        self.array_slot = func_ref.array_slot.clone();
     }
 
     /// 为要保存的callee save寄存器开栈,然后开栈以及处理 callee save的保存和恢复
@@ -573,6 +600,12 @@ impl Func {
         };
         // log!("stack: {:?}", self.stack_addr);
         stack_size += self.caller_saved_len * ADDR_SIZE;
+
+        // 局部数组空间
+        for array_size in self.array_slot.iter() {
+            stack_size += array_size
+        }
+        
         // log!("caller saved: {}", self.caller_saved.len());
         //栈对齐 - 调用func时sp需按16字节对齐
         stack_size = stack_size / 16 * 16 + 16;
@@ -1083,7 +1116,7 @@ impl Func {
                 break;
             }
         }
-        self.print_func();
+        // self.print_func();
     }
 }
 

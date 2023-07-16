@@ -253,7 +253,7 @@ impl AsmModule {
     fn print_model(&self) {
         self.func_map.iter().for_each(|(_, func)| {
             if !func.is_extern {
-                func.print_func();
+                // func.print_func();
             }
         });
     }

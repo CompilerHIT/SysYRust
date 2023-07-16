@@ -99,7 +99,6 @@ impl BackendPass {
     fn rm_useless_param_overflow(&self, func: ObjPtr<Func>, block: ObjPtr<BB>, pool: &mut BackendPool) {
         // 处理l/s param to stack
         let mut index = 0;
-        log!("stack_size: {}", func.context.get_offset());
         loop {
             if index >= block.insts.len() {
                 break;
@@ -125,7 +124,6 @@ impl BackendPass {
                     }
                     break;
                 }
-                log!("inst: {:?}", insts);
                 if insts.len() > 1 {
                     // l/s offset(sp) -> li offset gp. add gp gp sp. l/s 0(gp).
                     let s0 = Operand::Reg(Reg::new(8, ScalarType::Int));
