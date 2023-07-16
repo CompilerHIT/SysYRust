@@ -44,7 +44,6 @@ impl<'f> AsmBuilder<'f> {
         is_imm: bool,
         is_double: bool,
     ) -> Result<()> {
-        //FIXME: mul使用w是否有超过32位的用例
         match op {
             "fne.s" => {
                 writeln!(self.f, "    feq.s {dest}, {lhs}, {rhs}")?;
@@ -70,6 +69,7 @@ impl<'f> AsmBuilder<'f> {
                         || op == "xor"
                         || op == "and"
                         || op == "slt"
+                        || op == "sh2add"
                         || is_double
                     {
                         writeln!(self.f, "    {op} {dest}, {lhs}, {rhs}")
@@ -97,62 +97,6 @@ impl<'f> AsmBuilder<'f> {
     pub fn addi(&mut self, dest: &str, opr: &str, imm: i32) -> Result<()> {
         writeln!(self.f, "    addi {dest}, {opr}, {imm}")
     }
-
-    pub fn slli(&mut self, dest: &str, opr: &str, imm: i32) -> Result<()> {
-        writeln!(self.f, "    slli {dest}, {opr}, {imm}")
-    }
-
-    pub fn srai(&mut self, dest: &str, opr: &str, imm: i32) -> Result<()> {
-        writeln!(self.f, "    srai {dest}, {opr}, {imm}")
-    }
-
-    //TODO: optimize mul and div
-    // pub fn muli(&mut self, dest: &str, opr: &str, imm: i32) -> Result<()> {
-    //     if imm == 0 {
-    //         self.mv(dest, "x0")
-    //     } else if imm > 0 && (imm & (imm - 1)) == 0 {
-    //         let mut shift = 0;
-    //         let mut imm = imm >> 1;
-    //         while imm != 0 {
-    //             shift += 1;
-    //             imm >>= 1;
-    //         }
-    //         self.slli(dest, opr, shift)
-    //     } else {
-    //         self.li(self.temp, imm)?;
-    //         self.op2("mul", dest, opr, self.temp)
-    //     }
-    // }
-
-    // pub fn divi(&mut self, dest: &str, opr: &str, imm: i32) -> Result<()> {
-    //     if imm == 0 {
-    //         panic!("div by zero!");
-    //     } else if imm > 0 && (imm & (imm - 1)) == 0 {
-    //         let mut shift: i32 = 0;
-    //         let mut imm = imm >> 1;
-    //         while imm != 0 {
-    //             shift += 1;
-    //             imm >>= 1;
-    //         }
-    //         self.srai(dest, opr, shift)?;
-    //         Ok(())
-    //     } else {
-    //         // let sign = if imm < 0 { -1 } else { 1 };
-    //         // let imm = sign * imm;
-    //         // let mut tmp1 = String::from(dest);
-    //         // tmp1.push_str("_tmp");
-    //         // let mut tmp2 = String::from(dest);
-    //         // tmp2.push_str("_tmp2");
-    //         // self.li(tmp1.as_str(), imm)?;
-    //         // self.op2("mul", tmp2.as_str(), opr, tmp1.as_str())?;
-    //         // self.srai(dest, tmp2.as_str(), 31)?;
-    //         // self.op2("add", dest, dest, opr)?;
-    //         // self.op2("sub", dest, dest, tmp1.as_str())?;
-    //         self.li(self.temp, imm)?;
-    //         self.op2("div", dest, opr, self.temp);
-    //         Ok(())
-    //     }
-    // }
 
     pub fn s(
         &mut self,
@@ -195,7 +139,6 @@ impl<'f> AsmBuilder<'f> {
     pub fn b(&mut self, cond: &str, lhs: &str, rhs: &str, label: &str) -> Result<()> {
         writeln!(self.f, "    b{cond}    {lhs}, {rhs}, {label}")
     }
-
 
     pub fn beqz(&mut self, reg: &str, label: &str) -> Result<()> {
         writeln!(self.f, "    beqz {reg}, {label}")
