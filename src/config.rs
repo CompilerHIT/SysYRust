@@ -86,9 +86,22 @@ pub fn dump() {
             "sy_path:{}",
             SRC_PATH.as_ref().unwrap().clone()
         );
-    }
-    for (kind, times) in unsafe { CONFIG_INFO.as_ref().unwrap().times.iter() } {
-        log_file!("performance_eval.txt", "{}\t:{} times", kind, times);
+        let order = vec![
+            "spill",
+            "offset_overflow",
+            "branch_overflow",
+            "caller_save",
+            "callee_save",
+        ];
+        for kind in order.iter() {
+            let times = CONFIG_INFO
+                .as_ref()
+                .unwrap()
+                .times
+                .get(&kind.to_string())
+                .unwrap();
+            log_file!("performance_eval.txt", "{}\t:{} times", kind, times);
+        }
     }
 }
 
