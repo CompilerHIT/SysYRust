@@ -35,52 +35,9 @@ use std::fmt::{write, Display};
 use std::hash::Hash;
 use std::slice::Windows;
 
-const optls_path: &str = "optls.txt";
+const optls_path: &str = "optls2.txt";
 
-// 摆烂的深度优先指令编码简单实现的线性扫描寄存器分配
-pub struct Allocator {}
-
-#[derive(Eq, PartialEq)]
-struct RegInterval {
-    pub reg: Reg,
-    pub available: RegUsedStat,
-    pub die: i32,
-}
-impl Display for RegInterval {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "({},{},{})", self.reg, self.die, self.available)
-    }
-}
-
-impl RegInterval {
-    fn new(reg: Reg, die: i32, reg_use_stat: RegUsedStat) -> RegInterval {
-        RegInterval {
-            reg: reg,
-            die: die,
-            available: reg_use_stat,
-        }
-    }
-}
-
-impl PartialOrd for RegInterval {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.die.cmp(&other.die))
-    }
-}
-impl Ord for RegInterval {
-    fn cmp(&self, other: &Self) -> Ordering {
-        // Rust中BinaryHeap的默认实现是大根堆,我们需要的正是大根堆
-        self.partial_cmp(other).unwrap()
-    }
-    fn max(self, other: Self) -> Self {
-        let o = self.cmp(&other);
-        match o {
-            Ordering::Greater => self,
-            Ordering::Equal => self,
-            Ordering::Less => other,
-        }
-    }
-}
+struct Allocator {}
 
 impl Allocator {
     pub fn new() -> Allocator {
@@ -94,6 +51,8 @@ impl Regalloc for Allocator {
         let mut colors: HashMap<i32, i32> = HashMap::new();
         let mut spillings: HashSet<i32> = HashSet::new();
         let spill_costs = regalloc::estimate_spill_cost(func);
+        // let
+        let available = regalloc::init_availables(func);
         // let blocks = Allocator::order_blocks(&func.blocks);
 
         //TODO,寄存器分裂

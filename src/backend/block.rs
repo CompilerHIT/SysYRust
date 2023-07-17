@@ -1626,9 +1626,6 @@ impl BB {
                 index += 1;
                 continue;
             } else {
-                for reg in spills.iter() {
-                    config::record_spill(&self.func_label, &self.label, &reg.to_string(true));
-                }
                 for (i, r) in spills.iter().enumerate() {
                     let reg = match r.get_type() {
                         ScalarType::Int => Operand::Reg(Reg::new(5 + (i as i32), ScalarType::Int)),
@@ -1643,6 +1640,7 @@ impl BB {
                             vec![reg, Operand::IImm(IImm::new(stack_slot.get_pos()))],
                         );
                         ins.set_double();
+                        config::record_spill(&self.func_label, &self.label, &ins.to_string());
                         self.insts.insert(index, pool.put_inst(ins));
                         index += 1;
                     } else {
@@ -1703,6 +1701,7 @@ impl BB {
                         vec![reg, Operand::IImm(IImm::new(stack_slot.get_pos()))],
                     );
                     ins.set_double();
+                    config::record_spill(&self.func_label, &self.label, &ins.to_string());
                     self.insts.insert(index, pool.put_inst(ins));
                     index += 1;
                 }
@@ -2761,6 +2760,7 @@ impl BB {
                         vec![reg, Operand::IImm(IImm::new(stack_slot.get_pos()))],
                     );
                     ins.set_double();
+                    config::record_spill(&self.func_label, &self.label, &ins.to_string());
                     new_insts.push(pool.put_inst(ins));
                 }
                 for (i, r) in spills.iter().enumerate() {
@@ -2815,6 +2815,7 @@ impl BB {
                         vec![reg, Operand::IImm(IImm::new(stack_slot.get_pos()))],
                     );
                     ins.set_double();
+                    config::record_spill(&self.func_label, &self.label, &ins.to_string());
                     new_insts.push(pool.put_inst(ins));
                 }
             }
