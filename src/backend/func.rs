@@ -116,7 +116,7 @@ impl Func {
 
         // entry shouldn't generate for asm, called label for entry should always be false
         let label = &self.label;
-        let mut entry = pool.put_block(BB::new(&format!(".entry_{label}")));
+        let mut entry = pool.put_block(BB::new(&format!(".entry_{label}"), &self.label));
         entry.showed = false;
         self.entry = Some(entry);
         self.blocks.push(self.entry.unwrap());
@@ -130,7 +130,7 @@ impl Func {
         // 第一遍pass
         let fblock = ir_func.get_head();
         let mut ir_block_set: HashSet<ObjPtr<BasicBlock>> = HashSet::new();
-        let first_block = pool.put_block(BB::new(&label));
+        let first_block = pool.put_block(BB::new(&label, &self.label));
         info.ir_block_map.insert(fblock, first_block);
         info.block_ir_map.insert(first_block, fblock);
         ir_block_set.insert(fblock);
@@ -154,7 +154,7 @@ impl Func {
             }
             if ir_block_set.insert(fblock) {
                 let label = format!(".LBB{func_seq}_{block_seq}");
-                let block = pool.put_block(BB::new(&label));
+                let block = pool.put_block(BB::new(&label, &self.label));
                 info.ir_block_map.insert(fblock, block);
                 info.block_ir_map.insert(block, fblock);
                 self.blocks.push(block);

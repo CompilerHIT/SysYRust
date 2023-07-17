@@ -39,6 +39,7 @@ pub const FLOAT_BASE: i32 = 32;
 #[derive(Clone)]
 pub struct BB {
     pub label: String,
+    pub func_label: String,
     pub showed: bool,
 
     pub insts: Vec<ObjPtr<LIRInst>>,
@@ -63,9 +64,10 @@ pub struct BB {
 }
 
 impl BB {
-    pub fn new(label: &str) -> Self {
+    pub fn new(label: &str, func_label: &str) -> Self {
         Self {
             label: label.to_string(),
+            func_label: func_label.to_string(),
             showed: true,
             insts: Vec::new(),
             in_edge: Vec::new(),
@@ -1878,7 +1880,7 @@ impl BB {
                         distance += block.insts.len() as i32 * ADDR_SIZE;
                         if !operand::is_imm_12bs(distance) {
                             let name = format!("overflow_{}", get_tmp_bb());
-                            let tmp = pool.put_block(BB::new(&name));
+                            let tmp = pool.put_block(BB::new(&name, &func.label));
                             tmp.as_mut().insts.push(pool.put_inst(LIRInst::new(
                                 InstrsType::Jump,
                                 vec![Operand::Addr(target.clone())],
