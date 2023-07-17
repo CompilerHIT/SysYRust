@@ -304,9 +304,9 @@ impl AsmModule {
         self.handle_call_v3(pool);
         self.remove_useless_func();
         self.rearrange_stack_slot();
-
         self.update_array_offset(pool);
         self.build_stack_info(f, pool);
+        self.print_func();
         //删除无用的函数
     }
     pub fn handle_spill_v3(&mut self, pool: &mut BackendPool) {
@@ -335,29 +335,45 @@ impl AsmModule {
     /// 1. 准备每个函数需要的callee save,以及进行函数分裂
     /// 2. 针对性地让函数自我转变 , 调整每个函数中使用到的寄存器分布等等
     fn anaylyse_for_handle_call_v3(&mut self, pool: &mut BackendPool) {
-        todo!()
+        //TODO
+        // todo!()
+        for (_, func) in self.func_map.iter() {
+            self.callers_saveds
+                .insert(func.label.clone(), func.draw_used_callers());
+        }
     }
     /// 计算栈空间,进行ra,sp,callee 的保存和恢复
     pub fn build_stack_info(&mut self, f: &mut File, pool: &mut BackendPool) {
         for (_, func) in self.func_map.iter() {
-            func.as_mut().save_callee(pool, f);
+            if !func.is_extern {
+                func.as_mut().save_callee(pool, f);
+            }
         }
     }
 
     ///删除进行函数分裂后的剩余无用函数
     pub fn remove_useless_func(&mut self) {
-        let mut new_func_map = Vec::new();
-        for (f, func) in self.func_map.iter() {
-            if self.name_func.contains_key(&func.label) {
-                new_func_map.push((*f, *func));
-            }
-        }
-        self.func_map = new_func_map;
+        //TODO
+        // let mut new_func_map = Vec::new();
+        // for (f, func) in self.func_map.iter() {
+        //     if self.name_func.contains_key(&func.label) {
+        //         new_func_map.push((*f, *func));
+        //     }
+        // }
+        // self.func_map = new_func_map;
     }
 
     pub fn update_array_offset(&mut self, pool: &mut BackendPool) {
         for (_, func) in self.func_map.iter() {
-            func.as_mut().update_array_offset(pool);
+            if !func.is_extern {
+                func.as_mut().update_array_offset(pool);
+            }
+        }
+    }
+
+    pub fn print_func(&self) {
+        for (_, func) in self.func_map.iter() {
+            func.print_func();
         }
     }
 }

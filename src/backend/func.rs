@@ -53,8 +53,6 @@ pub struct Func {
     pub reg_alloc_info: FuncAllocStat,
     pub spill_stack_map: HashMap<Reg, StackSlot>,
 
-    pub slot_to_rearrange: HashMap<IImm, StackSlot>,
-
     pub const_array: HashSet<IntArray>,
     pub float_array: HashSet<FloatArray>,
     //FIXME: resolve float regs
@@ -86,7 +84,6 @@ impl Func {
 
             reg_alloc_info: FuncAllocStat::new(),
             spill_stack_map: HashMap::new(),
-            slot_to_rearrange: HashMap::new(),
 
             const_array: HashSet::new(),
             float_array: HashSet::new(),
@@ -1144,7 +1141,7 @@ impl Func {
                 //标记阶段 ,标记需要清除的指令
                 for (index, inst) in bb.insts.iter().enumerate().rev() {
                     for reg in inst.get_reg_def() {
-                        if !live_now.contains(&reg) {
+                        if !live_now.contains(&reg) && inst.get_type() != InstrsType::Call {
                             to_removed.insert(index);
                             break;
                         }
@@ -1199,9 +1196,11 @@ impl Func {
     /// * 一定要spill到内存上的时候,使用递增的slot,把slot记录到数组的表中,等待重排
     pub fn handle_spill_v3(&mut self, pool: &mut BackendPool) {
         self.calc_live();
+        //先分配空间
+        self.assign_stack_slot_for_spill();
         let this = pool.put_func(self.clone());
         for bb in self.blocks.iter() {
-            bb.as_mut().handle_spill_v3(&this.reg_alloc_info, pool);
+            bb.as_mut().handle_spill_v3(this, pool);
         }
     }
 
@@ -1221,6 +1220,22 @@ impl Func {
         callees
     }
 
+    /// 该函数应该在vtop之后调用
+    /// 获取该函数使用到的caller save寄存器
+    pub fn draw_used_callers(&self) -> HashSet<Reg> {
+        let mut callers: HashSet<Reg> = HashSet::new();
+        for bb in self.blocks.iter() {
+            for inst in bb.insts.iter() {
+                for reg in inst.get_regs() {
+                    if reg.is_caller_save() {
+                        callers.insert(reg);
+                    }
+                }
+            }
+        }
+        callers
+    }
+
     /// 在handle spill之后调用
     /// 生成call前后需要保存的caller save寄存器的信息
     /// 是否需要保存caller save,在于被调用函数是否使用了caller save寄存器
@@ -1236,17 +1251,13 @@ impl Func {
         todo!();
         new_funcs
     }
-
-    /// 根据信息进行call的插入
-    pub fn handle_call(&mut self, call_info: &HashMap<String, HashMap<Bitmap, ObjPtr<Func>>>) {
-        self.calc_live();
-    }
 }
 
 ///handle call v3的实现
 impl Func {
     ///配合v3系列的module.build
     /// 实现了自适应函数调用
+    /// callers_used 为  (func name, the caller saved reg this func used)
     pub fn handle_call_v3(
         &mut self,
         pool: &mut BackendPool,
@@ -1256,6 +1267,7 @@ impl Func {
         self.calc_live();
         let mut slots_for_caller_saved: Vec<StackSlot> = Vec::new();
         ///
+        // self.print_func();
         for bb in self.blocks.iter() {
             let mut new_insts: Vec<ObjPtr<LIRInst>> = Vec::new();
             let mut live_now: HashSet<Reg> = HashSet::new();
@@ -1263,6 +1275,14 @@ impl Func {
                 live_now.insert(*reg);
             });
             for inst in bb.insts.iter().rev() {
+                for reg in inst.get_reg_def() {
+                    debug_assert!(live_now.contains(&reg), "reg{}", reg);
+                    live_now.remove(&reg);
+                }
+                for reg in inst.get_reg_use() {
+                    live_now.insert(reg);
+                }
+
                 if inst.get_type() == InstrsType::Call {
                     ///找出 caller saved
                     let mut to_saved: Vec<Reg> = Vec::new();
@@ -1280,7 +1300,6 @@ impl Func {
                         .cloned()
                         .filter(|reg| callers_used.contains(reg))
                         .collect();
-
                     //根据调用的函数的情况,判断这个函数使用了哪些caller save寄存器
                     // 准备栈空间
                     while slots_for_caller_saved.len() < to_saved.len() {
@@ -1309,33 +1328,22 @@ impl Func {
                         let load_inst = pool.put_inst(load_inst);
                         new_insts.push(load_inst);
                     }
-                    new_insts.push(*inst);
-                    //插入保存指令
+                    new_insts.push(*inst); //插入该指令
+                                           //插入保存指令
                     for (index, reg) in to_saved.iter().enumerate() {
                         let pos = slots_for_caller_saved.get(index).unwrap().get_pos();
                         let store_inst = build_ls(*reg, pos, InstrsType::StoreToStack);
                         let store_inst = pool.put_inst(store_inst);
                         new_insts.push(store_inst);
                     }
-                    continue;
+                } else {
+                    new_insts.push(*inst);
                 }
-                for reg in inst.get_reg_def() {
-                    debug_assert!(live_now.contains(&reg));
-                    live_now.remove(&reg);
-                }
-                for reg in inst.get_reg_use() {
-                    live_now.insert(reg);
-                }
-                new_insts.push(*inst);
             }
             new_insts.reverse();
             bb.as_mut().insts = new_insts;
         }
-
-        slots_for_caller_saved.iter().for_each(|slot| {
-            let imm = IImm::new(slot.get_pos());
-            self.slot_to_rearrange.insert(imm, *slot);
-        });
+        // self.print_func();
     }
 }
 

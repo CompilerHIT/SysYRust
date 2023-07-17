@@ -78,7 +78,8 @@ pub fn generate_asm(
     let mut file2 = File::create(row_path).unwrap();
 
     //构造
-    module.build(&mut file, &mut file2, &mut pool);
+    // module.build(&mut file, &mut file2, &mut pool);
+    module.build_v3(&mut file, &mut file2, &mut pool);
     // module.build_v2(&mut file, &mut file2, &mut pool);
     // module.build(&mut file, &mut file2, &mut pool);
     // module.build_v2(&mut file, &mut file2, &mut pool);
