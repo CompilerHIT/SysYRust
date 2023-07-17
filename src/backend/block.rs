@@ -1879,8 +1879,6 @@ impl BB {
                         pos += 1;
                         continue;
                     }
-                    // TODO 检查overflow
-                    config::record_branch_overflow(&self.func_label, &self.label, &pos.to_string());
 
                     let (st, ed) = (min(start, end), max(start, end));
                     let rev = start > end;
@@ -1890,6 +1888,8 @@ impl BB {
                         distance += block.insts.len() as i32 * ADDR_SIZE;
                         if !operand::is_imm_12bs(distance) {
                             let name = format!("overflow_{}", get_tmp_bb());
+                            // TODO 检查overflow
+                            config::record_branch_overflow(&self.func_label, &self.label, &name);
                             let tmp = pool.put_block(BB::new(&name, &func.label));
                             tmp.as_mut().insts.push(pool.put_inst(LIRInst::new(
                                 InstrsType::Jump,
