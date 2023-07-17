@@ -60,19 +60,6 @@ impl RegUsedStat {
     }
 
     pub fn is_available_ireg(&self, ireg: i32) -> bool {
-        let mut unusable: HashSet<i32> = HashSet::from([0]); //保存x0
-        unusable.insert(2); //保留sp
-        unusable.insert(1); //保留ra
-        unusable.insert(3); //保留gp
-
-        unusable.insert(4); //保留tp寄存器
-        unusable.extend(5..=7); //三个临时寄存器用来处理spill逻辑
-        unusable.insert(8); //保留s0寄存器 (用来处理offset overflow)
-                            // unusable.insert(10); //保留a0
-                            // unusable.extend(11..=17);   //保留a1-a7
-        if unusable.contains(&ireg) {
-            return false;
-        }
         if (1 << ireg & self.iregs_used) == 0 {
             return true;
         }
@@ -80,10 +67,6 @@ impl RegUsedStat {
     }
     pub fn is_available_freg(&self, freg: i32) -> bool {
         let freg = freg - 32;
-        let unusable: HashSet<i32> = HashSet::from([18, 19, 20]);
-        if unusable.contains(&freg) {
-            return false;
-        }
         if (1 << freg & self.fregs_used) == 0 {
             return true;
         }

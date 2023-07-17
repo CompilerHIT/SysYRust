@@ -81,8 +81,22 @@ impl ToString for FImm {
 impl Reg {
     pub fn new(id: i32, r_type: ScalarType) -> Self {
         debug_assert!(
-            !((r_type == ScalarType::Int && (id < 0 || id > 31))
-                || (r_type == ScalarType::Float && (id < 32 || id > 63)))
+            || -> bool {
+                if id > 63 {
+                    true
+                } else if (id >= 0 && id < 32) && r_type == ScalarType::Int {
+                    true
+                } else if (id <= 63 && id >= 32) && r_type == ScalarType::Float {
+                    true
+                } else if id < 0 {
+                    unreachable!();
+                } else {
+                    false
+                }
+            }(),
+            "{}{:?}",
+            id,
+            r_type
         );
 
         Self { id, r_type }
