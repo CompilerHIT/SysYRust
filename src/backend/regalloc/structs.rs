@@ -123,12 +123,14 @@ impl RegUsedStat {
         let other_caller_save = vec![1, 5, 6, 7, 28, 29, 30, 31];
         let mut callees = vec![2, 8, 9];
         callees.extend(18..=27);
-        for reg in args {
+
+        for reg in callees {
             if self.is_available_ireg(reg) {
                 return Some(reg);
             }
         }
-        for reg in callees {
+
+        for reg in args {
             if self.is_available_ireg(reg) {
                 return Some(reg);
             }

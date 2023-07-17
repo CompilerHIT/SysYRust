@@ -461,14 +461,14 @@ impl Func {
         let file_path = config::get_file_path().unwrap();
         if alloc_stat.spillings.len() == 0 {
             log_file!(
-                "bestalloc.txt",
+                "./bestalloc.txt",
                 "func: {}-{}",
                 file_path.to_owned(),
                 self.label
             );
         } else {
             log_file!(
-                "unbestalloc.txt",
+                "./badalloc.txt",
                 "func:{}-{},dstr/spill:{}",
                 file_path.to_owned(),
                 self.label,
