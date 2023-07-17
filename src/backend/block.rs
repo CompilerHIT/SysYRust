@@ -1,6 +1,7 @@
 use rand::seq::index;
 
 use crate::backend::regalloc::structs::RegUsedStat;
+use crate::config;
 pub use crate::log;
 use crate::log_file;
 use std::cmp::max;
@@ -1568,6 +1569,12 @@ impl BB {
                     let mut pos = func.stack_addr.back().unwrap().get_pos();
                     pos += func.stack_addr.back().unwrap().get_size();
                     for (i, reg) in caller_regs.iter().enumerate() {
+                        config::record_caller_save_sl(
+                            &self.func_label,
+                            &self.label,
+                            format!("sd {}", reg).as_str(),
+                        );
+
                         let offset = pos + i as i32 * ADDR_SIZE;
                         let mut ins = LIRInst::new(
                             InstrsType::StoreToStack,
@@ -1579,6 +1586,11 @@ impl BB {
                     }
                     index += 1;
                     for (i, reg) in caller_regs.iter().enumerate() {
+                        config::record_caller_save_sl(
+                            &self.func_label,
+                            &self.label,
+                            format!("ld {}", reg).as_str(),
+                        );
                         let offset = pos + i as i32 * ADDR_SIZE;
                         let mut ins = LIRInst::new(
                             InstrsType::LoadFromStack,
@@ -1614,6 +1626,9 @@ impl BB {
                 index += 1;
                 continue;
             } else {
+                for reg in spills.iter() {
+                    config::record_spill(&self.func_label, &self.label, &reg.to_string(true));
+                }
                 for (i, r) in spills.iter().enumerate() {
                     let reg = match r.get_type() {
                         ScalarType::Int => Operand::Reg(Reg::new(5 + (i as i32), ScalarType::Int)),
@@ -1865,12 +1880,7 @@ impl BB {
                         continue;
                     }
                     // TODO 检查overflow
-                    log_file!(
-                        "branch_overflow.txt",
-                        "func:{},block:{}",
-                        func.label,
-                        self.label
-                    );
+                    config::record_branch_overflow(&self.func_label, &self.label, &pos.to_string());
 
                     let (st, ed) = (min(start, end), max(start, end));
                     let rev = start > end;
@@ -1918,6 +1928,7 @@ impl BB {
         // let op1 = Operand::IImm(IImm::new(upper));
         // //取得低12位
         // let op2 = Operand::IImm(IImm::new(lower));
+        config::record_offset_overflow(&self.func_label, &self.label, &pos.to_string());
         self.insts.insert(
             *pos,
             pool.put_inst(LIRInst::new(

@@ -625,6 +625,7 @@ impl Func {
             return;
         }
         for id in self.callee_saved.iter() {
+            config::record_callee_save_sl(&self.label, &format!("restore: {}", id));
             let pos = self.stack_addr.front().unwrap().get_pos() + ADDR_SIZE;
             let slot = StackSlot::new(pos, ADDR_SIZE);
             self.stack_addr.push_front(slot);

@@ -40,6 +40,7 @@ fn run_main() {
     // 获取文件名
     let filename = matches.value_of("filename").unwrap();
 
+    crate::config::init();
     crate::config::set_file_path(&String::from(filename)); //把函数名加载到全局
 
     // 生成汇编的标志
@@ -91,4 +92,7 @@ fn run_main() {
         &mut AsmModule::new(module),
         is_opt,
     );
+
+    ///编译结束后打印记录的属性
+    config::dump();
 }
