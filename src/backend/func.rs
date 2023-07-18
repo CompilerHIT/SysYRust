@@ -226,12 +226,16 @@ impl Func {
         self.update(this);
     }
 
-    /// 识别根据def use识别局部变量，窗口设为3，若存货区间少于3则认为是局部变量
+    /// 识别根据def use识别局部变量，窗口设为3，若存活区间少于3则认为是局部变量
     /// 局部变量一定在块内，对于born为-1的一定是非局部变量
     pub fn cal_tmp_var(&mut self) {
         self.build_reg_intervals();
         for block in self.blocks.iter() {
-            for reg in
+            for (st, ed) in block.reg_intervals.iter() {
+                if st.1 != -1 && ed.1 - st.1 < 3 {
+                    self.tmp_vars.insert(st.0);
+                }
+            }
         }
     }
 
