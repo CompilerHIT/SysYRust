@@ -43,6 +43,7 @@ pub struct Func {
     pub params: Vec<ObjPtr<Inst>>,
     pub param_cnt: (i32, i32), // (int, float)
 
+    pub is_header: bool, //判断一个函数是否是一个模板族下的第一个
     pub entry: Option<ObjPtr<BB>>,
 
     reg_def: Vec<HashSet<CurInstrInfo>>,
@@ -82,6 +83,7 @@ impl Func {
             reg_num: 0,
             // fregs: HashSet::new(),
             context,
+            is_header: true,
 
             reg_alloc_info: FuncAllocStat::new(),
             spill_stack_map: HashMap::new(),
@@ -611,6 +613,8 @@ impl Func {
 
     fn update(&mut self, func: ObjPtr<Func>) {
         let func_ref = func.as_ref();
+        self.is_extern = func.is_extern;
+        self.is_header = func.is_header;
         self.blocks = func_ref.blocks.clone();
         self.stack_addr = func_ref.stack_addr.clone();
         self.spill_stack_map = func_ref.spill_stack_map.clone();
@@ -837,11 +841,13 @@ impl GenerateAsm for Func {
         if self.const_array.len() > 0 || self.float_array.len() > 0 {
             writeln!(f, "	.data\n   .align  3")?;
         }
-        for mut a in self.const_array.clone() {
-            a.generate(self.context, f)?;
-        }
-        for mut a in self.float_array.clone() {
-            a.generate(self.context, f)?;
+        if self.is_header {
+            for mut a in self.const_array.clone() {
+                a.generate(self.context, f)?;
+            }
+            for mut a in self.float_array.clone() {
+                a.generate(self.context, f)?;
+            }
         }
         AsmBuilder::new(f).show_func(&self.label)?;
         self.context.as_mut().call_prologue_event();
@@ -1622,6 +1628,11 @@ impl Func {
         }
     }
 
+    /// 给局部静态数组改名,加上指定后缀
+    pub fn suffix_local_arr(&mut self, suffix: &String) {
+        todo!();
+    }
+
     ///函数分裂用到的函数的真实深度克隆
     pub fn real_deep_clone(&self, pool: &mut BackendPool) -> ObjPtr<Func> {
         let context = pool.put_context(Context::new());
@@ -1659,6 +1670,7 @@ impl Func {
 
         new_func.entry = Some(*old_to_new_bbs.get(&self.entry.unwrap()).unwrap());
         new_func.is_extern = self.is_extern;
+        new_func.is_header = self.is_header;
         new_func.stack_addr = self.stack_addr.iter().cloned().collect();
         new_func.spill_stack_map = self.spill_stack_map.clone();
         new_func.const_array = self.const_array.clone();

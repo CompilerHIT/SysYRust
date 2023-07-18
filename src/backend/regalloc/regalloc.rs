@@ -246,7 +246,6 @@ pub fn build_nums_neighbor_color(
 ///  获取 （下标,块)->失效寄存器集合  表
 /// 注意！！！！ 该函数依赖于func的cal live的结果，内部并不会调用func的cal live
 pub fn build_ends_index_bb(func: &Func) -> HashMap<(usize, ObjPtr<BB>), HashSet<Reg>> {
-    func.calc_live_for_alloc_reg();
     let mut out: HashMap<(usize, ObjPtr<BB>), HashSet<Reg>> = HashMap::new();
     for bb in func.blocks.iter() {
         let mut livenow: HashSet<Reg> = HashSet::new();
@@ -293,7 +292,8 @@ pub fn merge_alloc_total(
     false //合并结束不可能存在新的合并了
 }
 
-// 通用寄存器合并
+/// 通用寄存器合并
+/// 依赖外部 调用某种 calc live (比如 calc live for alloc)
 pub fn merge_alloc(
     func: &Func,
     dstr: &mut HashMap<i32, i32>,
@@ -565,8 +565,9 @@ pub fn merge_alloc(
 
 // 判断
 
-// 通用寄存器分配结果检查,判断是否仍然存在冲突情况,若存在,返回冲突的寄存器集合以及所在的指令编号，块标识符)
-// (old_reg,cur_reg,inst index,block label)
+/// 通用寄存器分配结果检查,判断是否仍然存在冲突情况,若存在,返回冲突的寄存器集合以及所在的指令编号，块标识符)
+/// (old_reg,cur_reg,inst index,block label)
+/// 调用该函数前外部应该对要分析的func调用某种calc live (比如 calc for handle alloc)
 pub fn check_alloc(
     func: &Func,
     dstr: &HashMap<i32, i32>,

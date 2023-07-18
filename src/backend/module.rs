@@ -499,6 +499,9 @@ impl AsmModule {
                     new_name.push_str(&format!("_{}", func_label).to_string());
                     new_callee_func.as_mut().set_name(&new_name);
                     new_callee_func.as_mut().suffix_bb(&suffix);
+                    if func_label_callee_maps.len() >= 1 {
+                        new_callee_func.as_mut().is_header = false;
+                    }
 
                     new_funcs.push(new_callee_func);
                     call_inst.as_mut().replace_label(new_name.clone());
