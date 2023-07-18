@@ -107,6 +107,7 @@ impl RegUsedStat {
         let mut callees = vec![2, 8, 9];
         callees.extend(18..=27);
 
+        // 优先使用callee saved寄存器,再使用参数寄存器,最后再使用其他caller save寄存器
         for reg in callees {
             if self.is_available_ireg(reg) {
                 return Some(reg);
@@ -130,27 +131,27 @@ impl RegUsedStat {
 
     // 获取一个可用的浮点寄存器
     pub fn get_available_freg(&self) -> Option<i32> {
-        // f0作为特殊浮点寄存器保持0
-        // 对于 freg,同样先使用 参数寄存器,然后再使用 callee save寄存器
-        // 最后再使用其他caller save寄存器
+        // 优先使用callee saved寄存器,再使用参数寄存器,最后再使用其他caller save寄存器
         let args = (10..=17);
         let mut other_caller_save = vec![];
         other_caller_save.extend(0..=7);
         other_caller_save.extend(28..=31);
         let mut callees = vec![8, 9];
         callees.extend(18..=27);
-        for reg in args {
-            let reg = reg + 32;
-            if self.is_available_freg(reg) {
-                return Some(reg);
-            }
-        }
+
         for reg in callees {
             let reg = reg + 32;
             if self.is_available_freg(reg) {
                 return Some(reg);
             }
         }
+        for reg in args {
+            let reg = reg + 32;
+            if self.is_available_freg(reg) {
+                return Some(reg);
+            }
+        }
+
         for reg in other_caller_save {
             let reg = reg + 32;
             if self.is_available_freg(reg) {

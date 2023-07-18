@@ -413,6 +413,7 @@ impl Allocator {
 
 impl Regalloc for Allocator {
     fn alloc(&mut self, func: &Func) -> FuncAllocStat {
+        func.calc_live_for_alloc_reg();
         func.build_reg_intervals();
         let mut colors: HashMap<i32, i32> = HashMap::new();
         let mut spillings: HashSet<i32> = HashSet::new();

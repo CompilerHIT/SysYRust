@@ -298,7 +298,6 @@ impl AsmModule {
         self.build_lir(pool);
         self.remove_unuse_inst_pre_alloc();
         // self.generate_row_asm(f2, pool);     //generate row  asm可能会造成bug
-        self.remove_unuse_inst_pre_alloc();
         self.allocate_reg();
         self.map_v_to_p();
         self.handle_spill_v3(pool);
@@ -370,10 +369,6 @@ impl AsmModule {
             build_external_func(self, "memcpy@plt", pool),
             Reg::get_all_callers_saved(),
         );
-
-        //创建外部函数
-
-        //对于额外使用的memset函数,单独记录s
         //构造每个函数的caller save regs  (caller save表要递归调用分析)
         //首先获取所有函数的所有call指令 (caller func,callee func)
         let mut call_insts: Vec<(ObjPtr<Func>, ObjPtr<Func>)> = Vec::new();
@@ -413,6 +408,7 @@ impl AsmModule {
                 break;
             }
         }
+
         //分析完caller saved的使用,把caller used表中的信息更新到func中
         for (func, caller_saved_regs) in caller_used {
             self.callers_saveds

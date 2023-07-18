@@ -1180,12 +1180,20 @@ impl Func {
     }
 }
 
-/// handle spill v3实现
+///寄存器重分配相关接口的实现
 impl Func {
     ///p_to_v
-    /// 把函数中分配到物理寄存器的虚拟寄存器改为使用虚拟寄存器
-    pub fn p2v(&mut self) {}
+    ///把函数中某些分配到某些物理寄存器的虚拟寄存器去色，变回虚拟寄存器
+    pub fn p2v(&mut self, to_decolor: Reg) {
+        debug_assert!(to_decolor.is_physic());
+        self.calc_live_for_handle_spill();
+    }
+}
 
+/// handle spill v3实现
+impl Func {
+    ///为handle spill 计算寄存器活跃区间
+    /// 会认为ra,sp,tp,gp在所有块中始终活跃
     pub fn calc_live_for_handle_spill(&self) {
         //TODO, 去除allocable限制!
         let calc_live_file = "callive_for_spill.txt";
@@ -1659,10 +1667,10 @@ impl Func {
 ///为函数创建寄存器活跃区间
 impl Func {
     /// 为函数创建寄存器活跃区间
-    /// 内部会调用calc_live_for_alloc_reg 计算 live use live def live in live out
+    /// 在使用它之前需要现在外部调用某种calc live
+    /// 内部不会调用 任何calc live (依赖于外部计算出来的 live in live out live use live def)
     /// 表面是unmut self,但是会通过内部可变性修改内部的 blocks的属性
     pub fn build_reg_intervals(&self) {
-        self.calc_live_for_alloc_reg();
         for bb in self.blocks.iter() {
             bb.as_mut().build_reg_intervals();
         }
