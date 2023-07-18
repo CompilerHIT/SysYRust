@@ -62,6 +62,7 @@ fn first_load_optimize(
 
         if inst.get_kind() == InstKind::Load
             && !inst.is_global_var_load()
+            && !inst.is_global_array_load()
             && inst.get_ptr().get_gep_ptr() == array_inst
             && inst.get_ptr().get_gep_offset().is_const()
         {
