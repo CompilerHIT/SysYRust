@@ -6,12 +6,151 @@ use crate::{
 };
 
 use super::*;
+/// 将对数组索引都是编译时已知的数组进行变量化
 pub fn array_transform(
     module: &mut Module,
     pools: &mut (&mut ObjPool<BasicBlock>, &mut ObjPool<Inst>),
 ) {
     global_array_transform(module, pools);
     local_array_transform(module, pools);
+}
+
+/// 对局部数组的store指令转变为初始化
+pub fn array_init_optimize(module: &mut Module) {
+    func_process(module, |_, func| {
+        bfs_inst_process(func.get_head(), |inst| {
+            if let InstKind::Alloca(_) = inst.get_kind() {
+                reinit_array(inst);
+            }
+        })
+    })
+}
+
+/// 对局部数组的第一次load指令的优化
+pub fn array_first_load_optimize(
+    module: &mut Module,
+    pools: &mut (&mut ObjPool<BasicBlock>, &mut ObjPool<Inst>),
+) {
+    func_process(module, |_, func| {
+        bfs_inst_process(func.get_head(), |inst| {
+            if let InstKind::Alloca(_) = inst.get_kind() {
+                first_load_optimize(inst, pools);
+            }
+        })
+    })
+}
+
+fn first_load_optimize(
+    array_inst: ObjPtr<Inst>,
+    pools: &mut (&mut ObjPool<BasicBlock>, &mut ObjPool<Inst>),
+) {
+    let mut inst = array_inst.get_next();
+    while !inst.is_tail() {
+        let mut flag = false;
+        if inst.get_kind() == InstKind::Load
+            && !inst.is_global_var_load()
+            && inst.get_ptr().get_gep_ptr() == array_inst
+            && inst.get_ptr().get_gep_offset().is_const()
+        {
+            let index = inst.get_ptr().get_gep_offset().get_int_bond() as usize;
+            flag = true;
+            if IrType::IntPtr == array_inst.get_ir_type() {
+                let init = array_inst.get_int_init().1[index].1;
+                let value = pools.1.make_int_const(init);
+                inst.insert_before(value);
+                inst.get_use_list().clone().iter_mut().for_each(|user| {
+                    let index = user.get_operand_index(inst);
+                    user.set_operand(value, index);
+                })
+            } else if IrType::FloatPtr == array_inst.get_ir_type() {
+                let init = array_inst.get_float_init().1[index].1;
+                let value = pools.1.make_float_const(init);
+                inst.insert_before(value);
+                inst.get_use_list().clone().iter_mut().for_each(|user| {
+                    let index = user.get_operand_index(inst);
+                    user.set_operand(value, index);
+                })
+            } else {
+                unreachable!(
+                    "first_load_optimize: {:?} ir_type not support {:?}",
+                    array_inst,
+                    array_inst.get_ir_type()
+                );
+            }
+        }
+        if flag {
+            let mut old = inst;
+            inst = inst.get_next();
+            old.remove_self();
+        } else {
+            inst = inst.get_next();
+        }
+    }
+}
+
+fn reinit_array(mut array_inst: ObjPtr<Inst>) {
+    let mut inst = array_inst.get_next();
+
+    let check = |inst: ObjPtr<Inst>| {
+        inst.get_kind() == InstKind::Store
+            && !inst.is_global_var_store()
+            && inst.get_dest().get_gep_ptr() == array_inst
+            && inst.get_dest().get_gep_offset().is_const()
+    };
+
+    if IrType::IntPtr == array_inst.get_ir_type() {
+        let mut init = array_inst.get_int_init().1.clone();
+        while !inst.is_tail() {
+            let mut flag = false;
+            if check(inst) {
+                let index = inst.get_dest().get_gep_offset().get_int_bond() as usize;
+                if index >= init.len() {
+                    init.resize(index + 1, (false, 0));
+                }
+                if inst.get_value().is_const() {
+                    flag = true;
+                    init[index] = (false, inst.get_value().get_int_bond());
+                } else {
+                    init[index] = (true, 0);
+                }
+            }
+            let mut old = inst;
+            inst = inst.get_next();
+            if flag {
+                old.remove_self();
+            }
+        }
+        array_inst.set_int_init(true, init);
+    } else if IrType::FloatPtr == array_inst.get_ir_type() {
+        let mut init = array_inst.get_float_init().1.clone();
+        while !inst.is_tail() {
+            let mut flag = false;
+            if check(inst) {
+                let index = inst.get_dest().get_gep_offset().get_int_bond() as usize;
+                if index >= init.len() {
+                    init.resize(index + 1, (false, 0.0));
+                }
+                if inst.get_value().is_const() {
+                    flag = true;
+                    init[index] = (false, inst.get_value().get_float_bond());
+                } else {
+                    init[index] = (true, 0.0);
+                }
+            }
+            let mut old = inst;
+            inst = inst.get_next();
+            if flag {
+                old.remove_self();
+            }
+        }
+        array_inst.set_float_init(true, init);
+    } else {
+        unreachable!(
+            "reinit_array error: {:?} ir type {:?}",
+            array_inst,
+            array_inst.get_ir_type()
+        );
+    }
 }
 
 fn global_array_transform(
@@ -36,8 +175,8 @@ fn global_array_transform(
 }
 
 fn local_array_transform(
-    module: &mut Module,
-    pools: &mut (&mut ObjPool<BasicBlock>, &mut ObjPool<Inst>),
+    _module: &mut Module,
+    _pools: &mut (&mut ObjPool<BasicBlock>, &mut ObjPool<Inst>),
 ) {
     // TODO: 本地数组优化
     // 目前发现这个东西不值得做
@@ -67,7 +206,7 @@ fn global_inst_transform(
     pools: &mut (&mut ObjPool<BasicBlock>, &mut ObjPool<Inst>),
     inst: ObjPtr<Inst>,
 ) {
-    if let InstKind::Alloca(len) = inst.get_kind() {
+    if let InstKind::Alloca(_len) = inst.get_kind() {
         // 将相应的全局变量放入一个HashMap中，等使用到这个变量的时候再生成
         let mut var = HashMap::new();
 

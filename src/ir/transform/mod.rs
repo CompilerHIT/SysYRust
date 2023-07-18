@@ -35,12 +35,13 @@ pub fn optimizer_run(
         simplify_cfg::simplify_cfg_run(module, &mut pools);
 
         // 函数内联
-        func_inline::inline_run(module, &mut pools);
-        functional_optimizer(module, &mut pools, optimize_flag);
+        //func_inline::inline_run(module, &mut pools);
+        //functional_optimizer(module, &mut pools, optimize_flag);
 
         // TODO: 性能优化
 
         // 再做一次
+        functional_optimizer(module, &mut pools, optimize_flag);
         functional_optimizer(module, &mut pools, optimize_flag);
     }
 }
@@ -71,6 +72,10 @@ fn functional_optimizer(
 
     // 数组转换
     array_transform::array_transform(module, &mut pools);
+    // 数组重新初始化
+    array_transform::array_init_optimize(module);
+    // 数组第一次load优化
+    array_transform::array_first_load_optimize(module, &mut pools);
 
     // 全局变量转换
     global_var_transform::global_var_transform(module, &mut pools);
