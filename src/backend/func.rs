@@ -239,6 +239,11 @@ impl Func {
         }
     }
 
+    /// 代码调度
+    pub fn list_scheduling_tech(&mut self) {
+        
+    }
+
     // 移除指定id的寄存器的使用信息
     // pub fn del_inst_reg(&mut self, cur_info: &CurInstrInfo, inst: ObjPtr<LIRInst>) {
     //     for reg in inst.as_ref().get_reg_use() {

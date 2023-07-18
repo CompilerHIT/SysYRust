@@ -12,7 +12,6 @@ pub use crate::utility::ObjPtr;
 mod block_pass;
 mod clear_pass;
 mod peephole_pass;
-mod list_scheduling;
 
 pub struct BackendPass {
     pub module: ObjPtr<AsmModule>,
@@ -24,7 +23,6 @@ impl BackendPass {
     }
 
     pub fn run_pass(&mut self, pool: &mut BackendPool) {
-        self.list_scheduling_tech();
         self.peephole_pass(pool);
         // self.module.generate_row_asm(
         //     &mut OpenOptions::new()

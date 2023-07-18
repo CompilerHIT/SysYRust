@@ -98,6 +98,14 @@ impl AsmModule {
 
         // self.generate_row_asm(f2, pool); //注释
         self.map_v_to_p();
+        // 代码调度
+        self.list_scheduling_tech();
+
+        // 为临时寄存器分配寄存器
+        self.clear_tmp_var();
+        self.allocate_reg();
+        self.map_v_to_p();
+
         // self.generate_row_asm(f2, pool); //注释
         self.remove_unuse_inst_suf_alloc();
         // self.generate_row_asm(f2, pool); //注释
@@ -122,10 +130,29 @@ impl AsmModule {
         }
     }
 
+    /// 计算临时变量的个数
     pub fn cal_tmp_var(&mut self) {
-        self.func_map.iter_mut().for_each(|(_, func)| {
+        self.func_map.iter().for_each(|(_, func)| {
             if !func.is_extern {
                 func.as_mut().cal_tmp_var();
+            }
+        });
+    }
+
+    /// 清除临时变量
+    pub fn clear_tmp_var(&mut self) {
+        self.func_map.iter().for_each(|(_, func)| {
+            if !func.is_extern {
+                func.as_mut().tmp_vars.clear();
+            }
+        });
+    }
+
+    /// 代码调度
+    pub fn list_scheduling_tech(&mut self) {
+        self.func_map.iter().for_each(|(_, func)| {
+            if !func.is_extern {
+                func.as_mut().list_scheduling_tech();
             }
         });
     }

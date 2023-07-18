@@ -255,7 +255,7 @@ impl LIRInst {
             }
             match self.operands[index] {
                 Operand::Reg(ref mut reg) => {
-                    if !reg.is_physic() {
+                    if !reg.is_physic() && !tmp_vars.contains(reg) {
                         if let Some(new) = map.get(&reg.get_id()) {
                             self.operands[index] = Operand::Reg(Reg::new(*new, reg.get_type()));
                         }
