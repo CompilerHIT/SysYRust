@@ -85,7 +85,8 @@ impl AsmModule {
         // TOCHECK 寄存器分配和handlespill前无用指令删除,比如删除mv指令方便寄存器分配
         // self.generate_row_asm(f2, pool); //注释
         self.remove_unuse_inst_pre_alloc();
-        self.generate_row_asm(f2, pool); //注释
+        self.cal_tmp_var();
+        // self.generate_row_asm(f2, pool); //注释
 
         self.allocate_reg();
         // self.generate_row_asm(f2, pool); //注释
@@ -119,6 +120,14 @@ impl AsmModule {
             func.as_mut().build_callee_map();
             func.as_mut().save_callee(pool, f)
         }
+    }
+
+    pub fn cal_tmp_var(&mut self) {
+        self.func_map.iter_mut().for_each(|(_, func)| {
+            if !func.is_extern {
+                func.as_mut().cal_tmp_var();
+            }
+        });
     }
 
     pub fn handle_overflow(&mut self, pool: &mut BackendPool) {

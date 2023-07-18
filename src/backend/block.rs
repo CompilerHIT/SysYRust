@@ -22,7 +22,6 @@ use crate::ir::instruction::{BinOp, Inst, InstKind, UnOp};
 use crate::ir::ir_type::IrType;
 use crate::utility::{ObjPtr, ScalarType};
 
-use super::instrs;
 use super::instrs::AsmBuilder;
 use super::operand::ARG_REG_COUNT;
 use super::operand::{FImm, ToString};
@@ -2844,9 +2843,6 @@ impl BB {
 impl BB {
     pub fn build_reg_intervals(&mut self) {
         self.reg_intervals.clear();
-        if self.label == "main" {
-            let a = 2;
-        }
         let mut regs: HashMap<Reg, (i32, i32)> = HashMap::new();
         self.live_in.iter().for_each(|reg| {
             regs.insert(*reg, (-1, -1));

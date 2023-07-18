@@ -2,11 +2,9 @@ use std::cmp::{max, min};
 use std::collections::LinkedList;
 pub use std::collections::{HashSet, VecDeque};
 pub use std::fs::File;
-use std::fs::OpenOptions;
 pub use std::hash::{Hash, Hasher};
 pub use std::io::Result;
 use std::io::Write;
-use std::process::id;
 use std::vec::Vec;
 
 use biheap::BiHeap;
@@ -14,7 +12,7 @@ use lazy_static::__Deref;
 
 use super::instrs::{InstrsType, SingleOp};
 use super::operand::IImm;
-use super::regalloc::structs::RegUsedStat;
+// use super::regalloc::structs::RegUsedStat;
 use super::{block, structs::*, BackendPool};
 use crate::backend::asm_builder::AsmBuilder;
 use crate::backend::instrs::{LIRInst, Operand};
@@ -60,6 +58,8 @@ pub struct Func {
     // pub caller_saved_len: i32,
     pub array_inst: Vec<ObjPtr<LIRInst>>,
     pub array_slot: Vec<i32>,
+
+    pub tmp_vars: HashSet<Reg>,
 }
 
 /// reg_num, stack_addr, caller_stack_addr考虑借助回填实现
@@ -88,6 +88,8 @@ impl Func {
             // caller_saved_len: 0,
             array_inst: Vec::new(),
             array_slot: Vec::new(),
+
+            tmp_vars: HashSet::new(),
         }
     }
 
@@ -222,6 +224,15 @@ impl Func {
             size += block.insts.len();
         }
         self.update(this);
+    }
+
+    /// 识别根据def use识别局部变量，窗口设为3，若存货区间少于3则认为是局部变量
+    /// 局部变量一定在块内，对于born为-1的一定是非局部变量
+    pub fn cal_tmp_var(&mut self) {
+        self.build_reg_intervals();
+        for block in self.blocks.iter() {
+            for reg in
+        }
     }
 
     // 移除指定id的寄存器的使用信息
@@ -384,9 +395,6 @@ impl Func {
                 reg
             );
             for pred in block.as_ref().in_edge.iter() {
-                if block.label == ".LBB0_5" && pred.label == ".LBB0_1" {
-                    let a = 2;
-                }
                 if pred.as_mut().live_out.insert(reg) {
                     if pred.as_mut().live_def.contains(&reg) {
                         continue;
