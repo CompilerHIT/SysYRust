@@ -110,6 +110,20 @@ impl Inst {
         self.user.set_operand(0, dest);
     }
 
+    /// 判断是否是全局变量的存储
+    /// # Return
+    /// 如果是返回true，否则返回false
+    pub fn is_global_store(&self) -> bool {
+        // 正确性检查
+        debug_assert_eq!(self.get_kind(), InstKind::Store);
+        self.self_check_store();
+        match self.get_dest().get_kind() {
+            InstKind::GlobalInt(_) => true,
+            InstKind::GlobalFloat(_) => true,
+            _ => false,
+        }
+    }
+
     /// 获得存储的值
     /// # Return
     /// 值指令的引用
