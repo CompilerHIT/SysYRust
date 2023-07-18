@@ -69,12 +69,8 @@ fn functional_optimizer(
     // 常量折叠
     constant_folding::constant_folding(module, &mut pools, optimize_flag);
 
-    // 数组转换
-    array_transform::array_transform(module, &mut pools);
-    // 数组重新初始化
-    array_transform::array_init_optimize(module);
-    // 数组第一次load优化
-    array_transform::array_first_load_optimize(module, &mut pools);
+    // 数组优化
+    array_transform::array_optimize(module, &mut pools, optimize_flag);
 
     // 全局变量转换
     global_var_transform::global_var_transform(module, &mut pools);
@@ -83,7 +79,7 @@ fn functional_optimizer(
     return_unused::return_unused(module);
 
     // 死代码删除
-    dead_code_eliminate::dead_code_eliminate(module, true);
+    //dead_code_eliminate::dead_code_eliminate(module, true);
     // 全局死代码删除
     dead_code_eliminate::global_eliminate(module);
 }

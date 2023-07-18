@@ -6,8 +6,21 @@ use crate::{
 };
 
 use super::*;
+
+pub fn array_optimize(
+    module: &mut Module,
+    pools: &mut (&mut ObjPool<BasicBlock>, &mut ObjPool<Inst>),
+    optimize_flag: bool,
+) {
+    if optimize_flag {
+        array_transform(module, pools);
+        array_init_optimize(module);
+        array_first_load_optimize(module, pools);
+    }
+}
+
 /// 将对数组索引都是编译时已知的数组进行变量化
-pub fn array_transform(
+fn array_transform(
     module: &mut Module,
     pools: &mut (&mut ObjPool<BasicBlock>, &mut ObjPool<Inst>),
 ) {
@@ -16,7 +29,7 @@ pub fn array_transform(
 }
 
 /// 对局部数组的store指令转变为初始化
-pub fn array_init_optimize(module: &mut Module) {
+fn array_init_optimize(module: &mut Module) {
     func_process(module, |_, func| {
         bfs_inst_process(func.get_head(), |inst| {
             if let InstKind::Alloca(_) = inst.get_kind() {
@@ -27,7 +40,7 @@ pub fn array_init_optimize(module: &mut Module) {
 }
 
 /// 对局部数组的第一次load指令的优化
-pub fn array_first_load_optimize(
+fn array_first_load_optimize(
     module: &mut Module,
     pools: &mut (&mut ObjPool<BasicBlock>, &mut ObjPool<Inst>),
 ) {
@@ -46,8 +59,6 @@ fn first_load_optimize(
 ) {
     let mut inst = array_inst.get_next();
     while !inst.is_tail() {
-        let mut flag = false;
-
         if inst.get_kind() == InstKind::Call("Nothing".to_string())
             && inst.get_operands().iter().any(|&op| {
                 if let InstKind::Gep = op.get_kind() {
@@ -60,6 +71,7 @@ fn first_load_optimize(
             break;
         }
 
+        let mut flag = false;
         if inst.get_kind() == InstKind::Load
             && !inst.is_global_var_load()
             && !inst.is_global_array_load()
@@ -105,12 +117,10 @@ fn first_load_optimize(
                 );
             }
         }
+        let mut old = inst;
+        inst = inst.get_next();
         if flag {
-            let mut old = inst;
-            inst = inst.get_next();
             old.remove_self();
-        } else {
-            inst = inst.get_next();
         }
     }
 }
