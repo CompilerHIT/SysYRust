@@ -47,6 +47,19 @@ fn first_load_optimize(
     let mut inst = array_inst.get_next();
     while !inst.is_tail() {
         let mut flag = false;
+
+        if inst.get_kind() == InstKind::Call("Nothing".to_string())
+            && inst.get_operands().iter().any(|&op| {
+                if let InstKind::Gep = op.get_kind() {
+                    op.get_gep_ptr() == array_inst
+                } else {
+                    op == array_inst
+                }
+            })
+        {
+            break;
+        }
+
         if inst.get_kind() == InstKind::Load
             && !inst.is_global_var_load()
             && inst.get_ptr().get_gep_ptr() == array_inst
@@ -55,7 +68,13 @@ fn first_load_optimize(
             let index = inst.get_ptr().get_gep_offset().get_int_bond() as usize;
             flag = true;
             if IrType::IntPtr == array_inst.get_ir_type() {
-                let init = array_inst.get_int_init().1[index].1;
+                let init_array = &array_inst.get_int_init().1;
+                let init;
+                if index >= init_array.len() {
+                    init = 0;
+                } else {
+                    init = init_array[index].1;
+                }
                 let value = pools.1.make_int_const(init);
                 inst.insert_before(value);
                 inst.get_use_list().clone().iter_mut().for_each(|user| {
@@ -63,7 +82,14 @@ fn first_load_optimize(
                     user.set_operand(value, index);
                 })
             } else if IrType::FloatPtr == array_inst.get_ir_type() {
-                let init = array_inst.get_float_init().1[index].1;
+                let init_array = &array_inst.get_float_init().1;
+                let init;
+                if index >= init_array.len() {
+                    init = 0.0;
+                } else {
+                    init = init_array[index].1;
+                }
+
                 let value = pools.1.make_float_const(init);
                 inst.insert_before(value);
                 inst.get_use_list().clone().iter_mut().for_each(|user| {
