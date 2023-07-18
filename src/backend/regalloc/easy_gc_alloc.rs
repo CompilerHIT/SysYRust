@@ -342,10 +342,9 @@ impl Allocator {
         }
         if let Some(neighbor) = tosimplify_with {
             self.decolor_one(neighbor);
-            debug_assert!(self.color_one(*target_reg));
-            debug_assert!(self.color_one(neighbor));
+            let ok = self.color_one(*target_reg) && self.color_one(neighbor);
+            debug_assert!(ok)
         }
-
         out
     }
 

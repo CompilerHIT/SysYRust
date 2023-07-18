@@ -330,7 +330,6 @@ impl AsmModule {
     pub fn handle_call_v3(&mut self, pool: &mut BackendPool) {
         // 分析并刷新每个函数的call指令前后需要保存的caller save信息,以及call内部的函数需要保存的callee save信息
         // 对于 handle call
-
         for (_, func) in self.func_map.iter() {
             func.as_mut().handle_call_v3(pool, &self.callers_saveds);
         }
@@ -432,7 +431,10 @@ impl AsmModule {
         //把 callee used表中的信息更新到func中
         for (_, func) in self.func_map.iter() {
             if !func.is_extern {
-                func.as_mut().callee_saved.extend(func.draw_used_callees());
+                let mut callees = func.draw_used_callees();
+                //虽然是callee saved寄存器,但是sp并不需要restore
+                callees.remove(&Reg::new(2, crate::utility::ScalarType::Int));
+                func.as_mut().callee_saved.extend(callees);
                 func.as_mut().save_callee(pool, f);
             }
         }

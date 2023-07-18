@@ -921,6 +921,7 @@ impl Func {
     /// 为spilling 寄存器预先分配空间 的 handle spill
     pub fn handle_spill_v2(&mut self, pool: &mut BackendPool, f: &mut File) {
         // 首先给这个函数分配spill的空间
+        self.calc_live_for_handle_spill();
         self.assign_stack_slot_for_spill();
         let this = pool.put_func(self.clone());
         for block in self.blocks.iter() {
