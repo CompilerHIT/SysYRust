@@ -247,7 +247,7 @@ impl LIRInst {
     }
 
     // mapping virtual reg_id to physic reg_id, 物理寄存器不映射
-    pub fn v_to_phy(&mut self, map: HashMap<i32, i32>) {
+    pub fn v_to_phy(&mut self, map: HashMap<i32, i32>, tmp_vars: HashSet<Reg>) {
         let mut index = 0;
         loop {
             if index >= self.operands.len() {
