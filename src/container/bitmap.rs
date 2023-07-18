@@ -1,4 +1,7 @@
-use std::hash::{Hash, Hasher};
+use std::{
+    fmt::Display,
+    hash::{Hash, Hasher},
+};
 
 // 一个简单的bitmap,用来统计spilling情况,用位图
 pub struct Bitmap {
