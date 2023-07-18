@@ -104,7 +104,14 @@ impl Debug for InstKind {
 
 impl Debug for Inst {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?} in {:?}", self.kind, self.parent_bb)
+        write!(
+            f,
+            "{:?} in {:?}",
+            self.kind,
+            self.parent_bb
+                .unwrap_or_else(|| ObjPtr::new(&BasicBlock::new("None".to_string())))
+                .get_name()
+        )
     }
 }
 
