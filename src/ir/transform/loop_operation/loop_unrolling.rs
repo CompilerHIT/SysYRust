@@ -59,7 +59,11 @@ fn attempt_loop_unrolling(
             match end.get_kind() {
                 InstKind::Binary(crate::ir::instruction::BinOp::Lt) => {
                     if end.get_lhs() == inst {
-                        if end.get_rhs().is_const() {
+                        if end.get_rhs().is_const()
+                            && (end.get_rhs().get_int_bond() - start.get_int_bond())
+                                / step.get_int_bond()
+                                < 1000
+                        {
                             one_block_loop_full_unrolling(
                                 loop_info,
                                 pools,
@@ -68,14 +72,17 @@ fn attempt_loop_unrolling(
                                 end.get_rhs().get_int_bond(),
                             );
                             analyzer.clear();
+                            true
                         } else {
+                            false
                         }
+                    } else {
+                        false
                     }
                 }
-                InstKind::Binary(crate::ir::instruction::BinOp::Le) => {}
-                _ => {}
+                InstKind::Binary(crate::ir::instruction::BinOp::Le) => false,
+                _ => false,
             }
-            true
         } else {
             false
         }
