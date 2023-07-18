@@ -26,7 +26,7 @@ pub struct Allocator {}
 // 针对只有一个块的函数的最优化
 impl Regalloc for Allocator {
     fn alloc(&mut self, func: &crate::backend::instrs::Func) -> FuncAllocStat {
-        func.calc_live();
+        func.calc_live_for_alloc_reg();
         if func.blocks.len() != 2 {
             unreachable!();
         }

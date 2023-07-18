@@ -35,7 +35,7 @@ impl Allocator {
 
 impl Regalloc for Allocator {
     fn alloc(&mut self, func: &crate::backend::instrs::Func) -> FuncAllocStat {
-        func.calc_live();
+        func.calc_live_for_alloc_reg();
         log_file!(easy_ls_path, "func:{}", func.label);
         let mut colors: HashMap<i32, i32> = HashMap::new();
         let mut spillings: HashSet<i32> = HashSet::new();

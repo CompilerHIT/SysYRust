@@ -2827,13 +2827,15 @@ impl BB {
 
 //for build v3
 impl BB {
+    ///为handle spill进行calc live
+
     pub fn handle_spill_v3(&mut self, func: ObjPtr<Func>, pool: &mut BackendPool) {
         //维护一个表,表里面记录了能够使用的寄存器
-        // 从后往前分析,判断某个寄存器是否还在某个地方活着
-        // 如果mv x88 x88,则该指令前后x88连续活着
-        // 如果add x89 x88 x89,则该指令前后x89连续活着
         // todo!();
         self.handle_spill_V2(func, &func.reg_alloc_info.spillings, pool);
+        return;
+
+        //
     }
 }
 

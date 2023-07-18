@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, LinkedList};
 use std::fs::File;
 use std::io::Write;
 
@@ -15,7 +15,7 @@ use crate::ir::module::Module;
 use crate::log;
 use crate::utility::ObjPtr;
 
-use super::instrs::Context;
+use super::instrs::{Context, InstrsType};
 use super::operand::Reg;
 use super::opt::BackendPass;
 use super::regalloc::structs::FuncAllocStat;
@@ -297,10 +297,13 @@ impl AsmModule {
     pub fn build_v3(&mut self, f: &mut File, f2: &mut File, pool: &mut BackendPool) {
         self.build_lir(pool);
         self.remove_unuse_inst_pre_alloc();
-        self.generate_row_asm(f2, pool);
+        // self.generate_row_asm(f2, pool);     //generate row  asm可能会造成bug
+        self.remove_unuse_inst_pre_alloc();
         self.allocate_reg();
         self.map_v_to_p();
         self.handle_spill_v3(pool);
+        self.remove_unuse_inst_suf_alloc();
+        self.anaylyse_for_handle_call_v3(pool);
         self.handle_call_v3(pool);
         self.remove_useless_func();
         self.rearrange_stack_slot();
@@ -326,7 +329,8 @@ impl AsmModule {
     /// 1. 插入保存和恢复caller save的指令
     pub fn handle_call_v3(&mut self, pool: &mut BackendPool) {
         // 分析并刷新每个函数的call指令前后需要保存的caller save信息,以及call内部的函数需要保存的callee save信息
-        self.anaylyse_for_handle_call_v3(pool);
+        // 对于 handle call
+
         for (_, func) in self.func_map.iter() {
             func.as_mut().handle_call_v3(pool, &self.callers_saveds);
         }
@@ -336,16 +340,99 @@ impl AsmModule {
     /// 2. 针对性地让函数自我转变 , 调整每个函数中使用到的寄存器分布等等
     fn anaylyse_for_handle_call_v3(&mut self, pool: &mut BackendPool) {
         //TODO
-        // todo!()
+        let mut caller_used: HashMap<ObjPtr<Func>, HashSet<Reg>> = HashMap::new();
         for (_, func) in self.func_map.iter() {
+            self.name_func.insert(func.label.clone(), *func);
+            if !func.is_extern {
+                self.callees_saveds
+                    .insert(func.label.clone(), func.draw_used_callees());
+                caller_used.insert(*func, func.draw_used_callers());
+            } else {
+                ///TODO,确认对于调用的库函数来说,使用的caller saved是否能够被忽略
+                ///获取所有的caller saved寄存器
+                caller_used.insert(*func, Reg::get_all_callers_saved());
+            }
+        }
+        //加入外部函数
+        let build_external_func =
+            |module: &mut AsmModule, name: &str, pool: &mut BackendPool| -> ObjPtr<Func> {
+                let external_context = pool.put_context(Context::new());
+                let external_func = pool.put_func(Func::new(name, external_context));
+                external_func.as_mut().is_extern = true;
+                module.name_func.insert(name.to_string(), external_func);
+                external_func
+            };
+        //补充外部函数
+        caller_used.insert(
+            build_external_func(self, "memset@plt", pool),
+            Reg::get_all_callers_saved(),
+        );
+        caller_used.insert(
+            build_external_func(self, "memcpy@plt", pool),
+            Reg::get_all_callers_saved(),
+        );
+
+        //创建外部函数
+
+        //对于额外使用的memset函数,单独记录s
+        //构造每个函数的caller save regs  (caller save表要递归调用分析)
+        //首先获取所有函数的所有call指令 (caller func,callee func)
+        let mut call_insts: Vec<(ObjPtr<Func>, ObjPtr<Func>)> = Vec::new();
+        for (func, _) in caller_used.iter() {
+            for bb in func.blocks.iter() {
+                for inst in bb.insts.iter() {
+                    if inst.get_type() == InstrsType::Call {
+                        let label = inst.get_label().get_func_name();
+                        debug_assert!(self.name_func.contains_key(label.as_str()), "{label}");
+                        let callee_func = *self.name_func.get(&label).unwrap();
+                        call_insts.push((*func, callee_func));
+                    }
+                }
+            }
+        }
+
+        loop {
+            let mut ifFinish = true;
+            //直到无法发生更新了才退出
+            ///更新caller save
+            for (caller_func, callee_func) in call_insts.iter() {
+                //
+                let old_caller_func_used_callers = caller_used.get(caller_func).unwrap();
+                let old_num = old_caller_func_used_callers.len();
+                let new_regs: HashSet<Reg> = caller_used
+                    .get(callee_func)
+                    .unwrap()
+                    .iter()
+                    .cloned()
+                    .collect();
+                caller_used.get_mut(caller_func).unwrap().extend(new_regs);
+                if caller_used.get(caller_func).unwrap().len() > old_num {
+                    ifFinish = false;
+                }
+            }
+            if ifFinish {
+                break;
+            }
+        }
+        //分析完caller saved的使用,把caller used表中的信息更新到func中
+        for (func, caller_saved_regs) in caller_used {
             self.callers_saveds
-                .insert(func.label.clone(), func.draw_used_callers());
+                .insert(func.label.clone(), caller_saved_regs);
+        }
+
+        //TODO,分析callee saved的使用并进行函数分裂
+        //根据上下文分析,获取每个callee saved的函数调用的上下文需要保存的callee save寄存器
+        for (func, callee_useds) in self.callees_saveds.iter() {
+            //从name func中取出
         }
     }
+
     /// 计算栈空间,进行ra,sp,callee 的保存和恢复
     pub fn build_stack_info(&mut self, f: &mut File, pool: &mut BackendPool) {
+        //把 callee used表中的信息更新到func中
         for (_, func) in self.func_map.iter() {
             if !func.is_extern {
+                func.as_mut().callee_saved.extend(func.draw_used_callees());
                 func.as_mut().save_callee(pool, f);
             }
         }
@@ -353,14 +440,13 @@ impl AsmModule {
 
     ///删除进行函数分裂后的剩余无用函数
     pub fn remove_useless_func(&mut self) {
-        //TODO
-        // let mut new_func_map = Vec::new();
-        // for (f, func) in self.func_map.iter() {
-        //     if self.name_func.contains_key(&func.label) {
-        //         new_func_map.push((*f, *func));
-        //     }
-        // }
-        // self.func_map = new_func_map;
+        let mut new_func_map = Vec::new();
+        for (f, func) in self.func_map.iter() {
+            if self.name_func.contains_key(&func.label) {
+                new_func_map.push((*f, *func));
+            }
+        }
+        self.func_map = new_func_map;
     }
 
     pub fn update_array_offset(&mut self, pool: &mut BackendPool) {

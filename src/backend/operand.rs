@@ -1,6 +1,9 @@
 use crate::log;
 use crate::utility::ScalarType;
-use std::fmt::{format, Display};
+use std::{
+    collections::HashSet,
+    fmt::{format, Display},
+};
 
 use super::block::FLOAT_BASE;
 pub const REG_COUNT: i32 = 32;
@@ -156,7 +159,6 @@ impl Reg {
         match self.r_type {
             ScalarType::Int => {
                 self.id == 1
-                    || self.id == 3
                     || (self.id >= 5 && self.id <= 7)
                     || (self.id >= 10 && self.id <= 17)
                     || (self.id >= 28 && self.id <= 31)
@@ -249,5 +251,40 @@ impl Reg {
         } else {
             Reg::new(bit_code >> 1, ScalarType::Int)
         }
+    }
+}
+
+///获取reg相关信息
+impl Reg {
+    ///获取所有caller saved寄存器
+    pub fn get_all_callers_saved() -> HashSet<Reg> {
+        let mut callers_saved = HashSet::new();
+        for id in 0..=31 {
+            let reg = Reg::new(id, ScalarType::Int);
+            if reg.is_caller_save() {
+                callers_saved.insert(reg);
+            }
+            let reg = Reg::new(id + FLOAT_BASE, ScalarType::Float);
+            if reg.is_caller_save() {
+                callers_saved.insert(reg);
+            }
+        }
+        callers_saved
+    }
+    ///获取所有callee saved寄存器
+    pub fn get_all_callees_saved() -> HashSet<Reg> {
+        let mut callees_saved = HashSet::new();
+        for id in 0..=31 {
+            let reg = Reg::new(id, ScalarType::Int);
+            if reg.is_callee_save() {
+                callees_saved.insert(reg);
+            }
+            let reg = Reg::new(id + FLOAT_BASE, ScalarType::Float);
+            if reg.is_callee_save() {
+                callees_saved.insert(reg);
+            }
+        }
+
+        callees_saved
     }
 }

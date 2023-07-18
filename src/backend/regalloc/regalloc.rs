@@ -246,7 +246,7 @@ pub fn build_nums_neighbor_color(
 ///  获取 （下标,块)->失效寄存器集合  表
 /// 注意！！！！ 该函数依赖于func的cal live的结果，内部并不会调用func的cal live
 pub fn build_ends_index_bb(func: &Func) -> HashMap<(usize, ObjPtr<BB>), HashSet<Reg>> {
-    func.calc_live();
+    func.calc_live_for_alloc_reg();
     let mut out: HashMap<(usize, ObjPtr<BB>), HashSet<Reg>> = HashMap::new();
     for bb in func.blocks.iter() {
         let mut livenow: HashSet<Reg> = HashSet::new();

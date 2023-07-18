@@ -7,7 +7,6 @@ extern crate biheap;
 use std::env;
 use sysylib::backend::module::AsmModule;
 use sysylib::frontend::irgen::irgen;
-use sysylib::ir::dump_now;
 use sysylib::ir::instruction::Inst;
 use sysylib::{self, backend::generate_asm, ir::module::Module, utility::ObjPool};
 lalrpop_mod! {
