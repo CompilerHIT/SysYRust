@@ -113,7 +113,7 @@ impl Inst {
     /// 判断是否是全局变量的存储
     /// # Return
     /// 如果是返回true，否则返回false
-    pub fn is_global_store(&self) -> bool {
+    pub fn is_global_var_store(&self) -> bool {
         // 正确性检查
         debug_assert_eq!(self.get_kind(), InstKind::Store);
         self.self_check_store();
