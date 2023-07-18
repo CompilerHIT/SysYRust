@@ -890,7 +890,7 @@ fn dump_inst(
             }
             text += "\n";
         }
-        InstKind::Head(_) => unreachable!("No Head in dump_inst"),
+        InstKind::Head => unreachable!("No Head in dump_inst"),
     }
     (name_index, text)
 }

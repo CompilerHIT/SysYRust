@@ -21,7 +21,7 @@ pub struct Congruence {
     pub map: HashMap<ObjPtr<Inst>, usize>,
 }
 
-pub fn easy_gvn(module: &mut Module) ->bool{
+pub fn easy_gvn(module: &mut Module) -> bool {
     let mut congruence = Congruence {
         vec_class: vec![],
         map: HashMap::new(),
@@ -37,9 +37,9 @@ pub fn easy_gvn(module: &mut Module) ->bool{
     changed
 }
 
-pub fn gvn(module: &mut Module,opt_option:bool){
-    if opt_option{
-        loop{
+pub fn gvn(module: &mut Module, opt_option: bool) {
+    if opt_option {
+        loop {
             let mut changed = false;
             changed |= easy_gvn(module);
             changed |= load_store_opt(module);
@@ -59,7 +59,7 @@ pub fn has_val(
     match inst.get_kind() {
         InstKind::Alloca(_)
         | InstKind::Branch
-        | InstKind::Head(_)
+        | InstKind::Head
         | InstKind::Parameter
         | InstKind::Return
         | InstKind::Store
