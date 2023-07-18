@@ -6,7 +6,7 @@ use crate::{
             call_optimize::call_optimize,
             dominator_tree::{calculate_dominator, DominatorTree},
         },
-        instruction::{BinOp, Inst, InstKind},
+        instruction::{BinOp, Inst, InstKind, UnOp},
         ir_type::IrType,
         module::Module,
         tools::{bfs_inst_process, func_process, replace_inst},
@@ -16,22 +16,133 @@ use crate::{
 
 use super::delete_redundant_load_store::load_store_opt;
 
+pub struct CongruenceClass{
+    gep_congruence:Congruence,
+    pos_congruence:Congruence,
+    neg_congruence:Congruence,
+    not_congruence:Congruence,
+    int_congruence:Congruence,
+    float_congruence:Congruence,
+    ftoi_congruence:Congruence,
+    itof_congruence:Congruence,
+    add_congruence:Congruence,
+    sub_congruence:Congruence,
+    mul_congruence:Congruence,
+    div_congruence:Congruence,
+    rem_congruence:Congruence,
+    ne_congruence:Congruence,
+    cmp_congruence:Congruence,
+    call_congruence:Congruence,
+}
+impl CongruenceClass{
+    pub fn new() ->CongruenceClass{
+        CongruenceClass{
+            gep_congruence:Congruence::new(),
+            pos_congruence:Congruence::new(),
+            neg_congruence:Congruence::new(),
+            not_congruence:Congruence::new(),
+            int_congruence:Congruence::new(),
+            float_congruence:Congruence::new(),
+            ftoi_congruence:Congruence::new(),
+            itof_congruence:Congruence::new(),
+            add_congruence:Congruence::new(),
+            sub_congruence:Congruence::new(),
+            mul_congruence:Congruence::new(),
+            div_congruence:Congruence::new(),
+            rem_congruence:Congruence::new(),
+            ne_congruence:Congruence::new(),
+            cmp_congruence:Congruence::new(),
+            call_congruence:Congruence::new(),
+        }
+    }
+    pub fn get_congruence(&mut self,inst:ObjPtr<Inst>)->Option<&mut Congruence>{
+        match inst.get_kind() {
+            InstKind::Gep =>{
+                Some(&mut self.gep_congruence)
+            }
+            InstKind::Binary(binop) =>{
+                match binop {
+                    BinOp::Eq |BinOp::Ge |BinOp::Gt |BinOp::Le |BinOp::Lt =>{
+                        Some(&mut self.cmp_congruence)
+                    }
+                    BinOp::Add =>{
+                        Some(&mut self.add_congruence)
+                    }
+                    BinOp::Sub =>{
+                        Some(&mut self.sub_congruence)
+                    }
+                    BinOp::Mul =>{
+                        Some(&mut self.mul_congruence)
+                    }
+                    BinOp::Div =>{
+                        Some(&mut self.div_congruence)
+                    }
+                    BinOp::Rem =>{
+                        Some(&mut self.rem_congruence)
+                    }
+                    BinOp::Ne =>{
+                        Some(&mut self.ne_congruence)
+                    }
+                }
+            }
+            InstKind::Unary(unop) =>{
+                match unop {
+                    UnOp::Pos =>{
+                        Some(&mut self.pos_congruence)
+                    }
+                    UnOp::Neg =>{
+                        Some(&mut self.neg_congruence)
+                    }
+                    UnOp::Not =>{
+                        Some(&mut self.not_congruence)
+                    }
+                }
+            }
+            InstKind::ConstInt(_) =>{
+                Some(&mut self.int_congruence)
+            }
+            InstKind::ConstFloat(_) =>{
+                Some(&mut self.float_congruence)
+            }
+            InstKind::FtoI =>{
+                Some(&mut self.ftoi_congruence)
+            }
+            InstKind::ItoF =>{
+                Some(&mut self.itof_congruence)
+            }
+            InstKind::Call(_) =>{
+                Some(&mut self.call_congruence)
+            }
+            _=>{
+                None
+            }
+        }
+    }
+}
+
+#[derive(PartialEq,Clone)]
 pub struct Congruence {
     pub vec_class: Vec<Vec<ObjPtr<Inst>>>,
     pub map: HashMap<ObjPtr<Inst>, usize>,
 }
 
+impl Congruence {
+    pub fn new() ->Congruence{
+        Congruence {
+            vec_class: vec![],
+            map: HashMap::new(),
+        }
+    }    
+}
+
 pub fn easy_gvn(module: &mut Module) -> bool {
-    let mut congruence = Congruence {
-        vec_class: vec![],
-        map: HashMap::new(),
-    };
+    let mut congruence_class = CongruenceClass::new();
     let mut changed = false;
     let set = call_optimize(module);
     func_process(module, |_, func| {
         let dominator_tree = calculate_dominator(func.get_head());
             bfs_inst_process(func.get_head(), |inst| {
-                changed |= has_val(&mut congruence, inst, &dominator_tree, set.clone())
+                changed |= has_val(&mut congruence_class, inst, &dominator_tree, set.clone())
             });
     });
     changed
@@ -51,7 +162,7 @@ pub fn gvn(module: &mut Module, opt_option: bool) {
 }
 
 pub fn has_val(
-    congrunce: &mut Congruence,
+    congrunce_class: &mut CongruenceClass,
     inst: ObjPtr<Inst>,
     dominator_tree: &DominatorTree,
     set: HashSet<String>,
@@ -68,15 +179,18 @@ pub fn has_val(
         | InstKind::GlobalConstInt(_)
         | InstKind::GlobalFloat(_)
         | InstKind::GlobalInt(_)
-        | InstKind::Phi => {} //todo:phi可以被优化吗
+        | InstKind::Phi => {
+            return false;
+        } //todo:phi可以被优化吗
         InstKind::Call(funcname) => {
+            let congruence = congrunce_class.get_congruence(inst).unwrap().clone();//副本
             if set.contains(&funcname) {
                 //纯函数，可复用
-                if let Some(_index) = congrunce.map.get(&inst) {
+                if let Some(_index) = congruence.map.get(&inst) {
                     return false;
                 }
-                for vec_congruent in congrunce.vec_class.clone() {
-                    if compare_two_inst(inst, vec_congruent[0], &congrunce) {
+                for vec_congruent in congruence.vec_class.clone() {
+                    if compare_two_inst(inst, vec_congruent[0], congrunce_class) {
                         if dominator_tree
                             .is_dominate(&vec_congruent[0].get_parent_bb(), &inst.get_parent_bb())
                         {
@@ -94,9 +208,10 @@ pub fn has_val(
                             }
                         }
                         //都没有可以替代这条指令的congruent inst,将这条指令加入congruent inst中
-                        if let Some(index) = congrunce.map.get(&vec_congruent[0]) {
-                            congrunce.vec_class[*index].push(inst);
-                            congrunce.map.insert(inst, *index);
+                        if let Some(index) = congruence.map.get(&vec_congruent[0]) {
+                            let congruence_mut = congrunce_class.get_congruence(inst).unwrap();
+                            congruence_mut.vec_class[*index].push(inst);
+                            congruence_mut.map.insert(inst, *index);
                         }
                         return false;
                     }
@@ -104,11 +219,12 @@ pub fn has_val(
             }
         }
         _ => {
-            if let Some(_index) = congrunce.map.get(&inst) {
+            let congruence = congrunce_class.get_congruence(inst).unwrap().clone();
+            if let Some(_index) = congruence.map.get(&inst) {
                 return false;
             }
-            for vec_congruent in congrunce.vec_class.clone() {
-                if compare_two_inst(inst, vec_congruent[0], &congrunce) {
+            for vec_congruent in congruence.vec_class.clone() {
+                if compare_two_inst(inst, vec_congruent[0], congrunce_class) {
                     if dominator_tree
                         .is_dominate(&vec_congruent[0].get_parent_bb(), &inst.get_parent_bb())
                     {
@@ -126,37 +242,39 @@ pub fn has_val(
                         }
                     }
                     //都没有可以替代这条指令的congruent inst,将这条指令加入congruent inst中
-                    if let Some(index) = congrunce.map.get(&vec_congruent[0]) {
-                        congrunce.vec_class[*index].push(inst);
-                        congrunce.map.insert(inst, *index);
+                    if let Some(index) = congruence.map.get(&vec_congruent[0]) {
+                        let congruence_mut = congrunce_class.get_congruence(inst).unwrap();
+                        congruence_mut.vec_class[*index].push(inst);
+                        congruence_mut.map.insert(inst, *index);
                     }
                     return false;
                 }
             }
         }
     }
-    let index = congrunce.vec_class.len();
-    congrunce.vec_class.push(vec![inst]); //加入新的congruent class
-    congrunce.map.insert(inst, index); //增加索引映射
+    let congruence = congrunce_class.get_congruence(inst).unwrap();
+    let index = congruence.vec_class.len();
+    congruence.vec_class.push(vec![inst]); //加入新的congruent class
+    congruence.map.insert(inst, index); //增加索引映射
     false
 }
 
-pub fn compare_two_inst(inst1: ObjPtr<Inst>, inst2: ObjPtr<Inst>, congrunce: &Congruence) -> bool {
+pub fn compare_two_inst(inst1: ObjPtr<Inst>, inst2: ObjPtr<Inst>, congrunce_class: &mut CongruenceClass) -> bool {
     let tpflag = inst1.get_ir_type() == inst2.get_ir_type();
     if inst1.get_kind() == inst2.get_kind() && tpflag {
         match inst1.get_kind() {
             InstKind::Gep => {
                 let operands1 = inst1.get_operands();
                 let operands2 = inst2.get_operands();
-                return compare_two_inst_with_index(operands1[0], operands2[0], congrunce)
-                    && compare_two_inst_with_index(operands1[1], operands2[1], congrunce);
+                return compare_two_inst_with_index(operands1[0], operands2[0], congrunce_class)
+                    && compare_two_inst_with_index(operands1[1], operands2[1], congrunce_class);
             }
             InstKind::Unary(unop1) => match inst2.get_kind() {
                 InstKind::Unary(unop2) => {
                     let operands1 = inst1.get_operands();
                     let operands2 = inst2.get_operands();
                     return unop1 == unop2
-                        && compare_two_inst_with_index(operands1[0], operands2[0], congrunce);
+                        && compare_two_inst_with_index(operands1[0], operands2[0], congrunce_class);
                 }
                 _ => unreachable!(),
             },
@@ -187,12 +305,12 @@ pub fn compare_two_inst(inst1: ObjPtr<Inst>, inst2: ObjPtr<Inst>, congrunce: &Co
             InstKind::FtoI => {
                 let operands1 = inst1.get_operands();
                 let operands2 = inst2.get_operands();
-                return compare_two_inst_with_index(operands1[0], operands2[0], congrunce);
+                return compare_two_inst_with_index(operands1[0], operands2[0], congrunce_class);
             }
             InstKind::ItoF => {
                 let operands1 = inst1.get_operands();
                 let operands2 = inst2.get_operands();
-                return compare_two_inst_with_index(operands1[0], operands2[0], congrunce);
+                return compare_two_inst_with_index(operands1[0], operands2[0], congrunce_class);
             }
             InstKind::Binary(binop1) => match inst2.get_kind() {
                 InstKind::Binary(binop2) => {
@@ -201,7 +319,7 @@ pub fn compare_two_inst(inst1: ObjPtr<Inst>, inst2: ObjPtr<Inst>, congrunce: &Co
                             BinOp::Add | BinOp::Eq | BinOp::Mul | BinOp::Ne => {
                                 let operands1 = inst1.get_operands();
                                 let operands2 = inst2.get_operands();
-                                return compare_two_operands(operands1, operands2, congrunce);
+                                return compare_two_operands(operands1, operands2, congrunce_class);
                             }
                             _ => {
                                 let operands1 = inst1.get_operands();
@@ -209,11 +327,11 @@ pub fn compare_two_inst(inst1: ObjPtr<Inst>, inst2: ObjPtr<Inst>, congrunce: &Co
                                 if compare_two_inst_with_index(
                                     operands1[0],
                                     operands2[0],
-                                    congrunce,
+                                    congrunce_class,
                                 ) && compare_two_inst_with_index(
                                     operands1[1],
                                     operands2[1],
-                                    congrunce,
+                                    congrunce_class,
                                 ) {
                                     return true;
                                 } else {
@@ -226,7 +344,7 @@ pub fn compare_two_inst(inst1: ObjPtr<Inst>, inst2: ObjPtr<Inst>, congrunce: &Co
                             BinOp::Eq | BinOp::Ne => {
                                 let operands1 = inst1.get_operands();
                                 let operands2 = inst2.get_operands();
-                                return compare_two_operands(operands1, operands2, congrunce);
+                                return compare_two_operands(operands1, operands2, congrunce_class);
                             }
                             _ => {
                                 let operands1 = inst1.get_operands();
@@ -234,11 +352,11 @@ pub fn compare_two_inst(inst1: ObjPtr<Inst>, inst2: ObjPtr<Inst>, congrunce: &Co
                                 if compare_two_inst_with_index(
                                     operands1[0],
                                     operands2[0],
-                                    congrunce,
+                                    congrunce_class,
                                 ) && compare_two_inst_with_index(
                                     operands1[1],
                                     operands2[1],
-                                    congrunce,
+                                    congrunce_class,
                                 ) {
                                     return true;
                                 } else {
@@ -263,8 +381,8 @@ pub fn compare_two_inst(inst1: ObjPtr<Inst>, inst2: ObjPtr<Inst>, congrunce: &Co
                         || (binop1 == BinOp::Le && binop2 == BinOp::Gt)
                         || (binop1 == BinOp::Lt && binop2 == BinOp::Ge)
                     {
-                        return compare_two_inst_with_index(operands1[0], operands2[1], congrunce)
-                            && compare_two_inst_with_index(operands1[1], operands2[0], congrunce);
+                        return compare_two_inst_with_index(operands1[0], operands2[1], congrunce_class)
+                            && compare_two_inst_with_index(operands1[1], operands2[0], congrunce_class);
                     }
                 }
                 _ => {}
@@ -278,14 +396,47 @@ pub fn compare_two_inst(inst1: ObjPtr<Inst>, inst2: ObjPtr<Inst>, congrunce: &Co
 pub fn compare_two_inst_with_index(
     inst1: ObjPtr<Inst>,
     inst2: ObjPtr<Inst>,
-    congrunce: &Congruence,
+    congrunce_class: &mut CongruenceClass,
 ) -> bool {
+    match inst1.get_kind() {
+        InstKind::Alloca(_)
+        | InstKind::Branch
+        | InstKind::Head
+        | InstKind::Parameter
+        | InstKind::Return
+        | InstKind::Store
+        | InstKind::Load
+        | InstKind::GlobalConstFloat(_)
+        | InstKind::GlobalConstInt(_)
+        | InstKind::GlobalFloat(_)
+        | InstKind::GlobalInt(_)
+        | InstKind::Phi => {return inst1==inst2;}
+        _=>{
+            match inst2.get_kind(){
+                InstKind::Alloca(_)
+                | InstKind::Branch
+                | InstKind::Head
+                | InstKind::Parameter
+                | InstKind::Return
+                | InstKind::Store
+                | InstKind::Load
+                | InstKind::GlobalConstFloat(_)
+                | InstKind::GlobalConstInt(_)
+                | InstKind::GlobalFloat(_)
+                | InstKind::GlobalInt(_)
+                | InstKind::Phi => {return inst1==inst2;}
+                _=>{}
+            }
+        }
+    }
     if inst1 == inst2 {
         //针对全局指针
         return true;
     }
-    if let Some(index1) = congrunce.map.get(&inst1) {
-        if let Some(index2) = congrunce.map.get(&inst2) {
+    let congruence = congrunce_class.get_congruence( inst1).unwrap();
+
+    if let Some(index1) = congruence.map.get(&inst1) {
+        if let Some(index2) = congruence.map.get(&inst2) {//如果不是同一类则获得不了索引
             if index1 == index2 {
                 return true;
             }
@@ -297,14 +448,14 @@ pub fn compare_two_inst_with_index(
 pub fn compare_two_operands(
     operands1: &Vec<ObjPtr<Inst>>,
     operands2: &Vec<ObjPtr<Inst>>,
-    congrunce: &Congruence,
+    congrunce_class: &mut CongruenceClass,
 ) -> bool {
-    if compare_two_inst_with_index(operands1[0], operands2[0], congrunce)
-        && compare_two_inst_with_index(operands1[1], operands2[1], congrunce)
+    if compare_two_inst_with_index(operands1[0], operands2[0], congrunce_class)
+        && compare_two_inst_with_index(operands1[1], operands2[1], congrunce_class)
     {
         return true;
-    } else if compare_two_inst_with_index(operands1[1], operands2[0], congrunce)
-        && compare_two_inst_with_index(operands1[0], operands2[1], congrunce)
+    } else if compare_two_inst_with_index(operands1[1], operands2[0], congrunce_class)
+        && compare_two_inst_with_index(operands1[0], operands2[1], congrunce_class)
     {
         return true;
     }
