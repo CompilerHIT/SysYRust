@@ -288,3 +288,15 @@ impl Reg {
         callees_saved
     }
 }
+
+///从颜色编号到寄存器
+impl Reg {
+    pub fn from_color(color: i32) -> Reg {
+        debug_assert!(color >= 0 && color <= 63);
+        if color < 32 {
+            Reg::new(color, ScalarType::Int)
+        } else {
+            Reg::new(color, ScalarType::Float)
+        }
+    }
+}

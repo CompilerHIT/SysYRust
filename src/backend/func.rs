@@ -1,4 +1,4 @@
-use std::cmp::max;
+use std::cmp::{max, min};
 use std::collections::LinkedList;
 pub use std::collections::{HashSet, VecDeque};
 pub use std::fs::File;
@@ -59,9 +59,8 @@ pub struct Func {
     pub float_array: HashSet<FloatArray>,
     //FIXME: resolve float regs
     pub callee_saved: HashSet<Reg>,
-    pub caller_saved: HashMap<Reg, Reg>,
-    pub caller_saved_len: i32,
-
+    // pub caller_saved: HashMap<Reg, Reg>,
+    // pub caller_saved_len: i32,
     pub array_inst: Vec<ObjPtr<LIRInst>>,
     pub array_slot: Vec<i32>,
 }
@@ -91,9 +90,8 @@ impl Func {
             const_array: HashSet::new(),
             float_array: HashSet::new(),
             callee_saved: HashSet::new(),
-            caller_saved: HashMap::new(),
-            caller_saved_len: 0,
-
+            // caller_saved: HashMap::new(),
+            // caller_saved_len: 0,
             array_inst: Vec::new(),
             array_slot: Vec::new(),
         }
@@ -548,23 +546,152 @@ impl Func {
                 .as_mut()
                 .handle_spill(this, &self.reg_alloc_info.spillings, pool);
         }
-        for block in self.blocks.iter() {
-            block.as_mut().save_reg(this, pool);
-        }
+        // for block in self.blocks.iter() {
+        //     block.as_mut().save_reg(this, pool);
+        // }
+
         self.update(this);
+        self.handle_call(pool);
+        //save reg之后保存使用的空间
+        //记录使用的空间到stack addr中
+        // for i in 0..self.caller_saved_len {
+        //     let back = self.stack_addr.back().unwrap();
+        //     let new_pos = back.get_pos() + back.get_size();
+        //     let new_slot = StackSlot::new(new_pos, ADDR_SIZE);
+        //     self.stack_addr.push_back(new_slot);
+        // }
         self.update_array_offset(pool);
+
+        //准备callee 需要的信息
+        self.build_callee_map();
         self.save_callee(pool, f);
+    }
+
+    ///能够在 vtop 之前调用的 , 根据regallocinfo得到callee 表的方法
+    /// 该方法应该在handle spill之后调用
+    pub fn build_callee_map(&mut self) {
+        for bb in self.blocks.iter() {
+            for inst in bb.insts.iter() {
+                for reg in inst.get_reg_def() {
+                    let p_reg = if reg.is_physic() {
+                        reg
+                    } else if self.reg_alloc_info.dstr.contains_key(&reg.get_id()) {
+                        Reg::from_color(*self.reg_alloc_info.dstr.get(&reg.get_id()).unwrap())
+                    } else {
+                        unreachable!()
+                    };
+                    if p_reg.is_callee_save() {
+                        self.callee_saved.insert(p_reg);
+                    }
+                }
+            }
+        }
+    }
+
+    ///该handle call在进行 vtop之前可以调用
+    /// 但应该在handle spill之后调用
+    pub fn handle_call(&mut self, pool: &mut BackendPool) {
+        self.calc_live_for_handle_call();
+        // self.print_func();
+        let mut slots_for_caller_saved: Vec<StackSlot> = Vec::new();
+        //先计算所有需要的空间
+        // self.print_func();
+        for bb in self.blocks.iter() {
+            let mut new_insts: Vec<ObjPtr<LIRInst>> = Vec::new();
+            let mut live_now: HashSet<Reg> = HashSet::new();
+            bb.live_out.iter().for_each(|reg| {
+                if reg.is_physic() {
+                    live_now.insert(*reg);
+                } else if self.reg_alloc_info.dstr.contains_key(&reg.get_id()) {
+                    let p_reg =
+                        Reg::from_color(*self.reg_alloc_info.dstr.get(&reg.get_id()).unwrap());
+                    live_now.insert(p_reg);
+                } else {
+                    unreachable!();
+                }
+            });
+
+            for inst in bb.insts.iter().rev() {
+                for reg in inst.get_reg_def() {
+                    if reg.is_physic() {
+                        live_now.remove(&reg);
+                    } else if self.reg_alloc_info.dstr.contains_key(&reg.get_id()) {
+                        let p_reg =
+                            Reg::from_color(*self.reg_alloc_info.dstr.get(&reg.get_id()).unwrap());
+                        live_now.remove(&p_reg);
+                    } else {
+                        unreachable!();
+                    }
+                }
+                if inst.get_type() == InstrsType::Call {
+                    ///找出 caller saved
+                    let mut to_saved: Vec<Reg> = Vec::new();
+                    for reg in live_now.iter() {
+                        if reg.is_caller_save() && reg.get_id() != 1 {
+                            to_saved.push(*reg);
+                        }
+                    }
+                    //TODO to_check, 根据指令判断是否使用
+                    //根据调用的函数的情况,判断这个函数使用了哪些caller save寄存器
+                    // 准备栈空间
+                    while slots_for_caller_saved.len() < to_saved.len() {
+                        let last_slot = self.stack_addr.back().unwrap();
+                        let new_pos = last_slot.get_pos() + last_slot.get_size();
+                        let new_slot = StackSlot::new(new_pos, ADDR_SIZE);
+                        self.stack_addr.push_back(new_slot);
+                        slots_for_caller_saved.push(new_slot);
+                    }
+                    //产生一条指令
+                    let build_ls = |reg: Reg, offset: i32, kind: InstrsType| -> LIRInst {
+                        debug_assert!(
+                            (kind == InstrsType::LoadFromStack || kind == InstrsType::StoreToStack)
+                        );
+                        let mut ins = LIRInst::new(
+                            kind,
+                            vec![Operand::Reg(reg), Operand::IImm(IImm::new(offset))],
+                        );
+                        ins.set_double();
+                        ins
+                    };
+                    // 插入恢复指令
+                    for (index, reg) in to_saved.iter().enumerate() {
+                        let pos = slots_for_caller_saved.get(index).unwrap().get_pos();
+                        let load_inst = build_ls(*reg, pos, InstrsType::LoadFromStack);
+                        let load_inst = pool.put_inst(load_inst);
+                        new_insts.push(load_inst);
+                    }
+                    new_insts.push(*inst); //插入该指令
+                                           //插入保存指令
+                    for (index, reg) in to_saved.iter().enumerate() {
+                        let pos = slots_for_caller_saved.get(index).unwrap().get_pos();
+                        let store_inst = build_ls(*reg, pos, InstrsType::StoreToStack);
+                        let store_inst = pool.put_inst(store_inst);
+                        new_insts.push(store_inst);
+                    }
+                } else {
+                    new_insts.push(*inst);
+                }
+                for reg in inst.get_reg_use() {
+                    if reg.is_physic() {
+                        live_now.insert(reg);
+                    } else if self.reg_alloc_info.dstr.contains_key(&reg.get_id()) {
+                        let p_reg =
+                            Reg::from_color(*self.reg_alloc_info.dstr.get(&reg.get_id()).unwrap());
+                        live_now.insert(p_reg);
+                    } else {
+                        unreachable!();
+                    }
+                }
+            }
+            new_insts.reverse();
+            bb.as_mut().insts = new_insts;
+        }
     }
 
     pub fn update_array_offset(&mut self, pool: &mut BackendPool) {
         let slot = self.stack_addr.back().unwrap();
-        let base_size = slot.get_pos() + slot.get_size() + self.caller_saved_len * ADDR_SIZE;
-        log!(
-            "{}, len {}, base {}",
-            self.label,
-            self.caller_saved_len,
-            base_size
-        );
+        // let base_size = slot.get_pos() + slot.get_size() + self.caller_saved_len * ADDR_SIZE;
+        let base_size = slot.get_pos() + slot.get_size();
 
         for (i, inst) in self.array_inst.iter().enumerate() {
             let mut offset = match inst.get_rhs() {
@@ -621,8 +748,8 @@ impl Func {
         self.const_array = func_ref.const_array.clone();
         self.float_array = func_ref.float_array.clone();
         self.callee_saved = func_ref.callee_saved.clone();
-        self.caller_saved = func_ref.caller_saved.clone();
-        self.caller_saved_len = func_ref.caller_saved_len;
+        // self.caller_saved = func_ref.caller_saved.clone();
+        // self.caller_saved_len = func_ref.caller_saved_len;
         self.array_inst = func_ref.array_inst.clone();
         self.array_slot = func_ref.array_slot.clone();
     }
@@ -668,7 +795,7 @@ impl Func {
         };
         // log!("stack: {:?}", self.stack_addr);
 
-        stack_size += self.caller_saved_len * ADDR_SIZE;
+        // stack_size += self.caller_saved_len * ADDR_SIZE;
 
         // 局部数组空间
         for array_size in self.array_slot.iter() {
@@ -936,11 +1063,12 @@ impl Func {
                 .as_mut()
                 .handle_spill_V2(this, &self.reg_alloc_info.spillings, pool);
         }
-        let this = pool.put_func(self.clone());
-        for block in self.blocks.iter() {
-            block.as_mut().save_reg(this, pool);
-        }
         self.update(this);
+        self.handle_call(pool);
+        // for block in self.blocks.iter() {
+        //     block.as_mut().save_reg(this, pool);
+        // }
+
         self.update_array_offset(pool);
         self.save_callee(pool, f);
     }
@@ -1407,7 +1535,7 @@ impl Func {
 ///handle call v3的实现
 impl Func {
     ///calc_live for handle call v3
-    /// 仅仅对五个特殊寄存器x0-x5认为始终活跃
+    /// 仅仅对五个特殊寄存器x0-x4认为始终活跃
     /// 其他寄存器都动态分析
     pub fn calc_live_for_handle_call(&self) {
         //TODO, 去除allocable限制!
@@ -1446,22 +1574,12 @@ impl Func {
             }
         };
 
-        // 计算公式，live in 来自于所有前继的live out的集合 + 自身的live use
-        // live out等于所有后继块的live in的集合与 (自身的livein 和live def的并集) 的交集
-        // 以块为遍历单位进行更新
-        // TODO 重写
-        // 首先计算出live def和live use
-        // if self.label == "main" {
-        //     log!("to");
-        // }
-
         let mut queue: VecDeque<(ObjPtr<BB>, Reg)> = VecDeque::new();
         for block in self.blocks.iter() {
             log_file!(calc_live_file, "block:{}", block.label);
             block.as_mut().live_use.clear();
             block.as_mut().live_def.clear();
             for it in block.as_ref().insts.iter().rev() {
-                log_file!(calc_live_file, "{}", it.as_ref());
                 for reg in it.as_ref().get_reg_def().into_iter() {
                     block.as_mut().live_use.remove(&reg);
                     block.as_mut().live_def.insert(reg);
@@ -1471,21 +1589,6 @@ impl Func {
                     block.as_mut().live_use.insert(reg);
                 }
             }
-            log_file!(
-                calc_live_file,
-                "live def:{:?},live use:{:?}",
-                block
-                    .live_def
-                    .iter()
-                    .map(|e| e.get_id())
-                    .collect::<Vec<i32>>(),
-                block
-                    .live_use
-                    .iter()
-                    .map(|e| e.get_id())
-                    .collect::<Vec<i32>>()
-            );
-            //
             for reg in block.as_ref().live_use.iter() {
                 queue.push_back((block.clone(), reg.clone()));
             }
@@ -1521,21 +1624,7 @@ impl Func {
         //然后计算live in 和live out
         while let Some(value) = queue.pop_front() {
             let (block, reg) = value;
-            log_file!(
-                calc_live_file,
-                "block {} 's ins:{:?}, transport live out:{}",
-                block.label,
-                block
-                    .in_edge
-                    .iter()
-                    .map(|b| &b.label)
-                    .collect::<HashSet<&String>>(),
-                reg
-            );
             for pred in block.as_ref().in_edge.iter() {
-                if block.label == ".LBB0_5" && pred.label == ".LBB0_1" {
-                    let a = 2;
-                }
                 if pred.as_mut().live_out.insert(reg) {
                     if pred.as_mut().live_def.contains(&reg) {
                         continue;
@@ -1637,7 +1726,6 @@ impl Func {
     pub fn real_deep_clone(&self, pool: &mut BackendPool) -> ObjPtr<Func> {
         let context = pool.put_context(Context::new());
         let mut new_func = Func::new("default", context);
-
         new_func.blocks = Vec::new();
         let mut old_to_new_bbs: HashMap<ObjPtr<BB>, ObjPtr<BB>> = HashMap::new();
         let mut old_to_new_insts: HashMap<ObjPtr<LIRInst>, ObjPtr<LIRInst>> = HashMap::new();
@@ -1676,9 +1764,9 @@ impl Func {
         new_func.const_array = self.const_array.clone();
         new_func.float_array = self.float_array.clone();
         new_func.callee_saved = self.callee_saved.iter().cloned().collect();
-        new_func.caller_saved = self.caller_saved.clone();
-        new_func.caller_saved_len = self.caller_saved_len;
-        new_func.array_slot = self.array_slot.clone();
+        // new_func.caller_saved = self.caller_saved.clone();
+        // new_func.caller_saved_len = self.caller_saved_len; //TODO,修改
+        new_func.array_slot = self.array_slot.iter().cloned().collect();
         ///对 array inst 进行复制
         new_func.array_inst.clear();
         for inst in self.array_inst.iter() {
