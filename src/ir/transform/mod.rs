@@ -35,13 +35,12 @@ pub fn optimizer_run(
         simplify_cfg::simplify_cfg_run(module, &mut pools);
 
         // 函数内联
-        //func_inline::inline_run(module, &mut pools);
-        //functional_optimizer(module, &mut pools, optimize_flag);
+        func_inline::inline_run(module, &mut pools);
+        functional_optimizer(module, &mut pools, optimize_flag);
 
         // TODO: 性能优化
 
         // 再做一次
-        functional_optimizer(module, &mut pools, optimize_flag);
         functional_optimizer(module, &mut pools, optimize_flag);
     }
 }
