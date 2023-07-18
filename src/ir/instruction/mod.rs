@@ -26,6 +26,8 @@ pub struct Inst {
     user: User,
     list: IList<Inst>,
     kind: InstKind,
+    /// 第一个bool为true时, 如果当前数组长度为0，则是未初始化的
+    /// 第二个bool为true时，如果当前i32值为0，那么这个地方其实是被一个变量初始化的
     init: ((bool, Vec<(bool, i32)>), (bool, Vec<(bool, f32)>)),
     parent_bb: Option<ObjPtr<BasicBlock>>,
 }

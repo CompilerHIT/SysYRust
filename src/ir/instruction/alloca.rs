@@ -53,7 +53,7 @@ impl ObjPool<Inst> {
 }
 
 impl Inst {
-    /// 设置整型数组的初始值,只允许在初始化的时候调用
+    /// 设置整型数组的初始值
     pub fn set_int_init(&mut self, is_init: bool, init: Vec<(bool, i32)>) {
         if let InstKind::Alloca(_) = self.get_kind() {
             if let IrType::IntPtr = self.get_ir_type() {
@@ -84,6 +84,8 @@ impl Inst {
     }
 
     /// 获得整型数组的初始值
+    /// 第一个bool为false时, 如果当前数组长度为0，则是未初始化的
+    /// 第二个bool为true时，如果当前i32值为0，那么这个地方其实是被一个变量初始化的
     pub fn get_int_init(&self) -> &(bool, Vec<(bool, i32)>) {
         // 正确性检查
         if let InstKind::Alloca(_) = self.get_kind() {
