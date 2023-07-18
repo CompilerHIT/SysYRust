@@ -142,16 +142,6 @@ pub fn delete_inst(
                                 }
                             }
                             InstKind::Load => {
-                                //todo:对于全局数组
-                                // println!("该参数为全局数组");
-                                // let operands_temp = ptr.get_operands();
-                                // for (pptr, j) in map.clone() {
-                                // if let Some(ptr2) = get_global_array_ptr(j) {
-                                //     if ptr2 == operands_temp[0] {
-                                //         map.remove(&pptr);
-                                //     }
-                                // }
-                                // }
                                 for (tgep, _) in map.clone() {
                                     if tgep.get_kind() == InstKind::Gep {
                                         let operands_temp = tgep.get_operands();
@@ -162,15 +152,6 @@ pub fn delete_inst(
                                 }
                             }
                             InstKind::Parameter => {
-                                // println!("该参数为输入参数");
-                                // for (tgep, _) in map.clone() {
-                                //     if tgep.get_kind() == InstKind::Gep {
-                                //         let operands_temp = tgep.get_operands();
-                                //         if operands_temp[0] == ptr {
-                                //             map.remove(&tgep);
-                                //         }
-                                //     }
-                                // }
                                 for (tgep, _) in map.clone() {
                                     if tgep.get_kind() == InstKind::Gep {
                                         let operands_temp = tgep.get_operands();
