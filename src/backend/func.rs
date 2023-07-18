@@ -1600,6 +1600,27 @@ impl Func {
             bb.as_mut().func_label = new_name.clone();
         }
     }
+    /// 给label改名,加上指定后缀
+    pub fn suffix_bb(&mut self, suffix: &String) {
+        //记录bb,遇到指令进行替换
+        let mut old_new = HashMap::new();
+        for bb in self.blocks.iter() {
+            let mut new_bb_label = bb.label.clone();
+            new_bb_label.push_str(&suffix);
+            old_new.insert(bb.as_mut().label.clone(), new_bb_label.clone());
+            bb.as_mut().label = new_bb_label;
+        }
+        for bb in self.blocks.iter() {
+            for inst in bb.insts.iter() {
+                let old = inst.get_bb_label();
+                if old.is_none() {
+                    continue;
+                }
+                let new = old_new.get(&old.unwrap()).unwrap().clone();
+                inst.as_mut().replace_label(new);
+            }
+        }
+    }
 
     ///函数分裂用到的函数的真实深度克隆
     pub fn real_deep_clone(&self, pool: &mut BackendPool) -> ObjPtr<Func> {
@@ -1750,7 +1771,28 @@ impl Func {
 
 // rearrange slot实现 ,for module-build v3
 impl Func {
-    pub fn rearrange_stack_slot(&mut self) {}
+    ///分析函数的栈空间的作用区间  (得到 live in 和 live out)
+    /// 在handle overflow前使用,仅仅对于spill的指令进行分析
+    pub fn calc_stackslot_interval(
+        &self,
+    ) -> (
+        HashMap<ObjPtr<BB>, HashSet<StackSlot>>,
+        HashMap<ObjPtr<BB>, HashSet<StackSlot>>,
+    ) {
+        todo!()
+    }
+
+    ///分析函数用到的栈空间的冲突
+    pub fn calc_stackslot_interef() -> HashSet<(StackSlot, StackSlot)> {
+        todo!();
+    }
+
+    pub fn rearrange_stack_slot(&mut self) {
+        return;
+        //定位使用到的栈空间(计算它们之间的依赖关系)
+
+        //分析栈空间的读写的传递
+    }
 }
 
 ///为函数创建寄存器活跃区间

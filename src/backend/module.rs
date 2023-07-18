@@ -1,4 +1,5 @@
 use std::collections::{HashMap, HashSet, LinkedList};
+use std::fmt::format;
 use std::fs::File;
 use std::io::Write;
 use std::string;
@@ -98,7 +99,7 @@ impl AsmModule {
     }
 
     pub fn handle_overflow(&mut self, pool: &mut BackendPool) {
-        self.func_map.iter_mut().for_each(|(_, func)| {
+        self.name_func.iter_mut().for_each(|(_, func)| {
             if !func.is_extern {
                 func.as_mut().handle_overflow(pool);
             }
@@ -241,7 +242,6 @@ impl AsmModule {
             debug_assert!(!func.is_extern);
             func.as_mut().generate(pool.put_context(Context::new()), f);
         });
-
         // self.func_map.iter_mut().for_each(|(_, func)| {
         //     if !func.is_extern {
         //         func.as_mut().generate(pool.put_context(Context::new()), f);
@@ -264,14 +264,6 @@ impl AsmModule {
             // });
             true
         }());
-    }
-
-    fn print_model(&self) {
-        self.func_map.iter().for_each(|(_, func)| {
-            if !func.is_extern {
-                // func.print_func();
-            }
-        });
     }
 }
 
@@ -502,11 +494,13 @@ impl AsmModule {
                     //否则产生一个新的函数
 
                     let new_callee_func = callee_func.real_deep_clone(pool);
-                    let mut new_name = regs_set_to_string(callee_regs);
-                    new_name.push_str(&format!("_{func_label}").to_string());
+                    let suffix = regs_set_to_string(callee_regs);
+                    let mut new_name = suffix.clone();
+                    new_name.push_str(&format!("_{}", func_label).to_string());
                     new_callee_func.as_mut().set_name(&new_name);
-                    new_funcs.push(new_callee_func);
+                    new_callee_func.as_mut().suffix_bb(&suffix);
 
+                    new_funcs.push(new_callee_func);
                     call_inst.as_mut().replace_label(new_name.clone());
 
                     self.call_info
@@ -540,15 +534,14 @@ impl AsmModule {
 
     /// 计算栈空间,进行ra,sp,callee 的保存和恢复
     pub fn build_stack_info(&mut self, f: &mut File, pool: &mut BackendPool) {
-        for (_, func) in self.name_func.iter() {
+        for (name, func) in self.name_func.iter() {
             debug_assert!(!func.is_extern);
             if func.label == "main" {
                 func.as_mut().callee_saved.clear(); // main函数不需要保存任何callee saved
             } else {
-                let mut callees = func.draw_used_callees();
-                //虽然是callee saved寄存器,但是sp并不需要restore
-                callees.remove(&Reg::new(2, crate::utility::ScalarType::Int));
-                func.as_mut().callee_saved.extend(callees);
+                let callees = self.callees_saveds.get_mut(name).unwrap();
+                callees.remove(&Reg::new(2, crate::utility::ScalarType::Int)); //sp虽然是callee saved但不需要通过栈方式restore
+                func.as_mut().callee_saved.extend(callees.iter());
             }
             func.as_mut().save_callee(pool, f);
         }

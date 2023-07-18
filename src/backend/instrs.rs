@@ -525,6 +525,16 @@ impl LIRInst {
     }
 }
 
+///j,b 类型指令 获取label
+impl LIRInst {
+    pub fn get_bb_label(&self) -> Option<String> {
+        match self.get_type() {
+            InstrsType::Branch(_) | InstrsType::Jump => Some(self.get_label().get_func_name()),
+            _ => None,
+        }
+    }
+}
+
 impl Operand {
     // 增加直接导出reg的接口
     #[inline]
