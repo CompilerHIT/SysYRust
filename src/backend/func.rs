@@ -11,11 +11,11 @@ use biheap::BiHeap;
 use lazy_static::__Deref;
 
 use super::instrs::{InstrsType, SingleOp};
-use super::operand::IImm;
+use super::operand::{IImm, IMM_12_Bs};
 // use super::regalloc::structs::RegUsedStat;
 use super::{block, structs::*, BackendPool};
 use crate::backend::asm_builder::AsmBuilder;
-use crate::backend::instrs::{LIRInst, Operand};
+use crate::backend::instrs::{BinaryOp, LIRInst, Operand};
 use crate::backend::module::AsmModule;
 use crate::backend::operand::{Reg, ARG_REG_COUNT};
 use crate::backend::regalloc::regalloc;
@@ -239,9 +239,82 @@ impl Func {
         }
     }
 
-    /// 代码调度
+    /// 块内代码调度
     pub fn list_scheduling_tech(&mut self) {
-        
+        // 建立数据依赖图
+        let mut graph: Graph<ObjPtr<LIRInst>, (i32, ObjPtr<LIRInst>)> = Graph::new();
+        for block in self.blocks.iter() {
+            for (i, inst) in block.insts.iter().rev().enumerate() {
+                // 对于涉及控制流的语句，不能进行调度
+                match inst.get_type() {
+                    InstrsType::Ret(..) | InstrsType::Branch(..) | InstrsType::Jump => {
+                        continue;
+                    }
+                    _ => {}
+                }
+
+                let pos = block.insts.len() - i - 1;
+                graph.add_node(*inst);
+                let use_vec = inst.as_ref().get_reg_use();
+                let def_vec = inst.as_ref().get_reg_def();
+                let mut near_pos = IMM_12_Bs;
+                for reg in use_vec.iter() {
+                    // 若use的寄存器在def中，则不考虑
+                    if def_vec.contains(reg) {
+                        continue;
+                    }
+
+                    // 向上找一个use的最近def
+                    for index in pos - 1..=0 {
+                        let inst = block.insts[index];
+                        if inst.as_ref().get_reg_def().contains(reg) {
+                            near_pos = min(near_pos, index as i32);
+                            break;
+                        }
+                    }
+                }
+
+                // 若没有找到，则最近def在上一个块中，数据依赖关系不纳入考虑。否则加入图中。
+                // 对于特殊的指令，其依赖关系权重为2，即两个指令间至少有一条其他指令
+                if near_pos != IMM_12_Bs {
+                    let last_inst = block.insts[near_pos as usize];
+                    let weight = if dep_inst_special(*inst, last_inst) {
+                        2
+                    } else {
+                        1
+                    };
+                    graph.add_edge(*inst, (weight, last_inst));
+                }
+            }
+
+            // 调度方案，在不考虑资源的情况下i有可能相同
+            let mut schedule_map: HashMap<ObjPtr<LIRInst>, i32> = HashMap::new();
+
+            // 暂时不考虑节点的优先级
+            for (n, e) in graph.get_nodes().iter() {
+                let mut s = e.iter().map(|(w, inst)| {
+                    w + *schedule_map.get(inst).unwrap_or(&0)
+                }).max().unwrap_or(0);
+                // 指令位置相同，若两个是特殊指令则距离增加2，否则增加1
+                match schedule_map.iter().find(|(_, v)| **v == s) {
+                    Some((l, _)) => {
+                        if dep_inst_special(n.clone(), l.clone()) {
+                            s += 2;
+                        } else {
+                            s += 1;
+                        }
+                    }
+                    None => {}
+                }
+                schedule_map.insert(*n, s);
+            }
+
+            // 移动代码
+            block.as_mut().insts.clear();
+            for (i, p) in schedule_map.iter() {
+                block.as_mut().insts.insert(*p as usize, *i);
+            }
+        }
     }
 
     // 移除指定id的寄存器的使用信息
@@ -1896,5 +1969,52 @@ impl Func {
         for bb in self.blocks.iter() {
             bb.as_mut().build_reg_intervals();
         }
+    }
+}
+
+fn dep_inst_special(inst: ObjPtr<LIRInst>, last: ObjPtr<LIRInst>) -> bool {
+    // 若相邻的指令是内存访问
+    match inst.get_type() {
+        InstrsType::LoadFromStack
+        | InstrsType::StoreToStack
+        | InstrsType::LoadParamFromStack
+        | InstrsType::StoreParamToStack
+        | InstrsType::Load
+        | InstrsType::Store => match last.get_type() {
+            InstrsType::LoadFromStack
+            | InstrsType::StoreToStack
+            | InstrsType::LoadParamFromStack
+            | InstrsType::StoreParamToStack
+            | InstrsType::Load
+            | InstrsType::Store => true,
+            _ => false,
+        },
+
+        // 若相邻的指令是乘法运算
+        InstrsType::Binary(BinaryOp::Mul) => match last.get_type() {
+            InstrsType::Binary(BinaryOp::Mul) => true,
+            _ => false,
+        },
+
+        // 若相邻的指令是浮点运算
+        InstrsType::Binary(..) => match last.get_type() {
+            InstrsType::Binary(..) => {
+                let inst_float = inst.operands.iter().any(|op| match op {
+                    Operand::Reg(reg) => reg.get_type() == ScalarType::Float,
+                    _ => false,
+                });
+                let last_float = last.operands.iter().any(|op| match op {
+                    Operand::Reg(reg) => reg.get_type() == ScalarType::Float,
+                    _ => false,
+                });
+                if last_float && inst_float {
+                    true
+                } else {
+                    false
+                }
+            },
+            _ => false,
+        },
+        _ => false,
     }
 }

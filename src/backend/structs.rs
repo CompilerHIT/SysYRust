@@ -359,3 +359,40 @@ impl Operand {
         }
     }
 }
+
+pub struct Graph<T, R> {
+    nodes: HashMap<T, Vec<R>>,
+}
+
+impl<T, R> Graph<T, R> {
+    pub fn new() -> Self {
+        Self {
+            nodes: HashMap::new(),
+        }
+    }
+
+    pub fn add_node(&mut self, node: T)
+    where
+        T: PartialEq + Eq + Hash,
+    {
+        self.nodes.entry(node).or_insert(Vec::new());
+    }
+
+    pub fn add_edge(&mut self, node: T, edge: R)
+    where
+        T: PartialEq + Eq + Hash,
+    {
+        self.nodes.entry(node).or_insert(Vec::new()).push(edge);
+    }
+
+    pub fn get_edges(&self, src: T) -> Option<&Vec<R>>
+    where
+        T: PartialEq + Eq + Hash + Copy,
+    {
+        self.nodes.get(&src)
+    }
+
+    pub fn get_nodes(&self) -> &HashMap<T, Vec<R>> {
+        &self.nodes
+    }
+}
