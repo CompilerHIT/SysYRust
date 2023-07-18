@@ -167,4 +167,15 @@ impl Inst {
 
         self.user.set_operand(0, ptr);
     }
+
+    /// 判断是否是加载全局变量
+    /// # Return
+    /// 如果是返回true，否则返回false
+    pub fn is_global_var_load(&self) -> bool {
+        match self.get_ptr().as_ref().get_ir_type() {
+            IrType::Int => true,
+            IrType::Float => true,
+            _ => false,
+        }
+    }
 }
