@@ -255,4 +255,9 @@ mod test_bitmap {
         set.insert(bp1);
         assert!(set.contains(&bp2));
     }
+
+    #[test]
+    fn test_hash() {
+        //TODo
+    }
 }

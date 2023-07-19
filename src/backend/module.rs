@@ -459,19 +459,12 @@ impl AsmModule {
         //根据寄存器使用情况生成字符串
         let regs_set_to_string = |regs: &HashSet<Reg>| -> String {
             let mut symbol = "".to_string();
-            for id in 0..=31 {
-                let reg = Reg::new(id, crate::utility::ScalarType::Int);
+            for id in 0..=63 {
+                let reg = Reg::from_color(id);
                 if !regs.contains(&reg) {
                     continue;
                 }
-                symbol.push_str(&reg.to_string(false));
-            }
-            for id in 32..=63 {
-                let reg = Reg::new(id, crate::utility::ScalarType::Float);
-                if !regs.contains(&reg) {
-                    continue;
-                }
-                symbol.push_str(&reg.to_string(false));
+                symbol.push_str(reg.to_string(false).as_str());
             }
             symbol
         };
@@ -492,6 +485,40 @@ impl AsmModule {
         new_name_func.insert("main".to_string(), main_func);
         self.callees_saveds
             .insert(main_func.label.to_owned(), HashSet::new());
+
+        //更新基础callees saved uesd 表
+        loop {
+            let mut ifFinish = true;
+            //直到无法发生更新了才退出
+            ///更新caller save
+            for (caller_func, callee_func) in call_insts.iter() {
+                //
+                let old_caller_func_used_callees =
+                    self.callees_saveds.get(caller_func.label.as_str()).unwrap();
+                let old_num = old_caller_func_used_callees.len();
+                let new_regs: HashSet<Reg> = self
+                    .callees_saveds
+                    .get(callee_func.label.as_str())
+                    .unwrap()
+                    .clone();
+                self.callees_saveds
+                    .get_mut(caller_func.as_ref().label.as_str())
+                    .unwrap()
+                    .extend(new_regs);
+                if self
+                    .callees_saveds
+                    .get(caller_func.label.as_str())
+                    .unwrap()
+                    .len()
+                    > old_num
+                {
+                    ifFinish = false;
+                }
+            }
+            if ifFinish {
+                break;
+            }
+        }
 
         //然后分析callee save的使用情况,更新callee save使用表
         loop {
@@ -523,6 +550,7 @@ impl AsmModule {
                     let mut new_name = suffix.clone();
                     new_name.push_str(&format!("_{}", func_label).to_string());
                     new_callee_func.as_mut().set_name(&new_name);
+                    let suffix = format!("_{func_label}_{suffix}");
                     new_callee_func.as_mut().suffix_bb(&suffix);
                     if func_label_callee_maps.len() >= 1 {
                         new_callee_func.as_mut().is_header = false;
