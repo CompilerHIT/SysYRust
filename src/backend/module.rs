@@ -364,9 +364,11 @@ impl AsmModule {
     pub fn build_v3(&mut self, f: &mut File, f2: &mut File, pool: &mut BackendPool) {
         self.build_lir(pool);
         self.remove_unuse_inst_pre_alloc();
+        
         // self.generate_row_asm(f2, pool);     //generate row  asm可能会造成bug
         self.allocate_reg();
         self.map_v_to_p();
+
         self.handle_spill_v3(pool);
         self.remove_unuse_inst_suf_alloc();
         self.anaylyse_for_handle_call_v3(pool);

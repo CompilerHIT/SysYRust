@@ -243,21 +243,33 @@ impl Func {
     pub fn list_scheduling_tech(&mut self) {
         // 建立数据依赖图
         let mut graph: Graph<ObjPtr<LIRInst>, (i32, ObjPtr<LIRInst>)> = Graph::new();
-        for block in self.blocks.iter() {
-            for (i, inst) in block.insts.iter().rev().enumerate() {
-                // 对于涉及控制流的语句，不能进行调度
-                match inst.get_type() {
+        let mut control_insts: Vec<ObjPtr<LIRInst>> = Vec::new();
+        for b in self.blocks.iter() {
+            // 对于涉及控制流的语句，不能进行调度
+            let basicblock: Vec<ObjPtr<LIRInst>> = b
+                .insts
+                .iter()
+                .filter(|inst| match inst.get_type() {
                     InstrsType::Ret(..) | InstrsType::Branch(..) | InstrsType::Jump => {
-                        continue;
-                    }
-                    _ => {}
-                }
-                let pos = block.insts.len() - i - 1;
+                        // 保存，以便后续恢复
+                        control_insts.push(**inst);
+                        false
+                    },
+                    _ => true,
+                })
+                .map(|x| *x)
+                .collect();
+
+            // 对于清除掉控制流语句的块，建立数据依赖图
+            for (i, inst) in basicblock.iter().rev().enumerate() {
+                let pos = basicblock.len() - i - 1;
                 log!("{}, i: {}", pos, i);
                 graph.add_node(*inst);
                 let use_vec = inst.as_ref().get_reg_use();
                 let def_vec = inst.as_ref().get_reg_def();
-                let mut near_pos = IMM_12_Bs;
+                let mut near_pos = -1;
+
+                log!("inst: {}", inst.as_ref());
                 for reg in use_vec.iter() {
                     // 若use的寄存器在def中，则不考虑
                     if def_vec.contains(reg) {
@@ -266,26 +278,21 @@ impl Func {
 
                     // 向上找一个use的最近def
                     for index in 1..pos {
-                        let i = block.insts[pos - index];
-                        log!(
-                            "inst: {:?}, i: {:?}, i's def reg: {:?}",
-                            inst,
-                            i,
-                            i.get_reg_def()
-                        );
-                        if i.as_ref().get_reg_def().contains(reg) {
-                            near_pos = min(near_pos, index as i32);
+                        let i = basicblock[pos - index];
+                        if i.get_reg_def().contains(reg) {
+                            log!("i: {}", i.as_ref());
+                            near_pos = max(near_pos, (pos - index) as i32);
                             break;
                         }
                     }
                 }
 
-                log!("inst: {:?}, near_pos: {}", inst, near_pos);
+                log!("inst: {}, near_pos: {}", inst.as_ref(), near_pos);
 
                 // 若没有找到，则最近def在上一个块中，数据依赖关系不纳入考虑。否则加入图中。
                 // 对于特殊的指令，其依赖关系权重为2，即两个指令间至少有一条其他指令
-                if near_pos != IMM_12_Bs {
-                    let last_inst = block.insts[near_pos as usize];
+                if near_pos != -1 {
+                    let last_inst = basicblock[near_pos as usize];
                     let weight = if dep_inst_special(*inst, last_inst) {
                         2
                     } else {
@@ -299,7 +306,7 @@ impl Func {
             let mut schedule_map: HashMap<ObjPtr<LIRInst>, i32> = HashMap::new();
 
             let mut s = 0;
-            for inst in block.insts.iter() {
+            for inst in basicblock.iter() {
                 if let Some(edges) = graph.get_edges(*inst) {
                     s = edges
                         .iter()
@@ -317,6 +324,14 @@ impl Func {
                         s += 1;
                     }
                 }
+                // 对于相邻指令，若是特殊指令则距离增加为2
+                while let Some((l, _)) = schedule_map.iter().find(|(_, v)| **v == s - 1) {
+                    if dep_inst_special(inst.clone(), l.clone()) {
+                        s += 1;
+                    } else {
+                        break;
+                    }
+                }
                 schedule_map.insert(*inst, s);
             }
 
@@ -331,18 +346,19 @@ impl Func {
 
             // 打印调度方案
             for (n, s) in schedule_map.iter() {
-                log!("{:?} {}", n.as_ref(), s);
+                log!("{} {}", n.as_ref(), s);
             }
 
-            for inst in block.insts.iter() {
-                log!("pre: {:?}", inst.as_ref());
+            for inst in b.insts.iter() {
+                log!("pre: {}", inst.as_ref());
             }
 
             // 移动代码
-            block.as_mut().insts = schedule_res;
+            b.as_mut().insts = schedule_res;
+            b.as_mut().push_back_list(&mut control_insts);
 
-            for inst in block.insts.iter() {
-                log!("{:?}", inst.as_ref());
+            for inst in b.insts.iter() {
+                log!("{}", inst.as_ref());
             }
         }
     }
@@ -2010,13 +2026,15 @@ fn dep_inst_special(inst: ObjPtr<LIRInst>, last: ObjPtr<LIRInst>) -> bool {
         | InstrsType::LoadParamFromStack
         | InstrsType::StoreParamToStack
         | InstrsType::Load
-        | InstrsType::Store => match last.get_type() {
+        | InstrsType::Store
+        | InstrsType::OpReg(SingleOp::LoadAddr) => match last.get_type() {
             InstrsType::LoadFromStack
             | InstrsType::StoreToStack
             | InstrsType::LoadParamFromStack
             | InstrsType::StoreParamToStack
             | InstrsType::Load
-            | InstrsType::Store => true,
+            | InstrsType::Store
+            | InstrsType::OpReg(SingleOp::LoadAddr) => true,
             _ => false,
         },
 
