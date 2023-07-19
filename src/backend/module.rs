@@ -91,11 +91,34 @@ impl AsmModule {
         // self.generate_row_asm(f2, pool); //注释
 
         self.handle_spill(pool, f);
+
+        self.handle_call(pool);
+        self.handle_callee(pool, f);
+
         // self.generate_row_asm(f2, pool); //注释
         self.map_v_to_p();
         // self.generate_row_asm(f2, pool); //注释
         self.remove_unuse_inst_suf_alloc();
         // self.generate_row_asm(f2, pool); //注释
+    }
+    ///处理call前后caller saved 寄存器的保存和恢复
+    /// 该函数应该在handle spill后调用
+    pub fn handle_call(&mut self, pool: &mut BackendPool) {
+        for (_, func) in self.name_func.iter() {
+            debug_assert!(!func.is_extern);
+            func.as_mut().handle_call(pool);
+            func.as_mut().update_array_offset(pool);
+        }
+    }
+
+    ///设置栈大小 ，设置开合栈以及进行callee saved的保存和恢复需要的前沿和后沿函数
+    /// 该函数需要在handle call后调用
+    pub fn handle_callee(&mut self, pool: &mut BackendPool, f: &mut File) {
+        for (_, func) in self.name_func.iter() {
+            debug_assert!(!func.is_extern);
+            func.as_mut().build_callee_map();
+            func.as_mut().save_callee(pool, f)
+        }
     }
 
     pub fn handle_overflow(&mut self, pool: &mut BackendPool) {

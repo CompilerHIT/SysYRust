@@ -549,22 +549,7 @@ impl Func {
         // for block in self.blocks.iter() {
         //     block.as_mut().save_reg(this, pool);
         // }
-
         self.update(this);
-        self.handle_call(pool);
-        //save reg之后保存使用的空间
-        //记录使用的空间到stack addr中
-        // for i in 0..self.caller_saved_len {
-        //     let back = self.stack_addr.back().unwrap();
-        //     let new_pos = back.get_pos() + back.get_size();
-        //     let new_slot = StackSlot::new(new_pos, ADDR_SIZE);
-        //     self.stack_addr.push_back(new_slot);
-        // }
-        self.update_array_offset(pool);
-
-        //准备callee 需要的信息
-        self.build_callee_map();
-        self.save_callee(pool, f);
     }
 
     ///能够在 vtop 之前调用的 , 根据regallocinfo得到callee 表的方法
