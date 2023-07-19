@@ -9,6 +9,7 @@ impl BackendPass {
                     // 在处理handle_overflow前的优化
                     self.rm_useless_overflow(*block, pool);
                     // self.rm_useless_param_overflow(*func, *block, pool);
+                    // self.rm_same_store(*block, pool);
                 })
             }
         });
@@ -202,5 +203,45 @@ impl BackendPass {
             }
         }
         false
+    }
+
+    fn rm_same_store(&self, block: ObjPtr<BB>, pool: &mut BackendPool) {
+        let stores = block
+            .insts
+            .iter()
+            .filter(|inst| inst.get_type() == InstrsType::Store)
+            .collect::<Vec<_>>();
+
+        let same_stores = stores
+            .iter()
+            .filter(|inst| {
+                stores.iter().any(|inst2| {
+                    inst2.get_dst() == inst.get_dst()
+                        && inst2.get_lhs() == inst.get_lhs()
+                        && inst2.get_rhs() == inst.get_rhs()
+                })
+            })
+            .collect::<Vec<_>>();
+        let dst = match same_stores[0].get_dst().clone() {
+            Operand::Reg(reg) => reg,
+            _ => panic!("get {:?}", same_stores[0].get_dst()),
+        };
+        let src = match same_stores[0].get_lhs().clone() {
+            Operand::Reg(reg) => reg,
+            _ => panic!("get {:?}", same_stores[0].get_lhs()),
+        };
+
+        block.as_mut().build_reg_intervals();
+        let dst_info = block
+            .reg_intervals
+            .iter()
+            .find(|info| info.0 .0 == dst)
+            .unwrap();
+        let src_info = block
+            .reg_intervals
+            .iter()
+            .find(|info| info.0 .0 == src)
+            .unwrap();
+        // if dst_info 
     }
 }

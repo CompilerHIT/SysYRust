@@ -454,33 +454,6 @@ impl BB {
                     let value_reg = self.resolve_operand(func, value, true, map_info, pool);
                     match addr.as_ref().get_kind() {
                         InstKind::Gep => {
-                            // let mut load_new = true;
-                            // let mut addr_reg = match map_info.val_map.get(&addr.get_gep_ptr()) {
-                            //     Some(reg) => {
-                            //         load_new = false;
-                            //         reg.clone()
-                            //     }
-                            //     None => Operand::Reg(Reg::init(ScalarType::Int)),
-                            // };
-                            // if let Some(base) = map_info.array_slot_map.get(&addr.get_gep_ptr()) {
-                            //     if load_new {
-                            //         let mut load = LIRInst::new(
-                            //             InstrsType::LoadParamFromStack,
-                            //             vec![addr_reg.clone(), Operand::IImm(IImm::new(*base))],
-                            //         );
-                            //         load.set_double();
-                            //         self.insts.push(pool.put_inst(load));
-                            //     }
-                            // } else {
-                            //     // 找不到，认为是全局数组或者参数或嵌套的gep
-                            //     addr_reg = self.resolve_operand(
-                            //         func,
-                            //         addr.get_gep_ptr(),
-                            //         true,
-                            //         map_info,
-                            //         pool,
-                            //     );
-                            // }
                             let addr_reg = self.resolve_operand(
                                 func,
                                 addr.get_gep_ptr(),
@@ -488,18 +461,6 @@ impl BB {
                                 map_info,
                                 pool,
                             );
-                            // match addr_reg {
-                            //     // 使用全局数组，addr_reg获得的是地址，而非寄存器，因此需要加载
-                            //     Operand::Addr(..) => {
-                            //         let addr = addr_reg.clone();
-                            //         addr_reg = Operand::Reg(Reg::init(ScalarType::Int));
-                            //         self.insts.push(pool.put_inst(LIRInst::new(
-                            //             InstrsType::OpReg(SingleOp::LoadAddr),
-                            //             vec![addr_reg.clone(), addr],
-                            //         )));
-                            //     }
-                            //     _ => {}
-                            // }
                             match addr.get_gep_offset().get_kind() {
                                 InstKind::ConstInt(offset) | InstKind::GlobalConstInt(offset) => {
                                     self.insts.push(pool.put_inst(LIRInst::new(
@@ -2184,7 +2145,6 @@ impl BB {
             self.insts.push(pool.put_inst(inst));
             reg
         } else {
-            // log!("find!");
             return self.global_map.get(&src).unwrap().clone();
         }
     }

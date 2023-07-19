@@ -1,8 +1,6 @@
 use std::collections::{HashMap, HashSet, LinkedList};
-use std::fmt::format;
 use std::fs::File;
 use std::io::Write;
-use std::string;
 
 use crate::backend::block::NUM_SIZE;
 use crate::backend::func::Func;

@@ -287,3 +287,18 @@ fn replace_first_block(block: ObjPtr<BB>, func: ObjPtr<Func>) {
     func.as_mut().blocks.remove(0);
     func.as_mut().blocks.insert(0, after.clone());
 }
+
+fn is_phi_block(block: ObjPtr<BB>) -> bool {
+    if block.insts.len() > 1 && block.get_tail_inst().get_type() == InstrsType::Jump {
+        if block
+            .insts
+            .iter()
+            .all(|inst| inst.get_type() == InstrsType::OpReg(SingleOp::Mv) || inst.get_type() == InstrsType::Jump)
+        {
+            return true;
+        } else {
+            return false;
+        }
+    }
+    false
+}
