@@ -101,10 +101,14 @@ impl AsmModule {
         // 代码调度
         self.list_scheduling_tech();
 
+        // self.generate_row_asm(f2, pool);
+
         // 为临时寄存器分配寄存器
         self.clear_tmp_var();
         self.allocate_reg();
         self.map_v_to_p();
+        // self.generate_row_asm(f2, pool);
+
 
         // self.generate_row_asm(f2, pool); //注释
         self.remove_unuse_inst_suf_alloc();

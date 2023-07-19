@@ -252,8 +252,8 @@ impl Func {
                     }
                     _ => {}
                 }
-
                 let pos = block.insts.len() - i - 1;
+                log!("{}, i: {}", pos, i);
                 graph.add_node(*inst);
                 let use_vec = inst.as_ref().get_reg_use();
                 let def_vec = inst.as_ref().get_reg_def();
@@ -265,14 +265,22 @@ impl Func {
                     }
 
                     // 向上找一个use的最近def
-                    for index in pos - 1..=0 {
-                        let inst = block.insts[index];
-                        if inst.as_ref().get_reg_def().contains(reg) {
+                    for index in 1..pos {
+                        let i = block.insts[pos - index];
+                        log!(
+                            "inst: {:?}, i: {:?}, i's def reg: {:?}",
+                            inst,
+                            i,
+                            i.get_reg_def()
+                        );
+                        if i.as_ref().get_reg_def().contains(reg) {
                             near_pos = min(near_pos, index as i32);
                             break;
                         }
                     }
                 }
+
+                log!("inst: {:?}, near_pos: {}", inst, near_pos);
 
                 // 若没有找到，则最近def在上一个块中，数据依赖关系不纳入考虑。否则加入图中。
                 // 对于特殊的指令，其依赖关系权重为2，即两个指令间至少有一条其他指令
@@ -290,29 +298,51 @@ impl Func {
             // 调度方案，在不考虑资源的情况下i有可能相同
             let mut schedule_map: HashMap<ObjPtr<LIRInst>, i32> = HashMap::new();
 
-            // 暂时不考虑节点的优先级
-            for (n, e) in graph.get_nodes().iter() {
-                let mut s = e.iter().map(|(w, inst)| {
-                    w + *schedule_map.get(inst).unwrap_or(&0)
-                }).max().unwrap_or(0);
-                // 指令位置相同，若两个是特殊指令则距离增加2，否则增加1
-                match schedule_map.iter().find(|(_, v)| **v == s) {
-                    Some((l, _)) => {
-                        if dep_inst_special(n.clone(), l.clone()) {
-                            s += 2;
-                        } else {
-                            s += 1;
-                        }
-                    }
-                    None => {}
+            let mut s = 0;
+            for inst in block.insts.iter() {
+                if let Some(edges) = graph.get_edges(*inst) {
+                    s = edges
+                        .iter()
+                        .map(|(w, inst)| w + *schedule_map.get(inst).unwrap_or(&0))
+                        .max()
+                        .unwrap_or(0);
+                } else {
+                    s = 0;
                 }
-                schedule_map.insert(*n, s);
+                // 指令位置相同，若两个是特殊指令则距离增加2，否则增加1
+                while let Some((l, _)) = schedule_map.iter().find(|(_, v)| **v == s) {
+                    if dep_inst_special(inst.clone(), l.clone()) {
+                        s += 2;
+                    } else {
+                        s += 1;
+                    }
+                }
+                schedule_map.insert(*inst, s);
+            }
+
+            let mut schedule_res: Vec<ObjPtr<LIRInst>> =
+                schedule_map.iter().map(|(&inst, _)| inst).collect();
+            schedule_res.sort_by(|a, b| {
+                schedule_map
+                    .get(a)
+                    .unwrap()
+                    .cmp(schedule_map.get(b).unwrap())
+            });
+
+            // 打印调度方案
+            for (n, s) in schedule_map.iter() {
+                log!("{:?} {}", n.as_ref(), s);
+            }
+
+            for inst in block.insts.iter() {
+                log!("pre: {:?}", inst.as_ref());
             }
 
             // 移动代码
-            block.as_mut().insts.clear();
-            for (i, p) in schedule_map.iter() {
-                block.as_mut().insts.insert(*p as usize, *i);
+            block.as_mut().insts = schedule_res;
+
+            for inst in block.insts.iter() {
+                log!("{:?}", inst.as_ref());
             }
         }
     }
@@ -2012,7 +2042,7 @@ fn dep_inst_special(inst: ObjPtr<LIRInst>, last: ObjPtr<LIRInst>) -> bool {
                 } else {
                     false
                 }
-            },
+            }
             _ => false,
         },
         _ => false,
