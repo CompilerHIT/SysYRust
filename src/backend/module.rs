@@ -111,7 +111,7 @@ impl AsmModule {
         }
     }
 
-    ///设置栈大小 ，设置开合栈以及进行callee saved的保存和恢复需要的前沿和后沿函数
+    /// 设置栈大小 ，设置开合栈以及进行callee saved的保存和恢复需要的前沿和后沿函数
     /// 该函数需要在handle call后调用
     pub fn handle_callee(&mut self, pool: &mut BackendPool, f: &mut File) {
         for (_, func) in self.name_func.iter() {
@@ -301,6 +301,8 @@ impl AsmModule {
         // self.generate_row_asm(f2, pool); //注释
         self.allocate_reg();
         self.handle_spill_v2(pool, f);
+        self.handle_call(pool);
+        self.handle_callee(pool, f);
         // self.handle_spill(pool, f);
         self.map_v_to_p();
         self.remove_unuse_inst_suf_alloc();

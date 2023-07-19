@@ -552,7 +552,7 @@ impl Func {
         self.update(this);
     }
 
-    ///能够在 vtop 之前调用的 , 根据regallocinfo得到callee 表的方法
+    /// 能够在 vtop 之前调用的 , 根据regallocinfo得到callee 表的方法
     /// 该方法应该在handle spill之后调用
     pub fn build_callee_map(&mut self) {
         for bb in self.blocks.iter() {
@@ -1049,13 +1049,6 @@ impl Func {
                 .handle_spill_V2(this, &self.reg_alloc_info.spillings, pool);
         }
         self.update(this);
-        self.handle_call(pool);
-        // for block in self.blocks.iter() {
-        //     block.as_mut().save_reg(this, pool);
-        // }
-
-        self.update_array_offset(pool);
-        self.save_callee(pool, f);
     }
 
     /// 为了分配spill的虚拟寄存器所需的栈空间使用的而构建冲突图
