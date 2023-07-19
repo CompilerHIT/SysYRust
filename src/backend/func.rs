@@ -254,7 +254,7 @@ impl Func {
                         // 保存，以便后续恢复
                         control_insts.push(**inst);
                         false
-                    },
+                    }
                     _ => true,
                 })
                 .map(|x| *x)
@@ -323,9 +323,16 @@ impl Func {
                     } else {
                         s += 1;
                     }
+
+                    if def_use_near(inst.clone(), l.clone()) {
+                        s += 1;
+                    }
                 }
                 // 对于相邻指令，若是特殊指令则距离增加为2
                 while let Some((l, _)) = schedule_map.iter().find(|(_, v)| **v == s - 1) {
+                    if def_use_near(inst.clone(), l.clone()) {
+                        s += 1;
+                    }
                     if dep_inst_special(inst.clone(), l.clone()) {
                         s += 1;
                     } else {
@@ -2026,8 +2033,7 @@ fn dep_inst_special(inst: ObjPtr<LIRInst>, last: ObjPtr<LIRInst>) -> bool {
         | InstrsType::LoadParamFromStack
         | InstrsType::StoreParamToStack
         | InstrsType::Load
-        | InstrsType::Store
-        | InstrsType::OpReg(SingleOp::LoadAddr) => match last.get_type() {
+        | InstrsType::Store => match last.get_type() {
             InstrsType::LoadFromStack
             | InstrsType::StoreToStack
             | InstrsType::LoadParamFromStack
@@ -2065,4 +2071,17 @@ fn dep_inst_special(inst: ObjPtr<LIRInst>, last: ObjPtr<LIRInst>) -> bool {
         },
         _ => false,
     }
+}
+
+fn def_use_near(inst: ObjPtr<LIRInst>, last: ObjPtr<LIRInst>) -> bool {
+    // 若def use相邻
+    if let Some(inst_def) = last.get_reg_def().last() {
+        inst.get_reg_use().iter().any(|reg_use| {
+            if reg_use == inst_def {
+                return true;
+            }
+            false
+        });
+    };
+    false
 }
