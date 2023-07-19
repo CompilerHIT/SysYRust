@@ -68,14 +68,14 @@ impl AsmModule {
 
     // 寄存器分配和寄存器赋值前,移除无用指令(比如移除mv)
     fn remove_unuse_inst_pre_alloc(&mut self) {
-        self.func_map.iter().for_each(|(_, func)| {
+        self.name_func.iter().for_each(|(_, func)| {
             func.as_mut().remove_unuse_inst();
         });
     }
 
     // 寄存器分配和使用后 移除无用指令(比如移除多余的缓存指令)
     fn remove_unuse_inst_suf_alloc(&mut self) {
-        self.func_map.iter().for_each(|(_, func)| {
+        self.name_func.iter().for_each(|(_, func)| {
             func.as_mut().remove_unuse_inst();
         });
     }
@@ -130,31 +130,28 @@ impl AsmModule {
     }
 
     fn map_v_to_p(&mut self) {
-        self.func_map.iter_mut().for_each(|(_, func)| {
-            if !func.is_extern {
-                func.blocks.iter().for_each(|block| {
-                    block.insts.iter().for_each(|inst| {
-                        inst.as_mut().v_to_phy(func.context.get_reg_map().clone());
-                    });
+        self.name_func.iter_mut().for_each(|(_, func)| {
+            debug_assert!(!func.is_extern);
+            func.blocks.iter().for_each(|block| {
+                block.insts.iter().for_each(|inst| {
+                    inst.as_mut().v_to_phy(func.context.get_reg_map().clone());
                 });
-            }
+            });
         });
     }
 
     fn allocate_reg(&mut self) {
-        self.func_map.iter_mut().for_each(|(_, func)| {
+        self.name_func.iter_mut().for_each(|(_, func)| {
             // log!("allocate reg fun: {}", func.as_ref().label);
-            if !func.is_extern {
-                func.as_mut().allocate_reg();
-            }
+            debug_assert!(!func.is_extern);
+            func.as_mut().allocate_reg();
         });
     }
 
     fn handle_spill(&mut self, pool: &mut BackendPool, f: &mut File) {
-        self.func_map.iter_mut().for_each(|(_, func)| {
-            if !func.is_extern {
-                func.as_mut().handle_spill(pool, f);
-            }
+        self.name_func.iter_mut().for_each(|(_, func)| {
+            debug_assert!(!func.is_extern);
+            func.as_mut().handle_spill(pool, f);
         });
     }
 
@@ -309,10 +306,9 @@ impl AsmModule {
     }
 
     fn handle_spill_v2(&mut self, pool: &mut BackendPool, f: &mut File) {
-        self.func_map.iter_mut().for_each(|(_, func)| {
-            if !func.is_extern {
-                func.as_mut().handle_spill_v2(pool, f);
-            }
+        self.name_func.iter_mut().for_each(|(_, func)| {
+            debug_assert!(!func.is_extern);
+            func.as_mut().handle_spill_v2(pool, f);
         });
     }
 }
@@ -334,13 +330,15 @@ impl AsmModule {
         self.remove_unuse_inst_suf_alloc();
         self.anaylyse_for_handle_call_v3(pool);
         self.handle_call_v3(pool);
-        self.remove_useless_func();
+        // self.remove_useless_func();
         self.rearrange_stack_slot();
         self.update_array_offset(pool);
         self.build_stack_info(f, pool);
         self.print_func();
         //删除无用的函数
     }
+
+    ///处理spillings的虚拟寄存器的临时物理寄存器借用
     pub fn handle_spill_v3(&mut self, pool: &mut BackendPool) {
         self.name_func
             .iter()
@@ -359,13 +357,15 @@ impl AsmModule {
     pub fn handle_call_v3(&mut self, pool: &mut BackendPool) {
         // 分析并刷新每个函数的call指令前后需要保存的caller save信息,以及call内部的函数需要保存的callee save信息
         // 对于 handle call
-        for (_, func) in self.func_map.iter() {
+        for (_, func) in self.name_func.iter() {
+            debug_assert!(!func.is_extern);
             func.as_mut().handle_call_v3(pool, &self.callers_saveds);
         }
     }
     ///准备 callee save和caller save需要的信息
     /// 1. 准备每个函数需要的callee save,以及进行函数分裂
     /// 2. 针对性地让函数自我转变 , 调整每个函数中使用到的寄存器分布等等
+    /// 3. 该函数应该在vtop和handle spill后调用
     fn anaylyse_for_handle_call_v3(&mut self, pool: &mut BackendPool) {
         //TODO
         let mut caller_used: HashMap<ObjPtr<Func>, HashSet<Reg>> = HashMap::new();
@@ -594,7 +594,7 @@ impl AsmModule {
     }
 
     pub fn print_func(&self) {
-        for (_, func) in self.func_map.iter() {
+        for (_, func) in self.name_func.iter() {
             func.print_func();
         }
     }

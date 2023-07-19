@@ -46,9 +46,6 @@ pub struct Func {
     pub is_header: bool, //判断一个函数是否是一个模板族下的第一个
     pub entry: Option<ObjPtr<BB>>,
 
-    reg_def: Vec<HashSet<CurInstrInfo>>,
-    reg_use: Vec<HashSet<CurInstrInfo>>,
-    reg_num: i32,
     // fregs: HashSet<Reg>,
     pub context: ObjPtr<Context>,
 
@@ -77,9 +74,6 @@ impl Func {
             params: Vec::new(),
             param_cnt: (0, 0),
             entry: None,
-            reg_def: Vec::new(),
-            reg_use: Vec::new(),
-            reg_num: 0,
             // fregs: HashSet::new(),
             context,
             is_header: true,
@@ -231,39 +225,39 @@ impl Func {
     }
 
     // 移除指定id的寄存器的使用信息
-    pub fn del_inst_reg(&mut self, cur_info: &CurInstrInfo, inst: ObjPtr<LIRInst>) {
-        for reg in inst.as_ref().get_reg_use() {
-            self.reg_use[reg.get_id() as usize].remove(cur_info);
-        }
-        for reg in inst.as_ref().get_reg_def() {
-            self.reg_def[reg.get_id() as usize].remove(cur_info);
-        }
-    }
+    // pub fn del_inst_reg(&mut self, cur_info: &CurInstrInfo, inst: ObjPtr<LIRInst>) {
+    //     for reg in inst.as_ref().get_reg_use() {
+    //         self.reg_use[reg.get_id() as usize].remove(cur_info);
+    //     }
+    //     for reg in inst.as_ref().get_reg_def() {
+    //         self.reg_def[reg.get_id() as usize].remove(cur_info);
+    //     }
+    // }
 
     // 添加指定id的寄存器的使用信息
-    pub fn add_inst_reg(&mut self, cur_info: &CurInstrInfo, inst: ObjPtr<LIRInst>) {
-        for reg in inst.as_ref().get_reg_use() {
-            self.reg_use[reg.get_id() as usize].insert(cur_info.clone());
-        }
-        for reg in inst.as_ref().get_reg_def() {
-            self.reg_def[reg.get_id() as usize].insert(cur_info.clone());
-        }
-    }
+    // pub fn add_inst_reg(&mut self, cur_info: &CurInstrInfo, inst: ObjPtr<LIRInst>) {
+    //     for reg in inst.as_ref().get_reg_use() {
+    //         self.reg_use[reg.get_id() as usize].insert(cur_info.clone());
+    //     }
+    //     for reg in inst.as_ref().get_reg_def() {
+    //         self.reg_def[reg.get_id() as usize].insert(cur_info.clone());
+    //     }
+    // }
 
     pub fn build_reg_info(&mut self) {
-        self.reg_def.clear();
-        self.reg_use.clear();
-        self.reg_def.resize(self.reg_num as usize, HashSet::new());
-        self.reg_use.resize(self.reg_num as usize, HashSet::new());
-        let mut p: CurInstrInfo = CurInstrInfo::new(0);
-        for block in self.blocks.clone() {
-            p.band_block(block);
-            for inst in block.as_ref().insts.iter() {
-                p.insts_it = Some(*inst);
-                self.add_inst_reg(&p, *inst);
-                p.pos += 1;
-            }
-        }
+        // self.reg_def.clear();
+        // self.reg_use.clear();
+        // self.reg_def.resize(self.reg_num as usize, HashSet::new());
+        // self.reg_use.resize(self.reg_num as usize, HashSet::new());
+        // let mut p: CurInstrInfo = CurInstrInfo::new(0);
+        // for block in self.blocks.clone() {
+        //     p.band_block(block);
+        //     for inst in block.as_ref().insts.iter() {
+        //         p.insts_it = Some(*inst);
+        //         self.add_inst_reg(&p, *inst);
+        //         p.pos += 1;
+        //     }
+        // }
     }
 
     pub fn calc_live_for_alloc_reg(&self) {
@@ -675,7 +669,6 @@ impl Func {
 
     pub fn update_array_offset(&mut self, pool: &mut BackendPool) {
         let slot = self.stack_addr.back().unwrap();
-        // let base_size = slot.get_pos() + slot.get_size() + self.caller_saved_len * ADDR_SIZE;
         let base_size = slot.get_pos() + slot.get_size();
 
         for (i, inst) in self.array_inst.iter().enumerate() {
@@ -1306,7 +1299,7 @@ impl Func {
 /// handle spill v3实现
 impl Func {
     ///为handle spill 计算寄存器活跃区间
-    /// 会认为ra,sp,tp,gp在所有块中始终活跃
+    /// 会认为zero,ra,sp,tp,gp在所有块中始终活跃
     pub fn calc_live_for_handle_spill(&self) {
         //TODO, 去除allocable限制!
         let calc_live_file = "callive_for_spill.txt";
@@ -1737,6 +1730,8 @@ impl Func {
         new_func.entry = Some(*old_to_new_bbs.get(&self.entry.unwrap()).unwrap());
         new_func.is_extern = self.is_extern;
         new_func.is_header = self.is_header;
+        new_func.param_cnt = self.param_cnt;
+        // new_func.params
         new_func.stack_addr = self.stack_addr.iter().cloned().collect();
         new_func.spill_stack_map = self.spill_stack_map.clone();
         new_func.const_array = self.const_array.clone();
@@ -1784,7 +1779,8 @@ impl Func {
                     ///找出 caller saved
                     let mut to_saved: Vec<Reg> = Vec::new();
                     for reg in live_now.iter() {
-                        if reg.is_caller_save() {
+                        //需要注意ra寄存器虽然是caller saved,但是不需要用栈空间方式进行restore
+                        if reg.is_caller_save() && reg.get_id() != 1 {
                             to_saved.push(*reg);
                         }
                     }

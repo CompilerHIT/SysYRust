@@ -3,7 +3,7 @@ use crate::log;
 use super::*;
 impl BackendPass {
     pub fn peephole_pass(&mut self, pool: &mut BackendPool) {
-        self.module.func_map.iter().for_each(|(_, func)| {
+        self.module.name_func.iter().for_each(|(_, func)| {
             if !func.is_extern {
                 func.blocks.iter().for_each(|block| {
                     // 在处理handle_overflow前的优化
@@ -96,7 +96,12 @@ impl BackendPass {
         }
     }
 
-    fn rm_useless_param_overflow(&self, func: ObjPtr<Func>, block: ObjPtr<BB>, pool: &mut BackendPool) {
+    fn rm_useless_param_overflow(
+        &self,
+        func: ObjPtr<Func>,
+        block: ObjPtr<BB>,
+        pool: &mut BackendPool,
+    ) {
         // 处理l/s param to stack
         let mut index = 0;
         loop {

@@ -12,7 +12,7 @@ impl BackendPass {
     }
 
     fn merge_br_jump(&mut self) {
-        self.module.func_map.iter().for_each(|(_, func)| {
+        self.module.name_func.iter().for_each(|(_, func)| {
             if !func.is_extern {
                 let mut jumps: Vec<ObjPtr<BB>> = vec![];
                 func.blocks.iter().for_each(|block| {
@@ -39,7 +39,7 @@ impl BackendPass {
     }
 
     fn fuse_imm_br(&mut self, pool: &mut BackendPool) {
-        self.module.func_map.iter().for_each(|(_, func)| {
+        self.module.name_func.iter().for_each(|(_, func)| {
             if !func.is_extern {
                 let mut imm_br: Vec<ObjPtr<BB>> = vec![];
                 func.blocks.iter().for_each(|block| {
@@ -70,7 +70,7 @@ impl BackendPass {
     }
 
     fn fuse_basic_block(&mut self) {
-        self.module.func_map.iter().for_each(|(_, func)| {
+        self.module.name_func.iter().for_each(|(_, func)| {
             if !func.is_extern {
                 let mut useless_blocks: Vec<ObjPtr<BB>> = vec![];
                 func.blocks.iter().for_each(|block| {
@@ -99,7 +99,7 @@ impl BackendPass {
     }
 
     fn clear_one_jump(&mut self) {
-        self.module.func_map.iter().for_each(|(_, func)| {
+        self.module.name_func.iter().for_each(|(_, func)| {
             if !func.is_extern {
                 func.blocks.iter().for_each(|block| {
                     if block.insts.len() == 1 {
@@ -145,7 +145,7 @@ impl BackendPass {
 
     fn clear_empty_block(&mut self) {
         let mut exsit_blocks: Vec<ObjPtr<BB>> = vec![];
-        self.module.func_map.iter().for_each(|(_, func)| {
+        self.module.name_func.iter().for_each(|(_, func)| {
             if !func.is_extern {
                 func.blocks.iter().for_each(|block| {
                     if block.insts.len() > 0 {
@@ -162,7 +162,7 @@ impl BackendPass {
     }
 
     fn resolve_merge_br(&mut self) {
-        self.module.func_map.iter().for_each(|(_, func)| {
+        self.module.name_func.iter().for_each(|(_, func)| {
             if !func.is_extern {
                 func.blocks.iter().for_each(|block| {
                     if block.insts.len() > 1 {
@@ -187,7 +187,7 @@ impl BackendPass {
     }
 
     pub fn clear_useless_jump(&mut self) {
-        self.module.func_map.iter().for_each(|(_, func)| {
+        self.module.name_func.iter().for_each(|(_, func)| {
             if !func.is_extern {
                 for (i, block) in func.blocks.iter().enumerate() {
                     if block.insts.len() > 0 && i < func.blocks.len() - 1 {
@@ -198,7 +198,8 @@ impl BackendPass {
                                 _ => panic!("jump label error"),
                             };
                             if *label == func.blocks[i + 1].label {
-                                let labels: Vec<_> = block.get_after().iter().map(|b| b.label.clone()).collect();
+                                let labels: Vec<_> =
+                                    block.get_after().iter().map(|b| b.label.clone()).collect();
                                 // log!("jump label: {:?}, next blocks label: {:?}", tail.get_label(), labels);
                                 block.as_mut().insts.pop();
                             }

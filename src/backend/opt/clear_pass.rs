@@ -13,7 +13,7 @@ use super::*;
 
 impl BackendPass {
     pub fn clear_pass(&mut self) {
-        self.module.func_map.iter().for_each(|(_, func)| {
+        self.module.name_func.iter().for_each(|(_, func)| {
             if !func.is_extern {
                 func.blocks.iter().for_each(|block| {
                     self.rm_useless(*block);
