@@ -36,6 +36,12 @@ impl BackendPass {
             }
         });
     }
+
+    ///移除代码中多余的la操作
+    fn rm_repeated_la(&mut self) {
+        //从程序的入口出发(层次遍历经过的块)
+    }
+
     /// 该代码应该在后端常量传播和常量折叠(表达式归纳,编译时计算) 后完成
     /// 移除重复的load语句和store语句 (目前只针对loadstack和storestack)
     fn rm_repeated_sl(&self, func: ObjPtr<Func>) {

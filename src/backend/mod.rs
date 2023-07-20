@@ -7,6 +7,7 @@ pub mod module;
 pub mod operand;
 pub mod opt;
 pub mod regalloc;
+pub mod simulator;
 pub mod structs;
 
 use std::fs::File;

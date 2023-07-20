@@ -83,9 +83,9 @@ impl BB {
         }
     }
 
-    /// 寄存器分配时决定开栈大小、栈对象属性(size(4/8 bytes), pos)，回填func的stack_addr
-    /// 尽量保证程序顺序执行，并满足首次遇分支向后跳转的原则？
-    //FIXME: b型指令长跳转(目标地址偏移量为+-4KiB)，若立即数非法是否需要增添一个jal块实现间接跳转？
+    /// 寄存器分配时决定开栈大小、栈对象属性(size(4/8 bytes), pos)，回填func的stack_addr <br>
+    /// 尽量保证程序顺序执行，并满足首次遇分支向后跳转的原则？ <br>
+    /// FIXME: b型指令长跳转(目标地址偏移量为+-4KiB)，若立即数非法是否需要增添一个jal块实现间接跳转？
     pub fn construct(
         &mut self,
         func: ObjPtr<Func>,

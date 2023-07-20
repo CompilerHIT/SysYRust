@@ -370,6 +370,7 @@ impl AsmModule {
         self.handle_spill_v3(pool);
         self.remove_unuse_inst_suf_alloc();
         self.anaylyse_for_handle_call_v3(pool);
+        self.split_func(pool);
         self.handle_call_v3(pool);
         // self.remove_useless_func();
         self.rearrange_stack_slot();
@@ -494,38 +495,9 @@ impl AsmModule {
                 .insert(func.label.clone(), caller_saved_regs);
         }
         //之后caller_used数据结构就没有用了 (信息已经存入了 self.callers_saved中)
-
-        //然后
-
-        //根据寄存器使用情况生成字符串
-        let regs_set_to_string = |regs: &HashSet<Reg>| -> String {
-            let mut symbol = "".to_string();
-            for id in 0..=63 {
-                let reg = Reg::from_color(id);
-                if !regs.contains(&reg) {
-                    continue;
-                }
-                symbol.push_str(reg.to_string(false).as_str());
-            }
-            symbol
-        };
         //
-        let regs_to_bitmap = |regs: &HashSet<Reg>| -> Bitmap {
-            let mut map = Bitmap::new();
-            for reg in regs {
-                map.insert(reg.get_color() as usize);
-            }
-            map
-        };
-
-        let main_func = *self.name_func.get("main").unwrap();
-        let mut func_to_process = Vec::new();
-        func_to_process.push(main_func);
-
-        let mut new_name_func: HashMap<String, ObjPtr<Func>> = HashMap::new();
-        new_name_func.insert("main".to_string(), main_func);
         self.callees_saveds
-            .insert(main_func.label.to_owned(), HashSet::new());
+            .insert("main".to_string(), HashSet::new());
 
         //更新基础callees saved uesd 表
         loop {
@@ -560,8 +532,37 @@ impl AsmModule {
                 break;
             }
         }
+    }
 
-        //然后分析callee save的使用情况,更新callee save使用表
+    ///函数分裂:
+    /// 该函数只应该在analyse for handle call v3后被调用
+    fn split_func(&mut self, pool: &mut BackendPool) {
+        let regs_set_to_string = |regs: &HashSet<Reg>| -> String {
+            let mut symbol = "".to_string();
+            for id in 0..=63 {
+                let reg = Reg::from_color(id);
+                if !regs.contains(&reg) {
+                    continue;
+                }
+                symbol.push_str(reg.to_string(false).as_str());
+            }
+            symbol
+        };
+        let regs_to_bitmap = |regs: &HashSet<Reg>| -> Bitmap {
+            let mut map = Bitmap::new();
+            for reg in regs {
+                map.insert(reg.get_color() as usize);
+            }
+            map
+        };
+        let main_func = *self.name_func.get("main").unwrap();
+        let mut func_to_process = Vec::new();
+        func_to_process.push(main_func);
+
+        let mut new_name_func: HashMap<String, ObjPtr<Func>> = HashMap::new();
+        new_name_func.insert("main".to_string(), main_func);
+
+        //然后分析callee save的使用情况,进行裂变,同时产生新的
         loop {
             let mut ifFinish = true;
             let mut new_funcs: Vec<ObjPtr<Func>> = Vec::new();
