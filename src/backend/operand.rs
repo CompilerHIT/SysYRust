@@ -300,6 +300,24 @@ impl Reg {
         }
     }
 }
+///获取一些特别寄存器
+impl Reg {
+    #[inline]
+    pub fn get_sp() -> Reg {
+        Reg {
+            id: 2,
+            r_type: ScalarType::Int,
+        }
+    }
+    #[inline]
+    pub fn get_ra() -> Reg {
+        Reg {
+            id: 1,
+            r_type: ScalarType::Int,
+        }
+    }
+}
+
 impl Operand {
     // 增加直接导出reg的接口
     #[inline]

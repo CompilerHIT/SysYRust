@@ -1076,6 +1076,9 @@ impl Func {
     pub fn print_func(&self) {
         log!("func:{}", self.label);
         for block in self.blocks.iter() {
+            if !block.showed {
+                continue;
+            }
             log!("\tblock:{}", block.label);
             for inst in block.insts.iter() {
                 log!("\t\t{}", inst.as_ref().to_string());
@@ -1846,6 +1849,7 @@ impl Func {
         //复制bb 的内容
         for bb in self.blocks.iter() {
             let mut new_bb = BB::new(&bb.label.clone(), &new_func.label);
+            new_bb.showed = bb.showed;
             new_bb.insts = Vec::new();
             for inst in bb.insts.iter() {
                 let new_inst = inst.as_ref().clone();

@@ -1,10 +1,10 @@
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{HashMap, HashSet, LinkedList},
     fs::{self, File, OpenOptions},
 };
 
 use crate::{
-    backend::{block::FLOAT_BASE, regalloc},
+    backend::{block::FLOAT_BASE, regalloc, simulator::program_stat::ProgramStat},
     log_file,
     utility::ObjPool,
 };
@@ -12,7 +12,7 @@ use crate::{
 use super::*;
 
 impl BackendPass {
-    pub fn clear_pass(&mut self) {
+    pub fn clear_pass(&mut self, pool: &BackendPool) {
         self.module.name_func.iter().for_each(|(_, func)| {
             if !func.is_extern {
                 func.blocks.iter().for_each(|block| {
@@ -33,24 +33,6 @@ impl BackendPass {
                 // func.as_mut().generate_row(func.context, &mut bf);
                 // self.rm_useless_def(func.clone());
                 // func.as_mut().generate_row(func.context, &mut sf);
-            }
-        });
-    }
-
-    ///移除代码中多余的la操作
-    fn rm_repeated_la(&mut self) {
-        self.module.name_func.iter().for_each(|(_, func)| {
-            //记录每个块中label加载的次数  (初始的时候label地址的加载和使用是邻近的)
-            let mut label_exist: HashMap<(ObjPtr<BB>, String), usize> = HashMap::new();
-            for bb in func.blocks.iter() {
-                for inst in bb.insts.iter() {
-                    let label = inst.get_addr_label();
-                    if label.is_none() {
-                        continue;
-                    }
-                    let label = label.unwrap();
-                    //TODO
-                }
             }
         });
     }
@@ -165,6 +147,13 @@ impl BackendPass {
         // }
     }
 
+    /// ///移除代码中多余的la操作 :(暂时只考虑单链条传递的情况)
+    fn rm_repeated_la(&mut self, pool: &BackendPool) {
+        self.module.name_func.iter().for_each(|(_, func)| {
+            func.as_mut().rm_repeated_la(pool);
+        });
+    }
+
     fn rm_useless(&self, block: ObjPtr<BB>) {
         let mut index = 0;
         loop {
@@ -247,4 +236,44 @@ impl BackendPass {
 
         return out;
     }
+}
+
+///删除重复la的实现
+impl Func {
+    ///获取func的block label的情况
+    pub fn draw_name_bbs(&self) -> HashMap<String, ObjPtr<BB>> {
+        let mut name_bbs = HashMap::new();
+        for bb in self.blocks.iter() {
+            name_bbs.insert(bb.label.clone(), *bb);
+        }
+        name_bbs
+    }
+
+    pub fn rm_repeated_la(&mut self, pool: &BackendPool) {
+        ///从这个函数的第一个块开始执行 (第一个块应该是entry中的bb的outedge中唯一的bb)
+        debug_assert!(self.entry.unwrap().out_edge.len() == 1);
+        self.calc_live_for_handle_call();
+        self.build_reg_intervals();
+        let first_bb = *self.entry.unwrap().out_edge.get(0).unwrap();
+        //从第一个块开始分析能够快速插值的情况(记录所有加入到表中的代码(最后直接一遍删除无用代码))
+        let labels_bbs = self.draw_name_bbs(); //装入 块label供跳转使用
+                                               //模拟执行第一个块(同时记录第一个块中到某个位置的时候的可用寄存器),如果遇到了ret则结束
+        let mut program_stat = ProgramStat::new();
+        //执行到退出函数的时候则退出函数 (执行到io函数的时候则执行特定的过程)
+        let mut cur_bb = first_bb;
+        loop {
+            ///顺序执行某个块的指令,(直到块中没有指令且没有跳转为止)
+            let mut index = 0;
+            if index >= cur_bb.insts.len() {
+                break;
+            }
+            let inst = cur_bb.insts.get(index).unwrap();
+            let execute_stat = program_stat.consume_inst(inst);
+        }
+    }
+
+    ///取值短路
+    ///(通过mv的传递,以及编译时计算的方式对于值的传递进行短路,进而暴露可以删除的代码)
+    /// 比如在中间插入最短计算语句
+    pub fn short_cut_val_trans(&mut self, pool: &BackendPool) {}
 }

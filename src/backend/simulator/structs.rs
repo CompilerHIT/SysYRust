@@ -1,55 +1,162 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet, LinkedList};
+
+use regex::internal::Exec;
 
 use crate::{
-    backend::{instrs::LIRInst, operand::Reg, BackendPool},
-    utility::{ObjPool, ObjPtr},
+    backend::{
+        instrs::{AsmBuilder, BinaryOp, CmpOp, Func, InstrsType, LIRInst, Operand, SingleOp, BB},
+        operand::Reg,
+        BackendPool,
+    },
+    ir::CallMap,
+    utility::{ObjPool, ObjPtr, ScalarType},
 };
 
-#[derive(Clone)]
+///复杂值类型 (实际实现的时候需要)
+pub struct ComplexValue {
+    add: HashMap<ObjPtr<LIRInst>, usize>,
+    minux: HashMap<ObjPtr<LIRInst>, usize>,
+}
+
+///通用值类型
+#[derive(Clone, PartialEq, Eq)]
 pub enum Value {
     Inst(ObjPtr<LIRInst>),
     IImm(i64),
+    FImm(String),
     Addr((String, i64)),
 }
-
-///程序资源状态
-#[derive(Clone)]
-pub struct ProgramStat {
-    reg_val: HashMap<Reg, Option<Value>>,
-    mem_val: HashMap<Value, Value>,
-    pool: &'static BackendPool,
+//值类型
+#[derive(Clone, PartialEq, Eq)]
+pub enum ValueType {
+    Inst,
+    IImm,
+    FImm,
+    Addr,
+}
+impl Value {
+    #[inline]
+    pub fn get_type(&self) -> ValueType {
+        match self {
+            Value::Addr(_) => ValueType::Addr,
+            Value::IImm(_) => ValueType::IImm,
+            Value::FImm(_) => ValueType::FImm,
+            Value::Inst(_) => ValueType::Inst,
+            _ => unreachable!(),
+        }
+    }
+    #[inline]
+    pub fn get_imm(&self) -> Option<&i64> {
+        match self {
+            Value::IImm(val) => Some(val),
+            _ => None,
+        }
+    }
+    #[inline]
+    pub fn get_fimm(&self) -> Option<&String> {
+        match self {
+            Value::FImm(val) => Some(val),
+            _ => None,
+        }
+    }
+    #[inline]
+    pub fn get_addr(&self) -> Option<&(String, i64)> {
+        match self {
+            Value::Addr(val) => Some(val),
+            _ => None,
+        }
+    }
 }
 
-///程序执行状态
-///如果确定程序的跳出目标,则返回一个跳出目标(否则返回所有可能跳出目标的列表)
-#[derive(Clone)]
-pub enum ExecuteStat {
-    Jump(String),
-    MayJump(Vec<String>),
-}
-
-impl ProgramStat {
-    ///初始化程序状态
-    pub fn new(pool: &'static BackendPool) -> ProgramStat {
-        ProgramStat {
-            reg_val: HashMap::new(),
-            mem_val: HashMap::new(),
-            pool: pool,
+impl PartialOrd for Value {
+    fn lt(&self, other: &Self) -> bool {
+        //判断是否小于(仅仅当两个数都是数字(整数)/都是对同一个数组下标的访问的时候)
+        if self.get_type() != other.get_type() {
+            false
+        } else if let Value::IImm(lhs) = self {
+            let rhs = other.get_imm().unwrap();
+            lhs < rhs
+        } else if let Value::Addr(addr) = self {
+            let r_addr = other.get_addr().unwrap();
+            if addr.0 != r_addr.0 {
+                false
+            } else {
+                addr.1 < r_addr.1
+            }
+        } else {
+            false
+        }
+    }
+    fn le(&self, other: &Self) -> bool {
+        if self.get_type() != other.get_type() {
+            false
+        } else if let Value::IImm(lhs) = self {
+            let rhs = other.get_imm().unwrap();
+            lhs <= rhs
+        } else if let Value::Addr(addr) = self {
+            let r_addr = other.get_addr().unwrap();
+            if addr.0 != r_addr.0 {
+                false
+            } else {
+                addr.1 <= r_addr.1
+            }
+        } else {
+            false
         }
     }
 
-    ///吞入一条指令,修改程序状态
-    pub fn consume_inst(&mut self, inst: ObjPtr<LIRInst>) {}
+    fn gt(&self, other: &Self) -> bool {
+        if self.get_type() != other.get_type() {
+            false
+        } else if let Value::IImm(lhs) = self {
+            let rhs = other.get_imm().unwrap();
+            lhs > rhs
+        } else if let Value::Addr(addr) = self {
+            let r_addr = other.get_addr().unwrap();
+            if addr.0 != r_addr.0 {
+                false
+            } else {
+                addr.1 > r_addr.1
+            }
+        } else {
+            false
+        }
+    }
 
-    //吞入一个块,修改程序状态
-    pub fn consume_block(&mut self, inst: ObjPtr<LIRInst>) {}
-
-    //
-
-    ///判断两个寄存器的值是否是相同的
-    /// 如果两个寄存器的值相同,返回true
-    /// 如果其中任何一个寄存器的值为未知,或者两个寄存器的值不同，返回false
-    pub fn is_equal(&mut self, reg1: &Reg, reg2: &Reg) -> bool {
+    fn ge(&self, other: &Self) -> bool {
+        if self.get_type() != other.get_type() {
+            false
+        } else if let Value::IImm(lhs) = self {
+            let rhs = other.get_imm().unwrap();
+            lhs >= rhs
+        } else if let Value::Addr(addr) = self {
+            let r_addr = other.get_addr().unwrap();
+            if addr.0 != r_addr.0 {
+                false
+            } else {
+                addr.1 >= r_addr.1
+            }
+        } else {
+            false
+        }
+    }
+    ///value并不都能排序
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         todo!()
     }
 }
+
+///实现一些对value的运算
+impl Value {
+    pub fn add_another(&mut self, another: &Value) {}
+    pub fn minus_another(&mut self, another: &Value) {}
+    pub fn add(one: &Value, another: &Value) -> Value {
+        todo!()
+    }
+    pub fn minus(one: &Value, another: &Value) -> Value {
+        todo!()
+    }
+}
+
+///内置函数 (比如一些io函数)
+pub struct BuiltInFunc {}

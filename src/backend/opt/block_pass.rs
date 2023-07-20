@@ -1,6 +1,15 @@
 use super::*;
 
 impl BackendPass {
+    pub fn block_pass_pre_clear(&mut self, pool: &mut BackendPool) {
+        self.clear_one_jump();
+        self.fuse_imm_br(pool);
+        self.fuse_basic_block();
+        // 跳转合并需要放在消除无用块之后，否则会干扰消除的正确性
+        self.merge_br_jump();
+        self.clear_empty_block();
+        // self.resolve_merge_br();
+    }
     pub fn block_pass(&mut self, pool: &mut BackendPool) {
         self.clear_one_jump();
         self.fuse_imm_br(pool);
@@ -9,6 +18,7 @@ impl BackendPass {
         self.merge_br_jump();
         self.clear_empty_block();
         self.resolve_merge_br();
+        // self.clear_useless_jump();
     }
 
     fn merge_br_jump(&mut self) {
@@ -290,11 +300,10 @@ fn replace_first_block(block: ObjPtr<BB>, func: ObjPtr<Func>) {
 
 fn is_phi_block(block: ObjPtr<BB>) -> bool {
     if block.insts.len() > 1 && block.get_tail_inst().get_type() == InstrsType::Jump {
-        if block
-            .insts
-            .iter()
-            .all(|inst| inst.get_type() == InstrsType::OpReg(SingleOp::Mv) || inst.get_type() == InstrsType::Jump)
-        {
+        if block.insts.iter().all(|inst| {
+            inst.get_type() == InstrsType::OpReg(SingleOp::Mv)
+                || inst.get_type() == InstrsType::Jump
+        }) {
             return true;
         } else {
             return false;
