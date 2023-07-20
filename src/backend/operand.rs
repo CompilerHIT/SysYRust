@@ -5,7 +5,7 @@ use std::{
     fmt::{format, Display},
 };
 
-use super::block::FLOAT_BASE;
+use super::{block::FLOAT_BASE, instrs::Operand};
 pub const REG_COUNT: i32 = 32;
 pub const ARG_REG_COUNT: i32 = 8;
 pub const REG_SP: i32 = 2;
@@ -297,6 +297,23 @@ impl Reg {
             Reg::new(color, ScalarType::Int)
         } else {
             Reg::new(color, ScalarType::Float)
+        }
+    }
+}
+impl Operand {
+    // 增加直接导出reg的接口
+    #[inline]
+    pub fn drop_reg(&self) -> Reg {
+        match self {
+            Operand::Reg(reg) => *reg,
+            _ => unreachable!(),
+        }
+    }
+    #[inline]
+    pub fn drop_addr(&self) -> String {
+        match self {
+            Operand::Addr(addr) => addr.clone(),
+            _ => unreachable!(),
         }
     }
 }

@@ -525,23 +525,30 @@ impl LIRInst {
     }
 }
 
-///j,b 类型指令 获取label
+///j,b,la等 类型指令 获取label
 impl LIRInst {
+    ///如果是b型/j型 指令 ,则能够获取块号,否则返回None
     pub fn get_bb_label(&self) -> Option<String> {
         match self.get_type() {
-            InstrsType::Branch(_) | InstrsType::Jump => Some(self.get_label().get_func_name()),
+            InstrsType::Branch(_) | InstrsType::Jump => Some(self.get_label().drop_addr()),
             _ => None,
         }
     }
-}
 
-impl Operand {
-    // 增加直接导出reg的接口
-    #[inline]
-    pub fn drop_reg(&self) -> Reg {
-        match self {
-            Operand::Reg(reg) => *reg,
-            _ => unreachable!(),
+    ///如果是la指令,则能够获取全局地址label,否则返回None
+    pub fn get_addr_label(&self) -> Option<String> {
+        match self.get_type() {
+            InstrsType::OpReg(SingleOp::LoadAddr) | InstrsType::Jump => {
+                Some(self.get_label().drop_addr())
+            }
+            _ => None,
+        }
+    }
+    ///如果是call指令,则能够获取函数名,否则返回None
+    pub fn get_func_name(&self) -> Option<String> {
+        match self.get_type() {
+            InstrsType::Call => Some(self.get_label().drop_addr()),
+            _ => None,
         }
     }
 }

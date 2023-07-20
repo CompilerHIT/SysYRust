@@ -32,6 +32,7 @@ impl BackendPass {
         //         .unwrap(),
         //     pool,
         // );
+        // self.module.print_func();
         self.clear_pass();
         // self.module.generate_row_asm(
         //     &mut OpenOptions::new()

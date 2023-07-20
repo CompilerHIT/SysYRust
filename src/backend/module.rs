@@ -376,7 +376,7 @@ impl AsmModule {
         self.rearrange_stack_slot();
         self.update_array_offset(pool);
         self.build_stack_info(f, pool);
-        self.print_func();
+        // self.print_func();
         //删除无用的函数
     }
 
@@ -452,7 +452,7 @@ impl AsmModule {
             for bb in func.blocks.iter() {
                 for inst in bb.insts.iter() {
                     if inst.get_type() == InstrsType::Call {
-                        let label = inst.get_label().get_func_name();
+                        let label = inst.get_func_name().unwrap();
                         debug_assert!(self.name_func.contains_key(label.as_str()), "{label}");
                         let callee_func = *self.name_func.get(&label).unwrap();
                         call_insts.push((*func, callee_func));
@@ -572,7 +572,7 @@ impl AsmModule {
                 //通过对func 的上下文分析 (返回某个call指令附近需要保存的callee saved寄存器)
                 //如果遇到新函数,加入callee saved
                 for (call_inst, callee_regs) in call_insts.iter() {
-                    let func_label = call_inst.get_label().get_func_name();
+                    let func_label = call_inst.get_func_name().unwrap();
                     let func_label_callee_maps = self.call_info.get(&func_label).unwrap();
                     let callee_func = self.name_func.get(&func_label).unwrap();
                     if callee_func.is_extern {

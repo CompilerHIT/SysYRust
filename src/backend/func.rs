@@ -1784,7 +1784,7 @@ impl Func {
                 }
                 //分析如果该指令为call指令的时候上下文中需要保存的callee saved
                 if inst.get_type() == InstrsType::Call {
-                    let func_label = inst.get_label().get_func_name();
+                    let func_label = inst.get_func_name().unwrap();
                     //如果是当前活跃并且在func used列表中的寄存器的callee saved寄存器 才是需要保存的寄存器
                     let callees_saved_now: HashSet<Reg> = callee_saved
                         .get(&func_label)
@@ -1927,9 +1927,8 @@ impl Func {
                             to_saved.push(*reg);
                         }
                     }
-
                     //TODO to_check, 根据指令判断是否使用
-                    let func_name = inst.get_label().get_func_name();
+                    let func_name = inst.get_func_name().unwrap();
                     let callers_used = callers_used.get(&func_name).unwrap();
                     to_saved = to_saved
                         .iter()

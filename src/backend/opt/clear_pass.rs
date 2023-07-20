@@ -39,7 +39,20 @@ impl BackendPass {
 
     ///移除代码中多余的la操作
     fn rm_repeated_la(&mut self) {
-        //从程序的入口出发(层次遍历经过的块)
+        self.module.name_func.iter().for_each(|(_, func)| {
+            //记录每个块中label加载的次数  (初始的时候label地址的加载和使用是邻近的)
+            let mut label_exist: HashMap<(ObjPtr<BB>, String), usize> = HashMap::new();
+            for bb in func.blocks.iter() {
+                for inst in bb.insts.iter() {
+                    let label = inst.get_addr_label();
+                    if label.is_none() {
+                        continue;
+                    }
+                    let label = label.unwrap();
+                    //TODO
+                }
+            }
+        });
     }
 
     /// 该代码应该在后端常量传播和常量折叠(表达式归纳,编译时计算) 后完成

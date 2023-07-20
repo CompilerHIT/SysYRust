@@ -14,6 +14,7 @@ use crate::ir::instruction::Inst;
 use crate::utility::ObjPtr;
 
 use super::asm_builder::AsmBuilder;
+use super::operand::Reg;
 
 #[derive(Clone)]
 pub struct IGlobalVar {
@@ -350,15 +351,6 @@ impl PartialEq for FloatArray {
 }
 
 impl Eq for FloatArray {}
-
-impl Operand {
-    pub fn get_func_name(&self) -> String {
-        match self {
-            Operand::Addr(func_name) => func_name.to_owned(),
-            _ => unreachable!(),
-        }
-    }
-}
 
 pub struct Graph<T, R> {
     nodes: HashMap<T, Vec<R>>,
