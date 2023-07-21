@@ -9,7 +9,6 @@ pub use std::hash::{Hash, Hasher};
 pub use std::io::Result;
 use std::vec;
 
-use crate::backend::func::Func;
 use crate::backend::instrs::Operand;
 use crate::backend::instrs::{BinaryOp, CmpOp, InstrsType, LIRInst, SingleOp};
 use crate::backend::operand::{IImm, Reg};
@@ -19,6 +18,7 @@ use crate::ir::ir_type::IrType;
 use crate::utility::{ObjPtr, ScalarType};
 
 use super::instrs::AsmBuilder;
+use super::instrs::Func;
 use super::operand::ARG_REG_COUNT;
 use super::operand::{FImm, ToString};
 use super::{structs::*, BackendPool};

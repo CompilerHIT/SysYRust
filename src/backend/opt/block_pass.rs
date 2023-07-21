@@ -6,8 +6,8 @@ impl BackendPass {
         self.fuse_imm_br(pool);
         self.fuse_basic_block();
         // 跳转合并需要放在消除无用块之后，否则会干扰消除的正确性
-        self.merge_br_jump();
-        self.clear_empty_block();
+        // self.merge_br_jump();
+        // self.clear_empty_block();
         // self.resolve_merge_br();
     }
     pub fn block_pass(&mut self, pool: &mut BackendPool) {

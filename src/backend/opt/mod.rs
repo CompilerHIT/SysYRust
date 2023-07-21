@@ -31,8 +31,8 @@ impl BackendPass {
         //     pool,
         // );
         // self.module.print_func();
-        // self.block_pass_pre_clear(pool);
-        // self.module.print_func();
+        self.block_pass_pre_clear(pool);
+        self.module.print_func();
         self.clear_pass(pool);
         // self.module.generate_row_asm(
         //     &mut OpenOptions::new()

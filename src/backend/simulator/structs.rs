@@ -1,4 +1,7 @@
-use std::collections::{HashMap, HashSet, LinkedList};
+use std::{
+    collections::{HashMap, HashSet, LinkedList},
+    hash::Hash,
+};
 
 use regex::internal::Exec;
 
@@ -34,6 +37,28 @@ pub enum ValueType {
     FImm,
     Addr,
 }
+
+impl Hash for Value {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        match self {
+            Value::Addr(addr) => {
+                addr.hash(state);
+            }
+            Value::FImm(fimm) => {
+                fimm.hash(state);
+            }
+            Value::Inst(inst) => {
+                inst.hash(state);
+            }
+            Value::IImm(iimm) => {
+                iimm.hash(state);
+            }
+            _ => (),
+        }
+        core::mem::discriminant(self).hash(state);
+    }
+}
+
 impl Value {
     #[inline]
     pub fn get_type(&self) -> ValueType {
