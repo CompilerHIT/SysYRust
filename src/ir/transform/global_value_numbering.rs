@@ -55,7 +55,73 @@ impl CongruenceClass{
             call_congruence:Congruence::new(),
         }
     }
-    pub fn get_congruence(&mut self,inst:ObjPtr<Inst>)->Option<&mut Congruence>{
+
+    pub fn get_congruence_immut(&self,inst:ObjPtr<Inst>)->Option<&Congruence>{
+        match inst.get_kind() {
+            InstKind::Gep =>{
+                Some(&self.gep_congruence)
+            }
+            InstKind::Binary(binop) =>{
+                match binop {
+                    BinOp::Eq |BinOp::Ge |BinOp::Gt |BinOp::Le |BinOp::Lt =>{
+                        Some(&self.cmp_congruence)
+                    }
+                    BinOp::Add =>{
+                        Some(&self.add_congruence)
+                    }
+                    BinOp::Sub =>{
+                        Some(&self.sub_congruence)
+                    }
+                    BinOp::Mul =>{
+                        Some(&self.mul_congruence)
+                    }
+                    BinOp::Div =>{
+                        Some(&self.div_congruence)
+                    }
+                    BinOp::Rem =>{
+                        Some(&self.rem_congruence)
+                    }
+                    BinOp::Ne =>{
+                        Some(&self.ne_congruence)
+                    }
+                }
+            }
+            InstKind::Unary(unop) =>{
+                match unop {
+                    UnOp::Pos =>{
+                        Some(&self.pos_congruence)
+                    }
+                    UnOp::Neg =>{
+                        Some(&self.neg_congruence)
+                    }
+                    UnOp::Not =>{
+                        Some(&self.not_congruence)
+                    }
+                }
+            }
+            InstKind::ConstInt(_) =>{
+                Some(&self.int_congruence)
+            }
+            InstKind::ConstFloat(_) =>{
+                Some(&self.float_congruence)
+            }
+            InstKind::FtoI =>{
+                Some(&self.ftoi_congruence)
+            }
+            InstKind::ItoF =>{
+                Some(&self.itof_congruence)
+            }
+            InstKind::Call(_) =>{
+                Some(&self.call_congruence)
+            }
+            _=>{
+                None
+            }
+        }
+    }
+
+
+    pub fn get_congruence_mut(&mut self,inst:ObjPtr<Inst>)->Option<&mut Congruence>{
         match inst.get_kind() {
             InstKind::Gep =>{
                 Some(&mut self.gep_congruence)
@@ -120,7 +186,7 @@ impl CongruenceClass{
     }
 }
 
-#[derive(PartialEq,Clone)]
+#[derive(Clone)]
 pub struct Congruence {
     pub vec_class: Vec<Vec<ObjPtr<Inst>>>,
     pub map: HashMap<ObjPtr<Inst>, usize>,
@@ -141,8 +207,13 @@ pub fn easy_gvn(module: &mut Module) -> bool {
     let set = call_optimize(module);
     func_process(module, |_, func| {
         let dominator_tree = calculate_dominator(func.get_head());
+        let mut index = 0;
             bfs_inst_process(func.get_head(), |inst| {
-                changed |= has_val(&mut congruence_class, inst, &dominator_tree, set.clone())
+                if index%10000==0{
+                    println!("index:{:?}",index);
+                }
+                index = index+1;
+                changed |= has_val(&mut congruence_class, inst, &dominator_tree, &set)
             });
     });
     changed
@@ -162,10 +233,10 @@ pub fn gvn(module: &mut Module, opt_option: bool) {
 }
 
 pub fn has_val(
-    congrunce_class: &mut CongruenceClass,
+    congruence_class: &mut CongruenceClass,
     inst: ObjPtr<Inst>,
     dominator_tree: &DominatorTree,
-    set: HashSet<String>,
+    set: &HashSet<String>,
 ) -> bool {
     match inst.get_kind() {
         InstKind::Alloca(_)
@@ -183,14 +254,15 @@ pub fn has_val(
             return false;
         } //todo:phi可以被优化吗
         InstKind::Call(funcname) => {
-            let congruence = congrunce_class.get_congruence(inst).unwrap().clone();//副本
+            let congruence = congruence_class.get_congruence_immut(inst).unwrap();//副本
             if set.contains(&funcname) {
                 //纯函数，可复用
                 if let Some(_index) = congruence.map.get(&inst) {
                     return false;
                 }
-                for vec_congruent in congruence.vec_class.clone() {
-                    if compare_two_inst(inst, vec_congruent[0], congrunce_class) {
+                let mut index_final = 0;
+                for vec_congruent in &congruence.vec_class {
+                    if compare_two_inst(inst, vec_congruent[0], congruence_class) {
                         if dominator_tree
                             .is_dominate(&vec_congruent[0].get_parent_bb(), &inst.get_parent_bb())
                         {
@@ -208,10 +280,14 @@ pub fn has_val(
                             }
                         }
                         //都没有可以替代这条指令的congruent inst,将这条指令加入congruent inst中
+                        
                         if let Some(index) = congruence.map.get(&vec_congruent[0]) {
-                            let congruence_mut = congrunce_class.get_congruence(inst).unwrap();
-                            congruence_mut.vec_class[*index].push(inst);
-                            congruence_mut.map.insert(inst, *index);
+                            index_final =index +1;
+                        }
+                        if index_final !=0{
+                            let congruence_mut = congruence_class.get_congruence_mut(inst).unwrap();
+                            congruence_mut.vec_class[index_final-1].push(inst);
+                            congruence_mut.map.insert(inst, index_final-1);
                         }
                         return false;
                     }
@@ -219,12 +295,13 @@ pub fn has_val(
             }
         }
         _ => {
-            let congruence = congrunce_class.get_congruence(inst).unwrap().clone();
+            let congruence = congruence_class.get_congruence_immut(inst).unwrap();
             if let Some(_index) = congruence.map.get(&inst) {
                 return false;
             }
-            for vec_congruent in congruence.vec_class.clone() {
-                if compare_two_inst(inst, vec_congruent[0], congrunce_class) {
+            let mut index_final = 0;
+            for vec_congruent in &congruence.vec_class {
+                if compare_two_inst(inst, vec_congruent[0], congruence_class) {
                     if dominator_tree
                         .is_dominate(&vec_congruent[0].get_parent_bb(), &inst.get_parent_bb())
                     {
@@ -242,24 +319,32 @@ pub fn has_val(
                         }
                     }
                     //都没有可以替代这条指令的congruent inst,将这条指令加入congruent inst中
+                    // if let Some(index) = congruence.map.get(&vec_congruent[0]) {
+                    //     let congruence_mut = congruence_class.get_congruence_mut(inst).unwrap();
+                    //     congruence_mut.vec_class[*index].push(inst);
+                    //     congruence_mut.map.insert(inst, *index);
+                    // }
                     if let Some(index) = congruence.map.get(&vec_congruent[0]) {
-                        let congruence_mut = congrunce_class.get_congruence(inst).unwrap();
-                        congruence_mut.vec_class[*index].push(inst);
-                        congruence_mut.map.insert(inst, *index);
+                        index_final =index +1;
+                    }
+                    if index_final !=0{
+                        let congruence_mut = congruence_class.get_congruence_mut(inst).unwrap();
+                        congruence_mut.vec_class[index_final-1].push(inst);
+                        congruence_mut.map.insert(inst, index_final-1);
                     }
                     return false;
                 }
             }
         }
     }
-    let congruence = congrunce_class.get_congruence(inst).unwrap();
+    let congruence = congruence_class.get_congruence_mut(inst).unwrap();
     let index = congruence.vec_class.len();
     congruence.vec_class.push(vec![inst]); //加入新的congruent class
     congruence.map.insert(inst, index); //增加索引映射
     false
 }
 
-pub fn compare_two_inst(inst1: ObjPtr<Inst>, inst2: ObjPtr<Inst>, congrunce_class: &mut CongruenceClass) -> bool {
+pub fn compare_two_inst(inst1: ObjPtr<Inst>, inst2: ObjPtr<Inst>, congrunce_class: &CongruenceClass) -> bool {
     let tpflag = inst1.get_ir_type() == inst2.get_ir_type();
     if inst1.get_kind() == inst2.get_kind() && tpflag {
         match inst1.get_kind() {
@@ -396,7 +481,7 @@ pub fn compare_two_inst(inst1: ObjPtr<Inst>, inst2: ObjPtr<Inst>, congrunce_clas
 pub fn compare_two_inst_with_index(
     inst1: ObjPtr<Inst>,
     inst2: ObjPtr<Inst>,
-    congrunce_class: &mut CongruenceClass,
+    congrunce_class: &CongruenceClass,
 ) -> bool {
     match inst1.get_kind() {
         InstKind::Alloca(_)
@@ -433,7 +518,7 @@ pub fn compare_two_inst_with_index(
         //针对全局指针
         return true;
     }
-    let congruence = congrunce_class.get_congruence( inst1).unwrap();
+    let congruence = congrunce_class.get_congruence_immut( inst1).unwrap();
 
     if let Some(index1) = congruence.map.get(&inst1) {
         if let Some(index2) = congruence.map.get(&inst2) {//如果不是同一类则获得不了索引
@@ -448,7 +533,7 @@ pub fn compare_two_inst_with_index(
 pub fn compare_two_operands(
     operands1: &Vec<ObjPtr<Inst>>,
     operands2: &Vec<ObjPtr<Inst>>,
-    congrunce_class: &mut CongruenceClass,
+    congrunce_class: &CongruenceClass,
 ) -> bool {
     if compare_two_inst_with_index(operands1[0], operands2[0], congrunce_class)
         && compare_two_inst_with_index(operands1[1], operands2[1], congrunce_class)
