@@ -359,7 +359,7 @@ impl AsmModule {
 /// 4. 删除无用函数模板(可选)
 impl AsmModule {
     ///TODO!
-    pub fn build_v3(&mut self, f: &mut File, f2: &mut File, pool: &mut BackendPool) {
+    pub fn build_v3(&mut self, f: &mut File, f2: &mut File, pool: &mut BackendPool, is_opt: bool) {
         self.build_lir(pool);
         self.remove_unuse_inst_pre_alloc();
         
@@ -369,14 +369,15 @@ impl AsmModule {
 
         self.allocate_reg();
         self.map_v_to_p();
-
-        // 代码调度，列表调度法
-        self.list_scheduling_tech();
-
-        // 为临时寄存器分配寄存器
-        self.clear_tmp_var();
-        self.allocate_reg();
-        self.map_v_to_p();
+        if is_opt {
+            // 代码调度，列表调度法
+            self.list_scheduling_tech();
+    
+            // 为临时寄存器分配寄存器
+            self.clear_tmp_var();
+            self.allocate_reg();
+            self.map_v_to_p();
+        }
 
         self.handle_spill_v3(pool);
         self.remove_unuse_inst_suf_alloc();
