@@ -352,6 +352,16 @@ impl PartialEq for FloatArray {
 
 impl Eq for FloatArray {}
 
+impl Operand {
+    pub fn get_func_name(&self) -> String {
+        match self {
+            Operand::Addr(func_name) => func_name.to_owned(),
+            _ => unreachable!(),
+        }
+    }
+}
+
+#[derive(Clone)]
 pub struct Graph<T, R> {
     nodes: HashMap<T, Vec<R>>,
 }
@@ -384,7 +394,25 @@ impl<T, R> Graph<T, R> {
         self.nodes.get(&src)
     }
 
+    pub fn get_mut_edges(&mut self, src: T) -> Option<&mut Vec<R>>
+    where
+        T: PartialEq + Eq + Hash + Copy,
+    {
+        self.nodes.get_mut(&src)
+    }
+
+    pub fn get_mut_nodes(&mut self) -> &mut HashMap<T, Vec<R>> {
+        &mut self.nodes
+    }
+
     pub fn get_nodes(&self) -> &HashMap<T, Vec<R>> {
         &self.nodes
+    }
+
+    pub fn delete_node(&mut self, node: T)
+    where
+        T: PartialEq + Eq + Hash + Copy,
+    {
+        self.nodes.remove(&node);
     }
 }

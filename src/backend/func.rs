@@ -242,9 +242,9 @@ impl Func {
     /// 块内代码调度
     pub fn list_scheduling_tech(&mut self) {
         // 建立数据依赖图
-        let mut graph: Graph<ObjPtr<LIRInst>, (i32, ObjPtr<LIRInst>)> = Graph::new();
-        let mut control_insts: Vec<ObjPtr<LIRInst>> = Vec::new();
         for b in self.blocks.iter() {
+            let mut graph: Graph<ObjPtr<LIRInst>, (i32, ObjPtr<LIRInst>)> = Graph::new();
+            let mut control_insts: Vec<ObjPtr<LIRInst>> = Vec::new();
             // 对于涉及控制流的语句，不能进行调度
             let basicblock: Vec<ObjPtr<LIRInst>> = b
                 .insts
@@ -263,50 +263,157 @@ impl Func {
             // 对于清除掉控制流语句的块，建立数据依赖图
             for (i, inst) in basicblock.iter().rev().enumerate() {
                 let pos = basicblock.len() - i - 1;
-                log!("{}, i: {}", pos, i);
+                // log!("{}, i: {}", pos, i);
                 graph.add_node(*inst);
-                let use_vec = inst.as_ref().get_reg_use();
-                let def_vec = inst.as_ref().get_reg_def();
-                let mut near_pos = -1;
 
-                log!("inst: {}", inst.as_ref());
-                for reg in use_vec.iter() {
-                    // 若use的寄存器在def中，则不考虑
-                    if def_vec.contains(reg) {
+                // call支配后续所有指令
+                for index in 1..=pos {
+                    let i = basicblock[pos - index];
+                    if i.get_type() == InstrsType::Call {
+                        graph.add_edge(*inst, (1, i));
+                    } else {
                         continue;
                     }
+                }
 
-                    // 向上找一个use的最近def
-                    for index in 1..pos {
+                // call依赖于之前的所有指令
+                if inst.get_type() == InstrsType::Call {
+                    for index in 1..=pos {
                         let i = basicblock[pos - index];
-                        if i.get_reg_def().contains(reg) {
-                            log!("i: {}", i.as_ref());
-                            near_pos = max(near_pos, (pos - index) as i32);
-                            break;
+                        graph.add_edge(*inst, (1, i));
+                    }
+                }
+
+                // 认为load/store依赖之前的所有load/store
+                if inst.get_type() == InstrsType::Load || inst.get_type() == InstrsType::Store {
+                    for index in 1..=pos {
+                        let i = basicblock[pos - index];
+                        if i.get_type() == InstrsType::Load || i.get_type() == InstrsType::Store {
+                            graph.add_edge(*inst, (1, i));
+                        } else {
+                            continue;
                         }
                     }
                 }
 
-                log!("inst: {}, near_pos: {}", inst.as_ref(), near_pos);
+                let use_vec = inst.get_reg_use();
+                let def_vec = inst.get_reg_def();
 
-                // 若没有找到，则最近def在上一个块中，数据依赖关系不纳入考虑。否则加入图中。
-                // 对于特殊的指令，其依赖关系权重为2，即两个指令间至少有一条其他指令
-                if near_pos != -1 {
-                    let last_inst = basicblock[near_pos as usize];
-                    let weight = if dep_inst_special(*inst, last_inst) {
-                        2
-                    } else {
-                        1
-                    };
-                    graph.add_edge(*inst, (weight, last_inst));
+                // log!("inst: {}", inst.as_ref());
+                for reg in use_vec.iter() {
+                    // 向上找一个use的最近def,将指令加入图中
+                    for index in 1..=pos {
+                        let i = basicblock[pos - index];
+                        if i.get_reg_def().contains(reg) {
+                            // log!("{} <- {}", i.as_ref(), inst.as_ref());
+                            graph.add_edge(*inst, (1, i));
+                        }
+                    }
+                }
+
+                for reg in def_vec.iter() {
+                    // 向上找一个def的最近use,将指令加入图中
+                    for index in 1..=pos {
+                        let i = basicblock[pos - index];
+                        if i.get_reg_use().contains(reg) {
+                            // log!("i: {}", i.as_ref());
+                            graph.add_edge(*inst, (1, i));
+                        }
+                    }
+                }
+                // log!("inst: {}, near_pos: {}", inst.as_ref(), near_pos);
+            }
+
+            // for (from, to) in graph.get_nodes().iter() {
+            //     log!("graph to: {:?}", from.as_ref());
+            //     for i in to.iter() {
+            //         log!("from: {:?}", i.1.as_ref());
+            //     }
+            // }
+
+            let mut queue: VecDeque<ObjPtr<LIRInst>> = VecDeque::new();
+            let mut visited = HashSet::new();
+
+            let mut g = graph
+                .get_nodes()
+                .into_iter()
+                .map(|(n, e)| {
+                    (
+                        *n,
+                        e.iter()
+                            .map(|(_, inst)| *inst)
+                            .collect::<Vec<ObjPtr<LIRInst>>>(),
+                    )
+                })
+                .collect::<HashMap<ObjPtr<LIRInst>, Vec<ObjPtr<LIRInst>>>>();
+
+            let mut reverse_graph: HashMap<ObjPtr<LIRInst>, Vec<ObjPtr<LIRInst>>> = HashMap::new();
+            for (from, to_nodes) in g.iter() {
+                for to_node in to_nodes {
+                    reverse_graph
+                        .entry(*to_node)
+                        .or_insert(Vec::new())
+                        .push(*from);
                 }
             }
+
+            // for (from, to) in g.iter() {
+            //     log!("to: {:?}", from.as_ref());
+            //     for i in to.iter() {
+            //         log!("from: {:?}", i.as_ref());
+            //     }
+            // }
+
+            // for (from, to) in reverse_graph.iter() {
+            //     log!("rev from: {:?}", from.as_ref());
+            //     for i in to.iter() {
+            //         log!("to: {:?}", i.as_ref());
+            //     }
+            // }
+
+            // 拓扑排序
+            loop {
+                if queue.len() == g.len() {
+                    break;
+                }
+                // 0出度算法，出度度为0代表不依赖于其他指令
+                let mut zero_nodes: Vec<ObjPtr<LIRInst>> = Vec::new();
+                for (node, _) in graph.get_nodes().iter() {
+                    let out_nodes = g.get(node).unwrap();
+                    if out_nodes.len() == 0 && !visited.contains(node) {
+                        visited.insert(*node);
+                        queue.push_back(*node);
+                        zero_nodes.push(*node);
+                    }
+                }
+                // 在反向图中查找该节点支配的节点，从而删除两点之间的边
+                for node in zero_nodes.iter() { 
+                    if let Some(in_nodes) = reverse_graph.get(node) {
+                        for in_node in in_nodes {
+                            if let Some(out_nodes) = g.get_mut(&in_node) {
+                                // log!("{:?}", out_nodes);
+                                out_nodes.retain(|&n| n != *node);
+                                // log!(
+                                //     "remove edge: {} -> {}, len left: {}",
+                                //     in_node.as_ref(),
+                                //     node.as_ref(),
+                                //     g.get(in_node).unwrap().len()
+                                // );
+                            }
+                        }
+                    }
+                }
+            }
+
+            // for n in queue.iter() {
+            //     log!("queue: {}", n.as_ref());
+            // }
 
             // 调度方案，在不考虑资源的情况下i有可能相同
             let mut schedule_map: HashMap<ObjPtr<LIRInst>, i32> = HashMap::new();
 
             let mut s = 0;
-            for inst in basicblock.iter() {
+            for inst in queue.iter() {
                 if let Some(edges) = graph.get_edges(*inst) {
                     s = edges
                         .iter()
@@ -318,27 +425,30 @@ impl Func {
                 }
                 // 指令位置相同，若两个是特殊指令则距离增加2，否则增加1
                 while let Some((l, _)) = schedule_map.iter().find(|(_, v)| **v == s) {
-                    if dep_inst_special(inst.clone(), l.clone()) {
-                        s += 2;
-                    } else {
-                        s += 1;
-                    }
+                    // if dep_inst_special(inst.clone(), l.clone()) {
+                    //     s += 2;
+                    // } else {
+                    //     s += 1;
+                    // }
+                    s += 1;
+                }
 
-                    if def_use_near(inst.clone(), l.clone()) {
-                        s += 1;
-                    }
-                }
-                // 对于相邻指令，若是特殊指令则距离增加为2
-                while let Some((l, _)) = schedule_map.iter().find(|(_, v)| **v == s - 1) {
-                    if def_use_near(inst.clone(), l.clone()) {
-                        s += 1;
-                    }
-                    if dep_inst_special(inst.clone(), l.clone()) {
-                        s += 1;
-                    } else {
-                        break;
-                    }
-                }
+                // while let Some((l, _)) = schedule_map.iter().find(|(_, v)| **v == s - 1) {
+                //     if def_use_near(inst.clone(), l.clone()) {
+                //         s += 1;
+                //     } else {
+                //         break;
+                //     }
+                // }
+
+                // // 对于相邻指令，若是特殊指令则距离增加为2
+                // while let Some((l, _)) = schedule_map.iter().find(|(_, v)| **v == s - 1) {
+                //     if dep_inst_special(inst.clone(), l.clone()) {
+                //         s += 1;
+                //     } else {
+                //         break;
+                //     }
+                // }
                 schedule_map.insert(*inst, s);
             }
 
@@ -352,20 +462,20 @@ impl Func {
             });
 
             // 打印调度方案
-            for (n, s) in schedule_map.iter() {
-                log!("{} {}", n.as_ref(), s);
-            }
-
+            // 调度前
+            log_file!("before_schedule.log", "{}", b.label);
             for inst in b.insts.iter() {
-                log!("pre: {}", inst.as_ref());
+                log_file!("before_schedule.log", "{}", inst.as_ref());
             }
 
             // 移动代码
             b.as_mut().insts = schedule_res;
             b.as_mut().push_back_list(&mut control_insts);
 
+            // 调度后
+            log_file!("after_schedule.log", "{}", b.label);
             for inst in b.insts.iter() {
-                log!("{}", inst.as_ref());
+                log_file!("after_schedule.log", "{}", inst.as_ref());
             }
         }
     }
