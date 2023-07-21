@@ -182,13 +182,13 @@ impl fmt::Display for LIRInst {
                 kind = "ret";
             }
         }
-        let mut def = HashSet::new();
-        let mut use_reg_id = HashSet::new();
+        let mut def = Vec::new();
+        let mut use_reg_id = Vec::new();
         self.get_reg_def().iter().for_each(|e| {
-            def.insert(e.to_string(true));
+            def.push(e.to_string(true));
         });
         self.get_reg_use().iter().for_each(|e| {
-            use_reg_id.insert(e.to_string(true));
+            use_reg_id.push(e.to_string(true));
         });
         write!(f, "{:?} def:{:?} use:{:?}", kind, def, use_reg_id)
     }
