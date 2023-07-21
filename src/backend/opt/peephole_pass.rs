@@ -207,43 +207,62 @@ impl BackendPass {
         false
     }
 
-    fn rm_same_store(&self, block: ObjPtr<BB>, pool: &mut BackendPool) {
-        let stores = block
-            .insts
-            .iter()
-            .filter(|inst| inst.get_type() == InstrsType::Store)
-            .collect::<Vec<_>>();
+    // fn rm_same_store(&self, block: ObjPtr<BB>, pool: &mut BackendPool) {
+    //     let stores = block
+    //         .insts
+    //         .iter()
+    //         .filter(|inst| inst.get_type() == InstrsType::Store)
+    //         .collect::<Vec<_>>();
 
-        let same_stores = stores
-            .iter()
-            .filter(|inst| {
-                stores.iter().any(|inst2| {
-                    inst2.get_dst() == inst.get_dst()
-                        && inst2.get_lhs() == inst.get_lhs()
-                        && inst2.get_rhs() == inst.get_rhs()
-                })
-            })
-            .collect::<Vec<_>>();
-        let dst = match same_stores[0].get_dst().clone() {
-            Operand::Reg(reg) => reg,
-            _ => panic!("get {:?}", same_stores[0].get_dst()),
-        };
-        let src = match same_stores[0].get_lhs().clone() {
-            Operand::Reg(reg) => reg,
-            _ => panic!("get {:?}", same_stores[0].get_lhs()),
-        };
+    //     let same_stores = stores
+    //         .iter()
+    //         .filter(|inst| {
+    //             stores.iter().any(|inst2| {
+    //                 inst2.get_dst() == inst.get_dst()
+    //                     && inst2.get_lhs() == inst.get_lhs()
+    //                     && inst2.get_rhs() == inst.get_rhs()
+    //             })
+    //         })
+    //         .collect::<Vec<_>>();
+    //     let dst = match same_stores[0].get_dst().clone() {
+    //         Operand::Reg(reg) => reg,
+    //         _ => panic!("get {:?}", same_stores[0].get_dst()),
+    //     };
+    //     let src = match same_stores[0].get_lhs().clone() {
+    //         Operand::Reg(reg) => reg,
+    //         _ => panic!("get {:?}", same_stores[0].get_lhs()),
+    //     };
 
-        block.as_mut().build_reg_intervals();
-        let dst_info = block
-            .reg_intervals
-            .iter()
-            .find(|info| info.0 .0 == dst)
-            .unwrap();
-        let src_info = block
-            .reg_intervals
-            .iter()
-            .find(|info| info.0 .0 == src)
-            .unwrap();
-        // if dst_info
-    }
+    //     let st = block
+    //         .insts
+    //         .iter()
+    //         .position(|inst| inst == *same_stores[0]) 
+    //         .unwrap();
+    //     let ed = block
+    //         .insts
+    //         .iter()
+    //         .position(|inst| inst == *same_stores[same_stores.len() - 1])
+    //         .unwrap();
+
+    //     block.as_mut().build_reg_intervals();
+    //     let dst_info = block
+    //         .reg_intervals
+    //         .iter()
+    //         .find(|info| info.0 .0 == dst)
+    //         .unwrap();
+    //     let src_info = block
+    //         .reg_intervals
+    //         .iter()
+    //         .find(|info| info.0 .0 == src)
+    //         .unwrap();
+
+    //     let (src_st, src_ed) = (src_info.0 .1 as usize, src_info.1 .1 as usize);
+    //     let (dst_st, dst_ed) = (dst_info.0 .1 as usize, dst_info.1 .1 as usize);
+        
+    //     if st >= src_st && ed <= src_ed && st >= dst_st && ed <= dst_ed {
+    //         // 说明这一段store是多余的
+    //         block.as_mut().insts.drain((st + 1) as usize..=ed as usize);
+    //     }
+    // }
+
 }
