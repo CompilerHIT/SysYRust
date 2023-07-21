@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use crate::ir::analysis::{
-    dominator_tree::{self, calculate_dominator, DominatorTree},
+    dominator_tree::DominatorTree,
     scev::{scevexp::SCEVExpKind, SCEVAnalyzer},
 };
 
@@ -13,7 +13,7 @@ pub fn livo_run(
     pools: &mut (&mut ObjPool<BasicBlock>, &mut ObjPool<Inst>),
 ) {
     let mut scev_analyzer = SCEVAnalyzer::new();
-    scev_analyzer.set_loops(loop_list);
+    scev_analyzer.set_dominator_tree(ObjPtr::new(&dominator_tree));
     for loop_info in loop_list.get_loop_list().iter() {
         if !is_break_continue_exist(*loop_info) {
             livo_in_loop(&dominator_tree, *loop_info, &mut scev_analyzer, pools);
@@ -28,30 +28,30 @@ fn livo_in_loop(
     pools: &mut (&mut ObjPool<BasicBlock>, &mut ObjPool<Inst>),
 ) {
     // 获得当前循环的归纳变量
-    let mut inst = loop_info.get_header().get_head_inst();
-    while SCEVExpKind::SCEVAddRecExpr != scev_analyzer.analyze(inst).get_kind() && !inst.is_tail() {
-        inst = inst.get_next();
-    }
-
-    if inst.is_tail() {
-        return;
-    }
+    let mut rec_set = HashSet::new();
+    inst_process_in_bb(loop_info.get_header().get_head_inst(), |inst| {
+        if let SCEVExpKind::SCEVRecExpr = scev_analyzer.analyze(&inst).get_kind() {
+            rec_set.insert(inst);
+        }
+    });
 
     let latchs = loop_info.get_latchs();
 
     loop {
         let mut flag = false;
-        for user in inst.get_use_list().iter() {
-            if !loop_info.is_in_loop(&user.get_parent_bb()) {
-                continue;
-            }
-            if scev_analyzer.analyze(*user).is_scev_mul_expr()
-                && latchs
-                    .iter()
-                    .all(|bb| dominator_tree.is_dominate(&user.get_parent_bb(), bb))
-            {
-                flag = mul_livo(*user, loop_info, pools, scev_analyzer);
-                break;
+        for inst in rec_set.iter() {
+            for user in inst.get_use_list().iter() {
+                if !loop_info.is_in_loop(&user.get_parent_bb()) {
+                    continue;
+                }
+                if scev_analyzer.analyze(user).is_scev_mul_rec_expr()
+                    && latchs
+                        .iter()
+                        .all(|bb| dominator_tree.is_dominate(&user.get_parent_bb(), bb))
+                {
+                    flag = mul_livo(*user, loop_info, pools, scev_analyzer);
+                    break;
+                }
             }
         }
 
@@ -68,8 +68,8 @@ fn mul_livo(
     pools: &mut (&mut ObjPool<BasicBlock>, &mut ObjPool<Inst>),
     scev_analyzer: &mut SCEVAnalyzer,
 ) -> bool {
-    let (rec_phi, other) = if let SCEVExpKind::SCEVAddRecExpr =
-        scev_analyzer.analyze(inst.get_operands()[0]).get_kind()
+    let (rec_phi, other) = if let SCEVExpKind::SCEVRecExpr =
+        scev_analyzer.analyze(&inst.get_operands()[0]).get_kind()
     {
         (inst.get_operands()[0], inst.get_operands()[1])
     } else {
@@ -80,9 +80,9 @@ fn mul_livo(
         return false;
     }
 
-    let rec_exp = scev_analyzer.analyze(rec_phi);
-    let start = rec_exp.get_add_rec_start();
-    let step = rec_exp.get_add_rec_step();
+    let rec_exp = scev_analyzer.analyze(&rec_phi);
+    let start = rec_exp.get_scev_rec_start();
+    let step = rec_exp.get_scev_rec_step();
 
     // 在preheader中插入start-step乘other的指令
     let sub = pools.1.make_sub(start, step);
