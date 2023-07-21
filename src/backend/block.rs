@@ -22,7 +22,6 @@ use crate::ir::instruction::{BinOp, Inst, InstKind, UnOp};
 use crate::ir::ir_type::IrType;
 use crate::utility::{ObjPtr, ScalarType};
 
-use super::instrs;
 use super::instrs::AsmBuilder;
 use super::operand::ARG_REG_COUNT;
 use super::operand::{FImm, ToString};
@@ -84,9 +83,9 @@ impl BB {
         }
     }
 
-    /// 寄存器分配时决定开栈大小、栈对象属性(size(4/8 bytes), pos)，回填func的stack_addr
-    /// 尽量保证程序顺序执行，并满足首次遇分支向后跳转的原则？
-    //FIXME: b型指令长跳转(目标地址偏移量为+-4KiB)，若立即数非法是否需要增添一个jal块实现间接跳转？
+    /// 寄存器分配时决定开栈大小、栈对象属性(size(4/8 bytes), pos)，回填func的stack_addr <br>
+    /// 尽量保证程序顺序执行，并满足首次遇分支向后跳转的原则？ <br>
+    /// FIXME: b型指令长跳转(目标地址偏移量为+-4KiB)，若立即数非法是否需要增添一个jal块实现间接跳转？
     pub fn construct(
         &mut self,
         func: ObjPtr<Func>,
@@ -455,33 +454,6 @@ impl BB {
                     let value_reg = self.resolve_operand(func, value, true, map_info, pool);
                     match addr.as_ref().get_kind() {
                         InstKind::Gep => {
-                            // let mut load_new = true;
-                            // let mut addr_reg = match map_info.val_map.get(&addr.get_gep_ptr()) {
-                            //     Some(reg) => {
-                            //         load_new = false;
-                            //         reg.clone()
-                            //     }
-                            //     None => Operand::Reg(Reg::init(ScalarType::Int)),
-                            // };
-                            // if let Some(base) = map_info.array_slot_map.get(&addr.get_gep_ptr()) {
-                            //     if load_new {
-                            //         let mut load = LIRInst::new(
-                            //             InstrsType::LoadParamFromStack,
-                            //             vec![addr_reg.clone(), Operand::IImm(IImm::new(*base))],
-                            //         );
-                            //         load.set_double();
-                            //         self.insts.push(pool.put_inst(load));
-                            //     }
-                            // } else {
-                            //     // 找不到，认为是全局数组或者参数或嵌套的gep
-                            //     addr_reg = self.resolve_operand(
-                            //         func,
-                            //         addr.get_gep_ptr(),
-                            //         true,
-                            //         map_info,
-                            //         pool,
-                            //     );
-                            // }
                             let addr_reg = self.resolve_operand(
                                 func,
                                 addr.get_gep_ptr(),
@@ -489,18 +461,6 @@ impl BB {
                                 map_info,
                                 pool,
                             );
-                            // match addr_reg {
-                            //     // 使用全局数组，addr_reg获得的是地址，而非寄存器，因此需要加载
-                            //     Operand::Addr(..) => {
-                            //         let addr = addr_reg.clone();
-                            //         addr_reg = Operand::Reg(Reg::init(ScalarType::Int));
-                            //         self.insts.push(pool.put_inst(LIRInst::new(
-                            //             InstrsType::OpReg(SingleOp::LoadAddr),
-                            //             vec![addr_reg.clone(), addr],
-                            //         )));
-                            //     }
-                            //     _ => {}
-                            // }
                             match addr.get_gep_offset().get_kind() {
                                 InstKind::ConstInt(offset) | InstKind::GlobalConstInt(offset) => {
                                     self.insts.push(pool.put_inst(LIRInst::new(
@@ -2185,7 +2145,6 @@ impl BB {
             self.insts.push(pool.put_inst(inst));
             reg
         } else {
-            // log!("find!");
             return self.global_map.get(&src).unwrap().clone();
         }
     }
@@ -2844,9 +2803,6 @@ impl BB {
 impl BB {
     pub fn build_reg_intervals(&mut self) {
         self.reg_intervals.clear();
-        if self.label == "main" {
-            let a = 2;
-        }
         let mut regs: HashMap<Reg, (i32, i32)> = HashMap::new();
         self.live_in.iter().for_each(|reg| {
             regs.insert(*reg, (-1, -1));

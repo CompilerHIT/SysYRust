@@ -5,7 +5,7 @@ use std::{
     fmt::{format, Display},
 };
 
-use super::block::FLOAT_BASE;
+use super::{block::FLOAT_BASE, instrs::Operand};
 pub const REG_COUNT: i32 = 32;
 pub const ARG_REG_COUNT: i32 = 8;
 pub const REG_SP: i32 = 2;
@@ -297,6 +297,41 @@ impl Reg {
             Reg::new(color, ScalarType::Int)
         } else {
             Reg::new(color, ScalarType::Float)
+        }
+    }
+}
+///获取一些特别寄存器
+impl Reg {
+    #[inline]
+    pub fn get_sp() -> Reg {
+        Reg {
+            id: 2,
+            r_type: ScalarType::Int,
+        }
+    }
+    #[inline]
+    pub fn get_ra() -> Reg {
+        Reg {
+            id: 1,
+            r_type: ScalarType::Int,
+        }
+    }
+}
+
+impl Operand {
+    // 增加直接导出reg的接口
+    #[inline]
+    pub fn drop_reg(&self) -> Reg {
+        match self {
+            Operand::Reg(reg) => *reg,
+            _ => unreachable!(),
+        }
+    }
+    #[inline]
+    pub fn drop_addr(&self) -> String {
+        match self {
+            Operand::Addr(addr) => addr.clone(),
+            _ => unreachable!(),
         }
     }
 }

@@ -11,8 +11,8 @@ use crate::backend::instrs::{InstrsType, BB};
 use crate::backend::operand::Reg;
 use crate::backend::regalloc::structs::FuncAllocStat;
 use crate::container::bitmap::Bitmap;
-use crate::log_file;
 use crate::utility::{ObjPtr, ScalarType};
+use crate::{log, log_file};
 
 use super::structs::RegUsedStat;
 
@@ -215,6 +215,7 @@ pub fn build_availables_with_interef_graph(
                 if availables.contains_key(&reg) {
                     continue;
                 }
+                log!("reg {} not in availables.", reg);
                 return false;
             }
             true

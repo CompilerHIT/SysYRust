@@ -2,22 +2,20 @@ use std::cmp::{max, min};
 use std::collections::LinkedList;
 pub use std::collections::{HashSet, VecDeque};
 pub use std::fs::File;
-use std::fs::OpenOptions;
 pub use std::hash::{Hash, Hasher};
 pub use std::io::Result;
 use std::io::Write;
-use std::process::id;
 use std::vec::Vec;
 
 use biheap::BiHeap;
 use lazy_static::__Deref;
 
 use super::instrs::{InstrsType, SingleOp};
-use super::operand::IImm;
-use super::regalloc::structs::RegUsedStat;
+use super::operand::{IImm, IMM_12_Bs};
+// use super::regalloc::structs::RegUsedStat;
 use super::{block, structs::*, BackendPool};
 use crate::backend::asm_builder::AsmBuilder;
-use crate::backend::instrs::{LIRInst, Operand};
+use crate::backend::instrs::{BinaryOp, LIRInst, Operand};
 use crate::backend::module::AsmModule;
 use crate::backend::operand::{Reg, ARG_REG_COUNT};
 use crate::backend::regalloc::regalloc;
@@ -46,9 +44,6 @@ pub struct Func {
     pub is_header: bool, //判断一个函数是否是一个模板族下的第一个
     pub entry: Option<ObjPtr<BB>>,
 
-    reg_def: Vec<HashSet<CurInstrInfo>>,
-    reg_use: Vec<HashSet<CurInstrInfo>>,
-    reg_num: i32,
     // fregs: HashSet<Reg>,
     pub context: ObjPtr<Context>,
 
@@ -63,6 +58,8 @@ pub struct Func {
     // pub caller_saved_len: i32,
     pub array_inst: Vec<ObjPtr<LIRInst>>,
     pub array_slot: Vec<i32>,
+
+    pub tmp_vars: HashSet<Reg>,
 }
 
 /// reg_num, stack_addr, caller_stack_addr考虑借助回填实现
@@ -77,9 +74,6 @@ impl Func {
             params: Vec::new(),
             param_cnt: (0, 0),
             entry: None,
-            reg_def: Vec::new(),
-            reg_use: Vec::new(),
-            reg_num: 0,
             // fregs: HashSet::new(),
             context,
             is_header: true,
@@ -94,6 +88,8 @@ impl Func {
             // caller_saved_len: 0,
             array_inst: Vec::new(),
             array_slot: Vec::new(),
+
+            tmp_vars: HashSet::new(),
         }
     }
 
@@ -230,40 +226,184 @@ impl Func {
         self.update(this);
     }
 
-    // 移除指定id的寄存器的使用信息
-    pub fn del_inst_reg(&mut self, cur_info: &CurInstrInfo, inst: ObjPtr<LIRInst>) {
-        for reg in inst.as_ref().get_reg_use() {
-            self.reg_use[reg.get_id() as usize].remove(cur_info);
-        }
-        for reg in inst.as_ref().get_reg_def() {
-            self.reg_def[reg.get_id() as usize].remove(cur_info);
-        }
-    }
-
-    // 添加指定id的寄存器的使用信息
-    pub fn add_inst_reg(&mut self, cur_info: &CurInstrInfo, inst: ObjPtr<LIRInst>) {
-        for reg in inst.as_ref().get_reg_use() {
-            self.reg_use[reg.get_id() as usize].insert(cur_info.clone());
-        }
-        for reg in inst.as_ref().get_reg_def() {
-            self.reg_def[reg.get_id() as usize].insert(cur_info.clone());
-        }
-    }
-
-    pub fn build_reg_info(&mut self) {
-        self.reg_def.clear();
-        self.reg_use.clear();
-        self.reg_def.resize(self.reg_num as usize, HashSet::new());
-        self.reg_use.resize(self.reg_num as usize, HashSet::new());
-        let mut p: CurInstrInfo = CurInstrInfo::new(0);
-        for block in self.blocks.clone() {
-            p.band_block(block);
-            for inst in block.as_ref().insts.iter() {
-                p.insts_it = Some(*inst);
-                self.add_inst_reg(&p, *inst);
-                p.pos += 1;
+    /// 识别根据def use识别局部变量，窗口设为3，若存活区间少于3则认为是局部变量
+    /// 局部变量一定在块内，对于born为-1的一定是非局部变量
+    pub fn cal_tmp_var(&mut self) {
+        self.build_reg_intervals();
+        for block in self.blocks.iter() {
+            for (st, ed) in block.reg_intervals.iter() {
+                if st.1 != -1 && ed.1 - st.1 < 3 {
+                    self.tmp_vars.insert(st.0);
+                }
             }
         }
+    }
+
+    /// 块内代码调度
+    pub fn list_scheduling_tech(&mut self) {
+        // 建立数据依赖图
+        let mut graph: Graph<ObjPtr<LIRInst>, (i32, ObjPtr<LIRInst>)> = Graph::new();
+        let mut control_insts: Vec<ObjPtr<LIRInst>> = Vec::new();
+        for b in self.blocks.iter() {
+            // 对于涉及控制流的语句，不能进行调度
+            let basicblock: Vec<ObjPtr<LIRInst>> = b
+                .insts
+                .iter()
+                .filter(|inst| match inst.get_type() {
+                    InstrsType::Ret(..) | InstrsType::Branch(..) | InstrsType::Jump => {
+                        // 保存，以便后续恢复
+                        control_insts.push(**inst);
+                        false
+                    }
+                    _ => true,
+                })
+                .map(|x| *x)
+                .collect();
+
+            // 对于清除掉控制流语句的块，建立数据依赖图
+            for (i, inst) in basicblock.iter().rev().enumerate() {
+                let pos = basicblock.len() - i - 1;
+                log!("{}, i: {}", pos, i);
+                graph.add_node(*inst);
+                let use_vec = inst.as_ref().get_reg_use();
+                let def_vec = inst.as_ref().get_reg_def();
+                let mut near_pos = -1;
+
+                log!("inst: {}", inst.as_ref());
+                for reg in use_vec.iter() {
+                    // 若use的寄存器在def中，则不考虑
+                    if def_vec.contains(reg) {
+                        continue;
+                    }
+
+                    // 向上找一个use的最近def
+                    for index in 1..pos {
+                        let i = basicblock[pos - index];
+                        if i.get_reg_def().contains(reg) {
+                            log!("i: {}", i.as_ref());
+                            near_pos = max(near_pos, (pos - index) as i32);
+                            break;
+                        }
+                    }
+                }
+
+                log!("inst: {}, near_pos: {}", inst.as_ref(), near_pos);
+
+                // 若没有找到，则最近def在上一个块中，数据依赖关系不纳入考虑。否则加入图中。
+                // 对于特殊的指令，其依赖关系权重为2，即两个指令间至少有一条其他指令
+                if near_pos != -1 {
+                    let last_inst = basicblock[near_pos as usize];
+                    let weight = if dep_inst_special(*inst, last_inst) {
+                        2
+                    } else {
+                        1
+                    };
+                    graph.add_edge(*inst, (weight, last_inst));
+                }
+            }
+
+            // 调度方案，在不考虑资源的情况下i有可能相同
+            let mut schedule_map: HashMap<ObjPtr<LIRInst>, i32> = HashMap::new();
+
+            let mut s = 0;
+            for inst in basicblock.iter() {
+                if let Some(edges) = graph.get_edges(*inst) {
+                    s = edges
+                        .iter()
+                        .map(|(w, inst)| w + *schedule_map.get(inst).unwrap_or(&0))
+                        .max()
+                        .unwrap_or(0);
+                } else {
+                    s = 0;
+                }
+                // 指令位置相同，若两个是特殊指令则距离增加2，否则增加1
+                while let Some((l, _)) = schedule_map.iter().find(|(_, v)| **v == s) {
+                    if dep_inst_special(inst.clone(), l.clone()) {
+                        s += 2;
+                    } else {
+                        s += 1;
+                    }
+
+                    if def_use_near(inst.clone(), l.clone()) {
+                        s += 1;
+                    }
+                }
+                // 对于相邻指令，若是特殊指令则距离增加为2
+                while let Some((l, _)) = schedule_map.iter().find(|(_, v)| **v == s - 1) {
+                    if def_use_near(inst.clone(), l.clone()) {
+                        s += 1;
+                    }
+                    if dep_inst_special(inst.clone(), l.clone()) {
+                        s += 1;
+                    } else {
+                        break;
+                    }
+                }
+                schedule_map.insert(*inst, s);
+            }
+
+            let mut schedule_res: Vec<ObjPtr<LIRInst>> =
+                schedule_map.iter().map(|(&inst, _)| inst).collect();
+            schedule_res.sort_by(|a, b| {
+                schedule_map
+                    .get(a)
+                    .unwrap()
+                    .cmp(schedule_map.get(b).unwrap())
+            });
+
+            // 打印调度方案
+            for (n, s) in schedule_map.iter() {
+                log!("{} {}", n.as_ref(), s);
+            }
+
+            for inst in b.insts.iter() {
+                log!("pre: {}", inst.as_ref());
+            }
+
+            // 移动代码
+            b.as_mut().insts = schedule_res;
+            b.as_mut().push_back_list(&mut control_insts);
+
+            for inst in b.insts.iter() {
+                log!("{}", inst.as_ref());
+            }
+        }
+    }
+
+    // 移除指定id的寄存器的使用信息
+    // pub fn del_inst_reg(&mut self, cur_info: &CurInstrInfo, inst: ObjPtr<LIRInst>) {
+    //     for reg in inst.as_ref().get_reg_use() {
+    //         self.reg_use[reg.get_id() as usize].remove(cur_info);
+    //     }
+    //     for reg in inst.as_ref().get_reg_def() {
+    //         self.reg_def[reg.get_id() as usize].remove(cur_info);
+    //     }
+    // }
+
+    // 添加指定id的寄存器的使用信息
+    // pub fn add_inst_reg(&mut self, cur_info: &CurInstrInfo, inst: ObjPtr<LIRInst>) {
+    //     for reg in inst.as_ref().get_reg_use() {
+    //         self.reg_use[reg.get_id() as usize].insert(cur_info.clone());
+    //     }
+    //     for reg in inst.as_ref().get_reg_def() {
+    //         self.reg_def[reg.get_id() as usize].insert(cur_info.clone());
+    //     }
+    // }
+
+    pub fn build_reg_info(&mut self) {
+        // self.reg_def.clear();
+        // self.reg_use.clear();
+        // self.reg_def.resize(self.reg_num as usize, HashSet::new());
+        // self.reg_use.resize(self.reg_num as usize, HashSet::new());
+        // let mut p: CurInstrInfo = CurInstrInfo::new(0);
+        // for block in self.blocks.clone() {
+        //     p.band_block(block);
+        //     for inst in block.as_ref().insts.iter() {
+        //         p.insts_it = Some(*inst);
+        //         self.add_inst_reg(&p, *inst);
+        //         p.pos += 1;
+        //     }
+        // }
     }
 
     pub fn calc_live_for_alloc_reg(&self) {
@@ -390,9 +530,6 @@ impl Func {
                 reg
             );
             for pred in block.as_ref().in_edge.iter() {
-                if block.label == ".LBB0_5" && pred.label == ".LBB0_1" {
-                    let a = 2;
-                }
                 if pred.as_mut().live_out.insert(reg) {
                     if pred.as_mut().live_def.contains(&reg) {
                         continue;
@@ -549,25 +686,10 @@ impl Func {
         // for block in self.blocks.iter() {
         //     block.as_mut().save_reg(this, pool);
         // }
-
         self.update(this);
-        self.handle_call(pool);
-        //save reg之后保存使用的空间
-        //记录使用的空间到stack addr中
-        // for i in 0..self.caller_saved_len {
-        //     let back = self.stack_addr.back().unwrap();
-        //     let new_pos = back.get_pos() + back.get_size();
-        //     let new_slot = StackSlot::new(new_pos, ADDR_SIZE);
-        //     self.stack_addr.push_back(new_slot);
-        // }
-        self.update_array_offset(pool);
-
-        //准备callee 需要的信息
-        self.build_callee_map();
-        self.save_callee(pool, f);
     }
 
-    ///能够在 vtop 之前调用的 , 根据regallocinfo得到callee 表的方法
+    /// 能够在 vtop 之前调用的 , 根据regallocinfo得到callee 表的方法
     /// 该方法应该在handle spill之后调用
     pub fn build_callee_map(&mut self) {
         for bb in self.blocks.iter() {
@@ -690,7 +812,6 @@ impl Func {
 
     pub fn update_array_offset(&mut self, pool: &mut BackendPool) {
         let slot = self.stack_addr.back().unwrap();
-        // let base_size = slot.get_pos() + slot.get_size() + self.caller_saved_len * ADDR_SIZE;
         let base_size = slot.get_pos() + slot.get_size();
 
         for (i, inst) in self.array_inst.iter().enumerate() {
@@ -955,6 +1076,9 @@ impl Func {
     pub fn print_func(&self) {
         log!("func:{}", self.label);
         for block in self.blocks.iter() {
+            if !block.showed {
+                continue;
+            }
             log!("\tblock:{}", block.label);
             for inst in block.insts.iter() {
                 log!("\t\t{}", inst.as_ref().to_string());
@@ -1064,13 +1188,6 @@ impl Func {
                 .handle_spill_V2(this, &self.reg_alloc_info.spillings, pool);
         }
         self.update(this);
-        self.handle_call(pool);
-        // for block in self.blocks.iter() {
-        //     block.as_mut().save_reg(this, pool);
-        // }
-
-        self.update_array_offset(pool);
-        self.save_callee(pool, f);
     }
 
     /// 为了分配spill的虚拟寄存器所需的栈空间使用的而构建冲突图
@@ -1328,7 +1445,7 @@ impl Func {
 /// handle spill v3实现
 impl Func {
     ///为handle spill 计算寄存器活跃区间
-    /// 会认为ra,sp,tp,gp在所有块中始终活跃
+    /// 会认为zero,ra,sp,tp,gp在所有块中始终活跃
     pub fn calc_live_for_handle_spill(&self) {
         //TODO, 去除allocable限制!
         let calc_live_file = "callive_for_spill.txt";
@@ -1670,7 +1787,7 @@ impl Func {
                 }
                 //分析如果该指令为call指令的时候上下文中需要保存的callee saved
                 if inst.get_type() == InstrsType::Call {
-                    let func_label = inst.get_label().get_func_name();
+                    let func_label = inst.get_func_name().unwrap();
                     //如果是当前活跃并且在func used列表中的寄存器的callee saved寄存器 才是需要保存的寄存器
                     let callees_saved_now: HashSet<Reg> = callee_saved
                         .get(&func_label)
@@ -1732,6 +1849,7 @@ impl Func {
         //复制bb 的内容
         for bb in self.blocks.iter() {
             let mut new_bb = BB::new(&bb.label.clone(), &new_func.label);
+            new_bb.showed = bb.showed;
             new_bb.insts = Vec::new();
             for inst in bb.insts.iter() {
                 let new_inst = inst.as_ref().clone();
@@ -1759,6 +1877,8 @@ impl Func {
         new_func.entry = Some(*old_to_new_bbs.get(&self.entry.unwrap()).unwrap());
         new_func.is_extern = self.is_extern;
         new_func.is_header = self.is_header;
+        new_func.param_cnt = self.param_cnt;
+        // new_func.params
         new_func.stack_addr = self.stack_addr.iter().cloned().collect();
         new_func.spill_stack_map = self.spill_stack_map.clone();
         new_func.const_array = self.const_array.clone();
@@ -1806,13 +1926,13 @@ impl Func {
                     ///找出 caller saved
                     let mut to_saved: Vec<Reg> = Vec::new();
                     for reg in live_now.iter() {
-                        if reg.is_caller_save() {
+                        //需要注意ra寄存器虽然是caller saved,但是不需要用栈空间方式进行restore
+                        if reg.is_caller_save() && reg.get_id() != 1 {
                             to_saved.push(*reg);
                         }
                     }
-
                     //TODO to_check, 根据指令判断是否使用
-                    let func_name = inst.get_label().get_func_name();
+                    let func_name = inst.get_func_name().unwrap();
                     let callers_used = callers_used.get(&func_name).unwrap();
                     to_saved = to_saved
                         .iter()
@@ -1906,4 +2026,65 @@ impl Func {
             bb.as_mut().build_reg_intervals();
         }
     }
+}
+
+fn dep_inst_special(inst: ObjPtr<LIRInst>, last: ObjPtr<LIRInst>) -> bool {
+    // 若相邻的指令是内存访问
+    match inst.get_type() {
+        InstrsType::LoadFromStack
+        | InstrsType::StoreToStack
+        | InstrsType::LoadParamFromStack
+        | InstrsType::StoreParamToStack
+        | InstrsType::Load
+        | InstrsType::Store => match last.get_type() {
+            InstrsType::LoadFromStack
+            | InstrsType::StoreToStack
+            | InstrsType::LoadParamFromStack
+            | InstrsType::StoreParamToStack
+            | InstrsType::Load
+            | InstrsType::Store
+            | InstrsType::OpReg(SingleOp::LoadAddr) => true,
+            _ => false,
+        },
+
+        // 若相邻的指令是乘法运算
+        InstrsType::Binary(BinaryOp::Mul) => match last.get_type() {
+            InstrsType::Binary(BinaryOp::Mul) => true,
+            _ => false,
+        },
+
+        // 若相邻的指令是浮点运算
+        InstrsType::Binary(..) => match last.get_type() {
+            InstrsType::Binary(..) => {
+                let inst_float = inst.operands.iter().any(|op| match op {
+                    Operand::Reg(reg) => reg.get_type() == ScalarType::Float,
+                    _ => false,
+                });
+                let last_float = last.operands.iter().any(|op| match op {
+                    Operand::Reg(reg) => reg.get_type() == ScalarType::Float,
+                    _ => false,
+                });
+                if last_float && inst_float {
+                    true
+                } else {
+                    false
+                }
+            }
+            _ => false,
+        },
+        _ => false,
+    }
+}
+
+fn def_use_near(inst: ObjPtr<LIRInst>, last: ObjPtr<LIRInst>) -> bool {
+    // 若def use相邻
+    if let Some(inst_def) = last.get_reg_def().last() {
+        inst.get_reg_use().iter().any(|reg_use| {
+            if reg_use == inst_def {
+                return true;
+            }
+            false
+        });
+    };
+    false
 }

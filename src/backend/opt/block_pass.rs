@@ -1,6 +1,15 @@
 use super::*;
 
 impl BackendPass {
+    pub fn block_pass_pre_clear(&mut self, pool: &mut BackendPool) {
+        self.clear_one_jump();
+        self.fuse_imm_br(pool);
+        self.fuse_basic_block();
+        // 跳转合并需要放在消除无用块之后，否则会干扰消除的正确性
+        self.merge_br_jump();
+        self.clear_empty_block();
+        // self.resolve_merge_br();
+    }
     pub fn block_pass(&mut self, pool: &mut BackendPool) {
         self.clear_one_jump();
         self.fuse_imm_br(pool);
@@ -9,10 +18,11 @@ impl BackendPass {
         self.merge_br_jump();
         self.clear_empty_block();
         self.resolve_merge_br();
+        // self.clear_useless_jump();
     }
 
     fn merge_br_jump(&mut self) {
-        self.module.func_map.iter().for_each(|(_, func)| {
+        self.module.name_func.iter().for_each(|(_, func)| {
             if !func.is_extern {
                 let mut jumps: Vec<ObjPtr<BB>> = vec![];
                 func.blocks.iter().for_each(|block| {
@@ -39,7 +49,7 @@ impl BackendPass {
     }
 
     fn fuse_imm_br(&mut self, pool: &mut BackendPool) {
-        self.module.func_map.iter().for_each(|(_, func)| {
+        self.module.name_func.iter().for_each(|(_, func)| {
             if !func.is_extern {
                 let mut imm_br: Vec<ObjPtr<BB>> = vec![];
                 func.blocks.iter().for_each(|block| {
@@ -70,7 +80,7 @@ impl BackendPass {
     }
 
     fn fuse_basic_block(&mut self) {
-        self.module.func_map.iter().for_each(|(_, func)| {
+        self.module.name_func.iter().for_each(|(_, func)| {
             if !func.is_extern {
                 let mut useless_blocks: Vec<ObjPtr<BB>> = vec![];
                 func.blocks.iter().for_each(|block| {
@@ -99,7 +109,7 @@ impl BackendPass {
     }
 
     fn clear_one_jump(&mut self) {
-        self.module.func_map.iter().for_each(|(_, func)| {
+        self.module.name_func.iter().for_each(|(_, func)| {
             if !func.is_extern {
                 func.blocks.iter().for_each(|block| {
                     if block.insts.len() == 1 {
@@ -145,7 +155,7 @@ impl BackendPass {
 
     fn clear_empty_block(&mut self) {
         let mut exsit_blocks: Vec<ObjPtr<BB>> = vec![];
-        self.module.func_map.iter().for_each(|(_, func)| {
+        self.module.name_func.iter().for_each(|(_, func)| {
             if !func.is_extern {
                 func.blocks.iter().for_each(|block| {
                     if block.insts.len() > 0 {
@@ -162,7 +172,7 @@ impl BackendPass {
     }
 
     fn resolve_merge_br(&mut self) {
-        self.module.func_map.iter().for_each(|(_, func)| {
+        self.module.name_func.iter().for_each(|(_, func)| {
             if !func.is_extern {
                 func.blocks.iter().for_each(|block| {
                     if block.insts.len() > 1 {
@@ -187,7 +197,7 @@ impl BackendPass {
     }
 
     pub fn clear_useless_jump(&mut self) {
-        self.module.func_map.iter().for_each(|(_, func)| {
+        self.module.name_func.iter().for_each(|(_, func)| {
             if !func.is_extern {
                 for (i, block) in func.blocks.iter().enumerate() {
                     if block.insts.len() > 0 && i < func.blocks.len() - 1 {
@@ -198,7 +208,8 @@ impl BackendPass {
                                 _ => panic!("jump label error"),
                             };
                             if *label == func.blocks[i + 1].label {
-                                let labels: Vec<_> = block.get_after().iter().map(|b| b.label.clone()).collect();
+                                let labels: Vec<_> =
+                                    block.get_after().iter().map(|b| b.label.clone()).collect();
                                 // log!("jump label: {:?}, next blocks label: {:?}", tail.get_label(), labels);
                                 block.as_mut().insts.pop();
                             }
@@ -285,4 +296,18 @@ fn replace_first_block(block: ObjPtr<BB>, func: ObjPtr<Func>) {
     func.as_mut().blocks.remove(index);
     func.as_mut().blocks.remove(0);
     func.as_mut().blocks.insert(0, after.clone());
+}
+
+fn is_phi_block(block: ObjPtr<BB>) -> bool {
+    if block.insts.len() > 1 && block.get_tail_inst().get_type() == InstrsType::Jump {
+        if block.insts.iter().all(|inst| {
+            inst.get_type() == InstrsType::OpReg(SingleOp::Mv)
+                || inst.get_type() == InstrsType::Jump
+        }) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+    false
 }

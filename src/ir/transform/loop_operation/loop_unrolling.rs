@@ -62,7 +62,7 @@ fn attempt_loop_unrolling(
                         if end.get_rhs().is_const()
                             && (end.get_rhs().get_int_bond() - start.get_int_bond())
                                 / step.get_int_bond()
-                                < 1000
+                                < 2000
                         {
                             one_block_loop_full_unrolling(
                                 loop_info,
