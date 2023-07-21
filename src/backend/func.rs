@@ -7,10 +7,9 @@ pub use std::io::Result;
 use std::io::Write;
 use std::vec::Vec;
 
-use biheap::BiHeap;
-
 use super::instrs::{InstrsType, SingleOp};
 use super::operand::IImm;
+use biheap::BiHeap;
 // use super::regalloc::structs::RegUsedStat;
 use super::{structs::*, BackendPool};
 use crate::backend::asm_builder::AsmBuilder;
@@ -1149,9 +1148,14 @@ impl Func {
     }
 }
 
+static mut p_time: i32 = 0;
 /// 打印函数当前的汇编形式
 impl Func {
     pub fn print_func(&self) {
+        // unsafe {
+        //     debug_assert!(false, "{p_time},{}", self.label.clone());
+        //     p_time += 1;
+        // }
         log!("func:{}", self.label);
         for block in self.blocks.iter() {
             if !block.showed {
@@ -1509,10 +1513,119 @@ impl Func {
 ///寄存器重分配相关接口的实现
 impl Func {
     ///p_to_v
-    ///把函数中某些分配到某些物理寄存器的虚拟寄存器去色，变回虚拟寄存器
-    pub fn p2v(&mut self, to_decolor: Reg) {
-        debug_assert!(to_decolor.is_physic());
+    ///把函数中所有在regs中的物理寄存器进行ptov(除了call指令def和call指令use的寄存器)<br>
+    /// 该行为需要在handle call之前执行 (在这个试图看来,一个call前后除了a0的值可能发生改变,其他寄存器的值并不会发生改变)
+    ///因为在handle call后有有些寄存器需要通过栈来restore,暂时还没有分析这个行为
+    /// 该函数会绝对保留原本程序的结构，并且不会通过构造phi等行为增加指令,不会调整指令顺序,不会合并寄存器等等
+    pub fn p2v_pre_handle_call(&mut self, regs: HashSet<Reg>) {
         self.calc_live_for_handle_spill();
+        //首先根据call上下文初始化 unchanged use 和 unchanged def.这些告诉我们哪些寄存器不能够p2v
+        let mut unchanged_use: HashSet<(ObjPtr<LIRInst>, Reg)> = HashSet::new();
+        let mut unchanged_def: HashSet<(ObjPtr<LIRInst>, Reg)> = HashSet::new();
+        for bb in self.blocks.iter() {
+            for (i, inst) in bb.insts.iter().enumerate() {
+                if inst.get_type() != InstrsType::Call {
+                    continue;
+                }
+                let mut index = i - 1;
+                let mut used: HashSet<Reg> = inst.get_reg_use().iter().cloned().collect();
+                while index >= 0 && used.len() != 0 {
+                    let inst = *bb.insts.get(index).unwrap();
+                    for reg_use in inst.get_reg_use() {
+                        if used.contains(&reg_use) {
+                            unchanged_use.insert((inst, reg_use));
+                        }
+                    }
+                    for reg_def in inst.get_reg_def() {
+                        if !used.contains(&reg_def) {
+                            continue;
+                        }
+                        used.remove(&reg_def);
+                        unchanged_def.insert((inst, reg_def));
+                    }
+                    index -= 1;
+                }
+                let mut defined: HashSet<Reg> = inst.get_reg_def().iter().cloned().collect();
+                let mut index = i + 1;
+                ///要找到define列表的最后一个直到遇到live out或者下一次def为止
+                while index < bb.insts.len() && defined.len() != 0 {
+                    let inst = *bb.insts.get(index).unwrap();
+                    for reg in inst.get_reg_use() {
+                        if defined.contains(&reg) {
+                            unchanged_use.insert((inst, reg));
+                        }
+                    }
+                    for reg in inst.get_reg_def() {
+                        if used.contains(&reg) {
+                            used.remove(&reg);
+                        }
+                    }
+                    index += 1;
+                }
+                if defined.len() != 0 {
+                    ///按照目前的代码结构来说不应该存在
+                    ///说明define到了live out中(说明其他块使用了这个块中的计算出的a0)
+                    /// 则其他块中计算出的a0也应该使用相同的物理寄存器号(不应该改变)
+                    let mut to_pass: LinkedList<(ObjPtr<BB>, Reg)> = LinkedList::new();
+                    for out_bb in bb.out_edge.iter() {
+                        for reg in defined.iter() {
+                            to_pass.push_back((*out_bb, *reg));
+                        }
+                    }
+                    let mut passed: HashSet<(ObjPtr<BB>, Reg)> = HashSet::new();
+                    while !to_pass.is_empty() {
+                        let (bb, reg) = to_pass.pop_front().unwrap();
+                        if passed.contains(&(bb, reg)) {
+                            continue;
+                        }
+                        passed.insert((bb, reg));
+                        let mut index = 0;
+                        for inst in bb.insts.iter() {
+                            for use_reg in inst.get_reg_use() {
+                                if use_reg == reg {
+                                    unchanged_use.insert((*inst, reg));
+                                }
+                            }
+                            for def_reg in inst.get_reg_def() {
+                                if def_reg == reg {
+                                    break;
+                                }
+                            }
+                            index += 1;
+                        }
+                        if index == bb.insts.len() {
+                            //说明可能传到live out中
+                            for out_bb in bb.out_edge.iter() {
+                                for reg in defined.iter() {
+                                    to_pass.push_back((*out_bb, *reg));
+                                }
+                            }
+                        }
+                    }
+                    unreachable!()
+                }
+            }
+        }
+        //然后从entry块开始p2v
+        let first_block = *self.entry.unwrap().out_edge.get(0).unwrap();
+        let mut to_pass: LinkedList<ObjPtr<BB>> = LinkedList::new();
+        to_pass.push_back(first_block);
+        let forward_passed: HashSet<(ObjPtr<BB>, Reg)> = HashSet::new();
+        let backward_passed: HashSet<(ObjPtr<BB>, Reg)> = HashSet::new();
+        ///搜索单元分为正向搜索单元与反向搜索单元
+        /// 如果某个P寄存器到了一个live out中,要么是单链,则直接修改
+        /// 要么是非单链,而是多链指向的一个块,说明这个块的入边是其他块(应该给它们赋予一样的虚拟寄存器)
+        /// 所以遍历分为两种,正向和反向
+        let forward_process = |unit: &(ObjPtr<BB>, HashMap<Reg, Reg>)|->LinkedList<(ObjPtr<BB>,HashMap<Reg,Reg>)> {
+            let (bb, p2v) = unit;
+            let mut backward_lists=LinkedList::new();
+            //正向遍历会试图加入一些新的东西,到遍历列表中
+            backward_lists
+        };
+        let backward_process = || {};
+        while !to_pass.is_empty() {}
+
+        //从基础搜索单元开始遍历
     }
 }
 
@@ -1976,8 +2089,8 @@ impl Func {
         callers_used: &HashMap<String, HashSet<Reg>>,
     ) {
         self.calc_live_for_handle_call();
-        self.print_func();
         let mut slots_for_caller_saved: Vec<StackSlot> = Vec::new();
+        ///
         // self.print_func();
         for bb in self.blocks.iter() {
             let mut new_insts: Vec<ObjPtr<LIRInst>> = Vec::new();
@@ -2056,6 +2169,14 @@ impl Func {
         }
         // self.print_func();
     }
+
+    pub fn handle_call_v4(
+        &mut self,
+        pool: &mut BackendPool,
+        callers_used: &HashMap<String, HashSet<Reg>>,
+    ) {
+        //根据上下文决定对函数能够使用哪些
+    }
 }
 
 // rearrange slot实现 ,for module-build v3
@@ -2070,7 +2191,6 @@ impl Func {
     ) {
         todo!()
     }
-
     ///分析函数用到的栈空间的冲突
     pub fn calc_stackslot_interef() -> HashSet<(StackSlot, StackSlot)> {
         todo!();

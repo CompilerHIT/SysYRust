@@ -361,7 +361,7 @@ impl AsmModule {
         self.build_lir(pool);
         self.remove_unuse_inst_pre_alloc();
 
-        self.generate_row_asm(_f2, pool);     //generate row  asm可能会造成bug
+        self.generate_row_asm(_f2, pool); //generate row  asm可能会造成bug
 
         if is_opt {
             // 设置一些寄存器为临时变量
@@ -642,6 +642,7 @@ impl AsmModule {
         }
 
         self.name_func = new_name_func; //修改完成后只有名称表内的函数才是有用的函数
+                                        // debug_assert!(false, "{}", self.name_func.len())
     }
 
     /// 计算栈空间,进行ra,sp,callee 的保存和恢复
@@ -678,6 +679,7 @@ impl AsmModule {
     }
 
     pub fn print_func(&self) {
+        // debug_assert!(false, "{}", self.name_func.len());
         for (_, func) in self.name_func.iter() {
             func.print_func();
         }

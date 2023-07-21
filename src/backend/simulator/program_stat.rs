@@ -161,16 +161,25 @@ impl ProgramStat {
             InstrsType::Load => {
                 //从内存位置加载一个值
                 //首先要判断该位置有没有值(以及是否是从一个未知地址加载值)
+                let dst_reg = inst.get_dst().drop_reg();
                 let addr = inst.get_lhs().drop_reg();
                 let addr = self.reg_val.get(&addr);
                 if addr.is_none() {
-                    ///从不知名内存写东西(不可能)
+                    ///从不知名内存写东西(不可能)  (或者说从某个数组的运行时未知偏移写东西)
                     debug_assert!(false, "try to load val from a unknown addr");
                 } else {
                     let offset = inst.get_offset().get_data() as i64;
                     let mut addr = addr.unwrap().get_addr().unwrap().clone();
                     addr.1 += offset;
-                    // let val=self.mem_val.get
+                    let addr = Value::Addr(addr);
+                    let val = self.mem_val.get(&addr);
+                    if val.is_none() {
+                        self.reg_val.insert(dst_reg, Value::Inst(*inst));
+                    } else if let Some(val) = val {
+                        self.reg_val.insert(dst_reg, val.clone());
+                    } else {
+                        unreachable!();
+                    }
                 }
             }
             InstrsType::Store => {}
