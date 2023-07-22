@@ -14,7 +14,7 @@ use crate::{
 use super::*;
 
 impl BackendPass {
-    pub fn clear_pass(&mut self, pool: &BackendPool) {
+    pub fn clear_pass(&mut self, _pool: &BackendPool) {
         self.module.name_func.iter().for_each(|(_, func)| {
             if !func.is_extern {
                 func.blocks.iter().for_each(|block| {
@@ -247,14 +247,14 @@ impl Func {
         name_bbs
     }
 
-    pub fn rm_repeated_la(&mut self, pool: &BackendPool) {
+    pub fn rm_repeated_la(&mut self, _pool: &BackendPool) {
         // 从这个函数的第一个块开始执行 (第一个块应该是entry中的bb的outedge中唯一的bb)
         debug_assert!(self.entry.unwrap().out_edge.len() == 1);
         self.calc_live_for_handle_call();
         self.build_reg_intervals();
         let first_bb = *self.entry.unwrap().out_edge.get(0).unwrap();
         //从第一个块开始分析能够快速插值的情况(记录所有加入到表中的代码(最后直接一遍删除无用代码))
-        let labels_bbs = self.draw_name_bbs(); //装入 块label供跳转使用
+        // let labels_bbs = self.draw_name_bbs(); //装入 块label供跳转使用
                                                //模拟执行第一个块(同时记录第一个块中到某个位置的时候的可用寄存器),如果遇到了ret则结束
         let mut program_stat = ProgramStat::new();
         //执行到退出函数的时候则退出函数 (执行到io函数的时候则执行特定的过程)

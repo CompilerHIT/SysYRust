@@ -76,7 +76,7 @@ impl AsmModule {
         });
     }
 
-    pub fn build(&mut self, f: &mut File, f2: &mut File, pool: &mut BackendPool) {
+    pub fn build(&mut self, f: &mut File, _f2: &mut File, pool: &mut BackendPool) {
         self.build_lir(pool);
         // TOCHECK 寄存器分配和handlespill前无用指令删除,比如删除mv指令方便寄存器分配
         // self.generate_row_asm(f2, pool); //注释
@@ -104,7 +104,6 @@ impl AsmModule {
         self.allocate_reg();
         self.map_v_to_p();
         // self.generate_row_asm(f2, pool);
-
 
         // self.generate_row_asm(f2, pool); //注释
         self.remove_unuse_inst_suf_alloc();
@@ -171,7 +170,8 @@ impl AsmModule {
             debug_assert!(!func.is_extern);
             func.blocks.iter().for_each(|block| {
                 block.insts.iter().for_each(|inst| {
-                    inst.as_mut().v_to_phy(func.context.get_reg_map().clone(), func.tmp_vars.clone());
+                    inst.as_mut()
+                        .v_to_phy(func.context.get_reg_map().clone(), func.tmp_vars.clone());
                 });
             });
         });
@@ -250,7 +250,7 @@ impl AsmModule {
 
     fn generate_global_var(&self, f: &mut File) {
         if self.global_var_list.len() > 0 {
-            writeln!(f, "    .data");
+            writeln!(f, "    .data").unwrap();
         }
         for (_, iter) in self.global_var_list.iter() {
             match iter {
@@ -258,34 +258,34 @@ impl AsmModule {
                     let name = ig.get_name();
                     let value = ig.get_init().to_string();
                     //FIXME:数组8字节对齐，一般变量4字节对齐，数组size大小为4*array_size
-                    writeln!(f, "   .globl {name}\n    .align  2\n     .type   {name}, @object\n   .size   {name}, 4");
-                    writeln!(f, "{name}:\n    .word   {value}\n");
+                    writeln!(f, "   .globl {name}\n    .align  2\n     .type   {name}, @object\n   .size   {name}, 4").unwrap();
+                    writeln!(f, "{name}:\n    .word   {value}\n").unwrap();
                 }
                 GlobalVar::FGlobalVar(fg) => {
                     let name = fg.get_name();
                     let value = fg.get_init().to_string();
-                    writeln!(f, "{name}:\n    .word   {value}\n");
+                    writeln!(f, "{name}:\n    .word   {value}\n").unwrap();
                 }
                 GlobalVar::GlobalConstIntArray(array) => {
-                    writeln!(f, "   .globl {name}\n    .align  3\n     .type   {name}, @object\n   .size   {name}, {num}", name = array.name, num = array.size * 4);
-                    writeln!(f, "{name}:", name = array.name);
+                    writeln!(f, "   .globl {name}\n    .align  3\n     .type   {name}, @object\n   .size   {name}, {num}", name = array.name, num = array.size * 4).unwrap();
+                    writeln!(f, "{name}:", name = array.name).unwrap();
                     for value in array.value.iter() {
-                        writeln!(f, "    .word   {value}");
+                        writeln!(f, "    .word   {value}").unwrap();
                     }
                     let zeros = array.size - array.value.len() as i32;
                     if zeros > 0 {
-                        writeln!(f, "	.zero	{n}", n = zeros * NUM_SIZE);
+                        writeln!(f, "	.zero	{n}", n = zeros * NUM_SIZE).unwrap();
                     }
                 }
                 GlobalVar::GlobalConstFloatArray(array) => {
-                    writeln!(f, "   .globl {name}\n    .align  3\n     .type   {name}, @object\n   .size   {name}, {num}", name = array.name, num = array.size * 4);
-                    writeln!(f, "{name}:", name = array.name);
+                    writeln!(f, "   .globl {name}\n    .align  3\n     .type   {name}, @object\n   .size   {name}, {num}", name = array.name, num = array.size * 4).unwrap();
+                    writeln!(f, "{name}:", name = array.name).unwrap();
                     for value in array.value.iter() {
-                        writeln!(f, "    .word   {value}");
+                        writeln!(f, "    .word   {value}").unwrap();
                     }
                     let zeros = array.size - array.value.len() as i32;
                     if zeros > 0 {
-                        writeln!(f, "	.zero	{n}", n = zeros * NUM_SIZE);
+                        writeln!(f, "	.zero	{n}", n = zeros * NUM_SIZE).unwrap();
                     }
                 }
             }
@@ -328,7 +328,7 @@ impl AsmModule {
 /// 1.紧缩spill过程使用的栈空间: 先分配后使用
 impl AsmModule {
     //先进行寄存器分配再handle_spill,
-    pub fn build_v2(&mut self, f: &mut File, f2: &mut File, pool: &mut BackendPool) {
+    pub fn build_v2(&mut self, f: &mut File, _f2: &mut File, pool: &mut BackendPool) {
         self.build_lir(pool);
         // TOCHECK 寄存器分配和handlespill前无用指令删除,比如删除mv指令方便寄存器分配
         self.remove_unuse_inst_pre_alloc();
@@ -357,26 +357,25 @@ impl AsmModule {
 /// 4. 删除无用函数模板(可选)
 impl AsmModule {
     ///TODO!
-    pub fn build_v3(&mut self, f: &mut File, f2: &mut File, pool: &mut BackendPool, is_opt: bool) {
+    pub fn build_v3(&mut self, f: &mut File, _f2: &mut File, pool: &mut BackendPool, is_opt: bool) {
         self.build_lir(pool);
         self.remove_unuse_inst_pre_alloc();
-        
+
         // self.generate_row_asm(f2, pool);     //generate row  asm可能会造成bug
 
         if is_opt {
             // 设置一些寄存器为临时变量
             self.cal_tmp_var();
-    
+
             self.allocate_reg();
             self.map_v_to_p();
             // 代码调度，列表调度法
             self.list_scheduling_tech();
-    
+
             // 为临时寄存器分配寄存器
             self.clear_tmp_var();
             self.allocate_reg();
             self.map_v_to_p();
-
         } else {
             self.allocate_reg();
             self.map_v_to_p();

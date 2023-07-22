@@ -1131,7 +1131,7 @@ impl Func {
         });
     }
 
-    pub fn generate_row(&mut self, _: ObjPtr<Context>, f: &mut File) -> Result<()> {
+    pub fn generate_row(&mut self, _: ObjPtr<Context>, f: &mut File) {
         debug_assert!(|| -> bool {
             AsmBuilder::new(f).show_func(&self.label);
             // self.context.as_mut().call_prologue_event();
@@ -1144,7 +1144,6 @@ impl Func {
             }
             true
         }());
-        Ok(())
     }
 }
 
@@ -1165,19 +1164,19 @@ impl Func {
 }
 
 impl GenerateAsm for Func {
-    fn generate(&mut self, _: ObjPtr<Context>, f: &mut File) -> Result<()> {
+    fn generate(&mut self, _: ObjPtr<Context>, f: &mut File) {
         if self.const_array.len() > 0 || self.float_array.len() > 0 {
-            writeln!(f, "	.data\n   .align  3")?;
+            writeln!(f, "	.data\n   .align  3").unwrap();
         }
         if self.is_header {
             for mut a in self.const_array.clone() {
-                a.generate(self.context, f)?;
+                a.generate(self.context, f);
             }
             for mut a in self.float_array.clone() {
-                a.generate(self.context, f)?;
+                a.generate(self.context, f);
             }
         }
-        AsmBuilder::new(f).show_func(&self.label)?;
+        AsmBuilder::new(f).show_func(&self.label);
         self.context.as_mut().call_prologue_event();
         let mut _size = 0;
         for block in self.blocks.iter() {
@@ -1185,10 +1184,9 @@ impl GenerateAsm for Func {
         }
         // log!("tatol {}", size);
         for block in self.blocks.iter() {
-            block.as_mut().generate(self.context, f)?;
+            block.as_mut().generate(self.context, f);
         }
-        writeln!(f, "	.size	{}, .-{}", self.label, self.label)?;
-        Ok(())
+        writeln!(f, "	.size	{}, .-{}", self.label, self.label).unwrap();
     }
 }
 

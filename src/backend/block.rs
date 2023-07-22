@@ -2557,31 +2557,29 @@ impl BB {
         }
     }
 
-    pub fn generate_row(&mut self, context: ObjPtr<Context>, f: &mut File) -> Result<()> {
+    pub fn generate_row(&mut self, context: ObjPtr<Context>, f: &mut File) {
         if self.showed {
             let mut builder = AsmBuilder::new(f);
-            builder.show_block(&self.label)?;
+            builder.show_block(&self.label);
         }
         context.as_mut().is_row = true;
         for inst in self.insts.iter() {
-            inst.as_mut().generate(context.clone(), f)?;
+            inst.as_mut().generate(context.clone(), f);
         }
-        Ok(())
     }
 }
 impl GenerateAsm for BB {
-    fn generate(&mut self, context: ObjPtr<Context>, f: &mut File) -> Result<()> {
+    fn generate(&mut self, context: ObjPtr<Context>, f: &mut File) {
         if self.showed {
             let mut builder = AsmBuilder::new(f);
-            builder.show_block(&self.label)?;
+            builder.show_block(&self.label);
         }
         context.as_mut().is_row = false;
         // log!("generate bb:{}", self.label);
         for inst in self.insts.iter() {
             // log!("generate inst:{:?}", inst);
-            inst.as_mut().generate(context.clone(), f)?;
+            inst.as_mut().generate(context.clone(), f);
         }
-        Ok(())
     }
 }
 

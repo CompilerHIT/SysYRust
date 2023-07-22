@@ -72,9 +72,9 @@ pub fn generate_asm(
         Ok(f) => f,
         Err(e) => panic!("Create    output path error: {}", e),
     };
-    writeln!(file, "	.file	\"{}\"", in_path);
-    writeln!(file, "	.option pic");
-    writeln!(file, "    .text");
+    writeln!(file, "	.file	\"{}\"", in_path).unwrap();
+    writeln!(file, "	.option pic").unwrap();
+    writeln!(file, "    .text").unwrap();
     let mut pool = BackendPool::new();
     let mut file2 = File::create(row_path).unwrap();
 
@@ -107,5 +107,5 @@ pub fn generate_asm(
     pool.free_all();
 
     // writeln!(file, "    .ident	\"GCC: (Ubuntu 9.4.0-1ubuntu1~20.04) 9.4.0\"");
-    writeln!(file, "    .section	.note.GNU-stack,\"\",@progbits");
+    writeln!(file, "    .section	.note.GNU-stack,\"\",@progbits").unwrap();
 }

@@ -170,9 +170,8 @@ impl FGlobalVar {
 }
 
 pub trait GenerateAsm {
-    fn generate(&mut self, _: ObjPtr<Context>, f: &mut File) -> Result<()> {
-        writeln!(f, "unreachable")?;
-        Ok(())
+    fn generate(&mut self, _: ObjPtr<Context>, f: &mut File) {
+        writeln!(f, "unreachable").unwrap();
     }
 }
 
@@ -280,10 +279,9 @@ impl IntArray {
 }
 
 impl GenerateAsm for IntArray {
-    fn generate(&mut self, _: ObjPtr<Context>, f: &mut File) -> Result<()> {
+    fn generate(&mut self, _: ObjPtr<Context>, f: &mut File) {
         let mut builder = AsmBuilder::new(f);
-        builder.print_array(&self.value, self.name.clone(), self.size)?;
-        Ok(())
+        builder.print_array(&self.value, self.name.clone(), self.size);
     }
 }
 
@@ -325,10 +323,9 @@ impl FloatArray {
 }
 
 impl GenerateAsm for FloatArray {
-    fn generate(&mut self, _: ObjPtr<Context>, f: &mut File) -> Result<()> {
+    fn generate(&mut self, _: ObjPtr<Context>, f: &mut File) {
         let mut builder = AsmBuilder::new(f);
-        builder.print_farray(&self.value, self.name.clone(), self.size)?;
-        Ok(())
+        builder.print_farray(&self.value, self.name.clone(), self.size);
     }
 }
 
