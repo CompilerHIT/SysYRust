@@ -1,5 +1,3 @@
-use std::collections::btree_map::IterMut;
-
 use super::*;
 
 // 调参池
@@ -73,7 +71,7 @@ impl Allocator {
         // spill代价计算:  活邻居越多,spill代价越小,spill_cost越大,spill代价越大,
         // 能够救回的节点的代价越大,spiLl代价越小
         // val[reg]=reg.spill_cost/num_live_neighbor[reg] - sum(rescue.spill_cost/num_live_neighbor[reg])
-        let val = |allocator: &Allocator, reg: &Reg| -> f32 {
+        let val = |_allocator: &Allocator, reg: &Reg| -> f32 {
             // 计算价值,首先,获取当前节点本身的spill cost(简单地使用spill cost来计算节省地内容)
             let mut out_val = self.get_spill_cost_div_lnn(reg);
             // 如果当前节点在colors里面,则spill cost还要减去消去它的颜色后能够救回的spill cost

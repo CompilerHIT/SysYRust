@@ -214,8 +214,8 @@ impl BackendPass {
                                 _ => panic!("jump label error"),
                             };
                             if *label == func.blocks[i + 1].label {
-                                let labels: Vec<_> =
-                                    block.get_after().iter().map(|b| b.label.clone()).collect();
+                                // let labels: Vec<_> =
+                                //     block.get_after().iter().map(|b| b.label.clone()).collect();
                                 // log!("jump label: {:?}, next blocks label: {:?}", tail.get_label(), labels);
                                 block.as_mut().insts.pop();
                             }
@@ -304,16 +304,16 @@ fn replace_first_block(block: ObjPtr<BB>, func: ObjPtr<Func>) {
     func.as_mut().blocks.insert(0, after.clone());
 }
 
-fn is_phi_block(block: ObjPtr<BB>) -> bool {
-    if block.insts.len() > 1 && block.get_tail_inst().get_type() == InstrsType::Jump {
-        if block.insts.iter().all(|inst| {
-            inst.get_type() == InstrsType::OpReg(SingleOp::Mv)
-                || inst.get_type() == InstrsType::Jump
-        }) {
-            return true;
-        } else {
-            return false;
-        }
-    }
-    false
-}
+// fn is_phi_block(block: ObjPtr<BB>) -> bool {
+//     if block.insts.len() > 1 && block.get_tail_inst().get_type() == InstrsType::Jump {
+//         if block.insts.iter().all(|inst| {
+//             inst.get_type() == InstrsType::OpReg(SingleOp::Mv)
+//                 || inst.get_type() == InstrsType::Jump
+//         }) {
+//             return true;
+//         } else {
+//             return false;
+//         }
+//     }
+//     false
+// }

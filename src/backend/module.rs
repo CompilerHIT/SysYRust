@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet, LinkedList};
+use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::Write;
 
@@ -12,13 +12,11 @@ use crate::ir::function::Function;
 use crate::ir::instruction::{Inst, InstKind};
 use crate::ir::ir_type::IrType;
 use crate::ir::module::Module;
-use crate::log;
+// use crate::log;
 use crate::utility::ObjPtr;
 
 use super::instrs::{Context, InstrsType};
 use super::operand::Reg;
-use super::opt::BackendPass;
-use super::regalloc::structs::FuncAllocStat;
 use super::structs::GenerateAsm;
 
 pub struct AsmModule {
@@ -89,10 +87,10 @@ impl AsmModule {
         self.allocate_reg();
         // self.generate_row_asm(f2, pool); //注释
 
-        self.handle_spill(pool, f);
+        self.handle_spill(pool);
 
         self.handle_call(pool);
-        self.handle_callee(pool, f);
+        self.handle_callee(f);
 
         // self.generate_row_asm(f2, pool); //注释
         self.map_v_to_p();
@@ -124,11 +122,11 @@ impl AsmModule {
 
     /// 设置栈大小 ，设置开合栈以及进行callee saved的保存和恢复需要的前沿和后沿函数
     /// 该函数需要在handle call后调用
-    pub fn handle_callee(&mut self, pool: &mut BackendPool, f: &mut File) {
+    pub fn handle_callee(&mut self, f: &mut File) {
         for (_, func) in self.name_func.iter() {
             debug_assert!(!func.is_extern);
             func.as_mut().build_callee_map();
-            func.as_mut().save_callee(pool, f)
+            func.as_mut().save_callee(f)
         }
     }
 
@@ -187,10 +185,10 @@ impl AsmModule {
         });
     }
 
-    fn handle_spill(&mut self, pool: &mut BackendPool, f: &mut File) {
+    fn handle_spill(&mut self, pool: &mut BackendPool) {
         self.name_func.iter_mut().for_each(|(_, func)| {
             debug_assert!(!func.is_extern);
-            func.as_mut().handle_spill(pool, f);
+            func.as_mut().handle_spill(pool);
         });
     }
 
@@ -203,11 +201,11 @@ impl AsmModule {
             match iter.as_ref().get_kind() {
                 InstKind::GlobalConstInt(value) | InstKind::GlobalInt(value) => list.push((
                     *iter,
-                    GlobalVar::IGlobalVar(IGlobalVar::init(name.to_string(), value, true)),
+                    GlobalVar::IGlobalVar(IGlobalVar::init(name.to_string(), value)),
                 )),
                 InstKind::GlobalConstFloat(value) | InstKind::GlobalFloat(value) => list.push((
                     *iter,
-                    GlobalVar::FGlobalVar(FGlobalVar::init(name.to_string(), value, true)),
+                    GlobalVar::FGlobalVar(FGlobalVar::init(name.to_string(), value)),
                 )),
                 InstKind::Alloca(size) => {
                     match iter.get_ir_type() {
@@ -254,7 +252,7 @@ impl AsmModule {
         if self.global_var_list.len() > 0 {
             writeln!(f, "    .data");
         }
-        for (inst, iter) in self.global_var_list.iter() {
+        for (_, iter) in self.global_var_list.iter() {
             match iter {
                 GlobalVar::IGlobalVar(ig) => {
                     let name = ig.get_name();
@@ -336,18 +334,18 @@ impl AsmModule {
         self.remove_unuse_inst_pre_alloc();
         // self.generate_row_asm(f2, pool); //注释
         self.allocate_reg();
-        self.handle_spill_v2(pool, f);
+        self.handle_spill_v2(pool);
         self.handle_call(pool);
-        self.handle_callee(pool, f);
+        self.handle_callee(f);
         // self.handle_spill(pool, f);
         self.map_v_to_p();
         self.remove_unuse_inst_suf_alloc();
     }
 
-    fn handle_spill_v2(&mut self, pool: &mut BackendPool, f: &mut File) {
+    fn handle_spill_v2(&mut self, pool: &mut BackendPool) {
         self.name_func.iter_mut().for_each(|(_, func)| {
             debug_assert!(!func.is_extern);
-            func.as_mut().handle_spill_v2(pool, f);
+            func.as_mut().handle_spill_v2(pool);
         });
     }
 }
@@ -378,7 +376,7 @@ impl AsmModule {
             self.clear_tmp_var();
             self.allocate_reg();
             self.map_v_to_p();
-            
+
         } else {
             self.allocate_reg();
             self.map_v_to_p();
@@ -392,7 +390,7 @@ impl AsmModule {
         // self.remove_useless_func();
         self.rearrange_stack_slot();
         self.update_array_offset(pool);
-        self.build_stack_info(f, pool);
+        self.build_stack_info(f);
         // self.print_func();
         //删除无用的函数
     }
@@ -483,9 +481,9 @@ impl AsmModule {
         }
 
         loop {
-            let mut ifFinish = true;
+            let mut if_finish = true;
             //直到无法发生更新了才退出
-            ///更新caller save
+            //更新caller save
             for (caller_func, callee_func) in call_insts.iter() {
                 //
                 let old_caller_func_used_callers = caller_used.get(caller_func).unwrap();
@@ -498,10 +496,10 @@ impl AsmModule {
                     .collect();
                 caller_used.get_mut(caller_func).unwrap().extend(new_regs);
                 if caller_used.get(caller_func).unwrap().len() > old_num {
-                    ifFinish = false;
+                    if_finish = false;
                 }
             }
-            if ifFinish {
+            if if_finish {
                 break;
             }
         }
@@ -518,9 +516,9 @@ impl AsmModule {
 
         //更新基础callees saved uesd 表
         loop {
-            let mut ifFinish = true;
+            let mut if_finish = true;
             //直到无法发生更新了才退出
-            ///更新caller save
+            //更新caller save
             for (caller_func, callee_func) in call_insts.iter() {
                 //
                 let old_caller_func_used_callees =
@@ -542,10 +540,10 @@ impl AsmModule {
                     .len()
                     > old_num
                 {
-                    ifFinish = false;
+                    if_finish = false;
                 }
             }
-            if ifFinish {
+            if if_finish {
                 break;
             }
         }
@@ -581,7 +579,7 @@ impl AsmModule {
 
         //然后分析callee save的使用情况,进行裂变,同时产生新的
         loop {
-            let mut ifFinish = true;
+            let mut if_finish = true;
             let mut new_funcs: Vec<ObjPtr<Func>> = Vec::new();
             //分析调用的上下文
             for func in func_to_process.iter() {
@@ -623,23 +621,23 @@ impl AsmModule {
                         .unwrap()
                         .insert(map, new_name.clone());
 
-                    ///更新新函数的callees map
+                    // 更新新函数的callees map
                     self.callees_saveds
                         .insert(new_name.clone(), callee_regs.iter().cloned().collect());
-                    ///继承旧函数的callers map
+                    // 继承旧函数的callers map
                     let old_callers_saved =
                         self.callers_saveds.get_mut(&callee_func.label).unwrap();
                     let new_callers_saved: HashSet<Reg> =
                         old_callers_saved.iter().cloned().collect();
                     self.callers_saveds
                         .insert(new_name.clone(), new_callers_saved);
-                    ///把新函数加入到名称表
+                    // 把新函数加入到名称表
                     new_name_func.insert(new_name.clone(), new_callee_func);
-                    ifFinish = false; //设置修改符号为错
+                    if_finish = false; //设置修改符号为错
                 }
             }
             func_to_process = new_funcs;
-            if ifFinish {
+            if if_finish {
                 break;
             }
         }
@@ -648,7 +646,7 @@ impl AsmModule {
     }
 
     /// 计算栈空间,进行ra,sp,callee 的保存和恢复
-    pub fn build_stack_info(&mut self, f: &mut File, pool: &mut BackendPool) {
+    pub fn build_stack_info(&mut self, f: &mut File) {
         for (name, func) in self.name_func.iter() {
             debug_assert!(!func.is_extern);
             if func.label == "main" {
@@ -658,7 +656,7 @@ impl AsmModule {
                 callees.remove(&Reg::new(2, crate::utility::ScalarType::Int)); //sp虽然是callee saved但不需要通过栈方式restore
                 func.as_mut().callee_saved.extend(callees.iter());
             }
-            func.as_mut().save_callee(pool, f);
+            func.as_mut().save_callee(f);
         }
     }
 

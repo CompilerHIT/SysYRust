@@ -1,5 +1,4 @@
 pub use std::collections::HashMap;
-use std::collections::LinkedList;
 pub use std::collections::{HashSet, VecDeque};
 pub use std::fs::File;
 pub use std::hash::{Hash, Hasher};
@@ -14,18 +13,15 @@ use crate::ir::instruction::Inst;
 use crate::utility::ObjPtr;
 
 use super::asm_builder::AsmBuilder;
-use super::operand::Reg;
 
 #[derive(Clone)]
 pub struct IGlobalVar {
     name: String,
-    init: bool,
     value: IImm,
 }
 #[derive(Clone)]
 pub struct FGlobalVar {
     name: String,
-    init: bool,
     value: FImm,
 }
 
@@ -138,15 +134,14 @@ impl CurInstrInfo {
 }
 
 impl IGlobalVar {
-    pub fn init(name: String, value: i32, init: bool) -> Self {
+    pub fn init(name: String, value: i32) -> Self {
         Self {
             name,
             value: IImm::new(value),
-            init,
         }
     }
     pub fn new(name: String) -> Self {
-        Self::init(name, 0, false)
+        Self::init(name, 0)
     }
     pub fn get_name(&self) -> &String {
         &self.name
@@ -157,15 +152,14 @@ impl IGlobalVar {
 }
 
 impl FGlobalVar {
-    pub fn init(name: String, value: f32, init: bool) -> Self {
+    pub fn init(name: String, value: f32) -> Self {
         Self {
             name,
             value: FImm::new(value),
-            init,
         }
     }
     pub fn new(name: String) -> Self {
-        Self::init(name, 0.0, false)
+        Self::init(name, 0.0)
     }
     pub fn get_name(&self) -> &String {
         &self.name
@@ -288,7 +282,7 @@ impl IntArray {
 impl GenerateAsm for IntArray {
     fn generate(&mut self, _: ObjPtr<Context>, f: &mut File) -> Result<()> {
         let mut builder = AsmBuilder::new(f);
-        builder.print_array(&self.value, self.name.clone(), self.size);
+        builder.print_array(&self.value, self.name.clone(), self.size)?;
         Ok(())
     }
 }
@@ -333,7 +327,7 @@ impl FloatArray {
 impl GenerateAsm for FloatArray {
     fn generate(&mut self, _: ObjPtr<Context>, f: &mut File) -> Result<()> {
         let mut builder = AsmBuilder::new(f);
-        builder.print_farray(&self.value, self.name.clone(), self.size);
+        builder.print_farray(&self.value, self.name.clone(), self.size)?;
         Ok(())
     }
 }

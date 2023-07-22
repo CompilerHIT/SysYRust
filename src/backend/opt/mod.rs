@@ -1,12 +1,10 @@
-use std::fs::OpenOptions;
-
 pub use crate::backend::block::BB;
 use crate::backend::instrs::*;
 use crate::backend::module::AsmModule;
 use crate::backend::operand;
 use crate::backend::operand::*;
 use crate::backend::BackendPool;
-use crate::log;
+// use crate::log;
 pub use crate::utility::ObjPtr;
 
 mod block_pass;

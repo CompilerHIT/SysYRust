@@ -41,7 +41,7 @@ impl Allocator {
             if info.spillings.contains(&neighbor.get_id()) {
                 continue;
             }
-            let mut color: Option<i32> = None;
+            let color: Option<i32>;
             if neighbor.is_physic() {
                 color = Some(neighbor.get_color());
             } else {

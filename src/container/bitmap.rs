@@ -1,7 +1,4 @@
-use std::{
-    fmt::Display,
-    hash::{Hash, Hasher},
-};
+use std::hash::{Hash, Hasher};
 
 // 一个简单的bitmap,用来统计spilling情况,用位图
 pub struct Bitmap {
@@ -10,7 +7,7 @@ pub struct Bitmap {
 }
 
 impl Bitmap {
-    pub fn andOther(&mut self, other: &Bitmap) {
+    pub fn and_other(&mut self, other: &Bitmap) {
         while other.cap() > self.arr.len() {
             self.arr.push(0);
         }
@@ -19,7 +16,7 @@ impl Bitmap {
             self.arr[i] = self.arr[i] & other.arr[i];
         }
     }
-    pub fn orOther(&mut self, other: &Bitmap) {
+    pub fn or_other(&mut self, other: &Bitmap) {
         while other.cap() > self.arr.len() {
             self.arr.push(0);
         }
@@ -173,8 +170,6 @@ impl PartialEq for Bitmap {
 mod test_bitmap {
     use std::collections::HashSet;
 
-    use rand::random;
-
     use super::Bitmap;
     #[test]
     fn test_insert() {
@@ -196,12 +191,12 @@ mod test_bitmap {
     #[test]
     fn test_len() {
         // TODO,检查len
-        for j in 0..=100000 {
+        for _ in 0..=100000 {
             let n = 100;
             let mode: usize = 10000;
             let mut set: HashSet<usize> = HashSet::new();
             let mut bitmap = Bitmap::new();
-            for i in 0..n {
+            for _ in 0..n {
                 // 获取一个随机数
                 let use_val = rand::random::<usize>() % mode;
                 let insert_or = rand::random::<bool>();
@@ -225,7 +220,7 @@ mod test_bitmap {
         let mode: usize = 10000;
         let mut set: HashSet<usize> = HashSet::new();
         let mut bitmap = Bitmap::new();
-        for i in 0..n {
+        for _ in 0..n {
             // 获取一个随机数
             let use_val = rand::random::<usize>() % mode;
             let insert_or = rand::random::<bool>();

@@ -1,19 +1,13 @@
 // 或者可以认为是没有启发的线性扫描寄存器分配
 
-use std::{
-    collections::{HashMap, HashSet},
-    fs,
-};
+use std::collections::{HashMap, HashSet};
 
 use crate::{
     backend::{
-        block,
         instrs::BB,
         operand::Reg,
         regalloc::{self, regalloc::Regalloc},
     },
-    container::bitmap::Bitmap,
-    frontend::ast::Continue,
     log_file,
     utility::{ObjPtr, ScalarType},
 };
@@ -67,23 +61,23 @@ impl RegUsedStat {
     }
 
     // 获取可用寄存器数量
-    pub fn num_available_regs(&self, kind: ScalarType) -> usize {
-        match kind {
-            ScalarType::Float => self.num_available_fregs(),
-            ScalarType::Int => self.num_avialable_iregs(),
-            _ => panic!("{:?}", kind),
-        }
-    }
-    pub fn num_avialable_iregs(&self) -> usize {
-        (0..=31)
-            .filter(|ireg| self.is_available_ireg(*ireg))
-            .count()
-    }
-    pub fn num_available_fregs(&self) -> usize {
-        (32..=63)
-            .filter(|freg| self.is_available_freg(*freg))
-            .count()
-    }
+    // pub fn num_available_regs(&self, kind: ScalarType) -> usize {
+    //     match kind {
+    //         ScalarType::Float => self.num_available_fregs(),
+    //         ScalarType::Int => self.num_avialable_iregs(),
+    //         _ => panic!("{:?}", kind),
+    //     }
+    // }
+    // pub fn num_avialable_iregs(&self) -> usize {
+    //     (0..=31)
+    //         .filter(|ireg| self.is_available_ireg(*ireg))
+    //         .count()
+    // }
+    // pub fn num_available_fregs(&self) -> usize {
+    //     (32..=63)
+    //         .filter(|freg| self.is_available_freg(*freg))
+    //         .count()
+    // }
 
     // 获取一个可用的整数寄存器
     pub fn get_available_ireg(&self) -> Option<i32> {
@@ -116,27 +110,27 @@ impl RegUsedStat {
         }
     }
 
-    // 获取剩余的可用通用寄存器
-    pub fn get_rest_iregs(&self) -> Vec<i32> {
-        let mut out = Vec::new();
-        for i in 1..=31 {
-            if self.is_available_ireg(i) {
-                out.push(i);
-            }
-        }
-        out
-    }
+    // // 获取剩余的可用通用寄存器
+    // pub fn get_rest_iregs(&self) -> Vec<i32> {
+    //     let mut out = Vec::new();
+    //     for i in 1..=31 {
+    //         if self.is_available_ireg(i) {
+    //             out.push(i);
+    //         }
+    //     }
+    //     out
+    // }
 
-    // 获取剩余的可用浮点寄存器
-    pub fn get_rest_fregs(&self) -> Vec<i32> {
-        let mut out = Vec::new();
-        for i in 32..=63 {
-            if self.is_available_freg(i) {
-                out.push(i);
-            }
-        }
-        out
-    }
+    // // 获取剩余的可用浮点寄存器
+    // pub fn get_rest_fregs(&self) -> Vec<i32> {
+    //     let mut out = Vec::new();
+    //     for i in 32..=63 {
+    //         if self.is_available_freg(i) {
+    //             out.push(i);
+    //         }
+    //     }
+    //     out
+    // }
 
     pub fn release_reg(&mut self, reg: i32) {
         if reg >= 0 && reg < 32 {
@@ -227,7 +221,7 @@ impl Regalloc for Allocator {
                 }
                 return;
             }
-            let mut color = Option::None;
+            let color;
             // 寻找个可用颜色,否则加入spilling
             color = reg_used_stat.get_available_reg(kind);
             if let Some(color) = color {
@@ -329,7 +323,7 @@ impl Regalloc for Allocator {
             count(*bb, ScalarType::Int);
         }
 
-        let (func_stack, bbstacks) = regalloc::regalloc::countStackSize(func, &spillings);
+        let (func_stack, bbstacks) = regalloc::regalloc::count_stack_size(func, &spillings);
 
         log_file!(calout, "\n\n{} final:\n", func.label);
         log_file!(calout, "dstr:{:?}\nspillings:{:?}", dstr, spillings);

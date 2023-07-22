@@ -1,10 +1,6 @@
-use rand::seq::index;
-
-use crate::backend::regalloc;
-use crate::backend::regalloc::structs::RegUsedStat;
 use crate::config;
 pub use crate::log;
-use crate::log_file;
+// use crate::log_file;
 use std::cmp::max;
 use std::cmp::min;
 pub use std::collections::{HashSet, VecDeque};
@@ -25,7 +21,6 @@ use crate::utility::{ObjPtr, ScalarType};
 use super::instrs::AsmBuilder;
 use super::operand::ARG_REG_COUNT;
 use super::operand::{FImm, ToString};
-use super::regalloc::structs::FuncAllocStat;
 use super::{structs::*, BackendPool};
 use crate::backend::operand;
 
@@ -108,9 +103,9 @@ impl BB {
                 InstKind::Binary(op) => {
                     let lhs = inst_ref.get_lhs();
                     let rhs = inst_ref.get_rhs();
-                    let mut lhs_reg;
-                    let mut rhs_reg;
-                    let mut dst_reg: Operand =
+                    let lhs_reg;
+                    let rhs_reg;
+                    let dst_reg: Operand =
                         self.resolve_operand(func, ir_block_inst, true, map_info, pool);
                     match op {
                         //TODO: Float Binary
@@ -526,7 +521,7 @@ impl BB {
                     // 在开启ir优化后，所有的非main函数都是递归函数，需要在栈上分配空间
                     // 而对于main函数的所有数组都可以当做全局数组使用
                     if func.label == "main" {
-                        let mut first = false;
+                        let first;
                         match inst_ref.get_ir_type() {
                             IrType::IntPtr => {
                                 let array: Vec<i32> =
@@ -821,8 +816,8 @@ impl BB {
 
                     match cond_ref.get_kind() {
                         InstKind::Binary(cond) => {
-                            let mut lhs_reg = Operand::IImm(IImm::new(0));
-                            let mut rhs_reg = Operand::IImm(IImm::new(0));
+                            let lhs_reg;
+                            let rhs_reg;
                             if let Some(lhs_cond) = is_cond_op(cond_ref.get_lhs()) {
                                 lhs_reg = self.resolve_bool(
                                     func,
@@ -860,7 +855,7 @@ impl BB {
                             }
 
                             let mut bz = false;
-                            let mut inst_kind = match cond {
+                            let inst_kind = match cond {
                                 BinOp::Eq => InstrsType::Branch(CmpOp::Ne),
                                 BinOp::Ne => InstrsType::Branch(CmpOp::Eq),
                                 BinOp::Ge => InstrsType::Branch(CmpOp::Lt),
@@ -1347,7 +1342,7 @@ impl BB {
 
                 InstKind::Phi => {
                     let phi_reg = self.resolve_operand(func, ir_block_inst, false, map_info, pool);
-                    let mut kind = ScalarType::Void;
+                    let kind;
                     let temp = match phi_reg {
                         Operand::Reg(reg) => {
                             assert!(reg.get_type() != ScalarType::Void);
@@ -1607,7 +1602,7 @@ impl BB {
                         index += 1;
                     } else {
                         let last_slot = func.stack_addr.back().unwrap();
-                        let mut pos = last_slot.get_pos() + last_slot.get_size();
+                        let pos = last_slot.get_pos() + last_slot.get_size();
                         let stack_slot = StackSlot::new(pos, ADDR_SIZE);
                         func.as_mut().stack_addr.push_back(stack_slot);
                         func.as_mut().spill_stack_map.insert(*r, stack_slot);
@@ -1733,9 +1728,6 @@ impl BB {
                 InstrsType::LoadFromStack | InstrsType::StoreToStack => {
                     let temp = Operand::Reg(Reg::new(8, ScalarType::Int));
                     let offset = inst_ref.get_stack_offset().get_data();
-                    if offset == 2112 {
-                        let b = 4;
-                    }
                     if operand::is_imm_12bs(offset) {
                         pos += 1;
                         continue;
@@ -2158,8 +2150,8 @@ impl BB {
         pool: &mut BackendPool,
     ) -> Operand {
         let dst_reg = self.resolve_operand(func, src, true, map, pool);
-        let mut lhs_reg = Operand::IImm(IImm::new(0));
-        let mut rhs_reg = Operand::IImm(IImm::new(0));
+        let mut lhs_reg;
+        let mut rhs_reg;
         let lhs = src.get_lhs();
         let rhs = src.get_rhs();
         if let Some(lhs_cond) = is_cond_op(lhs) {
@@ -2565,24 +2557,6 @@ impl BB {
         }
     }
 
-    fn has_div_rem(
-        &mut self,
-        imm: i32,
-        div_res: Operand,
-        dst: Operand,
-        src: Operand,
-        pool: &mut BackendPool,
-    ) {
-        // 余数
-        // r = n - q * imm
-        //FIXME:负数求余
-        self.find_opt_mul(imm, dst.clone(), div_res, pool);
-        self.insts.push(pool.put_inst(LIRInst::new(
-            InstrsType::Binary(BinaryOp::Sub),
-            vec![dst.clone(), src, dst],
-        )))
-    }
-
     pub fn generate_row(&mut self, context: ObjPtr<Context>, f: &mut File) -> Result<()> {
         if self.showed {
             let mut builder = AsmBuilder::new(f);
@@ -2654,7 +2628,8 @@ fn is_cond_op(cond: ObjPtr<Inst>) -> Option<BinOp> {
 }
 
 fn get_magic(is_neg: bool, abs: i32) -> (i64, i32) {
-    let (two31, uabs, mut p, mut delta) = (1 << 31 as u32, abs as u32, 31, 0 as u32);
+    let (two31, uabs, mut p) = (1 << 31 as u32, abs as u32, 31);
+    let mut delta;
     let t = two31 + (uabs >> 31);
     let anc = t - 1 - t % uabs;
     let (mut q1, mut q2) = (two31 / anc, two31 / uabs);
@@ -2694,7 +2669,7 @@ impl BB {
     ///使用block_handle_spill_v2之前 应该先已经给spillings的寄存器分配了对应的空间了
     /// 保底有三个寄存器t1,t2,t3能够使用 (x5,x6,x7)
     /// t1,t2,t3优先分配给之前使用它们的寄存器
-    pub fn handle_spill_V2(
+    pub fn handle_spill_v2(
         &mut self,
         func: ObjPtr<Func>,
         spill: &HashSet<i32>,
@@ -2804,7 +2779,7 @@ impl BB {
     pub fn handle_spill_v3(&mut self, func: ObjPtr<Func>, pool: &mut BackendPool) {
         //维护一个表,表里面记录了能够使用的寄存器
         // todo!();
-        self.handle_spill_V2(func, &func.reg_alloc_info.spillings, pool);
+        self.handle_spill_v2(func, &func.reg_alloc_info.spillings, pool);
         return;
 
         //

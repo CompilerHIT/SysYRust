@@ -131,7 +131,7 @@ impl Allocator {
     }
 
     #[inline]
-    pub fn get_num_of_live_neighbors(&self, reg: &Reg) -> usize {
+    pub fn get_num_of_live_neighbors(&self, _reg: &Reg) -> usize {
         self.info.as_ref().unwrap().all_live_neigbhors_bitmap.len()
     }
 

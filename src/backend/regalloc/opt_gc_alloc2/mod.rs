@@ -129,7 +129,7 @@ impl Regalloc for Allocator {
         // }
         self.color_last();
         let (dstr, spillings) = self.draw_dstr_spillings();
-        let (func_stack_size, bb_sizes) = regalloc::countStackSize(func, &spillings);
+        let (func_stack_size, bb_sizes) = regalloc::count_stack_size(func, &spillings);
 
         // 检查分配结果
         let p = "tmp4.txt";

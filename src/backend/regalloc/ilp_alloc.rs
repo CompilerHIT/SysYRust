@@ -31,9 +31,9 @@ impl Regalloc for Allocator {
         func.calc_live();
         let mut dstr: HashMap<i32, i32> = HashMap::new();
         let mut spillings: HashSet<i32> = HashSet::new();
-        let (stackSize, bb_stack_sizes) = regalloc::regalloc::countStackSize(func, &spillings);
+        let (stack_size, bb_stack_sizes) = regalloc::regalloc::count_stack_size(func, &spillings);
         FuncAllocStat {
-            stack_size: stackSize,
+            stack_size: stack_size,
             bb_stack_sizes: bb_stack_sizes,
             spillings: spillings,
             dstr: dstr,

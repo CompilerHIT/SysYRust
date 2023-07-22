@@ -1,5 +1,3 @@
-use crate::log;
-
 use super::*;
 
 impl Allocator {
@@ -14,7 +12,7 @@ impl Allocator {
         // 以spill/nln为cost,优先color cost最大的节点
         // 计算这个过程产生的收获，
         // color到的虚拟寄存器的spill cost之和就是收获,收获越大越好,
-        let mut out = ActionResult::Finish;
+        let out = ActionResult::Finish;
         loop {
             let mut old_val: f32 = 0.0; //记录旧的价值
             let mut new_val: f32 = 0.0; //新的价值

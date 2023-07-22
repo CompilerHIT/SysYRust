@@ -289,7 +289,7 @@ impl Process for ConstDecl {
                             .iter()
                             .map(|x| match x {
                                 ExpValue::Int(i) => *i,
-                                ExpValue::Float(f) => {
+                                ExpValue::Float(_) => {
                                     unreachable!()
                                 }
                                 ExpValue::None => {
@@ -360,7 +360,7 @@ impl Process for ConstDecl {
                             .process((Type::ConstFloat, vec![], 0, 1), kit_mut)
                             .unwrap();
 
-                        let mut bond = 0.0;
+                        let bond;
                         match val {
                             ExpValue::Float(i) => {
                                 bond = i;

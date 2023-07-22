@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fmt::Display;
-use std::ops::Range;
 use std::vec;
 
 use crate::backend::block::BB;
@@ -102,7 +101,7 @@ impl RegUsedStat {
         // 修改为优先使用参数寄存器
         // 其次使用callee save寄存器
         // 然后使用剩余 caller save寄存器
-        let mut args = (10..=17);
+        let args = 10..=17;
         let other_caller_save = vec![1, 5, 6, 7, 28, 29, 30, 31];
         let mut callees = vec![2, 8, 9];
         callees.extend(18..=27);
@@ -132,7 +131,7 @@ impl RegUsedStat {
     // 获取一个可用的浮点寄存器
     pub fn get_available_freg(&self) -> Option<i32> {
         // 优先使用callee saved寄存器,再使用参数寄存器,最后再使用其他caller save寄存器
-        let args = (10..=17);
+        let args = 10..=17;
         let mut other_caller_save = vec![];
         other_caller_save.extend(0..=7);
         other_caller_save.extend(28..=31);
@@ -303,8 +302,6 @@ impl BlockAllocStat {
 
 #[cfg(test)]
 mod test_regusestat {
-    use crate::backend::regalloc::regalloc::Regalloc;
-
     use super::RegUsedStat;
 
     #[test]

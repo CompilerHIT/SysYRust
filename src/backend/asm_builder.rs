@@ -153,10 +153,10 @@ impl<'f> AsmBuilder<'f> {
     }
 
     pub fn show_func(&mut self, label: &str) -> Result<()> {
-        writeln!(self.f, "	.text");
-        writeln!(self.f, "	.align	1");
-        writeln!(self.f, "	.globl	{label}");
-        writeln!(self.f, "    .type {label}, @function");
+        writeln!(self.f, "	.text")?;
+        writeln!(self.f, "	.align	1")?;
+        writeln!(self.f, "	.globl	{label}")?;
+        writeln!(self.f, "    .type {label}, @function")?;
         writeln!(self.f, "{label}:")
     }
 

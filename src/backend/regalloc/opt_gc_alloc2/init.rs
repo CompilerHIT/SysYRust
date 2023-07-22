@@ -1,4 +1,4 @@
-use crate::log;
+// use crate::log;
 
 use super::*;
 
@@ -9,7 +9,7 @@ impl Allocator {
 
     pub fn init(&mut self, func: &Func) {
         let num_estimate_regs = func.num_regs();
-        let ends_index_bb = regalloc::build_ends_index_bb(func);
+        // let ends_index_bb = regalloc::build_ends_index_bb(func);
         let all_neighbors = regalloc::build_interference_into_lst(func);
         let inter_ference_graph = regalloc::build_interference(func);
         let nums_neighbor_color = regalloc::build_nums_neighbor_color(func, &inter_ference_graph);
@@ -121,7 +121,7 @@ impl Allocator {
 
         // 循环地对live_graph进行处理,不断取出其中的悬点直到无悬点可取为止
         loop {
-            let mut ifFinish = true;
+            let mut if_finish = true;
 
             // 取出悬点加入last colors
             for (reg, live_neighbors) in &all_live_neighbors {
@@ -130,7 +130,7 @@ impl Allocator {
                 if nln < na {
                     last_colors_bitmap.insert(reg.bit_code() as usize);
                     last_colors_lst.push_back(*reg);
-                    ifFinish = false;
+                    if_finish = false;
                 }
             }
             // live_graph中移除悬点
@@ -154,7 +154,7 @@ impl Allocator {
             for reg in &to_remove_keys {
                 all_live_neighbors.remove(reg);
             }
-            if ifFinish {
+            if if_finish {
                 break;
             }
         }

@@ -1,12 +1,14 @@
-use std::{
-    collections::{HashMap, HashSet, LinkedList},
-    fs::{self, File, OpenOptions},
-};
+use std::collections::{HashMap, HashSet};
+
+// use crate::{
+//     backend::{block::FLOAT_BASE, regalloc, simulator::program_stat::ProgramStat},
+//     log_file,
+//     utility::ObjPool,
+// };
 
 use crate::{
-    backend::{block::FLOAT_BASE, regalloc, simulator::program_stat::ProgramStat},
+    backend::{block::FLOAT_BASE, simulator::program_stat::ProgramStat},
     log_file,
-    utility::ObjPool,
 };
 
 use super::*;
@@ -42,7 +44,7 @@ impl BackendPass {
     fn rm_repeated_sl(&self, func: ObjPtr<Func>) {
         // 删除重复的StoreStack和重复的LoadStack
         loop {
-            let mut ifFinish = true;
+            let mut if_finish = true;
             for bb in func.blocks.iter() {
                 // last_read[key]= if true=>上一条为读记录 elif false=>上一条为写记录 else 记录不存在
                 let mut last_load: HashMap<Reg, IImm> = HashMap::new(); //记录这对寄存器在之前的栈空间对中发生了写操作
@@ -63,10 +65,6 @@ impl BackendPass {
                     }
                     let reg = inst.get_dst().drop_reg();
                     let stack_slot = inst.get_stack_offset();
-                    let m = IImm::new(0);
-                    if stack_slot == m {
-                        let b = 2;
-                    }
                     if inst_type == InstrsType::LoadFromStack {
                         if !last_load.contains_key(&reg) {
                             last_load.insert(reg, stack_slot);
@@ -95,7 +93,7 @@ impl BackendPass {
                 let mut new_insts: Vec<ObjPtr<LIRInst>> = Vec::new();
                 for (index, inst) in bb.insts.iter().enumerate() {
                     if to_removed.contains(&index) {
-                        ifFinish = false;
+                        if_finish = false;
                         log_file!(
                             "remove_load_store.txt",
                             "{}={}-{}",
@@ -109,7 +107,7 @@ impl BackendPass {
                 }
                 bb.as_mut().insts = new_insts;
             }
-            if ifFinish {
+            if if_finish {
                 break;
             }
         }
@@ -250,7 +248,7 @@ impl Func {
     }
 
     pub fn rm_repeated_la(&mut self, pool: &BackendPool) {
-        ///从这个函数的第一个块开始执行 (第一个块应该是entry中的bb的outedge中唯一的bb)
+        // 从这个函数的第一个块开始执行 (第一个块应该是entry中的bb的outedge中唯一的bb)
         debug_assert!(self.entry.unwrap().out_edge.len() == 1);
         self.calc_live_for_handle_call();
         self.build_reg_intervals();
@@ -262,7 +260,7 @@ impl Func {
         //执行到退出函数的时候则退出函数 (执行到io函数的时候则执行特定的过程)
         let mut cur_bb = first_bb;
         loop {
-            ///顺序执行某个块的指令,(直到块中没有指令且没有跳转为止)
+            // 顺序执行某个块的指令,(直到块中没有指令且没有跳转为止)
             let mut index = 0;
             if index >= cur_bb.insts.len() {
                 break;
