@@ -46,6 +46,11 @@ impl Inst {
         self.user.get_operands()
     }
 
+    /// 获得指定下标的操作数
+    pub fn get_operand(&self, index: usize) -> ObjPtr<Inst> {
+        self.user.get_operand(index)
+    }
+
     /// 设置phi指令的操作数
     /// # Arguments
     /// * 'operand' - 操作数
