@@ -1517,7 +1517,7 @@ impl Func {
     /// 该行为需要在handle call之前执行 (在这个试图看来,一个call前后除了a0的值可能发生改变,其他寄存器的值并不会发生改变)
     ///因为在handle call后有有些寄存器需要通过栈来restore,暂时还没有分析这个行为
     /// 该函数会绝对保留原本程序的结构，并且不会通过构造phi等行为增加指令,不会调整指令顺序,不会合并寄存器等等
-    pub fn p2v_pre_handle_call(&mut self, regs: HashSet<Reg>) {
+    pub fn p2v_pre_handle_call(&mut self, regs_to_decolor: HashSet<Reg>) {
         self.calc_live_for_handle_spill();
         //首先根据call上下文初始化 unchanged use 和 unchanged def.这些告诉我们哪些寄存器不能够p2v
         let mut unchanged_use: HashSet<(ObjPtr<LIRInst>, Reg)> = HashSet::new();
@@ -1610,21 +1610,131 @@ impl Func {
         let first_block = *self.entry.unwrap().out_edge.get(0).unwrap();
         let mut to_pass: LinkedList<ObjPtr<BB>> = LinkedList::new();
         to_pass.push_back(first_block);
-        let forward_passed: HashSet<(ObjPtr<BB>, Reg)> = HashSet::new();
-        let backward_passed: HashSet<(ObjPtr<BB>, Reg)> = HashSet::new();
+        let mut forward_passed: HashSet<(ObjPtr<BB>, Reg)> = HashSet::new();
+        let mut backward_passed: HashSet<(ObjPtr<BB>, Reg)> = HashSet::new();
         ///搜索单元分为正向搜索单元与反向搜索单元
-        /// 如果某个P寄存器到了一个live out中,要么是单链,则直接修改
-        /// 要么是非单链,而是多链指向的一个块,说明这个块的入边是其他块(应该给它们赋予一样的虚拟寄存器)
-        /// 所以遍历分为两种,正向和反向
-        let forward_process = |unit: &(ObjPtr<BB>, HashMap<Reg, Reg>)|->LinkedList<(ObjPtr<BB>,HashMap<Reg,Reg>)> {
-            let (bb, p2v) = unit;
-            let mut backward_lists=LinkedList::new();
-            //正向遍历会试图加入一些新的东西,到遍历列表中
-            backward_lists
-        };
-        let backward_process = || {};
-        while !to_pass.is_empty() {}
+        ///
+        for bb in self.blocks.iter() {
+            let mut old_new: HashMap<Reg, Reg> = HashMap::with_capacity(64);
+            let mut to_forward: LinkedList<(ObjPtr<BB>, Reg, Reg)> = LinkedList::new();
+            let mut to_backward: LinkedList<(ObjPtr<BB>, Reg, Reg)> = LinkedList::new();
+            ///对于live out的情况(插入一些到forward中)
+            for reg in bb.live_out.iter() {
+                //
+                if !reg.is_physic() {
+                    continue;
+                }
+                if !regs_to_decolor.contains(reg) {
+                    continue;
+                }
+                if backward_passed.contains(&(*bb, *reg)) {
+                    continue;
+                }
+                let new_reg = Reg::init(reg.get_type());
+                old_new.insert(*reg, new_reg);
+                ///加入到后出表中
+                for out_bb in bb.out_edge.iter() {
+                    debug_assert!(!forward_passed.contains(&(*out_bb, *reg)));
+                    forward_passed.insert((*out_bb, *reg));
+                    to_forward.push_back((*out_bb, *reg, new_reg));
+                }
+            }
+            for inst in bb.insts.iter().rev() {
+                for reg in inst.get_reg_def() {
+                    if !regs_to_decolor.contains(&reg) {
+                        continue;
+                    }
+                    if !reg.is_physic() {
+                        continue;
+                    }
+                    debug_assert!(reg.is_physic() && regs_to_decolor.contains(&reg));
+                    debug_assert!(old_new.contains_key(&reg));
+                    inst.as_mut().replace_reg(&reg, old_new.get(&reg).unwrap());
+                    old_new.remove(&reg);
+                }
+                for reg in inst.get_reg_use() {
+                    if !regs_to_decolor.contains(&reg) {
+                        continue;
+                    }
+                    if !reg.is_physic() {
+                        continue;
+                    }
+                    debug_assert!(reg.is_physic() && regs_to_decolor.contains(&reg));
+                    if !old_new.contains_key(&reg) {
+                        old_new.insert(reg, Reg::init(reg.get_type()));
+                    }
+                    inst.as_mut().replace_reg(&reg, old_new.get(&reg).unwrap());
+                }
+            }
+            ///对于最后剩下来的寄存器,初始化前向表
+            for (old_reg, new_reg) in old_new.iter() {
+                for in_bb in bb.in_edge.iter() {
+                    if (backward_passed.contains(&(*in_bb, *old_reg))) {
+                        continue;
+                    }
+                    backward_passed.insert((*in_bb, *old_reg));
+                    to_backward.push_back((*in_bb, *old_reg, *new_reg));
+                }
+            }
 
+            loop {
+                //遍历前后向表,反着色
+                while !to_forward.is_empty() {
+                    let (bb, old_reg, new_reg) = to_forward.pop_front().unwrap();
+                    for inst in bb.insts.iter() {
+                        inst.as_mut().replace_only_use_reg(&old_reg, &new_reg);
+                        if inst.get_reg_def().contains(&old_reg) {
+                            break;
+                        }
+                    }
+                    ///到了尽头,判断该reg是否在live in中
+                    for out_bb in bb.out_edge.iter() {
+                        let key = (*out_bb, old_reg);
+                        if forward_passed.contains(&key) {
+                            continue;
+                        }
+                        forward_passed.insert(key);
+                        to_forward.push_back((*out_bb, old_reg, new_reg));
+
+                        ///然后检查要进入的那个块是否有哪些前继块要传递
+                        for in_bb_of_out_bb in out_bb.in_edge.iter() {
+                            let key = (*in_bb_of_out_bb, old_reg);
+                            if backward_passed.contains(&key) {
+                                continue;
+                            }
+                            backward_passed.insert(key);
+                            to_backward.push_back((*in_bb_of_out_bb, old_reg, new_reg));
+                        }
+                    }
+                }
+                while !to_backward.is_empty() {
+                    let (bb, old_reg, new_reg) = to_backward.pop_front().unwrap();
+                    for inst in bb.insts.iter().rev() {
+                        if inst.get_reg_def().contains(&old_reg) {
+                            inst.as_mut().replace_only_def_reg(&old_reg, &new_reg);
+                            break;
+                        }
+                        inst.as_mut().replace_only_use_reg(&old_reg, &new_reg);
+                    }
+                    for in_bb in bb.in_edge.iter() {
+                        let key = (*in_bb, old_reg);
+                        if backward_passed.contains(&key) {
+                            continue;
+                        }
+                        backward_passed.insert(key);
+                        to_backward.push_back((*in_bb, old_reg, new_reg));
+                        for out_bb_of_in_bb in in_bb.out_edge.iter() {
+                            let key = (*out_bb_of_in_bb, old_reg);
+                            if forward_passed.contains(&key) {
+                                continue;
+                            }
+                            forward_passed.insert(key);
+                            to_forward.push_back((*out_bb_of_in_bb, old_reg, new_reg));
+                        }
+                    }
+                }
+            }
+        }
         //从基础搜索单元开始遍历
     }
 }
