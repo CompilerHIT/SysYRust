@@ -364,17 +364,22 @@ impl AsmModule {
         self.remove_unuse_inst_pre_alloc();
         
         // self.generate_row_asm(f2, pool);     //generate row  asm可能会造成bug
-        // 设置一些寄存器为临时变量
-        self.cal_tmp_var();
 
-        self.allocate_reg();
-        self.map_v_to_p();
         if is_opt {
+            // 设置一些寄存器为临时变量
+            self.cal_tmp_var();
+    
+            self.allocate_reg();
+            self.map_v_to_p();
             // 代码调度，列表调度法
             self.list_scheduling_tech();
     
             // 为临时寄存器分配寄存器
             self.clear_tmp_var();
+            self.allocate_reg();
+            self.map_v_to_p();
+            
+        } else {
             self.allocate_reg();
             self.map_v_to_p();
         }
