@@ -209,6 +209,21 @@ impl LIRInst {
         self.inst_type
     }
 
+    pub fn replace_only_use_reg(&mut self, old_reg: &Reg, new_reg: &Reg) {
+        if self.is_rhs_exist() && self.get_rhs().drop_reg() == *old_reg {
+            *self.get_rhs_mut() = Operand::Reg(*new_reg);
+        }
+        if self.is_lhs_exist() && self.get_lhs().drop_reg() == *old_reg {
+            *self.get_lhs_mut() = Operand::Reg(*new_reg);
+        }
+    }
+
+    pub fn replace_only_def_reg(&mut self, old_reg: &Reg, new_reg: &Reg) {
+        if self.operands.len() > 0 && self.get_dst().drop_reg() == *old_reg {
+            *self.get_dst_mut() = Operand::Reg(*new_reg);
+        }
+    }
+
     pub fn get_dst(&self) -> &Operand {
         &self.operands[0]
     }
@@ -222,6 +237,14 @@ impl LIRInst {
     pub fn get_lhs_mut(&mut self) -> &mut Operand {
         &mut self.operands[1]
     }
+    pub fn is_lhs_exist(&self) -> bool {
+        if self.operands.len() < 2 {
+            false
+        } else {
+            true
+        }
+    }
+
     pub fn is_rhs_exist(&self) -> bool {
         if self.operands.len() < 3 {
             false
@@ -258,6 +281,23 @@ impl LIRInst {
                         if let Some(new) = map.get(&reg.get_id()) {
                             self.operands[index] = Operand::Reg(Reg::new(*new, reg.get_type()));
                         }
+                    }
+                }
+                _ => {}
+            }
+            index += 1;
+        }
+    }
+    pub fn replace_reg(&mut self, old_reg: &Reg, new_reg: &Reg) {
+        let mut index = 0;
+        loop {
+            if index >= self.operands.len() {
+                break;
+            }
+            match self.operands[index] {
+                Operand::Reg(ref mut reg) => {
+                    if reg == old_reg {
+                        self.operands[index] = Operand::Reg(*new_reg);
                     }
                 }
                 _ => {}
