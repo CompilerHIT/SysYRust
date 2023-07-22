@@ -73,13 +73,13 @@ fn functional_optimizer(
     array_transform::array_optimize(module, &mut pools, optimize_flag);
 
     // 全局变量转换
-    global_var_transform::global_var_transform(module, &mut pools);
+    global_var_transform::global_var_transform(module, &mut pools, optimize_flag);
 
     // 函数返回值优化
     return_unused::return_unused(module);
 
     // 死代码删除
-    //dead_code_eliminate::dead_code_eliminate(module, true);
+    dead_code_eliminate::dead_code_eliminate(module, optimize_flag);
     // 全局死代码删除
     dead_code_eliminate::global_eliminate(module);
 }
