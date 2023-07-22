@@ -3,7 +3,7 @@ use crate::{
         basicblock::BasicBlock,
         instruction::{BinOp, Inst, InstKind},
         module::Module,
-        tools::{bfs_inst_process, func_process, replace_inst}, ir_type::IrType,
+        tools::{bfs_inst_process, func_process, replace_inst},
     },
     utility::{ObjPool, ObjPtr},
 };
@@ -34,9 +34,7 @@ pub fn delete_useless_inst(inst: ObjPtr<Inst>, pool: &mut ObjPool<Inst>) {
                                 replace_inst(inst, operands[0]);
                             }
                         }
-                        _ => {
-                            
-                        }
+                        _ => {}
                     },
                 }
             }
@@ -46,7 +44,7 @@ pub fn delete_useless_inst(inst: ObjPtr<Inst>, pool: &mut ObjPool<Inst>) {
                     InstKind::ConstInt(i) => {
                         if i == 1 {
                             replace_inst(inst, operands[1]);
-                        }else if i==-1{
+                        } else if i == -1 {
                             let inst_new = pool.make_neg(operands[1]);
                             inst.as_mut().insert_before(inst_new);
                             replace_inst(inst, inst_new);
@@ -56,7 +54,7 @@ pub fn delete_useless_inst(inst: ObjPtr<Inst>, pool: &mut ObjPool<Inst>) {
                         InstKind::ConstInt(i) => {
                             if i == 1 {
                                 replace_inst(inst, operands[0]);
-                            }else if i==-1{
+                            } else if i == -1 {
                                 let inst_new = pool.make_neg(operands[0]);
                                 inst.as_mut().insert_before(inst_new);
                                 replace_inst(inst, inst_new);
@@ -84,20 +82,20 @@ pub fn delete_useless_inst(inst: ObjPtr<Inst>, pool: &mut ObjPool<Inst>) {
             }
             _ => {}
         },
-        InstKind::Load =>{
+        InstKind::Load => {
             let operand = inst.get_operands();
             match operand[0].get_kind() {
-                InstKind::GlobalConstInt(i) =>{
+                InstKind::GlobalConstInt(i) => {
                     let inst_new = pool.make_int_const(i);
                     inst.as_mut().insert_before(inst_new);
                     replace_inst(inst, inst_new);
                 }
-                InstKind::GlobalConstFloat(f) =>{
+                InstKind::GlobalConstFloat(f) => {
                     let inst_new = pool.make_float_const(f);
                     inst.as_mut().insert_before(inst_new);
                     replace_inst(inst, inst_new);
                 }
-                _=>{}
+                _ => {}
             }
         }
         _ => {}

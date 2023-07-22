@@ -1,5 +1,5 @@
 //! src/ir/Instruction/mod.rs
-use std::{collections::HashSet, fmt::Debug};
+use std::fmt::Debug;
 
 ///! 此模块中存放有Inst和InstKind结构体的定义，还有
 ///! 所有Inst类型的公有方法和Head的简单实现。特定的
