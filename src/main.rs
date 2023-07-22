@@ -1,6 +1,7 @@
 use lalrpop_util::lalrpop_mod;
 use sysylib::config;
 use sysylib::frontend::preprocess::preprocess;
+use sysylib::ir::dump_now;
 extern crate biheap;
 // extern crate hexf_parse;
 // extern crate libm;
@@ -83,8 +84,8 @@ fn run_main() {
     let output2 = "row_asm.log";
 
     // 后端解析
-    let is_opt = true;
-    // let is_opt = o1_option;
+    // let is_opt = true;
+    let is_opt = o1_option;
     generate_asm(
         filename,
         output,

@@ -361,7 +361,7 @@ impl AsmModule {
         self.build_lir(pool);
         self.remove_unuse_inst_pre_alloc();
 
-        // self.generate_row_asm(f2, pool);     //generate row  asm可能会造成bug
+        self.generate_row_asm(_f2, pool);     //generate row  asm可能会造成bug
 
         if is_opt {
             // 设置一些寄存器为临时变量

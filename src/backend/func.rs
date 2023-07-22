@@ -23,9 +23,7 @@ use crate::backend::{block::*, operand};
 // use crate::backend::regalloc::{
 //     easy_ls_alloc::Allocator, regalloc::Regalloc, structs::FuncAllocStat,
 // };
-use crate::backend::regalloc::{
-    regalloc::Regalloc, structs::FuncAllocStat,
-};
+use crate::backend::regalloc::{regalloc::Regalloc, structs::FuncAllocStat};
 use crate::container::bitmap::Bitmap;
 use crate::ir::basicblock::BasicBlock;
 use crate::ir::function::Function;
@@ -411,11 +409,15 @@ impl Func {
                 }
 
                 // // 对于相邻指令，若是特殊指令则距离增加为2
-                // while let Some((l, _)) = schedule_map.iter().find(|(_, v)| **v == s - 1) {
+                // let mut visited2 = HashSet::new();
+                // while let Some((l, _)) = schedule_map
+                //     .iter()
+                //     .find(|(_, v)| **v == s - 1 && !visited2.contains(inst))
+                // {
                 //     if dep_inst_special(inst.clone(), l.clone()) {
                 //         s += 1;
                 //     } else {
-                //         break;
+                //         visited2.insert(l.clone());
                 //     }
                 // }
                 schedule_map.insert(*inst, s);
