@@ -104,12 +104,13 @@ impl Debug for InstKind {
 
 impl Debug for Inst {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let none_bb = BasicBlock::new("GlobalZone".to_string());
         write!(
             f,
             "{:?} in {:?}",
             self.kind,
             self.parent_bb
-                .unwrap_or_else(|| ObjPtr::new(&BasicBlock::new("None".to_string())))
+                .unwrap_or_else(|| ObjPtr::new(&none_bb))
                 .get_name()
         )
     }
