@@ -29,6 +29,12 @@ pub fn global_var_transform(
             transform_nonconst_var(module, pools, name, inst);
         });
 
+    let var_vec: Vec<_> = module
+        .get_all_var()
+        .iter()
+        .map(|x| (x.0.clone(), x.1.clone()).clone())
+        .collect();
+
     // 将对于全局常量的读改为读本地常量
     var_vec
         .iter()
@@ -36,7 +42,11 @@ pub fn global_var_transform(
         .for_each(|(_, x)| change_glo_to_loc(*x, pools));
 
     // 将只有一个函数在使用的全局变量改为局部变量
-
+    let var_vec: Vec<_> = module
+        .get_all_var()
+        .iter()
+        .map(|x| (x.0.clone(), x.1.clone()).clone())
+        .collect();
     // 初始化全局变量和使用这个全局变量的函数的map
     let mut map_var_func = var_vec
         .iter()
