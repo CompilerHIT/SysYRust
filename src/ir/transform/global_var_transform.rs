@@ -79,7 +79,7 @@ pub fn global_var_transform(
     // 将只有一个函数在使用的全局变量改为局部变量
     map_var_func
         .iter()
-        .filter(|(_, set)| set.len() == 1)
+        .filter(|(_, set)| set.len() == 1 && set.contains("main"))
         .for_each(|(inst, set)| {
             let new_store;
             let init;
