@@ -1531,11 +1531,6 @@ impl Func {
                 let mut used: HashSet<Reg> = inst.get_reg_use().iter().cloned().collect();
                 while index >= 0 && used.len() != 0 {
                     let inst = *bb.insts.get(index).unwrap();
-                    for reg_use in inst.get_reg_use() {
-                        if used.contains(&reg_use) {
-                            unchanged_use.insert((inst, reg_use));
-                        }
-                    }
                     for reg_def in inst.get_reg_def() {
                         if !used.contains(&reg_def) {
                             continue;
@@ -1543,7 +1538,17 @@ impl Func {
                         used.remove(&reg_def);
                         unchanged_def.insert((inst, reg_def));
                     }
+                    for reg_use in inst.get_reg_use() {
+                        if used.contains(&reg_use) {
+                            unchanged_use.insert((inst, reg_use));
+                        }
+                    }
                     index -= 1;
+                }
+
+                if used.len() != 0 {
+                    //TODO  (暂时不考虑 参数的加入不在同一个块中的情况)
+                    unreachable!();
                 }
                 let mut defined: HashSet<Reg> = inst.get_reg_def().iter().cloned().collect();
                 let mut index = i + 1;
@@ -1556,13 +1561,14 @@ impl Func {
                         }
                     }
                     for reg in inst.get_reg_def() {
-                        if used.contains(&reg) {
-                            used.remove(&reg);
+                        if defined.contains(&reg) {
+                            defined.remove(&reg);
                         }
                     }
                     index += 1;
                 }
                 if defined.len() != 0 {
+                    unreachable!();
                     ///按照目前的代码结构来说不应该存在
                     ///说明define到了live out中(说明其他块使用了这个块中的计算出的a0)
                     /// 则其他块中计算出的a0也应该使用相同的物理寄存器号(不应该改变)
@@ -1586,23 +1592,25 @@ impl Func {
                                     unchanged_use.insert((*inst, reg));
                                 }
                             }
+                            let mut ifFinish = false;
                             for def_reg in inst.get_reg_def() {
                                 if def_reg == reg {
+                                    ifFinish = true;
                                     break;
                                 }
+                            }
+                            if ifFinish {
+                                break;
                             }
                             index += 1;
                         }
                         if index == bb.insts.len() {
                             //说明可能传到live out中
                             for out_bb in bb.out_edge.iter() {
-                                for reg in defined.iter() {
-                                    to_pass.push_back((*out_bb, *reg));
-                                }
+                                to_pass.push_back((*out_bb, reg));
                             }
                         }
                     }
-                    unreachable!()
                 }
             }
         }
@@ -1634,36 +1642,48 @@ impl Func {
                 old_new.insert(*reg, new_reg);
                 ///加入到后出表中
                 for out_bb in bb.out_edge.iter() {
+                    if !out_bb.live_in.contains(reg) {
+                        continue;
+                    }
                     debug_assert!(!forward_passed.contains(&(*out_bb, *reg)));
                     forward_passed.insert((*out_bb, *reg));
                     to_forward.push_back((*out_bb, *reg, new_reg));
                 }
             }
             for inst in bb.insts.iter().rev() {
-                for reg in inst.get_reg_def() {
-                    if !regs_to_decolor.contains(&reg) {
+                for reg_def in inst.get_reg_def() {
+                    if !regs_to_decolor.contains(&reg_def) {
                         continue;
                     }
-                    if !reg.is_physic() {
+                    if !reg_def.is_physic() {
                         continue;
                     }
-                    debug_assert!(reg.is_physic() && regs_to_decolor.contains(&reg));
-                    debug_assert!(old_new.contains_key(&reg));
-                    inst.as_mut().replace_reg(&reg, old_new.get(&reg).unwrap());
-                    old_new.remove(&reg);
+                    if !old_new.contains_key(&reg_def) {
+                        continue;
+                    }
+                    debug_assert!(reg_def.is_physic() && regs_to_decolor.contains(&reg_def));
+                    debug_assert!(old_new.contains_key(&reg_def));
+                    if !unchanged_def.contains(&(*inst, reg_def)) {
+                        inst.as_mut()
+                            .replace_only_def_reg(&reg_def, old_new.get(&reg_def).unwrap());
+                    }
+                    old_new.remove(&reg_def);
                 }
-                for reg in inst.get_reg_use() {
-                    if !regs_to_decolor.contains(&reg) {
+                for reg_use in inst.get_reg_use() {
+                    if !regs_to_decolor.contains(&reg_use) {
                         continue;
                     }
-                    if !reg.is_physic() {
+                    if !reg_use.is_physic() {
                         continue;
                     }
-                    debug_assert!(reg.is_physic() && regs_to_decolor.contains(&reg));
-                    if !old_new.contains_key(&reg) {
-                        old_new.insert(reg, Reg::init(reg.get_type()));
+                    debug_assert!(reg_use.is_physic() && regs_to_decolor.contains(&reg_use));
+                    if !old_new.contains_key(&reg_use) {
+                        old_new.insert(reg_use, Reg::init(reg_use.get_type()));
                     }
-                    inst.as_mut().replace_reg(&reg, old_new.get(&reg).unwrap());
+                    if !unchanged_use.contains(&(*inst, reg_use)) {
+                        inst.as_mut()
+                            .replace_reg(&reg_use, old_new.get(&reg_use).unwrap());
+                    }
                 }
             }
             ///对于最后剩下来的寄存器,初始化前向表
@@ -1681,13 +1701,34 @@ impl Func {
                 //遍历前后向表,反着色
                 while !to_forward.is_empty() {
                     let (bb, old_reg, new_reg) = to_forward.pop_front().unwrap();
+                    //对于前向表(先进行反向试探)
+                    for in_bb in bb.in_edge.iter() {
+                        if !in_bb.live_out.contains(&old_reg) {
+                            continue;
+                        }
+                        let key = (*in_bb, old_reg);
+                        if backward_passed.contains(&key) {
+                            continue;
+                        }
+                        backward_passed.insert(key);
+                        to_backward.push_back((*in_bb, old_reg, new_reg));
+                    }
+
+                    let mut if_keep_forward = true;
+
                     for inst in bb.insts.iter() {
                         inst.as_mut().replace_only_use_reg(&old_reg, &new_reg);
                         if inst.get_reg_def().contains(&old_reg) {
+                            if_keep_forward = false;
                             break;
                         }
                     }
-                    ///到了尽头,判断该reg是否在live in中
+
+                    //如果中间结束,则直接进入下一轮
+                    if !if_keep_forward {
+                        continue;
+                    }
+                    ///到了尽头,判断是否后递
                     for out_bb in bb.out_edge.iter() {
                         let key = (*out_bb, old_reg);
                         if forward_passed.contains(&key) {
@@ -1695,26 +1736,35 @@ impl Func {
                         }
                         forward_passed.insert(key);
                         to_forward.push_back((*out_bb, old_reg, new_reg));
-
-                        ///然后检查要进入的那个块是否有哪些前继块要传递
-                        for in_bb_of_out_bb in out_bb.in_edge.iter() {
-                            let key = (*in_bb_of_out_bb, old_reg);
-                            if backward_passed.contains(&key) {
-                                continue;
-                            }
-                            backward_passed.insert(key);
-                            to_backward.push_back((*in_bb_of_out_bb, old_reg, new_reg));
-                        }
                     }
                 }
                 while !to_backward.is_empty() {
                     let (bb, old_reg, new_reg) = to_backward.pop_front().unwrap();
+                    //反向者寻找所有前向
+                    for out_bb in bb.out_edge.iter() {
+                        if !out_bb.live_in.contains(&old_reg) {
+                            continue;
+                        }
+                        let key = (*out_bb, old_reg);
+                        if forward_passed.contains(&key) {
+                            continue;
+                        }
+                        forward_passed.insert(key);
+                        to_forward.push_back((*out_bb, old_reg, new_reg));
+                    }
+
+                    let mut if_keep_backward = true;
+
                     for inst in bb.insts.iter().rev() {
                         if inst.get_reg_def().contains(&old_reg) {
                             inst.as_mut().replace_only_def_reg(&old_reg, &new_reg);
+                            if_keep_backward = false;
                             break;
                         }
                         inst.as_mut().replace_only_use_reg(&old_reg, &new_reg);
+                    }
+                    if !if_keep_backward {
+                        continue;
                     }
                     for in_bb in bb.in_edge.iter() {
                         let key = (*in_bb, old_reg);
@@ -1723,14 +1773,6 @@ impl Func {
                         }
                         backward_passed.insert(key);
                         to_backward.push_back((*in_bb, old_reg, new_reg));
-                        for out_bb_of_in_bb in in_bb.out_edge.iter() {
-                            let key = (*out_bb_of_in_bb, old_reg);
-                            if forward_passed.contains(&key) {
-                                continue;
-                            }
-                            forward_passed.insert(key);
-                            to_forward.push_back((*out_bb_of_in_bb, old_reg, new_reg));
-                        }
                     }
                 }
             }
