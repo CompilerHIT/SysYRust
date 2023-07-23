@@ -1,6 +1,11 @@
 ///! 本文件为phi指令的实现
 use super::*;
 impl ObjPool<Inst> {
+    /// 创建指定类型的phi
+    pub fn make_phi(&mut self, irtype: IrType) -> ObjPtr<Inst> {
+        self.put(Inst::new(irtype, InstKind::Phi, vec![]))
+    }
+
     /// 创建int类型的phi指令
     pub fn make_int_phi(&mut self) -> ObjPtr<Inst> {
         self.put(Inst::new(IrType::Int, InstKind::Phi, vec![]))
@@ -44,6 +49,11 @@ impl Inst {
     /// 获得phi指令的操作数列表
     pub fn get_operands(&self) -> &Vec<ObjPtr<Inst>> {
         self.user.get_operands()
+    }
+
+    /// 获得指定下标的操作数
+    pub fn get_operand(&self, index: usize) -> ObjPtr<Inst> {
+        self.user.get_operand(index)
     }
 
     /// 设置phi指令的操作数

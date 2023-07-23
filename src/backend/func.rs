@@ -1,4 +1,4 @@
-use std::cmp::{max, min};
+use std::cmp::max;
 use std::collections::LinkedList;
 pub use std::collections::{HashSet, VecDeque};
 pub use std::fs::File;
@@ -8,22 +8,22 @@ use std::io::Write;
 use std::vec::Vec;
 
 use biheap::BiHeap;
-use lazy_static::__Deref;
 
 use super::instrs::{InstrsType, SingleOp};
-use super::operand::{IImm, IMM_12_Bs};
+use super::operand::IImm;
 // use super::regalloc::structs::RegUsedStat;
-use super::{block, structs::*, BackendPool};
+use super::{structs::*, BackendPool};
 use crate::backend::asm_builder::AsmBuilder;
 use crate::backend::instrs::{BinaryOp, LIRInst, Operand};
 use crate::backend::module::AsmModule;
 use crate::backend::operand::{Reg, ARG_REG_COUNT};
 use crate::backend::regalloc::regalloc;
-use crate::backend::{block::*, func, operand};
+use crate::backend::{block::*, operand};
 // use crate::backend::regalloc::simulate_assign;
-use crate::backend::regalloc::{
-    easy_ls_alloc::Allocator, regalloc::Regalloc, structs::FuncAllocStat,
-};
+// use crate::backend::regalloc::{
+//     easy_ls_alloc::Allocator, regalloc::Regalloc, structs::FuncAllocStat,
+// };
+use crate::backend::regalloc::{regalloc::Regalloc, structs::FuncAllocStat};
 use crate::container::bitmap::Bitmap;
 use crate::ir::basicblock::BasicBlock;
 use crate::ir::function::Function;
@@ -188,7 +188,7 @@ impl Func {
             index += 1;
         }
         // 第三遍pass，拆phi
-        let mut size = 0;
+        let mut _size = 0;
         for block in self.blocks.iter() {
             if block.insts.len() == 0 {
                 continue;
@@ -221,7 +221,7 @@ impl Func {
             while let Some(inst) = phis.pop() {
                 block.as_mut().insts.insert(0, inst);
             }
-            size += block.insts.len();
+            _size += block.insts.len();
         }
         self.update(this);
     }
@@ -242,9 +242,9 @@ impl Func {
     /// 块内代码调度
     pub fn list_scheduling_tech(&mut self) {
         // 建立数据依赖图
-        let mut graph: Graph<ObjPtr<LIRInst>, (i32, ObjPtr<LIRInst>)> = Graph::new();
-        let mut control_insts: Vec<ObjPtr<LIRInst>> = Vec::new();
         for b in self.blocks.iter() {
+            let mut graph: Graph<ObjPtr<LIRInst>, (i32, ObjPtr<LIRInst>)> = Graph::new();
+            let mut control_insts: Vec<ObjPtr<LIRInst>> = Vec::new();
             // 对于涉及控制流的语句，不能进行调度
             let basicblock: Vec<ObjPtr<LIRInst>> = b
                 .insts
@@ -263,50 +263,120 @@ impl Func {
             // 对于清除掉控制流语句的块，建立数据依赖图
             for (i, inst) in basicblock.iter().rev().enumerate() {
                 let pos = basicblock.len() - i - 1;
-                log!("{}, i: {}", pos, i);
                 graph.add_node(*inst);
-                let use_vec = inst.as_ref().get_reg_use();
-                let def_vec = inst.as_ref().get_reg_def();
-                let mut near_pos = -1;
 
-                log!("inst: {}", inst.as_ref());
-                for reg in use_vec.iter() {
-                    // 若use的寄存器在def中，则不考虑
-                    if def_vec.contains(reg) {
+                // call支配后续所有指令
+                for index in 1..=pos {
+                    let i = basicblock[pos - index];
+                    if i.get_type() == InstrsType::Call {
+                        graph.add_edge(*inst, (1, i));
+                    } else {
                         continue;
                     }
+                }
 
-                    // 向上找一个use的最近def
-                    for index in 1..pos {
+                // call依赖于之前的所有指令
+                if inst.get_type() == InstrsType::Call {
+                    for index in 1..=pos {
                         let i = basicblock[pos - index];
-                        if i.get_reg_def().contains(reg) {
-                            log!("i: {}", i.as_ref());
-                            near_pos = max(near_pos, (pos - index) as i32);
-                            break;
+                        graph.add_edge(*inst, (1, i));
+                    }
+                }
+
+                // 认为load/store依赖之前的所有load/store
+                if inst.get_type() == InstrsType::Load || inst.get_type() == InstrsType::Store {
+                    for index in 1..=pos {
+                        let i = basicblock[pos - index];
+                        if i.get_type() == InstrsType::Load || i.get_type() == InstrsType::Store {
+                            graph.add_edge(*inst, (1, i));
+                        } else {
+                            continue;
                         }
                     }
                 }
 
-                log!("inst: {}, near_pos: {}", inst.as_ref(), near_pos);
+                let use_vec = inst.get_reg_use();
+                let def_vec = inst.get_reg_def();
 
-                // 若没有找到，则最近def在上一个块中，数据依赖关系不纳入考虑。否则加入图中。
-                // 对于特殊的指令，其依赖关系权重为2，即两个指令间至少有一条其他指令
-                if near_pos != -1 {
-                    let last_inst = basicblock[near_pos as usize];
-                    let weight = if dep_inst_special(*inst, last_inst) {
-                        2
-                    } else {
-                        1
-                    };
-                    graph.add_edge(*inst, (weight, last_inst));
+                for reg in use_vec.iter() {
+                    // 向上找一个use的最近def,将指令加入图中
+                    for index in 1..=pos {
+                        let i = basicblock[pos - index];
+                        if i.get_reg_def().contains(reg) {
+                            graph.add_edge(*inst, (1, i));
+                        }
+                    }
+                }
+
+                for reg in def_vec.iter() {
+                    // 向上找一个def的最近use,将指令加入图中
+                    for index in 1..=pos {
+                        let i = basicblock[pos - index];
+                        if i.get_reg_use().contains(reg) {
+                            graph.add_edge(*inst, (1, i));
+                        }
+                    }
+                }
+            }
+
+            let mut queue: VecDeque<ObjPtr<LIRInst>> = VecDeque::new();
+            let mut visited = HashSet::new();
+
+            let mut g = graph
+                .get_nodes()
+                .into_iter()
+                .map(|(n, e)| {
+                    (
+                        *n,
+                        e.iter()
+                            .map(|(_, inst)| *inst)
+                            .collect::<Vec<ObjPtr<LIRInst>>>(),
+                    )
+                })
+                .collect::<HashMap<ObjPtr<LIRInst>, Vec<ObjPtr<LIRInst>>>>();
+
+            let mut reverse_graph: HashMap<ObjPtr<LIRInst>, Vec<ObjPtr<LIRInst>>> = HashMap::new();
+            for (from, to_nodes) in g.iter() {
+                for to_node in to_nodes {
+                    reverse_graph
+                        .entry(*to_node)
+                        .or_insert(Vec::new())
+                        .push(*from);
+                }
+            }
+
+            // 拓扑排序
+            loop {
+                if queue.len() == g.len() {
+                    break;
+                }
+                // 0出度算法，出度度为0代表不依赖于其他指令
+                let mut zero_nodes: Vec<ObjPtr<LIRInst>> = Vec::new();
+                for (node, _) in graph.get_nodes().iter() {
+                    let out_nodes = g.get(node).unwrap();
+                    if out_nodes.len() == 0 && !visited.contains(node) {
+                        visited.insert(*node);
+                        queue.push_back(*node);
+                        zero_nodes.push(*node);
+                    }
+                }
+                // 在反向图中查找该节点支配的节点，从而删除两点之间的边
+                for node in zero_nodes.iter() {
+                    if let Some(in_nodes) = reverse_graph.get(node) {
+                        for in_node in in_nodes {
+                            if let Some(out_nodes) = g.get_mut(&in_node) {
+                                out_nodes.retain(|&n| n != *node);
+                            }
+                        }
+                    }
                 }
             }
 
             // 调度方案，在不考虑资源的情况下i有可能相同
             let mut schedule_map: HashMap<ObjPtr<LIRInst>, i32> = HashMap::new();
 
-            let mut s = 0;
-            for inst in basicblock.iter() {
+            let mut s;
+            for inst in queue.iter() {
                 if let Some(edges) = graph.get_edges(*inst) {
                     s = edges
                         .iter()
@@ -316,6 +386,7 @@ impl Func {
                 } else {
                     s = 0;
                 }
+
                 // 指令位置相同，若两个是特殊指令则距离增加2，否则增加1
                 while let Some((l, _)) = schedule_map.iter().find(|(_, v)| **v == s) {
                     if dep_inst_special(inst.clone(), l.clone()) {
@@ -323,22 +394,32 @@ impl Func {
                     } else {
                         s += 1;
                     }
-
-                    if def_use_near(inst.clone(), l.clone()) {
-                        s += 1;
-                    }
                 }
-                // 对于相邻指令，若是特殊指令则距离增加为2
-                while let Some((l, _)) = schedule_map.iter().find(|(_, v)| **v == s - 1) {
+
+                let mut visited: HashSet<ObjPtr<LIRInst>> = HashSet::new();
+                while let Some((l, _)) = schedule_map
+                    .iter()
+                    .find(|(inst, v)| **v == s - 1 && !visited.contains(inst))
+                {
                     if def_use_near(inst.clone(), l.clone()) {
-                        s += 1;
-                    }
-                    if dep_inst_special(inst.clone(), l.clone()) {
                         s += 1;
                     } else {
-                        break;
+                        visited.insert(l.clone());
                     }
                 }
+
+                // // 对于相邻指令，若是特殊指令则距离增加为2
+                // let mut visited2 = HashSet::new();
+                // while let Some((l, _)) = schedule_map
+                //     .iter()
+                //     .find(|(_, v)| **v == s - 1 && !visited2.contains(inst))
+                // {
+                //     if dep_inst_special(inst.clone(), l.clone()) {
+                //         s += 1;
+                //     } else {
+                //         visited2.insert(l.clone());
+                //     }
+                // }
                 schedule_map.insert(*inst, s);
             }
 
@@ -352,20 +433,20 @@ impl Func {
             });
 
             // 打印调度方案
-            for (n, s) in schedule_map.iter() {
-                log!("{} {}", n.as_ref(), s);
-            }
-
+            // 调度前
+            log_file!("before_schedule.log", "{}", b.label);
             for inst in b.insts.iter() {
-                log!("pre: {}", inst.as_ref());
+                log_file!("before_schedule.log", "{}", inst.as_ref());
             }
 
             // 移动代码
             b.as_mut().insts = schedule_res;
             b.as_mut().push_back_list(&mut control_insts);
 
+            // 调度后
+            log_file!("after_schedule.log", "{}", b.label);
             for inst in b.insts.iter() {
-                log!("{}", inst.as_ref());
+                log_file!("after_schedule.log", "{}", inst.as_ref());
             }
         }
     }
@@ -583,7 +664,7 @@ impl Func {
         // let mut allocator = crate::backend::regalloc::opt_gc_alloc2::Allocator::new();
         // let mut allocator = crate::backend::regalloc::opt_gc_alloc::Allocator::new();
         // let mut allocator = crate::backend::regalloc::base_alloc::Allocator::new();
-        let mut alloc_stat = allocator.alloc(self);
+        let alloc_stat = allocator.alloc(self);
 
         // 评价估计结果
         log_file!(
@@ -660,10 +741,9 @@ impl Func {
         self.params.append(&mut iparam);
         self.params.append(&mut fparam);
 
-        let mut offset = 0;
         let overflow_param =
             max(0, self.param_cnt.0 - ARG_REG_COUNT) + max(0, self.param_cnt.1 - ARG_REG_COUNT);
-        offset = overflow_param * ADDR_SIZE;
+        let offset = overflow_param * ADDR_SIZE;
         let mut slot = StackSlot::new(offset, offset);
         assert!(self.stack_addr.is_empty());
         self.stack_addr.push_front(StackSlot::new(0, 0));
@@ -676,7 +756,7 @@ impl Func {
     }
 
     ///做了 spill操作以及caller save和callee save的保存和恢复
-    pub fn handle_spill(&mut self, pool: &mut BackendPool, f: &mut File) {
+    pub fn handle_spill(&mut self, pool: &mut BackendPool) {
         let this = pool.put_func(self.clone());
         for block in self.blocks.iter() {
             block
@@ -746,7 +826,7 @@ impl Func {
                     }
                 }
                 if inst.get_type() == InstrsType::Call {
-                    ///找出 caller saved
+                    //找出 caller saved
                     let mut to_saved: Vec<Reg> = Vec::new();
                     for reg in live_now.iter() {
                         if reg.is_caller_save() && reg.get_id() != 1 {
@@ -876,7 +956,7 @@ impl Func {
     }
 
     /// 为要保存的callee save寄存器开栈,然后开栈以及处理 callee save的保存和恢复
-    pub fn save_callee(&mut self, pool: &mut BackendPool, f: &mut File) {
+    pub fn save_callee(&mut self, f: &mut File) {
         let mut callee_map: HashMap<Reg, StackSlot> = HashMap::new();
         if self.label == "main" {
             self.build_stack_info(f, callee_map, true);
@@ -926,7 +1006,6 @@ impl Func {
         // log!("caller saved: {}", self.caller_saved.len());
         //栈对齐 - 调用func时sp需按16字节对齐
         stack_size = stack_size / 16 * 16 + 16;
-        let (icnt, fcnt) = self.param_cnt;
         self.context.as_mut().set_offset(stack_size - ADDR_SIZE);
 
         let ra = Reg::new(1, ScalarType::Int);
@@ -1054,20 +1133,19 @@ impl Func {
         });
     }
 
-    pub fn generate_row(&mut self, _: ObjPtr<Context>, f: &mut File) -> Result<()> {
+    pub fn generate_row(&mut self, _: ObjPtr<Context>, f: &mut File) {
         debug_assert!(|| -> bool {
             AsmBuilder::new(f).show_func(&self.label);
             // self.context.as_mut().call_prologue_event();
-            let mut size = 0;
+            let mut _size = 0;
             for block in self.blocks.iter() {
-                size += block.insts.len();
+                _size += block.insts.len();
             }
             for block in self.blocks.iter() {
                 block.as_mut().generate_row(self.context, f);
             }
             true
         }());
-        Ok(())
     }
 }
 
@@ -1088,30 +1166,29 @@ impl Func {
 }
 
 impl GenerateAsm for Func {
-    fn generate(&mut self, _: ObjPtr<Context>, f: &mut File) -> Result<()> {
+    fn generate(&mut self, _: ObjPtr<Context>, f: &mut File) {
         if self.const_array.len() > 0 || self.float_array.len() > 0 {
-            writeln!(f, "	.data\n   .align  3")?;
+            writeln!(f, "	.data\n   .align  3").unwrap();
         }
         if self.is_header {
             for mut a in self.const_array.clone() {
-                a.generate(self.context, f)?;
+                a.generate(self.context, f);
             }
             for mut a in self.float_array.clone() {
-                a.generate(self.context, f)?;
+                a.generate(self.context, f);
             }
         }
-        AsmBuilder::new(f).show_func(&self.label)?;
+        AsmBuilder::new(f).show_func(&self.label);
         self.context.as_mut().call_prologue_event();
-        let mut size = 0;
+        let mut _size = 0;
         for block in self.blocks.iter() {
-            size += block.insts.len();
+            _size += block.insts.len();
         }
         // log!("tatol {}", size);
         for block in self.blocks.iter() {
-            block.as_mut().generate(self.context, f)?;
+            block.as_mut().generate(self.context, f);
         }
-        writeln!(f, "	.size	{}, .-{}", self.label, self.label)?;
-        Ok(())
+        writeln!(f, "	.size	{}, .-{}", self.label, self.label).unwrap();
     }
 }
 
@@ -1159,7 +1236,7 @@ impl Func {
     // 获取所有虚拟寄存器和用到的物理寄存器
     pub fn draw_all_virtual_regs(&self) -> HashSet<Reg> {
         let mut passed = HashSet::new();
-        let mut out = self.blocks.iter().for_each(|bb| {
+        self.blocks.iter().for_each(|bb| {
             bb.insts.iter().for_each(|inst| {
                 for reg in inst.get_regs() {
                     if reg.is_physic() {
@@ -1177,7 +1254,7 @@ impl Func {
 /// 当前func的spill不能够与v1的spill完美替换
 impl Func {
     /// 为spilling 寄存器预先分配空间 的 handle spill
-    pub fn handle_spill_v2(&mut self, pool: &mut BackendPool, f: &mut File) {
+    pub fn handle_spill_v2(&mut self, pool: &mut BackendPool) {
         // 首先给这个函数分配spill的空间
         self.calc_live_for_handle_spill();
         self.assign_stack_slot_for_spill();
@@ -1185,7 +1262,7 @@ impl Func {
         for block in self.blocks.iter() {
             block
                 .as_mut()
-                .handle_spill_V2(this, &self.reg_alloc_info.spillings, pool);
+                .handle_spill_v2(this, &self.reg_alloc_info.spillings, pool);
         }
         self.update(this);
     }
@@ -1304,9 +1381,6 @@ impl Func {
             while !lst.is_empty() {
                 let toassign = lst.pop_front().unwrap();
                 log_file!(path, "assign:{}", toassign);
-                if toassign.get_id() == 776 {
-                    let a = 2;
-                }
                 if self.spill_stack_map.contains_key(&toassign) {
                     unreachable!()
                 }
@@ -1383,7 +1457,7 @@ impl Func {
     pub fn remove_unuse_def(&mut self) {
         loop {
             self.calc_live_for_alloc_reg();
-            let mut ifFinish = true;
+            let mut if_finish = true;
             for bb in self.blocks.iter() {
                 let mut new_insts: Vec<ObjPtr<LIRInst>> = Vec::with_capacity(bb.insts.len());
                 let mut to_removed: HashSet<usize> = HashSet::new();
@@ -1410,7 +1484,7 @@ impl Func {
                 //清楚阶段, 清除之前标记的指令
                 for (index, inst) in bb.insts.iter().enumerate() {
                     if to_removed.contains(&index) {
-                        ifFinish = false;
+                        if_finish = false;
                         log_file!(
                             "remove_unusedef.txt",
                             ":{}-{}:{}",
@@ -1424,7 +1498,7 @@ impl Func {
                 }
                 bb.as_mut().insts = new_insts;
             }
-            if ifFinish {
+            if if_finish {
                 break;
             }
         }
@@ -1570,9 +1644,6 @@ impl Func {
                 reg
             );
             for pred in block.as_ref().in_edge.iter() {
-                if block.label == ".LBB0_5" && pred.label == ".LBB0_1" {
-                    let a = 2;
-                }
                 if pred.as_mut().live_out.insert(reg) {
                     if pred.as_mut().live_def.contains(&reg) {
                         continue;
@@ -1835,9 +1906,9 @@ impl Func {
     }
 
     /// 给局部静态数组改名,加上指定后缀
-    pub fn suffix_local_arr(&mut self, suffix: &String) {
-        todo!();
-    }
+    // pub fn suffix_local_arr(&mut self, suffix: &String) {
+    //     todo!();
+    // }
 
     ///函数分裂用到的函数的真实深度克隆
     pub fn real_deep_clone(&self, pool: &mut BackendPool) -> ObjPtr<Func> {
@@ -1887,7 +1958,7 @@ impl Func {
         // new_func.caller_saved = self.caller_saved.clone();
         // new_func.caller_saved_len = self.caller_saved_len; //TODO,修改
         new_func.array_slot = self.array_slot.iter().cloned().collect();
-        ///对 array inst 进行复制
+        // 对 array inst 进行复制
         new_func.array_inst.clear();
         for inst in self.array_inst.iter() {
             let new_inst = old_to_new_insts.get(inst).unwrap();
@@ -1904,11 +1975,9 @@ impl Func {
         pool: &mut BackendPool,
         callers_used: &HashMap<String, HashSet<Reg>>,
     ) {
-        ///
         self.calc_live_for_handle_call();
         self.print_func();
         let mut slots_for_caller_saved: Vec<StackSlot> = Vec::new();
-        ///
         // self.print_func();
         for bb in self.blocks.iter() {
             let mut new_insts: Vec<ObjPtr<LIRInst>> = Vec::new();
@@ -1923,7 +1992,7 @@ impl Func {
                 }
 
                 if inst.get_type() == InstrsType::Call {
-                    ///找出 caller saved
+                    // 找出 caller saved
                     let mut to_saved: Vec<Reg> = Vec::new();
                     for reg in live_now.iter() {
                         //需要注意ra寄存器虽然是caller saved,但是不需要用栈空间方式进行restore

@@ -1,5 +1,5 @@
 //! src/ir/Instruction/mod.rs
-use std::{collections::HashSet, fmt::Debug};
+use std::fmt::Debug;
 
 ///! 此模块中存放有Inst和InstKind结构体的定义，还有
 ///! 所有Inst类型的公有方法和Head的简单实现。特定的
@@ -104,12 +104,13 @@ impl Debug for InstKind {
 
 impl Debug for Inst {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let none_bb = BasicBlock::new("GlobalZone".to_string());
         write!(
             f,
             "{:?} in {:?}",
             self.kind,
             self.parent_bb
-                .unwrap_or_else(|| ObjPtr::new(&BasicBlock::new("None".to_string())))
+                .unwrap_or_else(|| ObjPtr::new(&none_bb))
                 .get_name()
         )
     }

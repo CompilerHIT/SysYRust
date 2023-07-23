@@ -1,16 +1,13 @@
-use crate::log;
+// use crate::log;
 use crate::utility::ScalarType;
-use std::{
-    collections::HashSet,
-    fmt::{format, Display},
-};
+use std::{collections::HashSet, fmt::Display};
 
 use super::{block::FLOAT_BASE, instrs::Operand};
 pub const REG_COUNT: i32 = 32;
 pub const ARG_REG_COUNT: i32 = 8;
 pub const REG_SP: i32 = 2;
-pub const IMM_12_Bs: i32 = 2047;
-pub const IMM_20_Bs: i32 = 524287;
+pub const IMM_12_BS: i32 = 2047;
+pub const IMM_20_BS: i32 = 524287;
 pub static mut REG_ID: i32 = 64;
 
 #[derive(Clone, Copy, PartialEq, Hash, Eq, Debug)]
@@ -59,10 +56,10 @@ impl FImm {
 }
 
 pub fn is_imm_20bs(imm: i32) -> bool {
-    imm >= -IMM_20_Bs - 1 && imm <= IMM_20_Bs
+    imm >= -IMM_20_BS - 1 && imm <= IMM_20_BS
 }
 pub fn is_imm_12bs(imm: i32) -> bool {
-    imm >= -IMM_12_Bs - 1 && imm <= IMM_12_Bs
+    imm >= -IMM_12_BS - 1 && imm <= IMM_12_BS
 }
 
 pub trait ToString {

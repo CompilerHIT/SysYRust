@@ -1,5 +1,4 @@
 use crate::{
-    backend::operand,
     frontend::context::Type,
     ir::basicblock::BasicBlock,
     ir::instruction::Inst,

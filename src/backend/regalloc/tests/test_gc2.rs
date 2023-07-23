@@ -1,11 +1,10 @@
 #[cfg(test)]
 mod test {
-    use std::collections::{HashMap, HashSet, VecDeque};
+    use std::collections::{HashMap, HashSet};
 
-    use biheap::BiHeap;
     #[test]
     fn test_get_ltzero() {
-        let m: Vec<i32> = Vec::new();
+        // let m: Vec<i32> = Vec::new();
         // let g = m.get(0 - 1);
     }
 
@@ -14,7 +13,7 @@ mod test {
         let mut m = HashMap::new();
         m.insert(1, 3);
         m.insert(2, 4);
-        let mut cm = m.clone();
+        let cm = m.clone();
         assert_eq!(m.len(), cm.len());
         for (k, v) in m.iter() {
             let ck = cm.get(k).unwrap();

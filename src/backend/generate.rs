@@ -2,7 +2,7 @@ use super::{instrs::*, operand::is_imm_12bs};
 use crate::backend::operand::ToString;
 use std::fs::File;
 impl GenerateAsm for LIRInst {
-    fn generate(&mut self, context: ObjPtr<Context>, f: &mut File) -> Result<()> {
+    fn generate(&mut self, context: ObjPtr<Context>, f: &mut File) {
         let mut builder = AsmBuilder::new(f);
         let row = context.is_row;
         match self.get_type() {
@@ -20,17 +20,15 @@ impl GenerateAsm for LIRInst {
                     BinaryOp::Shl => "sll",
                     BinaryOp::Shr => "srl",
                     BinaryOp::Sar => "sra",
-                    BinaryOp::FCmp(cmp) => {
-                        match cmp {
-                            CmpOp::Eq => "eq",
-                            CmpOp::Ne => "ne",
-                            CmpOp::Lt => "lt",
-                            CmpOp::Le => "le",
-                            CmpOp::Gt => "gt",
-                            CmpOp::Ge => "ge",
-                            _ => unreachable!()
-                        }
-                    }
+                    BinaryOp::FCmp(cmp) => match cmp {
+                        CmpOp::Eq => "eq",
+                        CmpOp::Ne => "ne",
+                        CmpOp::Lt => "lt",
+                        CmpOp::Le => "le",
+                        CmpOp::Gt => "gt",
+                        CmpOp::Ge => "ge",
+                        _ => unreachable!(),
+                    },
                 };
                 let mut is_imm = match op {
                     "add" | "sub" | "and" | "or" | "xor" | "sll" | "srl" | "sra" | "slt" => true,
@@ -69,8 +67,7 @@ impl GenerateAsm for LIRInst {
                     Operand::IImm(iimm) => iimm.to_string(),
                     _ => panic!("rhs of binary op must be reg or imm, to improve"),
                 };
-                builder.op2(op, &dst, &lhs, &rhs, is_imm, is_double)?;
-                Ok(())
+                builder.op2(op, &dst, &lhs, &rhs, is_imm, is_double);
             }
             InstrsType::OpReg(op) => {
                 let mut op = match op {
@@ -95,13 +92,13 @@ impl GenerateAsm for LIRInst {
                             is_float = true;
                         }
                         reg.to_string(row)
-                    },
+                    }
                     Operand::IImm(iimm) => {
                         if is_imm_12bs(iimm.get_data()) && op == "li" {
                             op = "addiw";
                         }
                         iimm.to_string()
-                    },
+                    }
                     Operand::FImm(fimm) => fimm.to_string(),
                     Operand::Addr(addr) => addr.to_string(),
                 };
@@ -109,8 +106,7 @@ impl GenerateAsm for LIRInst {
                 if is_float && (op == "mv" || op == "neg") {
                     op = fop
                 }
-                builder.op1(op, &dst, &src)?;
-                Ok(())
+                builder.op1(op, &dst, &src);
             }
             InstrsType::Load => {
                 let mut builder = AsmBuilder::new(f);
@@ -135,14 +131,13 @@ impl GenerateAsm for LIRInst {
                     }
                 };
 
-                builder.l(&dst, &addr, offset.get_data(), is_float, self.is_double())?;
-                Ok(())
+                builder.l(&dst, &addr, offset.get_data(), is_float, self.is_double());
             }
             InstrsType::Store => {
                 let mut builder = AsmBuilder::new(f);
                 let offset = self.get_offset();
                 // if !operand::is_imm_12bs(offset.get_data()) {
-                //     panic!("illegal offset, {:?}", self);
+                //     panic!("illegal offset, {:}", self);
                 // }
                 let mut is_float = self.is_float();
                 let src = match self.get_dst() {
@@ -163,8 +158,7 @@ impl GenerateAsm for LIRInst {
                         self
                     ),
                 };
-                builder.s(&src, &addr, offset.get_data(), is_float, self.is_double())?;
-                Ok(())
+                builder.s(&src, &addr, offset.get_data(), is_float, self.is_double());
             }
 
             InstrsType::StoreToStack => {
@@ -191,8 +185,7 @@ impl GenerateAsm for LIRInst {
                     offset,
                     is_float,
                     self.is_double(),
-                )?;
-                Ok(())
+                );
             }
             InstrsType::LoadFromStack => {
                 let mut builder = AsmBuilder::new(f);
@@ -219,8 +212,7 @@ impl GenerateAsm for LIRInst {
                     offset,
                     is_float,
                     self.is_double(),
-                )?;
-                Ok(())
+                );
             }
             InstrsType::LoadParamFromStack => {
                 let mut builder = AsmBuilder::new(f);
@@ -248,8 +240,7 @@ impl GenerateAsm for LIRInst {
                     true_offset,
                     is_float,
                     self.is_double(),
-                )?;
-                Ok(())
+                );
             }
 
             InstrsType::StoreParamToStack => {
@@ -276,8 +267,7 @@ impl GenerateAsm for LIRInst {
                     true_offset,
                     is_float,
                     self.is_double(),
-                )?;
-                Ok(())
+                );
             }
             // 判断！是否需要多插入一条j，间接跳转到
             InstrsType::Branch(cond) => {
@@ -300,15 +290,14 @@ impl GenerateAsm for LIRInst {
                     _ => unreachable!("branch block's lhs must be reg"),
                 };
                 if cond == "eqz" {
-                    builder.beqz(&lhs, &label)?;
+                    builder.beqz(&lhs, &label);
                 } else {
                     let rhs = match self.get_rhs() {
                         Operand::Reg(reg) => reg.to_string(row),
                         _ => unreachable!("branch block's rhs must be reg"),
                     };
-                    builder.b(cond, &lhs, &rhs, &label)?;
+                    builder.b(cond, &lhs, &rhs, &label);
                 }
-                Ok(())
             }
             InstrsType::Jump => {
                 let mut builder = AsmBuilder::new(f);
@@ -316,8 +305,7 @@ impl GenerateAsm for LIRInst {
                     Operand::Addr(label) => label.to_string(),
                     _ => unreachable!("jump block's label must be string"),
                 };
-                builder.j(&label)?;
-                Ok(())
+                builder.j(&label);
             }
             InstrsType::Call => {
                 //TODO:
@@ -326,14 +314,12 @@ impl GenerateAsm for LIRInst {
                     Operand::Addr(label) => label.to_string(),
                     _ => unreachable!("call block's label must be string"),
                 };
-                builder.call(&func_name)?;
-                Ok(())
+                builder.call(&func_name);
             }
             InstrsType::Ret(..) => {
                 context.as_mut().call_epilogue_event();
                 let mut builder = AsmBuilder::new(f);
-                builder.ret()?;
-                Ok(())
+                builder.ret();
             }
         }
     }

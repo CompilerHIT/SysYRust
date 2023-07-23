@@ -129,7 +129,6 @@ impl Allocator {
         // 移除着色并且取出颜色
         let color = *self.get_color(reg).unwrap();
         self.get_mut_colors().remove(&reg.get_id());
-        let mut out = false;
         // let mut to_despill = LinkedList::new(); //暂存decolor过程中发现的能够拯救回来的寄存器
         // todo
         let mut num_live_neighbors = self.get_live_neighbors(reg).len();
@@ -170,7 +169,7 @@ impl Allocator {
                 panic!("gg{},{}", reg, neighbor);
             }
         }
-        out
+        false
     }
 
     /// 给某个虚拟寄存器使用某种特定颜色进行着色

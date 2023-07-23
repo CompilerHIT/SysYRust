@@ -1,6 +1,9 @@
 use super::*;
 use crate::ir::{
-    analysis::scev::{scevexp::SCEVExpKind, SCEVAnalyzer},
+    analysis::{
+        dominator_tree::calculate_dominator,
+        scev::{scevexp::SCEVExpKind, SCEVAnalyzer},
+    },
     instruction::InstKind,
 };
 
@@ -10,11 +13,12 @@ pub fn loop_unrolling(
     loop_map: &mut HashMap<String, LoopList>,
     pools: &mut (&mut ObjPool<BasicBlock>, &mut ObjPool<Inst>),
 ) {
-    func_process(module, |name, _func| loop {
+    func_process(module, |name, func| loop {
         let mut flag = false;
         let loop_list = loop_map.get_mut(&name).unwrap();
         let mut analyzer = SCEVAnalyzer::new();
-        analyzer.set_loops(&loop_list);
+        let dominator_tree = calculate_dominator(func.get_head());
+        analyzer.set_dominator_tree(ObjPtr::new(&dominator_tree));
         let mut remove_list = None;
         for loop_info in loop_list.get_loop_list().iter() {
             if loop_info.get_sub_loops().len() == 0 && loop_info.get_current_loop_bb().len() == 2 {
@@ -43,17 +47,17 @@ fn attempt_loop_unrolling(
     let mut rec_add = None;
     let mut inst = loop_info.get_header().get_head_inst();
     while let InstKind::Phi = inst.get_kind() {
-        if let SCEVExpKind::SCEVAddRecExpr = analyzer.analyze(inst).get_kind() {
+        if let SCEVExpKind::SCEVRecExpr = analyzer.analyze(&inst).get_kind() {
             rec_add = Some(inst);
         }
         inst = inst.get_next();
     }
 
     if let Some(inst) = rec_add {
-        let rec_add = analyzer.analyze(inst);
-        let start = rec_add.get_add_rec_start();
-        let step = rec_add.get_add_rec_step();
-        let end = rec_add.get_add_rec_end_cond(loop_info);
+        let rec_add = analyzer.analyze(&inst);
+        let start = rec_add.get_scev_rec_start();
+        let step = rec_add.get_scev_rec_step();
+        let end = rec_add.get_scev_rec_end_cond(loop_info);
         if start.is_const() && step.is_const() && end.len() == 1 {
             let end = end[0];
             match end.get_kind() {

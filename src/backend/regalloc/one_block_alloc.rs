@@ -5,21 +5,9 @@
 2.合并寄存器
  */
 
-use crate::{
-    backend::{
-        operand::Reg,
-        regalloc::{easy_gc_alloc, structs::FuncAllocStat},
-    },
-    container::bitmap::Bitmap,
-    log_file, log_file_uln,
-};
-use core::panic;
-use std::{
-    collections::{HashMap, HashSet, LinkedList, VecDeque},
-    fs,
-};
+use crate::backend::regalloc::structs::FuncAllocStat;
 
-use super::regalloc::{self, Regalloc};
+use super::regalloc::Regalloc;
 
 pub struct Allocator {}
 

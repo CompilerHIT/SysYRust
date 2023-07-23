@@ -72,25 +72,23 @@ pub fn generate_asm(
         Ok(f) => f,
         Err(e) => panic!("Create    output path error: {}", e),
     };
-    writeln!(file, "	.file	\"{}\"", in_path);
-    writeln!(file, "	.option pic");
-    writeln!(file, "    .text");
+    writeln!(file, "	.file	\"{}\"", in_path).unwrap();
+    writeln!(file, "	.option pic").unwrap();
+    writeln!(file, "    .text").unwrap();
     let mut pool = BackendPool::new();
     let mut file2 = File::create(row_path).unwrap();
 
     //构造
     // module.build(&mut file, &mut file2, &mut pool);
-    module.build_v3(&mut file, &mut file2, &mut pool);
     // module.build_v2(&mut file, &mut file2, &mut pool);
-    // module.build(&mut file, &mut file2, &mut pool);
-    // module.build_v2(&mut file, &mut file2, &mut pool);
+    module.build_v3(&mut file, &mut file2, &mut pool, is_opt);
     // module.generate_row_asm(&mut file2, &mut pool);
-    //优化
+
+    // 后端优化
     if is_opt {
         BackendPass::new(ObjPtr::new(module)).run_pass(&mut pool);
     }
-    // module.generate_row_asm(&mut file2, &mut pool);
-    // module.generate_row_asm(&mut file2, &mut pool);
+
     // 检查地址溢出，插入间接寻址
     module.handle_overflow(&mut pool);
 
@@ -98,13 +96,16 @@ pub fn generate_asm(
     if is_opt {
         BackendPass::new(ObjPtr::new(module)).run_addition_block_pass();
     }
+
     //生成抽象汇编
     // module.generate_row_asm(&mut file2, &mut pool);
+
     //生成汇编
     module.generate_asm(&mut file, &mut pool);
+    
     //释放
     pool.free_all();
 
     // writeln!(file, "    .ident	\"GCC: (Ubuntu 9.4.0-1ubuntu1~20.04) 9.4.0\"");
-    writeln!(file, "    .section	.note.GNU-stack,\"\",@progbits");
+    writeln!(file, "    .section	.note.GNU-stack,\"\",@progbits").unwrap();
 }

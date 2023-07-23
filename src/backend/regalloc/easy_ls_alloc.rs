@@ -1,29 +1,22 @@
 // 或者可以认为是没有启发的线性扫描寄存器分配
 
-use std::{
-    collections::{HashMap, HashSet, VecDeque},
-    fs,
-};
-
-use biheap::BiHeap;
+use std::collections::{HashMap, HashSet};
 
 use crate::{
     backend::{
-        block,
-        instrs::{Func, BB},
+        instrs::BB,
         operand::Reg,
         regalloc::{self, regalloc::Regalloc, structs::RegUsedStat},
     },
-    frontend::ast::{Break, Continue},
-    log, log_file,
-    utility::{ObjPtr, ScalarType},
+    log_file,
+    utility::ObjPtr,
 };
 
 use super::structs::FuncAllocStat;
 
-const easy_ls_path: &str = "easyls.txt";
+const EASY_LS_PATH: &str = "easyls.txt";
 
-struct BlocksVec(Vec<ObjPtr<BB>>);
+// struct BlocksVec(Vec<ObjPtr<BB>>);
 
 pub struct Allocator {}
 
@@ -35,7 +28,7 @@ impl Allocator {
 
 impl Regalloc for Allocator {
     fn alloc(&mut self, func: &crate::backend::instrs::Func) -> FuncAllocStat {
-        log_file!(easy_ls_path, "func:{}", func.label);
+        log_file!(EASY_LS_PATH, "func:{}", func.label);
         let mut colors: HashMap<i32, i32> = HashMap::new();
         let mut spillings: HashSet<i32> = HashSet::new();
         let ends_index_bb = regalloc::regalloc::build_ends_index_bb(func);
@@ -54,7 +47,7 @@ impl Regalloc for Allocator {
 
         let mut blocks: Vec<ObjPtr<BB>> = func.blocks.iter().cloned().collect();
         // blocks.sort_by_key(|bb| bb.live_in.len());
-        ///基础着色,
+        // 基础着色,
         Allocator::alloc_one_opt(
             &blocks,
             &ends_index_bb,
@@ -90,11 +83,11 @@ impl Regalloc for Allocator {
             break;
         }
         // TODO,循环裂变着色
-        let (stackSize, bb_stack_sizes) = regalloc::regalloc::countStackSize(func, &spillings);
+        let (stack_size, bb_stack_sizes) = regalloc::regalloc::count_stack_size(func, &spillings);
         FuncAllocStat {
-            stack_size: stackSize,
-            bb_stack_sizes: bb_stack_sizes,
-            spillings: spillings,
+            stack_size,
+            bb_stack_sizes,
+            spillings,
             dstr: colors,
         }
     }
@@ -109,7 +102,7 @@ impl Allocator {
         colors: &mut HashMap<i32, i32>,
         spill_costs: &HashMap<Reg, f32>,
     ) -> bool {
-        ///基础着色
+        // 基础着色
         let mut fixed: HashSet<i32> = HashSet::new();
         for (reg, _) in colors.iter() {
             fixed.insert(*reg);
@@ -119,7 +112,7 @@ impl Allocator {
             let mut reg_use_stat: RegUsedStat = RegUsedStat::new();
             let mut live_now: HashSet<Reg> = HashSet::new();
             let mut last_used: HashMap<i32, Reg> = HashMap::new();
-            log_file!(easy_ls_path, "{},live in:{:?}", bb.label, bb.live_in);
+            log_file!(EASY_LS_PATH, "{},live in:{:?}", bb.label, bb.live_in);
             bb.live_in.iter().for_each(|reg| {
                 if reg.is_physic() || colors.contains_key(&reg.get_id()) {
                     Allocator::process_one_reg_fixed(
@@ -194,15 +187,15 @@ impl Allocator {
         colors: &mut HashMap<i32, i32>,
         spill_costs: &HashMap<Reg, f32>,
     ) {
-        ///基础着色
+        // 基础着色
         for bb in blocks.iter() {
             // 对于bb,首先从 live in中找出已用颜色
             let mut reg_use_stat: RegUsedStat = RegUsedStat::new();
             let mut live_now: HashSet<Reg> = HashSet::new();
             let mut last_used: HashMap<i32, Reg> = HashMap::new();
-            log_file!(easy_ls_path, "{},live in:{:?}", bb.label, bb.live_in);
+            log_file!(EASY_LS_PATH, "{},live in:{:?}", bb.label, bb.live_in);
             log_file!(
-                easy_ls_path,
+                EASY_LS_PATH,
                 "insts:{:?}",
                 bb.as_ref()
                     .insts
@@ -291,13 +284,13 @@ impl Allocator {
         };
         if !last_used.contains_key(&color) {
             // debug_assert!(reg_use_stat.is_available_reg(color), "color:{color}");    //比如zero 就不是available的
-            log_file!(easy_ls_path, "init color:{color}");
+            log_file!(EASY_LS_PATH, "init color:{color}");
             reg_use_stat.use_reg(color);
             last_used.insert(color, reg);
         } else if !reg.is_physic() {
             let last_used_reg = last_used.get(&color).unwrap();
             if last_used_reg.is_physic() {
-                log_file!(easy_ls_path, "spill:{reg}");
+                log_file!(EASY_LS_PATH, "spill:{reg}");
                 colors.remove(&reg.get_id());
                 spillings.insert(reg.get_id());
             } else {
@@ -305,22 +298,22 @@ impl Allocator {
                 let last_spill_cost = spill_costs.get(last_used_reg);
                 let cur_spill_cost = spill_costs.get(&reg);
                 if last_spill_cost > cur_spill_cost {
-                    log_file!(easy_ls_path, "spill:{reg}");
+                    log_file!(EASY_LS_PATH, "spill:{reg}");
                     colors.remove(&reg.get_id());
                     spillings.insert(reg.get_id());
                 } else {
-                    log_file!(easy_ls_path, "spill:{last_used_reg}");
+                    log_file!(EASY_LS_PATH, "spill:{last_used_reg}");
                     spillings.insert(last_used_reg.get_id());
                     colors.remove(&last_used_reg.get_id());
                     last_used.insert(color, reg);
                 }
             }
         } else if reg.is_physic() {
-            log_file!(easy_ls_path, "{reg}({color}),{last_used:?}");
+            log_file!(EASY_LS_PATH, "{reg}({color}),{last_used:?}");
             let last_use_reg = *last_used.get(&color).unwrap();
             debug_assert!(!last_use_reg.is_physic());
             colors.remove(&last_use_reg.get_id());
-            log_file!(easy_ls_path, "spill:{}", last_use_reg.get_id());
+            log_file!(EASY_LS_PATH, "spill:{}", last_use_reg.get_id());
             spillings.insert(last_use_reg.get_id());
             last_used.insert(color, reg);
         } else {
@@ -351,7 +344,7 @@ impl Allocator {
         };
         if !last_used.contains_key(&color) {
             // debug_assert!(reg_use_stat.is_available_reg(color), "color:{color}");    //比如zero 就不是available的
-            log_file!(easy_ls_path, "init color:{color}");
+            log_file!(EASY_LS_PATH, "init color:{color}");
             reg_use_stat.use_reg(color);
             last_used.insert(color, reg);
         } else if !reg.is_physic() {
@@ -360,7 +353,7 @@ impl Allocator {
                 !(fixed.contains(&last_used_reg.get_id()) && fixed.contains(&reg.get_id()))
             );
             if last_used_reg.is_physic() {
-                log_file!(easy_ls_path, "spill:{reg}");
+                log_file!(EASY_LS_PATH, "spill:{reg}");
                 colors.remove(&reg.get_id());
                 spillings.insert(reg.get_id());
             } else if fixed.contains(&last_used_reg.get_id()) {
@@ -374,18 +367,18 @@ impl Allocator {
                 let last_spill_cost = spill_costs.get(last_used_reg);
                 let cur_spill_cost = spill_costs.get(&reg);
                 if last_spill_cost > cur_spill_cost {
-                    log_file!(easy_ls_path, "spill:{reg}");
+                    log_file!(EASY_LS_PATH, "spill:{reg}");
                     colors.remove(&reg.get_id());
                     spillings.insert(reg.get_id());
                 } else {
-                    log_file!(easy_ls_path, "spill:{last_used_reg}");
+                    log_file!(EASY_LS_PATH, "spill:{last_used_reg}");
                     spillings.insert(last_used_reg.get_id());
                     colors.remove(&last_used_reg.get_id());
                     last_used.insert(color, reg);
                 }
             }
         } else if reg.is_physic() {
-            log_file!(easy_ls_path, "{reg}({color}),{last_used:?}");
+            log_file!(EASY_LS_PATH, "{reg}({color}),{last_used:?}");
             let last_use_reg = *last_used.get(&color).unwrap();
             debug_assert!(!last_use_reg.is_physic());
             colors.remove(&last_use_reg.get_id());
@@ -403,9 +396,6 @@ impl Allocator {
         colors: &mut HashMap<i32, i32>,
         last_used: &mut HashMap<i32, Reg>,
     ) -> bool {
-        if reg.get_id() == 70 {
-            let a = 2;
-        }
         debug_assert!(!colors.contains_key(&reg.get_id()));
         debug_assert!(!spillings.contains(&reg.get_id()));
         let color = reg_use_stat.get_available_reg(reg.get_type());
@@ -414,7 +404,7 @@ impl Allocator {
             return false;
         } else {
             let color = color.unwrap();
-            log_file!(easy_ls_path, "color:{}({})", reg, color);
+            log_file!(EASY_LS_PATH, "color:{}({})", reg, color);
             colors.insert(reg.get_id(), color);
             reg_use_stat.use_reg(color);
             last_used.insert(color, *reg);

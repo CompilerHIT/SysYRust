@@ -1,10 +1,6 @@
-use rand::seq::index;
-
-use crate::backend::regalloc;
-use crate::backend::regalloc::structs::RegUsedStat;
 use crate::config;
 pub use crate::log;
-use crate::log_file;
+// use crate::log_file;
 use std::cmp::max;
 use std::cmp::min;
 pub use std::collections::{HashSet, VecDeque};
@@ -25,7 +21,6 @@ use crate::utility::{ObjPtr, ScalarType};
 use super::instrs::AsmBuilder;
 use super::operand::ARG_REG_COUNT;
 use super::operand::{FImm, ToString};
-use super::regalloc::structs::FuncAllocStat;
 use super::{structs::*, BackendPool};
 use crate::backend::operand;
 
@@ -108,9 +103,9 @@ impl BB {
                 InstKind::Binary(op) => {
                     let lhs = inst_ref.get_lhs();
                     let rhs = inst_ref.get_rhs();
-                    let mut lhs_reg;
-                    let mut rhs_reg;
-                    let mut dst_reg: Operand =
+                    let lhs_reg;
+                    let rhs_reg;
+                    let dst_reg: Operand =
                         self.resolve_operand(func, ir_block_inst, true, map_info, pool);
                     match op {
                         //TODO: Float Binary
@@ -526,7 +521,7 @@ impl BB {
                     // 在开启ir优化后，所有的非main函数都是递归函数，需要在栈上分配空间
                     // 而对于main函数的所有数组都可以当做全局数组使用
                     if func.label == "main" {
-                        let mut first = false;
+                        let first;
                         match inst_ref.get_ir_type() {
                             IrType::IntPtr => {
                                 let array: Vec<i32> =
@@ -821,8 +816,8 @@ impl BB {
 
                     match cond_ref.get_kind() {
                         InstKind::Binary(cond) => {
-                            let mut lhs_reg = Operand::IImm(IImm::new(0));
-                            let mut rhs_reg = Operand::IImm(IImm::new(0));
+                            let lhs_reg;
+                            let rhs_reg;
                             if let Some(lhs_cond) = is_cond_op(cond_ref.get_lhs()) {
                                 lhs_reg = self.resolve_bool(
                                     func,
@@ -860,7 +855,7 @@ impl BB {
                             }
 
                             let mut bz = false;
-                            let mut inst_kind = match cond {
+                            let inst_kind = match cond {
                                 BinOp::Eq => InstrsType::Branch(CmpOp::Ne),
                                 BinOp::Ne => InstrsType::Branch(CmpOp::Eq),
                                 BinOp::Ge => InstrsType::Branch(CmpOp::Lt),
@@ -1086,31 +1081,9 @@ impl BB {
                                         }
                                     };
 
-                                    // 避免覆盖
-                                    // let stack_addr = &func.as_ref().stack_addr;
-                                    // let last = stack_addr.front().unwrap();
-                                    // let pos = last.get_pos() + ADDR_SIZE;
-
-                                    // let slot = StackSlot::new(pos, ADDR_SIZE);
-                                    // func.as_mut().stack_addr.push_front(slot);
-                                    // func.as_mut()
-                                    //     .spill_stack_map
-                                    //     .insert(Reg::new(10 + icnt, ScalarType::Int), slot);
-                                    // let mut inst = LIRInst::new(
-                                    //     InstrsType::StoreParamToStack,
-                                    //     vec![dst_reg.clone(), Operand::IImm(IImm::new(pos))],
-                                    // );
-                                    // inst.set_double();
-                                    // self.insts.push(pool.put_inst(inst));
-
-                                    let tmp = Operand::Reg(Reg::init(ScalarType::Int));
                                     self.insts.push(pool.put_inst(LIRInst::new(
                                         InstrsType::OpReg(SingleOp::Mv),
-                                        vec![tmp.clone(), src_reg],
-                                    )));
-                                    self.insts.push(pool.put_inst(LIRInst::new(
-                                        InstrsType::OpReg(SingleOp::Mv),
-                                        vec![dst_reg.clone(), tmp],
+                                        vec![dst_reg.clone(), src_reg],
                                     )));
                                 }
                             }
@@ -1178,32 +1151,9 @@ impl BB {
                                         }
                                     };
 
-                                    // 避免覆盖
-                                    // let stack_addr = &func.as_ref().stack_addr;
-                                    // let last = stack_addr.front().unwrap();
-                                    // let pos = last.get_pos() + ADDR_SIZE;
-
-                                    // let slot = StackSlot::new(pos, ADDR_SIZE);
-                                    // func.as_mut().stack_addr.push_front(slot);
-                                    // func.as_mut().spill_stack_map.insert(
-                                    //     Reg::new(FLOAT_BASE + 10 + fcnt, ScalarType::Float),
-                                    //     slot,
-                                    // );
-                                    // let mut inst = LIRInst::new(
-                                    //     InstrsType::StoreParamToStack,
-                                    //     vec![dst_reg.clone(), Operand::IImm(IImm::new(pos))],
-                                    // );
-                                    // inst.set_double();
-                                    // self.insts.push(pool.put_inst(inst));
-
-                                    let tmp = Operand::Reg(Reg::init(ScalarType::Float));
                                     self.insts.push(pool.put_inst(LIRInst::new(
                                         InstrsType::OpReg(SingleOp::Mv),
-                                        vec![tmp.clone(), src_reg],
-                                    )));
-                                    self.insts.push(pool.put_inst(LIRInst::new(
-                                        InstrsType::OpReg(SingleOp::Mv),
-                                        vec![dst_reg.clone(), tmp],
+                                        vec![dst_reg.clone(), src_reg],
                                     )));
                                 }
                             }
@@ -1318,13 +1268,24 @@ impl BB {
                 },
                 InstKind::ItoF => {
                     let dst_reg = self.resolve_operand(func, ir_block_inst, true, map_info, pool);
-                    let src_reg = self.resolve_operand(
-                        func,
-                        ir_block_inst.get_int_to_float_value(),
-                        true,
-                        map_info,
-                        pool,
-                    );
+                    let src_reg;
+                    if let Some(cond) = is_cond_op(ir_block_inst.get_int_to_float_value()) {
+                        src_reg = self.resolve_bool(
+                            func,
+                            cond,
+                            ir_block_inst.get_int_to_float_value(),
+                            map_info,
+                            pool,
+                        )
+                    } else {
+                        src_reg = self.resolve_operand(
+                            func,
+                            ir_block_inst.get_int_to_float_value(),
+                            true,
+                            map_info,
+                            pool,
+                        );
+                    }
                     self.insts.push(pool.put_inst(LIRInst::new(
                         InstrsType::OpReg(SingleOp::I2F),
                         vec![dst_reg, src_reg],
@@ -1347,7 +1308,7 @@ impl BB {
 
                 InstKind::Phi => {
                     let phi_reg = self.resolve_operand(func, ir_block_inst, false, map_info, pool);
-                    let mut kind = ScalarType::Void;
+                    let kind;
                     let temp = match phi_reg {
                         Operand::Reg(reg) => {
                             assert!(reg.get_type() != ScalarType::Void);
@@ -1607,7 +1568,7 @@ impl BB {
                         index += 1;
                     } else {
                         let last_slot = func.stack_addr.back().unwrap();
-                        let mut pos = last_slot.get_pos() + last_slot.get_size();
+                        let pos = last_slot.get_pos() + last_slot.get_size();
                         let stack_slot = StackSlot::new(pos, ADDR_SIZE);
                         func.as_mut().stack_addr.push_back(stack_slot);
                         func.as_mut().spill_stack_map.insert(*r, stack_slot);
@@ -1733,9 +1694,6 @@ impl BB {
                 InstrsType::LoadFromStack | InstrsType::StoreToStack => {
                     let temp = Operand::Reg(Reg::new(8, ScalarType::Int));
                     let offset = inst_ref.get_stack_offset().get_data();
-                    if offset == 2112 {
-                        let b = 4;
-                    }
                     if operand::is_imm_12bs(offset) {
                         pos += 1;
                         continue;
@@ -2158,8 +2116,8 @@ impl BB {
         pool: &mut BackendPool,
     ) -> Operand {
         let dst_reg = self.resolve_operand(func, src, true, map, pool);
-        let mut lhs_reg = Operand::IImm(IImm::new(0));
-        let mut rhs_reg = Operand::IImm(IImm::new(0));
+        let mut lhs_reg;
+        let mut rhs_reg;
         let lhs = src.get_lhs();
         let rhs = src.get_rhs();
         if let Some(lhs_cond) = is_cond_op(lhs) {
@@ -2172,96 +2130,132 @@ impl BB {
         } else {
             rhs_reg = self.resolve_operand(func, rhs, false, map, pool);
         }
-        let is_limm = match lhs_reg {
-            Operand::IImm(..) | Operand::FImm(..) => true,
-            Operand::Reg(..) => false,
+        let (is_limm, is_lfloat) = match lhs_reg {
+            Operand::IImm(..) => (true, false),
+            Operand::FImm(..) => (true, true),
+            Operand::Reg(reg) => match reg.get_type() {
+                ScalarType::Int => (false, false),
+                ScalarType::Float => (false, true),
+                _ => unreachable!("reg type must be int or float"),
+            },
             Operand::Addr(..) => unreachable!("reg cannot be addr"),
         };
-        let is_rimm = match rhs_reg {
-            Operand::IImm(..) | Operand::FImm(..) => true,
-            Operand::Reg(..) => false,
+        let (is_rimm, is_rfloat) = match rhs_reg {
+            Operand::IImm(..) => (true, false),
+            Operand::FImm(..) => (true, true),
+            Operand::Reg(reg) => match reg.get_type() {
+                ScalarType::Int => (false, false),
+                ScalarType::Float => (false, true),
+                _ => unreachable!("reg type must be int or float"),
+            },
             Operand::Addr(..) => unreachable!("reg cannot be addr"),
         };
-        match cond {
-            BinOp::Eq | BinOp::Ne => {
-                // 允许交换
-                if is_limm {
-                    if !is_rimm {
-                        let tmp = rhs_reg.clone();
-                        rhs_reg = lhs_reg.clone();
-                        lhs_reg = tmp;
-                    } else {
-                        lhs_reg = self.resolve_operand(func, lhs, true, map, pool)
+
+        // 如果是浮点数比较则左右操作数一定都是浮点类型
+        debug_assert_eq!(is_lfloat, is_rfloat);
+        if is_lfloat {
+            if is_limm {
+                lhs_reg = self.resolve_operand(func, lhs, true, map, pool);
+            }
+            if is_rimm {
+                rhs_reg = self.resolve_operand(func, rhs, true, map, pool);
+            }
+            let kind = match cond {
+                BinOp::Eq => InstrsType::Binary(BinaryOp::FCmp(CmpOp::Eq)),
+                BinOp::Ne => InstrsType::Binary(BinaryOp::FCmp(CmpOp::Ne)),
+                BinOp::Ge => InstrsType::Binary(BinaryOp::FCmp(CmpOp::Ge)),
+                BinOp::Le => InstrsType::Binary(BinaryOp::FCmp(CmpOp::Le)),
+                BinOp::Gt => InstrsType::Binary(BinaryOp::FCmp(CmpOp::Gt)),
+                BinOp::Lt => InstrsType::Binary(BinaryOp::FCmp(CmpOp::Lt)),
+                _ => unreachable!(),
+            };
+            self.insts.push(pool.put_inst(LIRInst::new(
+                kind,
+                vec![dst_reg.clone(), lhs_reg.clone(), rhs_reg.clone()],
+            )));
+        } else {
+            match cond {
+                BinOp::Eq | BinOp::Ne => {
+                    // 允许交换
+                    if is_limm {
+                        if !is_rimm {
+                            let tmp = rhs_reg.clone();
+                            rhs_reg = lhs_reg.clone();
+                            lhs_reg = tmp;
+                        } else {
+                            lhs_reg = self.resolve_operand(func, lhs, true, map, pool)
+                        }
+                    }
+                    self.insts.push(pool.put_inst(LIRInst::new(
+                        InstrsType::Binary(BinaryOp::Xor),
+                        vec![dst_reg.clone(), lhs_reg, rhs_reg],
+                    )));
+                    match cond {
+                        BinOp::Eq => self.insts.push(pool.put_inst(LIRInst::new(
+                            InstrsType::OpReg(SingleOp::Seqz),
+                            vec![dst_reg.clone(), dst_reg.clone()],
+                        ))),
+                        BinOp::Ne => self.insts.push(pool.put_inst(LIRInst::new(
+                            InstrsType::OpReg(SingleOp::Snez),
+                            vec![dst_reg.clone(), dst_reg.clone()],
+                        ))),
+                        _ => unreachable!("no more cond"),
                     }
                 }
-                self.insts.push(pool.put_inst(LIRInst::new(
-                    InstrsType::Binary(BinaryOp::Xor),
-                    vec![dst_reg.clone(), lhs_reg, rhs_reg],
-                )));
-                match cond {
-                    BinOp::Eq => self.insts.push(pool.put_inst(LIRInst::new(
-                        InstrsType::OpReg(SingleOp::Seqz),
-                        vec![dst_reg.clone(), dst_reg.clone()],
-                    ))),
-                    BinOp::Ne => self.insts.push(pool.put_inst(LIRInst::new(
-                        InstrsType::OpReg(SingleOp::Snez),
-                        vec![dst_reg.clone(), dst_reg.clone()],
-                    ))),
-                    _ => unreachable!("no more cond"),
+                // 不允许交换
+                BinOp::Lt => {
+                    if is_limm {
+                        lhs_reg = self.resolve_operand(func, lhs, true, map, pool);
+                    }
+                    self.insts.push(pool.put_inst(LIRInst::new(
+                        InstrsType::Binary(BinaryOp::Slt),
+                        vec![dst_reg.clone(), lhs_reg, rhs_reg],
+                    )))
                 }
-            }
-            // 不允许交换
-            BinOp::Lt => {
-                if is_limm {
-                    lhs_reg = self.resolve_operand(func, lhs, true, map, pool);
+                BinOp::Gt => {
+                    // a > b 变为 b < a
+                    if is_rimm {
+                        rhs_reg = self.resolve_operand(func, rhs, true, map, pool);
+                    }
+                    self.insts.push(pool.put_inst(LIRInst::new(
+                        InstrsType::Binary(BinaryOp::Slt),
+                        vec![dst_reg.clone(), rhs_reg, lhs_reg],
+                    )))
                 }
-                self.insts.push(pool.put_inst(LIRInst::new(
-                    InstrsType::Binary(BinaryOp::Slt),
-                    vec![dst_reg.clone(), lhs_reg, rhs_reg],
-                )))
-            }
-            BinOp::Gt => {
-                // a > b 变为 b < a
-                if is_rimm {
-                    rhs_reg = self.resolve_operand(func, rhs, true, map, pool);
+                BinOp::Le => {
+                    // a <= b 变为 !(b < a)
+                    if is_rimm {
+                        rhs_reg = self.resolve_operand(func, rhs, true, map, pool);
+                    }
+                    let tmp = Operand::Reg(Reg::init(ScalarType::Int));
+                    self.insts.push(pool.put_inst(LIRInst::new(
+                        InstrsType::Binary(BinaryOp::Slt),
+                        vec![tmp.clone(), rhs_reg, lhs_reg],
+                    )));
+                    self.insts.push(pool.put_inst(LIRInst::new(
+                        InstrsType::Binary(BinaryOp::Xor),
+                        vec![dst_reg.clone(), tmp, Operand::IImm(IImm::new(1))],
+                    )));
                 }
-                self.insts.push(pool.put_inst(LIRInst::new(
-                    InstrsType::Binary(BinaryOp::Slt),
-                    vec![dst_reg.clone(), rhs_reg, lhs_reg],
-                )))
-            }
-            BinOp::Le => {
-                // a <= b 变为 !(b < a)
-                if is_rimm {
-                    rhs_reg = self.resolve_operand(func, rhs, true, map, pool);
+                BinOp::Ge => {
+                    // a >= b 变为 !(a < b)
+                    if is_limm {
+                        lhs_reg = self.resolve_operand(func, lhs, true, map, pool);
+                    }
+                    let tmp = Operand::Reg(Reg::init(ScalarType::Int));
+                    self.insts.push(pool.put_inst(LIRInst::new(
+                        InstrsType::Binary(BinaryOp::Slt),
+                        vec![tmp.clone(), lhs_reg, rhs_reg],
+                    )));
+                    self.insts.push(pool.put_inst(LIRInst::new(
+                        InstrsType::Binary(BinaryOp::Xor),
+                        vec![dst_reg.clone(), tmp.clone(), Operand::IImm(IImm::new(1))],
+                    )));
                 }
-                let tmp = Operand::Reg(Reg::init(ScalarType::Int));
-                self.insts.push(pool.put_inst(LIRInst::new(
-                    InstrsType::Binary(BinaryOp::Slt),
-                    vec![tmp.clone(), rhs_reg, lhs_reg],
-                )));
-                self.insts.push(pool.put_inst(LIRInst::new(
-                    InstrsType::Binary(BinaryOp::Xor),
-                    vec![dst_reg.clone(), tmp, Operand::IImm(IImm::new(1))],
-                )));
+                _ => unreachable!("cond not illegal"),
             }
-            BinOp::Ge => {
-                // a >= b 变为 !(a < b)
-                if is_limm {
-                    lhs_reg = self.resolve_operand(func, lhs, true, map, pool);
-                }
-                let tmp = Operand::Reg(Reg::init(ScalarType::Int));
-                self.insts.push(pool.put_inst(LIRInst::new(
-                    InstrsType::Binary(BinaryOp::Slt),
-                    vec![tmp.clone(), lhs_reg, rhs_reg],
-                )));
-                self.insts.push(pool.put_inst(LIRInst::new(
-                    InstrsType::Binary(BinaryOp::Xor),
-                    vec![dst_reg.clone(), tmp.clone(), Operand::IImm(IImm::new(1))],
-                )));
-            }
-            _ => unreachable!("cond not illegal"),
         }
+
         dst_reg
     }
 
@@ -2301,17 +2295,18 @@ impl BB {
                         )))
                     }
                 } else if is_opt_num(abs - 1) {
+                    let tmp = Operand::Reg(Reg::init(ScalarType::Int));
                     self.insts.push(pool.put_inst(LIRInst::new(
                         InstrsType::Binary(BinaryOp::Shl),
                         vec![
-                            dst.clone(),
+                            tmp.clone(),
                             src.clone(),
                             Operand::IImm(IImm::new(log2(abs - 1))),
                         ],
                     )));
                     self.insts.push(pool.put_inst(LIRInst::new(
                         InstrsType::Binary(BinaryOp::Add),
-                        vec![dst.clone(), dst.clone(), src],
+                        vec![dst.clone(), tmp.clone(), src],
                     )));
                     if is_neg {
                         self.insts.push(pool.put_inst(LIRInst::new(
@@ -2320,17 +2315,18 @@ impl BB {
                         )))
                     }
                 } else if is_opt_num(abs + 1) {
+                    let tmp = Operand::Reg(Reg::init(ScalarType::Int));
                     self.insts.push(pool.put_inst(LIRInst::new(
                         InstrsType::Binary(BinaryOp::Shl),
                         vec![
-                            dst.clone(),
+                            tmp.clone(),
                             src.clone(),
                             Operand::IImm(IImm::new(log2(abs + 1))),
                         ],
                     )));
                     self.insts.push(pool.put_inst(LIRInst::new(
                         InstrsType::Binary(BinaryOp::Sub),
-                        vec![dst.clone(), dst.clone(), src],
+                        vec![dst.clone(), tmp.clone(), src],
                     )));
                     if is_neg {
                         self.insts.push(pool.put_inst(LIRInst::new(
@@ -2384,13 +2380,14 @@ impl BB {
             InstrsType::Binary(BinaryOp::Shl),
             vec![temp.clone(), src.clone(), Operand::IImm(IImm::new(power))],
         )));
+        let tmp2 = Operand::Reg(Reg::init(ScalarType::Int));
         self.insts.push(pool.put_inst(LIRInst::new(
             InstrsType::Binary(BinaryOp::Shl),
-            vec![dst.clone(), src.clone(), Operand::IImm(IImm::new(bits))],
+            vec![tmp2.clone(), src.clone(), Operand::IImm(IImm::new(bits))],
         )));
         self.insts.push(pool.put_inst(LIRInst::new(
             combine_inst_kind,
-            vec![dst.clone(), dst.clone(), temp],
+            vec![dst.clone(), tmp2.clone(), temp],
         )));
         if is_neg {
             self.insts.push(pool.put_inst(LIRInst::new(
@@ -2428,21 +2425,23 @@ impl BB {
                         InstrsType::Binary(BinaryOp::Sar),
                         vec![tmp.clone(), src.clone(), Operand::IImm(IImm::new(bits - 1))],
                     )));
+                    let tmp2 = Operand::Reg(Reg::init(ScalarType::Int));
                     self.insts.push(pool.put_inst(LIRInst::new(
                         InstrsType::Binary(BinaryOp::Shr),
                         vec![
-                            tmp.clone(),
+                            tmp2.clone(),
                             tmp.clone(),
                             Operand::IImm(IImm::new(32 - bits)),
                         ],
                     )));
+                    let tmp3 = Operand::Reg(Reg::init(ScalarType::Int));
                     self.insts.push(pool.put_inst(LIRInst::new(
                         InstrsType::Binary(BinaryOp::Add),
-                        vec![tmp.clone(), tmp.clone(), src.clone()],
+                        vec![tmp3.clone(), tmp2.clone(), src.clone()],
                     )));
                     self.insts.push(pool.put_inst(LIRInst::new(
                         InstrsType::Binary(BinaryOp::Sar),
-                        vec![dst, tmp, Operand::IImm(IImm::new(log2(abs)))],
+                        vec![dst, tmp3, Operand::IImm(IImm::new(log2(abs)))],
                     )))
                 } else {
                     let (magic, shift) = get_magic(is_neg, abs);
@@ -2453,35 +2452,39 @@ impl BB {
                         vec![tmp.clone(), Operand::Addr(magic.to_string())],
                     )));
                     // q = floor(M * an / 2^32)
+                    let tmp2 = Operand::Reg(Reg::init(ScalarType::Int));
                     let mut inst = LIRInst::new(
                         InstrsType::Binary(BinaryOp::Mul),
-                        vec![dst.clone(), tmp.clone(), src.clone()],
+                        vec![tmp2.clone(), tmp.clone(), src.clone()],
                     );
                     inst.set_double();
                     self.insts.push(pool.put_inst(inst));
 
+                    let tmp3 = Operand::Reg(Reg::init(ScalarType::Int));
                     let mut inst = LIRInst::new(
                         InstrsType::Binary(BinaryOp::Shr),
-                        vec![dst.clone(), dst.clone(), Operand::IImm(IImm::new(32))],
+                        vec![tmp3.clone(), tmp2.clone(), Operand::IImm(IImm::new(32))],
                     );
                     inst.set_double();
                     self.insts.push(pool.put_inst(inst));
                     // q = q >> s
                     // shrsi q, q, s
+                    let tmp4 = Operand::Reg(Reg::init(ScalarType::Int));
                     self.insts.push(pool.put_inst(LIRInst::new(
                         InstrsType::Binary(BinaryOp::Sar),
-                        vec![dst.clone(), dst.clone(), Operand::IImm(IImm::new(shift))],
+                        vec![tmp4.clone(), tmp3.clone(), Operand::IImm(IImm::new(shift))],
                     )));
                     // add 1 to q if n is neg
                     // shri t, n, 31
+                    let tmp5 = Operand::Reg(Reg::init(ScalarType::Int));
                     self.insts.push(pool.put_inst(LIRInst::new(
                         InstrsType::Binary(BinaryOp::Shr),
-                        vec![tmp.clone(), src.clone(), Operand::IImm(IImm::new(31))],
+                        vec![tmp5.clone(), src.clone(), Operand::IImm(IImm::new(31))],
                     )));
                     // add q, q, t
                     self.insts.push(pool.put_inst(LIRInst::new(
                         InstrsType::Binary(BinaryOp::Add),
-                        vec![dst.clone(), dst.clone(), tmp.clone()],
+                        vec![dst.clone(), tmp5.clone(), tmp4.clone()],
                     )));
                 }
             }
@@ -2515,31 +2518,34 @@ impl BB {
                     ],
                 )));
             } else {
+                let tmp2 = Operand::Reg(Reg::init(ScalarType::Int));
                 self.insts.push(pool.put_inst(LIRInst::new(
                     InstrsType::Binary(BinaryOp::Sar),
                     vec![
-                        tmp.clone(),
+                        tmp2.clone(),
                         lhs_reg.clone(),
                         Operand::IImm(IImm::new(k - 1)),
                     ],
                 )));
                 self.insts.push(pool.put_inst(LIRInst::new(
                     InstrsType::Binary(BinaryOp::Shr),
-                    vec![tmp.clone(), tmp.clone(), Operand::IImm(IImm::new(32 - k))],
+                    vec![tmp.clone(), tmp2.clone(), Operand::IImm(IImm::new(32 - k))],
                 )));
             }
+            let tmp3 = Operand::Reg(Reg::init(ScalarType::Int));
             self.insts.push(pool.put_inst(LIRInst::new(
                 InstrsType::Binary(BinaryOp::Add),
-                vec![dst.clone(), lhs_reg.clone(), tmp.clone()],
+                vec![tmp3.clone(), lhs_reg.clone(), tmp.clone()],
             )));
             let abs_reg = self.resolve_iimm(abs - 1, pool);
+            let tmp4 = Operand::Reg(Reg::init(ScalarType::Int));
             self.insts.push(pool.put_inst(LIRInst::new(
                 InstrsType::Binary(BinaryOp::And),
-                vec![dst.clone(), dst.clone(), abs_reg],
+                vec![tmp4.clone(), tmp3.clone(), abs_reg],
             )));
             self.insts.push(pool.put_inst(LIRInst::new(
                 InstrsType::Binary(BinaryOp::Sub),
-                vec![dst.clone(), dst.clone(), tmp.clone()],
+                vec![dst.clone(), tmp4.clone(), tmp.clone()],
             )));
         } else {
             let tmp1 = Operand::Reg(Reg::init(ScalarType::Int));
@@ -2553,49 +2559,29 @@ impl BB {
         }
     }
 
-    fn has_div_rem(
-        &mut self,
-        imm: i32,
-        div_res: Operand,
-        dst: Operand,
-        src: Operand,
-        pool: &mut BackendPool,
-    ) {
-        // 余数
-        // r = n - q * imm
-        //FIXME:负数求余
-        self.find_opt_mul(imm, dst.clone(), div_res, pool);
-        self.insts.push(pool.put_inst(LIRInst::new(
-            InstrsType::Binary(BinaryOp::Sub),
-            vec![dst.clone(), src, dst],
-        )))
-    }
-
-    pub fn generate_row(&mut self, context: ObjPtr<Context>, f: &mut File) -> Result<()> {
+    pub fn generate_row(&mut self, context: ObjPtr<Context>, f: &mut File) {
         if self.showed {
             let mut builder = AsmBuilder::new(f);
-            builder.show_block(&self.label)?;
+            builder.show_block(&self.label);
         }
         context.as_mut().is_row = true;
         for inst in self.insts.iter() {
-            inst.as_mut().generate(context.clone(), f)?;
+            inst.as_mut().generate(context.clone(), f);
         }
-        Ok(())
     }
 }
 impl GenerateAsm for BB {
-    fn generate(&mut self, context: ObjPtr<Context>, f: &mut File) -> Result<()> {
+    fn generate(&mut self, context: ObjPtr<Context>, f: &mut File) {
         if self.showed {
             let mut builder = AsmBuilder::new(f);
-            builder.show_block(&self.label)?;
+            builder.show_block(&self.label);
         }
         context.as_mut().is_row = false;
         // log!("generate bb:{}", self.label);
         for inst in self.insts.iter() {
             // log!("generate inst:{:?}", inst);
-            inst.as_mut().generate(context.clone(), f)?;
+            inst.as_mut().generate(context.clone(), f);
         }
-        Ok(())
     }
 }
 
@@ -2642,7 +2628,8 @@ fn is_cond_op(cond: ObjPtr<Inst>) -> Option<BinOp> {
 }
 
 fn get_magic(is_neg: bool, abs: i32) -> (i64, i32) {
-    let (two31, uabs, mut p, mut delta) = (1 << 31 as u32, abs as u32, 31, 0 as u32);
+    let (two31, uabs, mut p) = (1 << 31 as u32, abs as u32, 31);
+    let mut delta;
     let t = two31 + (uabs >> 31);
     let anc = t - 1 - t % uabs;
     let (mut q1, mut q2) = (two31 / anc, two31 / uabs);
@@ -2682,7 +2669,7 @@ impl BB {
     ///使用block_handle_spill_v2之前 应该先已经给spillings的寄存器分配了对应的空间了
     /// 保底有三个寄存器t1,t2,t3能够使用 (x5,x6,x7)
     /// t1,t2,t3优先分配给之前使用它们的寄存器
-    pub fn handle_spill_V2(
+    pub fn handle_spill_v2(
         &mut self,
         func: ObjPtr<Func>,
         spill: &HashSet<i32>,
@@ -2792,7 +2779,7 @@ impl BB {
     pub fn handle_spill_v3(&mut self, func: ObjPtr<Func>, pool: &mut BackendPool) {
         //维护一个表,表里面记录了能够使用的寄存器
         // todo!();
-        self.handle_spill_V2(func, &func.reg_alloc_info.spillings, pool);
+        self.handle_spill_v2(func, &func.reg_alloc_info.spillings, pool);
         return;
 
         //

@@ -15,11 +15,17 @@ pub fn return_unused(module: &mut Module) {
         }
     });
 
-    func_process(module, |_, func| {
+    func_process(module, |func_name, func| {
         bfs_inst_process(func.get_head(), |inst| {
             if let InstKind::Call(callee) = inst.get_kind() {
                 if call_map.contains_key(&callee) {
-                    if inst.get_use_list().len() == 0 {
+                    if inst.get_use_list().len() == 0
+                        || (func_name == callee
+                            && inst.get_use_list().iter().all(|x| {
+                                x.is_return()
+                                    || x.is_phi() && x.get_use_list().iter().all(|y| y.is_return())
+                            }))
+                    {
                         call_map.get_mut(&callee).unwrap().insert(inst);
                     } else {
                         call_map.remove_entry(&callee);

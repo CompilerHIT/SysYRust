@@ -15,11 +15,7 @@ use crate::{
     container::bitmap::Bitmap,
     log_file, log_file_uln,
 };
-use core::panic;
-use std::{
-    collections::{HashMap, HashSet, LinkedList, VecDeque},
-    fs,
-};
+use std::collections::{HashSet, LinkedList};
 
 use super::regalloc::{self, Regalloc};
 
@@ -27,8 +23,8 @@ pub struct Allocator {
     easy_gc_allocator: easy_gc_alloc::Allocator,
 
     k_graph: (LinkedList<Reg>, Bitmap), //用来实现弦图优化
-    interference_graph_lst: HashMap<Reg, LinkedList<Reg>>, //遍历节点的冲突用
-    tosave_regs: LinkedList<Reg>,       //保存等待拯救的寄存器,或者说save寄存器
+    // interference_graph_lst: HashMap<Reg, LinkedList<Reg>>, //遍历节点的冲突用
+    tosave_regs: LinkedList<Reg>, //保存等待拯救的寄存器,或者说save寄存器
 }
 
 impl Allocator {
@@ -37,7 +33,7 @@ impl Allocator {
             easy_gc_allocator: easy_gc_alloc::Allocator::new(),
             k_graph: (LinkedList::new(), Bitmap::new()),
             tosave_regs: LinkedList::new(),
-            interference_graph_lst: HashMap::new(),
+            // interference_graph_lst: HashMap::new(),
         }
     }
 
@@ -124,7 +120,7 @@ impl Allocator {
     }
 
     // 选择一个价值最大节点spill
-    pub fn opt_spill_one(&mut self, reg: Reg) {}
+    pub fn opt_spill_one(&mut self) {}
 
     // 改变节点颜色
     pub fn opt_simplify_one(&mut self) {}
@@ -159,7 +155,7 @@ impl Regalloc for Allocator {
         // self.color_k_graph();
 
         let (spillings, dstr) = self.easy_gc_allocator.alloc_register();
-        let (func_stack_size, bb_sizes) = regalloc::countStackSize(func, &spillings);
+        let (func_stack_size, bb_sizes) = regalloc::count_stack_size(func, &spillings);
         let mut out = FuncAllocStat {
             stack_size: func_stack_size,
             bb_stack_sizes: bb_sizes,

@@ -8,8 +8,7 @@ pub use crate::backend::block::BB;
 pub use crate::backend::func::Func;
 use crate::backend::operand::*;
 pub use crate::backend::structs::{Context, GenerateAsm};
-use crate::ir::instruction::Inst;
-use crate::log_file;
+// use crate::log_file;
 pub use crate::utility::{ObjPtr, ScalarType};
 
 use super::block::FLOAT_BASE;
@@ -121,7 +120,7 @@ pub struct LIRInst {
 // 实现个fmt display trait
 impl fmt::Display for LIRInst {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut kind = "";
+        let kind;
         match self.get_type() {
             InstrsType::Binary(op) => {
                 kind = match op {
@@ -161,8 +160,8 @@ impl fmt::Display for LIRInst {
                 kind = "store";
             }
             // 判断！是否需要多插入一条j，间接跳转到
-            InstrsType::Branch(CmpOp) => {
-                kind = match CmpOp {
+            InstrsType::Branch(cmp_op) => {
+                kind = match cmp_op {
                     CmpOp::Eq => "eq",
                     CmpOp::Ne => "ne",
                     CmpOp::Lt => "lt",
@@ -182,13 +181,13 @@ impl fmt::Display for LIRInst {
                 kind = "ret";
             }
         }
-        let mut def = HashSet::new();
-        let mut use_reg_id = HashSet::new();
+        let mut def = Vec::new();
+        let mut use_reg_id = Vec::new();
         self.get_reg_def().iter().for_each(|e| {
-            def.insert(e.to_string(true));
+            def.push(e.to_string(true));
         });
         self.get_reg_use().iter().for_each(|e| {
-            use_reg_id.insert(e.to_string(true));
+            use_reg_id.push(e.to_string(true));
         });
         write!(f, "{:?} def:{:?} use:{:?}", kind, def, use_reg_id)
     }
@@ -393,7 +392,7 @@ impl LIRInst {
             | InstrsType::Branch(..)
             | InstrsType::Jump
             | InstrsType::LoadParamFromStack => {
-                let mut regs = self.operands.clone();
+                let regs = self.operands.clone();
                 let mut res = Vec::new();
                 for (i, operand) in regs.iter().enumerate() {
                     if *operand == *self.get_dst() && i == 0 {

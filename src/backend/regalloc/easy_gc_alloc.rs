@@ -1,21 +1,12 @@
 // a impl of graph color register alloc algo
 
 use crate::{
-    backend::{
-        func,
-        instrs::{Func, BB},
-        operand::Reg,
-    },
-    container::bitmap::{self, Bitmap},
+    backend::{instrs::Func, operand::Reg},
+    container::bitmap::Bitmap,
     log_file, log_file_uln,
-    utility::{ObjPool, ObjPtr, ScalarType},
 };
 use core::panic;
-use std::{
-    collections::{HashMap, HashSet, LinkedList, VecDeque},
-    fmt::{self, format},
-    hash::Hash,
-};
+use std::collections::{HashMap, HashSet, LinkedList, VecDeque};
 
 use super::{
     regalloc::{self, Regalloc},
@@ -80,7 +71,7 @@ impl Allocator {
         self.costs_reg = regalloc::estimate_spill_cost(func);
         let path = "reg_spill_costs.txt";
         log_file!(path, "func:{}", func.label);
-        let mut i = 0;
+        let i = 0;
         let reline = 20;
         self.costs_reg.iter().for_each(|(reg, cost)| {
             if i % reline == 19 {
@@ -122,8 +113,8 @@ impl Allocator {
         // 简化方式
         // 处理产生冲突的寄存器
         // 方式,周围的寄存器变换颜色,直到该寄存器有不冲突颜色
-        let mut ok = false;
-        ///对interference
+        let ok;
+        // 对interference
         let tosimplify = self.tosimplifys.pop_front().unwrap();
         ok = self.simplify_one(&tosimplify);
         if ok {
@@ -137,7 +128,7 @@ impl Allocator {
     // 简化失败后执行溢出操作,选择一个节点进行溢出,然后对已经作色节点进行重新分配
     pub fn spill(&mut self) {
         // 溢出寄存器之后更新节点周围节点颜色
-        ///对interference
+        // 对interference
         let to_spill_one = self.tospills.pop_front().unwrap();
         self.spill_one(&to_spill_one);
     }
@@ -154,7 +145,7 @@ impl Allocator {
     }
 
     pub fn color_one(&mut self, reg: Reg) -> bool {
-        let (colors, availables, interference_graph) = (
+        let (_, availables, _) = (
             &mut self.colors,
             &mut self.availables,
             &self.interference_graph,
@@ -403,7 +394,7 @@ impl Regalloc for Allocator {
         }
 
         let (spillings, dstr) = self.alloc_register();
-        let (func_stack_size, bb_sizes) = regalloc::countStackSize(func, &spillings);
+        let (func_stack_size, bb_sizes) = regalloc::count_stack_size(func, &spillings);
 
         //println!("dstr:{:?}",self.dstr);
         //println!("spillings:{:?}",self.spillings);

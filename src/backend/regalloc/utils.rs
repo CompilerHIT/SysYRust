@@ -3,8 +3,6 @@ use std::collections::{HashMap, VecDeque};
 extern crate biheap;
 use biheap::BiHeap;
 
-use crate::backend;
-
 // 根据nnc指定的(item,coe)的权重关系,来对items进行排序,并且把排序结果保存到out_come_order中
 pub fn sort(nnc: &HashMap<i32, i32>, out_come_order: &mut Vec<i32>) {
     // 排序过程,首先建桶 (出现次数, 颜色列表)
@@ -31,7 +29,7 @@ mod tests {
     use std::collections::{HashMap, VecDeque};
 
     use biheap::BiHeap;
-
+ 
     #[test]
     fn test_sort() {
         // 测试一个编写的对颜色排序的操作

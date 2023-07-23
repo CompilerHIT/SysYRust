@@ -25,7 +25,6 @@ impl Allocator {
 
         if self.if_has_been_colored(&reg) || self.if_has_been_spilled(&reg) {
             panic!("");
-            return false;
         }
 
         //简化成功,该实例可以使用颜色,则化简成功,否则化简失败(但是化简失败也可能让别的spill能够恢复可着色状态)
@@ -195,7 +194,6 @@ impl Allocator {
         let color2 = *self.get_color(reg2).unwrap();
         if color1 == color2 {
             panic!("理论上不处理相同颜色之间的swap操作");
-            return 0.0;
         }
         let mut cost = 0.0; //记录能够造成的溢出/节省的溢出
                             // 集合所有能够从spillings中拯救的寄存器

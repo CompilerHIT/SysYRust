@@ -1,7 +1,4 @@
-use std::{
-    collections::{HashMap, HashSet, LinkedList},
-    string,
-};
+use std::collections::{HashMap, HashSet, LinkedList};
 
 use crate::log_file;
 
@@ -73,7 +70,7 @@ pub fn dump() {
         if unsafe { CONFIG_INFO.as_ref().unwrap().baned_set.contains(file) } {
             continue;
         }
-        ///打印信息
+        // 打印信息
         for info in infos.iter() {
             log_file!(file, "{info}");
         }
