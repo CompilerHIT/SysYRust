@@ -5,6 +5,7 @@ source_files=$(ls "${source_folder}" | grep '\.sy$')
 
 compiler_path="./target/release/compiler"
 
+rm -r compiler_product
 # 检测compiler_product文件夹是否存在
 if [ ! -d "compiler_product" ]; then
 	mkdir compiler_product

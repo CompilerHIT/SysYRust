@@ -209,7 +209,7 @@ pub fn easy_gvn(module: &mut Module) -> bool {
         let mut index = 0;
             bfs_inst_process(func.get_head(), |inst| {
                 if index%10000==0{
-                    println!("index:{:?}",index);
+                    // println!("index:{:?}",index);
                 }
                 index = index+1;
                 changed |= has_val(&mut congruence_class, inst, &dominator_tree, &set)
