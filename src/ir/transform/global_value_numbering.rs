@@ -206,12 +206,7 @@ pub fn easy_gvn(module: &mut Module) -> bool {
     let set = call_optimize(module);
     func_process(module, |_, func| {
         let dominator_tree = calculate_dominator(func.get_head());
-        let mut index = 0;
             bfs_inst_process(func.get_head(), |inst| {
-                if index%10000==0{
-                    println!("index:{:?}",index);
-                }
-                index = index+1;
                 changed |= has_val(&mut congruence_class, inst, &dominator_tree, &set)
             });
     });
