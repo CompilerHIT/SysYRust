@@ -361,7 +361,7 @@ impl AsmModule {
         self.build_lir(pool);
         self.remove_unuse_inst_pre_alloc();
 
-        self.generate_row_asm(_f2, pool); //generate row  asm可能会造成bug
+        // self.generate_row_asm(_f2, pool); //generate row  asm可能会造成bug
 
         if is_opt {
             // 设置一些寄存器为临时变量
@@ -377,13 +377,18 @@ impl AsmModule {
             self.allocate_reg();
             self.map_v_to_p();
         } else {
+            // self.generate_row_asm(_f2, pool);
             self.allocate_reg();
+            // self.generate_row_asm(_f2, pool);
             self.map_v_to_p();
+            self.generate_row_asm(_f2, pool);
             ///重分配
-            // self.name_func.iter().for_each(|(_, func)| {
-            //     func.as_mut()
-            //         .p2v_pre_handle_call(Reg::get_all_recolorable_regs())
-            // });
+            self.name_func.iter().for_each(|(_, func)| {
+                func.as_mut()
+                    .p2v_pre_handle_call(Reg::get_all_recolorable_regs())
+            });
+            self.generate_row_asm(_f2, pool);
+            // self.allocate_reg();
             self.map_v_to_p();
         }
 

@@ -1519,6 +1519,7 @@ impl Func {
     /// 该函数会绝对保留原本程序的结构，并且不会通过构造phi等行为增加指令,不会调整指令顺序,不会合并寄存器等等
     pub fn p2v_pre_handle_call(&mut self, regs_to_decolor: HashSet<Reg>) {
         let path = "p2v.txt";
+        // self.print_func();
         self.calc_live_for_handle_spill();
         //首先根据call上下文初始化 unchanged use 和 unchanged def.这些告诉我们哪些寄存器不能够p2v
         let mut unchanged_use: HashSet<(ObjPtr<LIRInst>, Reg)> = HashSet::new();
@@ -1786,6 +1787,8 @@ impl Func {
             }
         }
         //从基础搜索单元开始遍历
+
+        // self.print_func();
     }
 }
 
