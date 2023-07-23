@@ -186,7 +186,6 @@ impl CongruenceClass{
     }
 }
 
-#[derive(Clone)]
 pub struct Congruence {
     pub vec_class: Vec<Vec<ObjPtr<Inst>>>,
     pub map: HashMap<ObjPtr<Inst>, usize>,
