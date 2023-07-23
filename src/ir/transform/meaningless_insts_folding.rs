@@ -13,7 +13,9 @@ pub fn meaningless_inst_folding(
     pools: &mut (&mut ObjPool<BasicBlock>, &mut ObjPool<Inst>),
 ) {
     func_process(module, |_, func| {
-        bfs_inst_process(func.get_head(), |inst| delete_useless_inst(inst, pools.1))
+        bfs_inst_process(func.get_head(), |inst| {delete_useless_inst(inst, pools.1);
+            delete_useless_inst2(inst, pools.1)
+        })
     });
 }
 
@@ -99,5 +101,101 @@ pub fn delete_useless_inst(inst: ObjPtr<Inst>, pool: &mut ObjPool<Inst>) {
             }
         }
         _ => {}
+    }
+}
+
+//删除乘除相同数的指令
+pub fn delete_useless_inst2(inst: ObjPtr<Inst>, pool: &mut ObjPool<Inst>) {
+    match inst.get_kind() {
+        InstKind::Binary(binop) => match binop {
+            BinOp::Mul => {
+                let operands = inst.get_operands();
+                match operands[0].get_kind() {
+                    InstKind::ConstInt(i) => {
+                        match operands[1].get_kind() {
+                            InstKind::Binary(binop_op) =>{
+                                match binop_op {
+                                    BinOp::Div =>{
+                                        let operands_op = operands[1].get_operands();
+                                        match operands_op[1].get_kind() {
+                                            InstKind::ConstInt(i2) =>{
+                                                if i==i2{
+                                                    replace_inst(inst, operands_op[0]);
+                                                }
+                                            }
+                                            _=>{}
+                                        }
+                                    }
+                                    _=>{}
+                                }
+                            }
+                            _=>{}
+                        }
+                    }
+                    _ => match operands[1].get_kind() {
+                        InstKind::ConstInt(i) => {
+                            match operands[0].get_kind() {
+                                InstKind::Binary(binop_op) =>{
+                                    match binop_op {
+                                        BinOp::Div =>{
+                                            let operands_op = operands[0].get_operands();
+                                            match operands_op[1].get_kind() {
+                                                InstKind::ConstInt(i2) =>{
+                                                    if i==i2{
+                                                        replace_inst(inst, operands_op[0]);
+                                                    }
+                                                }
+                                                _=>{}
+                                            }
+                                        }
+                                        _=>{}
+                                    }
+                                }
+                                _=>{}
+                            }
+                        }
+                        _ => {}
+                    },
+                }
+            }
+            BinOp::Div =>{
+                let operands = inst.get_operands();
+                match operands[1].get_kind() {
+                    InstKind::ConstInt(i) =>{
+                        match operands[0].get_kind() {
+                            InstKind::Binary(binop_op) =>{
+                                match binop_op {
+                                    BinOp::Mul =>{
+                                        let operands_op = operands[0].get_operands();
+                                        match operands_op[0].get_kind() {
+                                            InstKind::ConstInt(i2) =>{
+                                                if i2==i{
+                                                    replace_inst(inst, operands_op[1]);
+                                                }
+                                            }
+                                            _=>{
+                                                match operands_op[1].get_kind() {
+                                                    InstKind::ConstInt(i2) =>{
+                                                        if i2==i{
+                                                            replace_inst(inst, operands_op[0]);
+                                                        }
+                                                    }
+                                                    _=>{}
+                                                }
+                                            }
+                                        }
+                                    }
+                                    _=>{}
+                                }
+                            }
+                            _=>{}
+                        }
+                    }
+                    _=>{}
+                }
+            }
+            _=>{}
+        }
+        _=>{}
     }
 }
