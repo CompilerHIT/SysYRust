@@ -379,6 +379,12 @@ impl AsmModule {
         } else {
             self.allocate_reg();
             self.map_v_to_p();
+            ///重分配
+            // self.name_func.iter().for_each(|(_, func)| {
+            //     func.as_mut()
+            //         .p2v_pre_handle_call(Reg::get_all_recolorable_regs())
+            // });
+            self.map_v_to_p();
         }
 
         self.handle_spill_v3(pool);

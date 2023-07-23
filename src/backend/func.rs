@@ -1518,6 +1518,7 @@ impl Func {
     ///因为在handle call后有有些寄存器需要通过栈来restore,暂时还没有分析这个行为
     /// 该函数会绝对保留原本程序的结构，并且不会通过构造phi等行为增加指令,不会调整指令顺序,不会合并寄存器等等
     pub fn p2v_pre_handle_call(&mut self, regs_to_decolor: HashSet<Reg>) {
+        let path = "p2v.txt";
         self.calc_live_for_handle_spill();
         //首先根据call上下文初始化 unchanged use 和 unchanged def.这些告诉我们哪些寄存器不能够p2v
         let mut unchanged_use: HashSet<(ObjPtr<LIRInst>, Reg)> = HashSet::new();
@@ -1740,6 +1741,7 @@ impl Func {
                 }
                 while !to_backward.is_empty() {
                     let (bb, old_reg, new_reg) = to_backward.pop_front().unwrap();
+
                     //反向者寻找所有前向
                     for out_bb in bb.out_edge.iter() {
                         if !out_bb.live_in.contains(&old_reg) {
@@ -1767,6 +1769,9 @@ impl Func {
                         continue;
                     }
                     for in_bb in bb.in_edge.iter() {
+                        if !in_bb.live_out.contains(&old_reg) {
+                            continue;
+                        }
                         let key = (*in_bb, old_reg);
                         if backward_passed.contains(&key) {
                             continue;
@@ -1774,6 +1779,9 @@ impl Func {
                         backward_passed.insert(key);
                         to_backward.push_back((*in_bb, old_reg, new_reg));
                     }
+                }
+                if to_forward.is_empty() && to_backward.is_empty() {
+                    break;
                 }
             }
         }
