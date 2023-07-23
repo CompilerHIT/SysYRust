@@ -128,10 +128,12 @@ impl SCEVAnalyzer {
                 return self.scevexp_pool.make_scev_unknown(*inst);
             };
 
-            if dominator_tree.is_dominate(
-                &inst.get_parent_bb(),
-                &inst.get_operands()[index].get_parent_bb(),
-            ) {
+            if inst.get_operand(index).get_kind() == InstKind::Binary(BinOp::Add)
+                && dominator_tree.is_dominate(
+                    &inst.get_parent_bb(),
+                    &inst.get_operands()[index].get_parent_bb(),
+                )
+            {
                 let start: Vec<_> = inst
                     .get_operands()
                     .iter()
