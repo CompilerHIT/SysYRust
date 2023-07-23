@@ -62,4 +62,19 @@ impl Inst {
 
         self.user.get_operand(0)
     }
+
+    /// 判断是否为return指令
+    pub fn is_return(&self) -> bool {
+        InstKind::Return == self.get_kind()
+    }
+
+    /// 判断是否为return void指令
+    pub fn is_void_return(&self) -> bool {
+        InstKind::Return == self.get_kind() && self.get_ir_type() == IrType::Void
+    }
+
+    /// 判断是否为return value指令
+    pub fn is_value_return(&self) -> bool {
+        InstKind::Return == self.get_kind() && self.get_ir_type() != IrType::Void
+    }
 }
