@@ -284,6 +284,17 @@ impl Reg {
 
         callees_saved
     }
+
+    ///获取所有能够重分配的寄存器
+    /// 当前认为除了五个特殊寄存器,其他寄存器都能够重分配
+    /// 0:zero,1:ra,2:sp,3:gp,4:tp
+    pub fn get_all_recolorable_regs() -> HashSet<Reg> {
+        let mut out = HashSet::new();
+        for i in 5..=63 {
+            out.insert(Reg::from_color(i));
+        }
+        out
+    }
 }
 
 ///从颜色编号到寄存器
