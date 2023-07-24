@@ -295,6 +295,20 @@ impl Reg {
         }
         out
     }
+
+    //获取所有参数寄存器
+    pub fn get_all_args() -> HashSet<Reg> {
+        let mut args = HashSet::new();
+        //通用参数寄存器a0-a7 :10-17
+        //浮点参数寄存器 : 42-49
+        for i in 10..=17 {
+            args.insert(Reg::from_color(i));
+        }
+        for i in 42..=49 {
+            args.insert(Reg::from_color(i));
+        }
+        args
+    }
 }
 
 ///从颜色编号到寄存器

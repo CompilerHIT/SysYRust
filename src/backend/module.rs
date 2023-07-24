@@ -597,6 +597,13 @@ impl AsmModule {
     ///函数分裂:
     /// 该函数只应该在analyse for handle call v3后被调用
     fn split_func(&mut self, pool: &mut BackendPool) {
+        //加入一些extern的函数
+        for (_, func) in self.func_map.iter() {
+            if func.is_extern {
+                self.name_func.insert(func.label.clone(), *func);
+            }
+        }
+
         let regs_set_to_string = |regs: &HashSet<Reg>| -> String {
             let mut symbol = "".to_string();
             for id in 0..=63 {
@@ -715,6 +722,14 @@ impl AsmModule {
             }
         }
         self.func_map = new_func_map;
+        let mut new_name_func = HashMap::new();
+        for (name, func) in self.name_func.iter() {
+            if func.is_extern {
+                continue;
+            }
+            new_name_func.insert(name.clone(), *func);
+        }
+        self.name_func = new_name_func;
     }
 
     pub fn update_array_offset(&mut self, pool: &mut BackendPool) {

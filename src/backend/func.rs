@@ -1652,9 +1652,27 @@ impl Func {
 
         //然后从entry块开始p2v
         let first_block = *self.entry.unwrap().out_edge.get(0).unwrap();
-        let arg_regs: HashSet<Reg> = first_block.live_in.iter().cloned().collect();
-        if arg_regs.len() != 0 {
-            todo!()
+        let mut live_in: HashSet<Reg> = first_block.live_in.iter().cloned().collect();
+        if live_in.len() != 0 {
+            let mut args: HashSet<Reg> = Reg::get_all_args()
+                .iter()
+                .filter(|reg| live_in.contains(&reg))
+                .cloned()
+                .collect();
+            //对于参数往后传递
+            for inst in first_block.insts.iter() {
+                for reg_use in inst.get_reg_use() {
+                    if args.contains(&reg_use) {
+                        unchanged_use.insert((*inst, reg_use));
+                    }
+                }
+                for reg_def in inst.get_reg_def() {
+                    args.remove(&reg_def);
+                }
+            }
+            if args.len() != 0 {
+                unreachable!()
+            }
         }
         // let mut to_pass: LinkedList<ObjPtr<BB>> = LinkedList::new();
         // to_pass.push_back(first_block);
