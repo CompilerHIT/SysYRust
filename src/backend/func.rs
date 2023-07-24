@@ -1529,32 +1529,34 @@ impl Func {
                 if inst.get_type() != InstrsType::Call {
                     continue;
                 }
-                let mut index = i - 1;
-                let mut used: HashSet<Reg> = inst.get_reg_use().iter().cloned().collect();
-                while index >= 0 && used.len() != 0 {
-                    let inst = *bb.insts.get(index).unwrap();
-                    for reg_def in inst.get_reg_def() {
-                        if !used.contains(&reg_def) {
-                            continue;
+                if i != 0 {
+                    let mut index = i - 1;
+                    let mut used: HashSet<Reg> = inst.get_reg_use().iter().cloned().collect();
+                    while index >= 0 && used.len() != 0 {
+                        let inst = *bb.insts.get(index).unwrap();
+                        for reg_def in inst.get_reg_def() {
+                            if !used.contains(&reg_def) {
+                                continue;
+                            }
+                            used.remove(&reg_def);
+                            unchanged_def.insert((inst, reg_def));
                         }
-                        used.remove(&reg_def);
-                        unchanged_def.insert((inst, reg_def));
-                    }
-                    for reg_use in inst.get_reg_use() {
-                        if used.contains(&reg_use) {
-                            unchanged_use.insert((inst, reg_use));
+                        for reg_use in inst.get_reg_use() {
+                            if used.contains(&reg_use) {
+                                unchanged_use.insert((inst, reg_use));
+                            }
                         }
+                        if index == 0 {
+                            break;
+                        }
+                        index -= 1;
                     }
-                    if index == 0 {
-                        break;
+                    if used.len() != 0 {
+                        //TODO  (暂时不考虑 参数的加入不在同一个块中的情况)
+                        unreachable!();
                     }
-                    index -= 1;
                 }
 
-                if used.len() != 0 {
-                    //TODO  (暂时不考虑 参数的加入不在同一个块中的情况)
-                    unreachable!();
-                }
                 let mut defined: HashSet<Reg> = inst.get_reg_def().iter().cloned().collect();
                 let mut index = i + 1;
                 ///要找到define列表的最后一个直到遇到live out或者下一次def为止
