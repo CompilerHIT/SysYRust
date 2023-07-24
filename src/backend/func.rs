@@ -1579,7 +1579,8 @@ impl Func {
                             if !out_bb.live_in.contains(reg) {
                                 continue;
                             }
-                            debug_assert!(false, "{}->{}", bb.label, out_bb.label);
+                            unreachable!();
+                            // debug_assert!(false, "{}->{}", bb.label, out_bb.label);
                             to_pass.push_back((*out_bb, *reg));
                         }
                     }

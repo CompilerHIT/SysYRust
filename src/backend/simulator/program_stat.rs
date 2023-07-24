@@ -184,10 +184,52 @@ impl ProgramStat {
             }
             InstrsType::Store => {}
 
-            InstrsType::StoreToStack => {}
-            InstrsType::LoadFromStack => {}
-            InstrsType::LoadParamFromStack => {}
-            InstrsType::StoreParamToStack => {}
+            InstrsType::StoreToStack => {
+                let src_reg = inst.get_dst().drop_reg();
+                let offset = inst.get_stack_offset().get_data();
+                let mut addr = self
+                    .reg_val
+                    .get(&Reg::get_sp())
+                    .unwrap()
+                    .get_addr()
+                    .unwrap()
+                    .clone();
+                addr.1 += offset as i64;
+                let val = self.reg_val.get(&src_reg);
+                if val.is_none() {
+                    self.mem_val.insert(Value::Addr(addr), Value::Inst(*inst));
+                } else {
+                    self.mem_val.insert(Value::Addr(addr), val.unwrap().clone());
+                }
+            }
+            InstrsType::LoadFromStack => {
+                let dst_reg = inst.get_dst().drop_reg();
+                let offset = inst.get_stack_offset().get_data();
+                let mut addr = self
+                    .reg_val
+                    .get(&Reg::get_sp())
+                    .unwrap()
+                    .get_addr()
+                    .unwrap()
+                    .clone();
+                addr.1 += offset as i64;
+                let val = self.mem_val.get(&Value::Addr(addr));
+                if val.is_none() {
+                    self.reg_val.insert(dst_reg, Value::Inst(*inst));
+                } else {
+                    self.reg_val.insert(dst_reg, val.unwrap().clone());
+                }
+            }
+
+            InstrsType::LoadParamFromStack => {
+                let dst_reg = inst.get_dst().drop_reg();
+                self.reg_val.insert(dst_reg, Value::Inst(*inst));
+            }
+            InstrsType::StoreParamToStack => {
+                //该指令的偏移的介绍并不确定,所以不能够确定会store到栈上的什么区域
+                // 但是作为传递参数使用的情况(不会影响到sp中非传参部分区域的值)
+                //所以当前可以忽略该指令的影响
+            }
             // 判断！是否需要多插入一条j，间接跳转到
             InstrsType::Branch(cond) => {
                 let lhs = inst.get_lhs().drop_reg();
