@@ -1621,6 +1621,7 @@ impl Func {
             }
         }
 
+        ///考虑ret
         ///一个block中只可能出现一条return最多
         for bb in self.blocks.iter() {
             if let Some(last_inst) = bb.insts.last() {
@@ -1647,10 +1648,14 @@ impl Func {
             }
         }
 
-        //考虑ret
+        //考虑使用参数寄存器传参的情况,该情况只会发生在函数的第一个块
 
         //然后从entry块开始p2v
-        // let first_block = *self.entry.unwrap().out_edge.get(0).unwrap();
+        let first_block = *self.entry.unwrap().out_edge.get(0).unwrap();
+        let arg_regs: HashSet<Reg> = first_block.live_in.iter().cloned().collect();
+        if arg_regs.len() != 0 {
+            todo!()
+        }
         // let mut to_pass: LinkedList<ObjPtr<BB>> = LinkedList::new();
         // to_pass.push_back(first_block);
         let mut forward_passed: HashSet<(ObjPtr<BB>, Reg)> = HashSet::new();
