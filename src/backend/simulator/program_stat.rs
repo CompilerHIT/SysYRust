@@ -146,7 +146,7 @@ impl ProgramStat {
                     }
                 }
                 SingleOp::Mv => {
-                    let dst_reg = inst.get_rhs().drop_reg();
+                    let dst_reg = inst.get_dst().drop_reg();
                     let src_reg = inst.get_lhs().drop_reg();
                     let old_val = self.reg_val.get(&dst_reg);
                     if old_val.is_none() {
@@ -183,6 +183,7 @@ impl ProgramStat {
                 }
             }
             InstrsType::Store => {}
+
             InstrsType::StoreToStack => {}
             InstrsType::LoadFromStack => {}
             InstrsType::LoadParamFromStack => {}
@@ -257,10 +258,7 @@ impl ProgramStat {
                 self.execute_stat = ExecuteStat::Jump(label);
             }
             InstrsType::Call => {
-                let reg_def = inst.get_reg_def();
-                for reg in reg_def {
-                    self.reg_val.insert(reg, Value::Inst(*inst));
-                }
+                //注意 , call对于 a0 寄存器的影响跟跳转关系有关,需要外部单独处理
                 self.execute_stat = ExecuteStat::Call((inst.get_func_name().unwrap()));
             }
             InstrsType::Ret(..) => {
