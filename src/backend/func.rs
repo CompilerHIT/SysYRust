@@ -1559,7 +1559,7 @@ impl Func {
 
                 let mut defined: HashSet<Reg> = inst.get_reg_def().iter().cloned().collect();
                 let mut index = i + 1;
-                ///要找到define列表的最后一个直到遇到live out或者下一次def为止
+                ///往后继块传递defined
                 while index < bb.insts.len() && defined.len() != 0 {
                     let inst = *bb.insts.get(index).unwrap();
                     for reg in inst.get_reg_use() {
@@ -1691,6 +1691,9 @@ impl Func {
                 assert!(to_pass.len() == 0);
             }
         }
+
+        //考虑特殊寄存器的使用情况
+
         // let mut to_pass: LinkedList<ObjPtr<BB>> = LinkedList::new();
         // to_pass.push_back(first_block);
         let mut forward_passed: HashSet<(ObjPtr<BB>, Reg)> = HashSet::new();
@@ -1755,12 +1758,7 @@ impl Func {
                     if !old_new.contains_key(&reg_use) {
                         old_new.insert(reg_use, Reg::init(reg_use.get_type()));
                     }
-                    unchanged_use.contains(&(*inst, reg_use));
-                    let ok = unchanged_use.contains(&(*inst, reg_use));
                     if !unchanged_use.contains(&(*inst, reg_use)) {
-                        if reg_use.get_color() == 10 {
-                            let a = 2;
-                        }
                         inst.as_mut()
                             .replace_only_use_reg(&reg_use, old_new.get(&reg_use).unwrap());
                     }
