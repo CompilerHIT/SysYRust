@@ -569,30 +569,30 @@ impl Func {
 
             block.as_mut().live_in = block.as_ref().live_use.clone();
             block.as_mut().live_out.clear();
-            if let Some(last_isnt) = block.insts.last() {
-                match last_isnt.get_type() {
-                    InstrsType::Ret(r_type) => {
-                        match r_type {
-                            ScalarType::Int => {
-                                let ret_reg = Reg::new(10, r_type);
-                                block.as_mut().live_out.insert(ret_reg);
-                                if !block.live_def.contains(&ret_reg) {
-                                    queue.push_front((*block, ret_reg));
-                                }
-                            }
-                            ScalarType::Float => {
-                                let ret_reg = Reg::new(10 + FLOAT_BASE, r_type);
-                                block.as_mut().live_out.insert(ret_reg);
-                                if !block.live_def.contains(&ret_reg) {
-                                    queue.push_front((*block, ret_reg));
-                                }
-                            }
-                            _ => (),
-                        };
-                    }
-                    _ => (),
-                }
-            }
+            // if let Some(last_isnt) = block.insts.last() {
+            //     match last_isnt.get_type() {
+            //         InstrsType::Ret(r_type) => {
+            //             match r_type {
+            //                 ScalarType::Int => {
+            //                     let ret_reg = Reg::new(10, r_type);
+            //                     block.as_mut().live_out.insert(ret_reg);
+            //                     if !block.live_def.contains(&ret_reg) {
+            //                         queue.push_front((*block, ret_reg));
+            //                     }
+            //                 }
+            //                 ScalarType::Float => {
+            //                     let ret_reg = Reg::new(10 + FLOAT_BASE, r_type);
+            //                     block.as_mut().live_out.insert(ret_reg);
+            //                     if !block.live_def.contains(&ret_reg) {
+            //                         queue.push_front((*block, ret_reg));
+            //                     }
+            //                 }
+            //                 _ => (),
+            //             };
+            //         }
+            //         _ => (),
+            //     }
+            // }
         }
 
         //然后计算live in 和live out
@@ -1616,10 +1616,13 @@ impl Func {
                 }
             }
         }
+
+        //考虑ret
+
         //然后从entry块开始p2v
-        let first_block = *self.entry.unwrap().out_edge.get(0).unwrap();
-        let mut to_pass: LinkedList<ObjPtr<BB>> = LinkedList::new();
-        to_pass.push_back(first_block);
+        // let first_block = *self.entry.unwrap().out_edge.get(0).unwrap();
+        // let mut to_pass: LinkedList<ObjPtr<BB>> = LinkedList::new();
+        // to_pass.push_back(first_block);
         let mut forward_passed: HashSet<(ObjPtr<BB>, Reg)> = HashSet::new();
         let mut backward_passed: HashSet<(ObjPtr<BB>, Reg)> = HashSet::new();
         ///搜索单元分为正向搜索单元与反向搜索单元
@@ -1880,30 +1883,30 @@ impl Func {
             block.as_mut().live_in = block.as_ref().live_use.clone();
             block.as_mut().live_out.clear();
             //a0从reg处往前传递
-            if let Some(last_isnt) = block.insts.last() {
-                match last_isnt.get_type() {
-                    InstrsType::Ret(r_type) => {
-                        match r_type {
-                            ScalarType::Int => {
-                                let ret_reg = Reg::new(10, r_type);
-                                block.as_mut().live_out.insert(ret_reg);
-                                if !block.live_def.contains(&ret_reg) {
-                                    queue.push_front((*block, ret_reg));
-                                }
-                            }
-                            ScalarType::Float => {
-                                let ret_reg = Reg::new(10 + FLOAT_BASE, r_type);
-                                block.as_mut().live_out.insert(ret_reg);
-                                if !block.live_def.contains(&ret_reg) {
-                                    queue.push_front((*block, ret_reg));
-                                }
-                            }
-                            _ => (),
-                        };
-                    }
-                    _ => (),
-                }
-            }
+            // if let Some(last_isnt) = block.insts.last() {
+            //     match last_isnt.get_type() {
+            //         InstrsType::Ret(r_type) => {
+            //             match r_type {
+            //                 ScalarType::Int => {
+            //                     let ret_reg = Reg::new(10, r_type);
+            //                     block.as_mut().live_out.insert(ret_reg);
+            //                     if !block.live_def.contains(&ret_reg) {
+            //                         queue.push_front((*block, ret_reg));
+            //                     }
+            //                 }
+            //                 ScalarType::Float => {
+            //                     let ret_reg = Reg::new(10 + FLOAT_BASE, r_type);
+            //                     block.as_mut().live_out.insert(ret_reg);
+            //                     if !block.live_def.contains(&ret_reg) {
+            //                         queue.push_front((*block, ret_reg));
+            //                     }
+            //                 }
+            //                 _ => (),
+            //             };
+            //         }
+            //         _ => (),
+            //     }
+            // }
         }
         //然后计算live in 和live out
         while let Some(value) = queue.pop_front() {
@@ -2059,30 +2062,30 @@ impl Func {
 
             block.as_mut().live_in = block.as_ref().live_use.clone();
             block.as_mut().live_out.clear();
-            if let Some(last_isnt) = block.insts.last() {
-                match last_isnt.get_type() {
-                    InstrsType::Ret(r_type) => {
-                        match r_type {
-                            ScalarType::Int => {
-                                let ret_reg = Reg::new(10, r_type);
-                                block.as_mut().live_out.insert(ret_reg);
-                                if !block.live_def.contains(&ret_reg) {
-                                    queue.push_front((*block, ret_reg));
-                                }
-                            }
-                            ScalarType::Float => {
-                                let ret_reg = Reg::new(10 + FLOAT_BASE, r_type);
-                                block.as_mut().live_out.insert(ret_reg);
-                                if !block.live_def.contains(&ret_reg) {
-                                    queue.push_front((*block, ret_reg));
-                                }
-                            }
-                            _ => (),
-                        };
-                    }
-                    _ => (),
-                }
-            }
+            // if let Some(last_isnt) = block.insts.last() {
+            //     match last_isnt.get_type() {
+            //         InstrsType::Ret(r_type) => {
+            //             match r_type {
+            //                 ScalarType::Int => {
+            //                     let ret_reg = Reg::new(10, r_type);
+            //                     block.as_mut().live_out.insert(ret_reg);
+            //                     if !block.live_def.contains(&ret_reg) {
+            //                         queue.push_front((*block, ret_reg));
+            //                     }
+            //                 }
+            //                 ScalarType::Float => {
+            //                     let ret_reg = Reg::new(10 + FLOAT_BASE, r_type);
+            //                     block.as_mut().live_out.insert(ret_reg);
+            //                     if !block.live_def.contains(&ret_reg) {
+            //                         queue.push_front((*block, ret_reg));
+            //                     }
+            //                 }
+            //                 _ => (),
+            //             };
+            //         }
+            //         _ => (),
+            //     }
+            // }
         }
 
         //然后计算live in 和live out

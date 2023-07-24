@@ -416,9 +416,6 @@ impl LIRInst {
             | InstrsType::Store => vec![],
 
             InstrsType::Ret(re_type) => match re_type {
-                // ScalarType::Int => vec![Reg::new(10, ScalarType::Int)],
-                // ScalarType::Float => vec![Reg::new(10 + FLOAT_BASE, ScalarType::Float)],
-                // ScalarType::Void => vec![],
                 _ => vec![],
             },
         }
@@ -474,8 +471,8 @@ impl LIRInst {
                 // vec![]
             }
             InstrsType::Ret(re_type) => match re_type {
-                // ScalarType::Float => vec![Reg::new(10 + FLOAT_BASE, ScalarType::Float)],
-                // ScalarType::Int => vec![Reg::new(10, ScalarType::Int)],
+                ScalarType::Float => vec![Reg::new(10 + FLOAT_BASE, ScalarType::Float)],
+                ScalarType::Int => vec![Reg::new(10, ScalarType::Int)],
                 _ => vec![],
             },
         }
