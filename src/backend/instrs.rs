@@ -210,11 +210,25 @@ impl LIRInst {
     }
 
     pub fn replace_only_use_reg(&mut self, old_reg: &Reg, new_reg: &Reg) {
-        if self.is_rhs_exist() && self.get_rhs().drop_reg() == *old_reg {
-            *self.get_rhs_mut() = Operand::Reg(*new_reg);
+        if self.is_rhs_exist() {
+            match self.get_rhs_mut() {
+                Operand::Reg(reg) => {
+                    if reg == old_reg {
+                        *reg = *new_reg;
+                    }
+                }
+                _ => (),
+            }
         }
-        if self.is_lhs_exist() && self.get_lhs().drop_reg() == *old_reg {
-            *self.get_lhs_mut() = Operand::Reg(*new_reg);
+        if self.is_lhs_exist() {
+            match self.get_lhs_mut() {
+                Operand::Reg(reg) => {
+                    if reg == old_reg {
+                        *reg = *new_reg;
+                    }
+                }
+                _ => (),
+            }
         }
     }
 
