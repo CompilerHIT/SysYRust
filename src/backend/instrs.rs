@@ -233,8 +233,15 @@ impl LIRInst {
     }
 
     pub fn replace_only_def_reg(&mut self, old_reg: &Reg, new_reg: &Reg) {
-        if self.operands.len() > 0 && self.get_dst().drop_reg() == *old_reg {
-            *self.get_dst_mut() = Operand::Reg(*new_reg);
+        if self.operands.len() > 0 {
+            match self.get_dst_mut() {
+                Operand::Reg(reg) => {
+                    if reg == old_reg {
+                        *reg = *new_reg;
+                    }
+                }
+                _ => (),
+            }
         }
     }
 
