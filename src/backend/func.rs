@@ -1529,9 +1529,9 @@ impl Func {
                 if inst.get_type() != InstrsType::Call {
                     continue;
                 }
+                let mut used: HashSet<Reg> = inst.get_reg_use().iter().cloned().collect();
                 if i != 0 {
                     let mut index = i - 1;
-                    let mut used: HashSet<Reg> = inst.get_reg_use().iter().cloned().collect();
                     while index >= 0 && used.len() != 0 {
                         let inst = *bb.insts.get(index).unwrap();
                         for reg_def in inst.get_reg_def() {
@@ -1551,10 +1551,10 @@ impl Func {
                         }
                         index -= 1;
                     }
-                    if used.len() != 0 {
-                        //TODO  (暂时不考虑 参数的加入不在同一个块中的情况)
-                        unreachable!();
-                    }
+                }
+                if used.len() != 0 {
+                    //TODO  (暂时不考虑 参数的加入不在同一个块中的情况)
+                    unreachable!();
                 }
 
                 let mut defined: HashSet<Reg> = inst.get_reg_def().iter().cloned().collect();
