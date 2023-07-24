@@ -1617,6 +1617,32 @@ impl Func {
             }
         }
 
+        ///一个block中只可能出现一条return最多
+        for bb in self.blocks.iter() {
+            if let Some(last_inst) = bb.insts.last() {
+                let use_reg = last_inst.get_reg_use();
+                if use_reg.is_empty() {
+                    continue;
+                }
+                debug_assert!(use_reg.len() == 1);
+                let use_reg = use_reg.get(0).unwrap();
+                unchanged_use.insert((*last_inst, *use_reg));
+                ///往前直到遇到第一个def为止
+                let mut index = bb.insts.len() - 2;
+                loop {
+                    let inst = bb.insts.get(index).unwrap();
+                    if inst.get_reg_def().contains(use_reg) {
+                        unchanged_def.insert((*inst, *use_reg));
+                        break;
+                    }
+                    if inst.get_reg_use().contains(use_reg) {
+                        unchanged_use.insert((*inst, *use_reg));
+                    }
+                    index -= 1;
+                }
+            }
+        }
+
         //考虑ret
 
         //然后从entry块开始p2v
