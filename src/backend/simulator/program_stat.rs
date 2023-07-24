@@ -285,8 +285,6 @@ impl ProgramStat {
         self.execute_stat.clone()
     }
 
-    //
-
     ///判断两个寄存器的值是否是相同的
     /// 如果两个寄存器的值相同,返回true
     /// 如果其中任何一个寄存器的值为未知,或者两个寄存器的值不同，返回false

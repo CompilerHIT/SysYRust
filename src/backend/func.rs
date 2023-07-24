@@ -1570,13 +1570,16 @@ impl Func {
                     index += 1;
                 }
                 if defined.len() != 0 {
-                    unreachable!();
                     ///按照目前的代码结构来说不应该存在
                     ///说明define到了live out中(说明其他块使用了这个块中的计算出的a0)
                     /// 则其他块中计算出的a0也应该使用相同的物理寄存器号(不应该改变)
                     let mut to_pass: LinkedList<(ObjPtr<BB>, Reg)> = LinkedList::new();
                     for out_bb in bb.out_edge.iter() {
                         for reg in defined.iter() {
+                            if !out_bb.live_in.contains(reg) {
+                                continue;
+                            }
+                            debug_assert!(false, "{}->{}", bb.label, out_bb.label);
                             to_pass.push_back((*out_bb, *reg));
                         }
                     }
