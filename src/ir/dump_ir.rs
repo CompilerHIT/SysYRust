@@ -392,7 +392,13 @@ fn dump_inst(
             }
         }
         InstKind::Load => match inst.get_ir_type() {
-            IrType::IntPtr | IrType::FloatPtr => {}
+            IrType::IntPtr | IrType::FloatPtr => {
+                text += format!(
+                    "  ; Load array label {}\n",
+                    global_map.get(&inst.get_ptr()).unwrap()
+                )
+                .as_str();
+            }
             IrType::Int => {
                 name_index = put_name(local_map, inst, name_index);
                 let ptr = inst.get_ptr();
