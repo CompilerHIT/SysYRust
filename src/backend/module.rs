@@ -381,7 +381,7 @@ impl AsmModule {
             self.allocate_reg();
             // self.generate_row_asm(_f2, pool);
             self.map_v_to_p();
-            // self.generate_row_asm(_f2, pool);
+            self.generate_row_asm(_f2, pool);
             // ///重分配
             self.name_func.iter().for_each(|(_, func)| {
                 func.as_mut()
