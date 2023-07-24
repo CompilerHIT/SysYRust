@@ -80,8 +80,8 @@ pub fn generate_asm(
 
     //构造
     // module.build(&mut file, &mut file2, &mut pool);
-    // module.build_v2(&mut file, &mut file2, &mut pool);
-    module.build_v3(&mut file, &mut file2, &mut pool, is_opt);
+    module.build_v2(&mut file, &mut file2, &mut pool);
+    // module.build_v3(&mut file, &mut file2, &mut pool, is_opt);
     // module.generate_row_asm(&mut file2, &mut pool);
 
     // 后端优化
@@ -102,7 +102,7 @@ pub fn generate_asm(
 
     //生成汇编
     module.generate_asm(&mut file, &mut pool);
-    
+
     //释放
     pool.free_all();
 

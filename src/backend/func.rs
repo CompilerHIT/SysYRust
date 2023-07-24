@@ -1545,6 +1545,9 @@ impl Func {
                             unchanged_use.insert((inst, reg_use));
                         }
                     }
+                    if index == 0 {
+                        break;
+                    }
                     index -= 1;
                 }
 
@@ -1654,6 +1657,7 @@ impl Func {
         let first_block = *self.entry.unwrap().out_edge.get(0).unwrap();
         let mut live_in: HashSet<Reg> = first_block.live_in.iter().cloned().collect();
         if live_in.len() != 0 {
+            // println!("{}", first_block.label.clone());
             let mut args: HashSet<Reg> = Reg::get_all_args()
                 .iter()
                 .filter(|reg| live_in.contains(&reg))
@@ -1664,6 +1668,7 @@ impl Func {
                 for reg_use in inst.get_reg_use() {
                     if args.contains(&reg_use) {
                         unchanged_use.insert((*inst, reg_use));
+                        // println!("unchange used:{:?}\t{}\n", inst, reg_use);
                     }
                 }
                 for reg_def in inst.get_reg_def() {
@@ -1671,7 +1676,17 @@ impl Func {
                 }
             }
             if args.len() != 0 {
-                unreachable!()
+                //可能传递到后面
+                let mut to_pass: LinkedList<(ObjPtr<BB>, Reg)> = LinkedList::new();
+                for arg in args.iter() {
+                    for out_bb in first_block.out_edge.iter() {
+                        if !out_bb.live_in.contains(arg) {
+                            continue;
+                        }
+                        unreachable!();
+                    }
+                }
+                assert!(to_pass.len() == 0);
             }
         }
         // let mut to_pass: LinkedList<ObjPtr<BB>> = LinkedList::new();
@@ -1738,9 +1753,14 @@ impl Func {
                     if !old_new.contains_key(&reg_use) {
                         old_new.insert(reg_use, Reg::init(reg_use.get_type()));
                     }
+                    unchanged_use.contains(&(*inst, reg_use));
+                    let ok = unchanged_use.contains(&(*inst, reg_use));
                     if !unchanged_use.contains(&(*inst, reg_use)) {
+                        if reg_use.get_color() == 10 {
+                            let a = 2;
+                        }
                         inst.as_mut()
-                            .replace_reg(&reg_use, old_new.get(&reg_use).unwrap());
+                            .replace_only_use_reg(&reg_use, old_new.get(&reg_use).unwrap());
                     }
                 }
             }
@@ -1775,7 +1795,11 @@ impl Func {
                     let mut if_keep_forward = true;
 
                     for inst in bb.insts.iter() {
-                        inst.as_mut().replace_only_use_reg(&old_reg, &new_reg);
+                        for reg_use in inst.get_reg_use() {
+                            if !unchanged_use.contains(&(*inst, reg_use)) {
+                                inst.as_mut().replace_only_use_reg(&old_reg, &new_reg);
+                            }
+                        }
                         if inst.get_reg_def().contains(&old_reg) {
                             if_keep_forward = false;
                             break;
@@ -1816,7 +1840,9 @@ impl Func {
 
                     for inst in bb.insts.iter().rev() {
                         if inst.get_reg_def().contains(&old_reg) {
-                            inst.as_mut().replace_only_def_reg(&old_reg, &new_reg);
+                            if !unchanged_def.contains(&(*inst, old_reg)) {
+                                inst.as_mut().replace_only_def_reg(&old_reg, &new_reg);
+                            }
                             if_keep_backward = false;
                             break;
                         }
