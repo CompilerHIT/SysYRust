@@ -230,24 +230,70 @@ impl LIRInst {
                 _ => (),
             }
         }
-    }
-
-    pub fn replace_only_def_reg(&mut self, old_reg: &Reg, new_reg: &Reg) {
         if self.operands.len() > 0 {
-            match self.get_dst_mut() {
-                Operand::Reg(reg) => {
-                    if reg == old_reg {
-                        *reg = *new_reg;
+            match self.get_type() {
+                InstrsType::Store | InstrsType::StoreParamToStack | InstrsType::StoreToStack => {
+                    match self.get_dst_mut() {
+                        Operand::Reg(reg) => {
+                            if reg == old_reg {
+                                *reg = *new_reg;
+                            }
+                        }
+                        _ => (),
                     }
                 }
                 _ => (),
             }
         }
     }
+    pub fn replace_only_def_reg(&mut self, old_reg: &Reg, new_reg: &Reg) {
+        if self.operands.len() > 0 {
+            match self.get_type() {
+                InstrsType::Store | InstrsType::StoreParamToStack | InstrsType::StoreToStack => {}
+                _ => match self.get_dst_mut() {
+                    Operand::Reg(reg) => {
+                        if reg == old_reg {
+                            *reg = *new_reg;
+                        }
+                    }
+                    _ => (),
+                },
+            }
+        }
+    }
+    pub fn get_def_reg(&self) -> Option<&Reg> {
+        if self.operands.len() > 0 {
+            match self.get_type() {
+                InstrsType::Store | InstrsType::StoreParamToStack | InstrsType::StoreToStack => {}
+                _ => {
+                    return match self.get_dst() {
+                        Operand::Reg(reg) => Some(reg),
+                        _ => None,
+                    }
+                }
+            }
+        }
+        None
+    }
+    pub fn get_mut_def_reg(&mut self) -> Option<&mut Reg> {
+        if self.operands.len() > 0 {
+            match self.get_type() {
+                InstrsType::Store | InstrsType::StoreParamToStack | InstrsType::StoreToStack => {}
+                _ => {
+                    return match self.get_dst_mut() {
+                        Operand::Reg(reg) => Some(reg),
+                        _ => None,
+                    }
+                }
+            }
+        }
+        None
+    }
 
     pub fn get_dst(&self) -> &Operand {
         &self.operands[0]
     }
+
     pub fn get_dst_mut(&mut self) -> &mut Operand {
         &mut self.operands[0]
     }
