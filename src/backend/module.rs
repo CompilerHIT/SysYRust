@@ -330,16 +330,37 @@ impl AsmModule {
     //先进行寄存器分配再handle_spill,
     pub fn build_v2(&mut self, f: &mut File, _f2: &mut File, pool: &mut BackendPool) {
         self.build_lir(pool);
-        // TOCHECK 寄存器分配和handlespill前无用指令删除,比如删除mv指令方便寄存器分配
         self.remove_unuse_inst_pre_alloc();
-        // self.generate_row_asm(f2, pool); //注释
+        // self.generate_row_asm(_f2, pool); //generate row  asm可能会造成bug
+
+        // self.generate_row_asm(_f2, pool);
         self.allocate_reg();
-        self.handle_spill_v2(pool);
-        self.handle_call(pool);
-        self.handle_callee(f);
-        // self.handle_spill(pool, f);
+        // self.generate_row_asm(_f2, pool);
+        // self.map_v_to_p();
+        // self.generate_row_asm(_f2, pool);
+        // // ///重分配
+        // self.name_func.iter().for_each(|(_, func)| {
+        //     func.as_mut()
+        //         .p2v_pre_handle_call(Reg::get_all_recolorable_regs())
+        // });
+        // // self.generate_row_asm(_f2, pool);
+        // self.allocate_reg();
         self.map_v_to_p();
+
+        self.handle_spill_v3(pool);
         self.remove_unuse_inst_suf_alloc();
+        self.anaylyse_for_handle_call_v3(pool);
+
+        let mut is_opt = false;
+        if is_opt {
+            self.split_func(pool);
+        }
+
+        self.handle_call_v3(pool);
+        // self.remove_useless_func();
+        self.rearrange_stack_slot();
+        self.update_array_offset(pool);
+        self.build_stack_info(f);
     }
 
     fn handle_spill_v2(&mut self, pool: &mut BackendPool) {
