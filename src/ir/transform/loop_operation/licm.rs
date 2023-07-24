@@ -47,12 +47,18 @@ fn licm_one_loop(loop_info: ObjPtr<LoopInfo>) -> bool {
             if is_loop_invariant(inst, loop_info) {
                 match inst.get_kind() {
                     InstKind::Alloca(_)
-                    | InstKind::Load
                     | InstKind::Store
                     | InstKind::Return
                     | InstKind::Branch
                     | InstKind::Phi
                     | InstKind::Call(_) => {}
+                    InstKind::Load => {
+                        if inst.is_global_array_load() {
+                            changed = true;
+                            inst.move_self();
+                            tail_inst.insert_before(inst);
+                        }
+                    }
                     _ => {
                         changed = true;
                         inst.move_self();
@@ -69,11 +75,7 @@ fn licm_one_loop(loop_info: ObjPtr<LoopInfo>) -> bool {
 fn is_loop_invariant(inst: ObjPtr<Inst>, loop_info: ObjPtr<LoopInfo>) -> bool {
     inst.get_operands().iter().all(|op| {
         op.is_global_var()
-            || if let InstKind::Parameter = op.get_kind() {
-                true
-            } else {
-                false
-            }
+            || op.is_param()
             || !loop_info.is_in_loop(&op.get_parent_bb())
             || match op.get_kind() {
                 InstKind::ConstInt(_) | InstKind::ConstFloat(_) => true,
