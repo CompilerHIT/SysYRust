@@ -772,14 +772,14 @@ impl AsmModule {
             self.map_v_to_p();
         }
 
-        for i in 0..=2 {
-            self.p2v();
-            self.allocate_reg();
-            self.map_v_to_p();
-            self.p2v();
-            self.allocate_reg();
-            self.map_v_to_p();
-        }
+        // for i in 0..=2 {
+        //     self.p2v();
+        //     self.allocate_reg();
+        //     self.map_v_to_p();
+        //     self.p2v();
+        //     self.allocate_reg();
+        //     self.map_v_to_p();
+        // }
 
         self.handle_spill_v3(pool);
         self.remove_unuse_inst_suf_alloc();

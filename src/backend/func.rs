@@ -2205,12 +2205,12 @@ impl Func {
             }
         }
 
-        //把 特殊寄存器 (函数进入和离开的时候自己保存的寄存器从live in live out中移除)
+        //把 特殊寄存器 (加入自己的in 和 out)
         for bb in self.blocks.iter() {
             //0:zero, 1:ra, 2:sp 3:gp ,4,tp
             for id in 0..=4 {
-                bb.as_mut().live_in.remove(&Reg::new(id, ScalarType::Int));
-                bb.as_mut().live_out.remove(&Reg::new(id, ScalarType::Int));
+                bb.as_mut().live_in.insert(Reg::new(id, ScalarType::Int));
+                bb.as_mut().live_out.insert(Reg::new(id, ScalarType::Int));
             }
         }
         log_file!(calc_live_file,"-----------------------------------after count live in,live out----------------------------");
