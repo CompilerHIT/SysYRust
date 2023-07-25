@@ -4,7 +4,7 @@ use crate::backend::module::AsmModule;
 use crate::backend::operand;
 use crate::backend::operand::*;
 use crate::backend::BackendPool;
-// use crate::log;
+use crate::log;
 pub use crate::utility::ObjPtr;
 
 mod block_pass;
@@ -32,19 +32,12 @@ impl BackendPass {
         // );
         // self.module.print_func();
         self.block_pass_pre_clear(pool);
-        self.module.print_func();
+        // self.module.print_func();
         self.clear_pass(pool);
-        // self.module.generate_row_asm(
-        //     &mut OpenOptions::new()
-        //         .create(true)
-        //         .append(true)
-        //         .open("row_asm2.log")
-        //         .unwrap(),
-        //     pool,
-        // );
         // 清除无用指令之后开始栈空间重排
         // self.rearrange_stack_slot();
         self.block_pass(pool);
+        self.peephole_pass(pool);
     }
 
     pub fn run_addition_block_pass(&mut self) {
