@@ -16,12 +16,15 @@ impl BackendPass {
         // 如果一个块的终止指令是直接跳转, 且直接跳转到的基本块里有且只有一条直接跳转的指令, 那么就把这个二次跳转消除
         // 要求中间那个只有一条跳转指令的基本块的前继只有一个,
         self.fuse_imm_br(pool);
+        // 处理fuse_imm_br中，中间的基本块有多个前继的情况
+        self.fuse_muti2imm_br();
         // 在直接跳转到另一个块, 并且跳转目标块没有其它前继的情况下, 可以直接把两个块合成为一个大块
         self.fuse_basic_block();
         // 若branch的下一条jump指令的目标块，只有一个前驱，则将该jump指令删除，并将其合并到这个块中
         self.merge_br_jump();
         // 清除空块(包括entry块)
         self.clear_empty_block();
+        self.clear_unreachable_block();
         // 如果branch和其紧邻的jump语句的目标块相同，则将jump语句删除
         self.resolve_merge_br();
         // self.clear_useless_jump();
@@ -83,6 +86,47 @@ impl BackendPass {
                 })
             }
         });
+    }
+
+    fn fuse_muti2imm_br(&mut self) {
+        self.module.name_func.iter().for_each(|(_, func)| {
+            let mut imm_br_pred: Vec<(ObjPtr<BB>, Vec<ObjPtr<BB>>)> = vec![];
+            func.blocks.iter().for_each(|block| {
+                let afters = block.get_after();
+                let prevs: Vec<_> = block
+                    .get_prev()
+                    .iter()
+                    .filter(|&&prev| is_jump(prev))
+                    .map(|prev| *prev)
+                    .collect();
+                if afters.len() == 1 && prevs.len() > 1 {
+                    imm_br_pred.push((block.clone(), prevs.clone()));
+                }
+            });
+
+            imm_br_pred.iter().for_each(|(block, prevs)| {
+                let after = block.get_after()[0];
+                if prevs.len() == block.get_prev().len() {
+                    adjust_after_in(after, prevs.clone(), &block.label);
+                    block.as_mut().out_edge.clear();
+                } else {
+                    adjust_after_in(after, prevs.clone(), &String::from(""));
+                }
+                for prev in prevs.iter() {
+                    let mut insts = block.insts.clone();
+                    prev.as_mut().insts.pop();
+                    prev.as_mut().push_back_list(&mut insts);
+                    prev.as_mut().out_edge = vec![after.clone()];
+                }
+                block.as_mut().in_edge = block
+                    .as_mut()
+                    .in_edge
+                    .iter()
+                    .filter(|&&b| prevs.iter().all(|&prev| prev != b))
+                    .map(|b| *b)
+                    .collect::<Vec<ObjPtr<BB>>>();
+            })
+        })
     }
 
     fn fuse_basic_block(&mut self) {
@@ -160,9 +204,9 @@ impl BackendPass {
     }
 
     fn clear_empty_block(&mut self) {
-        let mut exsit_blocks: Vec<ObjPtr<BB>> = vec![];
         self.module.name_func.iter().for_each(|(_, func)| {
             if !func.is_extern {
+                let mut exsit_blocks: Vec<ObjPtr<BB>> = vec![];
                 func.blocks.iter().for_each(|block| {
                     if block.insts.len() > 0 {
                         exsit_blocks.push(block.clone());
@@ -172,11 +216,23 @@ impl BackendPass {
                     }
                 });
                 func.as_mut().blocks = exsit_blocks.clone();
-                exsit_blocks.clear();
             }
         })
     }
 
+    fn clear_unreachable_block(&mut self) {
+        self.module.name_func.iter().for_each(|(_, func)| {
+            let mut exist_blocks: Vec<ObjPtr<BB>> = vec![];
+            func.blocks.iter().for_each(|block| {
+                print_context(block.clone());
+                if block.get_after().len() != 0 || block.get_prev().len() != 0 {
+                    exist_blocks.push(block.clone());
+                }
+            });
+            func.as_mut().blocks = exist_blocks.clone();
+        })
+    }
+    
     fn resolve_merge_br(&mut self) {
         self.module.name_func.iter().for_each(|(_, func)| {
             if !func.is_extern {
@@ -317,3 +373,13 @@ fn replace_first_block(block: ObjPtr<BB>, func: ObjPtr<Func>) {
 //     }
 //     false
 // }
+
+fn print_context(block: ObjPtr<BB>) {
+    log!("from: {}", block.label);
+    for prev in block.get_prev().iter() {
+        log!("prev: {}", prev.label);
+    }
+    for after in block.get_after().iter() {
+        log!("after: {}", after.label);
+    }
+}
