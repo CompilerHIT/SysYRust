@@ -359,3 +359,14 @@ impl Operand {
         }
     }
 }
+
+impl Reg {
+    pub fn get_color_type(color: &i32) -> ScalarType {
+        debug_assert!(color >= &0 && color <= &63);
+        if color < &32 {
+            ScalarType::Int
+        } else {
+            ScalarType::Float
+        }
+    }
+}
