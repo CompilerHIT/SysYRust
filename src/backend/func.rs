@@ -1654,7 +1654,6 @@ impl Func {
         }
 
         //考虑使用参数寄存器传参的情况,该情况只会发生在函数的第一个块
-
         //然后从entry块开始p2v
         let first_block = *self.entry.unwrap().out_edge.get(0).unwrap();
         let mut live_in: HashSet<Reg> = first_block.live_in.iter().cloned().collect();
@@ -2568,6 +2567,9 @@ impl Func {
             to_color.push(*v_reg);
         }
         loop {
+            if to_color.len() == 0 {
+                break;
+            }
             debug_assert!(to_color.len() != 0);
             //初始化 to color
             to_color.sort_by_key(|reg| {
