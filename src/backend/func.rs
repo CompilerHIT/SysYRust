@@ -2623,6 +2623,14 @@ impl Func {
                 break;
             }
             colors.insert(reg, color.unwrap());
+            //根据冲突图,更新其他寄存器与之的影响
+            let neighbors = interference_graph.get(&reg).unwrap();
+            for neighbor in neighbors.iter() {
+                availables
+                    .get_mut(neighbor)
+                    .unwrap()
+                    .use_reg(color.unwrap());
+            }
         }
         if to_color.len() != 0 {
             log_file!(ban_path, "fail");
