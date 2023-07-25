@@ -8,6 +8,7 @@ pub use crate::backend::block::BB;
 pub use crate::backend::func::Func;
 use crate::backend::operand::*;
 pub use crate::backend::structs::{Context, GenerateAsm};
+use crate::{config, log_file};
 // use crate::log_file;
 pub use crate::utility::{ObjPtr, ScalarType};
 
@@ -210,6 +211,14 @@ impl LIRInst {
     }
 
     pub fn replace_only_use_reg(&mut self, old_reg: &Reg, new_reg: &Reg) {
+        // let ff_reg = config::get_reg("ff");
+        // if let Some(ff_reg) = ff_reg {
+        //     if ff_reg == *old_reg {
+        //         log_file!("ff.txt", "{}->{}", old_reg, new_reg);
+        //         let a = 2;
+        //     }
+        // }
+
         if self.is_rhs_exist() {
             match self.get_rhs_mut() {
                 Operand::Reg(reg) => {
