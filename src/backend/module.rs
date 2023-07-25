@@ -798,9 +798,10 @@ impl AsmModule {
         //         .try_ban_certain_reg(&Reg::from_color(18), &caller_useds, &callee_useds);
         // }
 
-        if is_opt {
-            self.split_func(pool);
-        }
+        // if is_opt {
+        //     self.split_func(pool);
+        // }
+        self.split_func(pool);
 
         self.remove_useless_func();
         self.handle_call_v3(pool);
