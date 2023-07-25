@@ -2587,6 +2587,9 @@ impl Func {
                     if color.is_some() {
                         break;
                     }
+                    if callee_reg.get_type() != reg.get_type() {
+                        continue;
+                    }
                     if available.is_available_reg(callee_reg.get_color()) {
                         color = Some(callee_reg.get_color());
                     }
@@ -2594,6 +2597,9 @@ impl Func {
                 for caller_reg in callers_aviabled.iter() {
                     if color.is_some() {
                         break;
+                    }
+                    if caller_reg.get_type() != reg.get_type() {
+                        continue;
                     }
                     if available.is_available_reg(caller_reg.get_color()) {
                         color = Some(caller_reg.get_color());
@@ -2604,6 +2610,9 @@ impl Func {
                     if color.is_some() {
                         break;
                     }
+                    if caller_reg.get_type() != reg.get_type() {
+                        continue;
+                    }
                     if available.is_available_reg(caller_reg.get_color()) {
                         color = Some(caller_reg.get_color());
                     }
@@ -2611,6 +2620,9 @@ impl Func {
                 for callee_reg in callee_avialbled.iter() {
                     if color.is_some() {
                         break;
+                    }
+                    if callee_reg.get_type() != reg.get_type() {
+                        continue;
                     }
                     if available.is_available_reg(callee_reg.get_color()) {
                         color = Some(callee_reg.get_color());
