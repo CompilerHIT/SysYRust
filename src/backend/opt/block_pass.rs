@@ -2,15 +2,6 @@ use super::*;
 
 impl BackendPass {
     pub fn block_pass_pre_clear(&mut self, pool: &mut BackendPool) {
-        self.clear_one_jump();
-        self.fuse_imm_br(pool);
-        self.fuse_basic_block();
-        // 跳转合并需要放在消除无用块之后，否则会干扰消除的正确性
-        // self.merge_br_jump();
-        // self.clear_empty_block();
-        // self.resolve_merge_br();
-    }
-    pub fn block_pass(&mut self, pool: &mut BackendPool) {
         // 当前块只有一条跳转指令，将该块删除，并修改其前驱的跳转目标、前驱的后继、后继的前驱
         self.clear_one_jump();
         // 如果一个块的终止指令是直接跳转, 且直接跳转到的基本块里有且只有一条直接跳转的指令, 那么就把这个二次跳转消除
@@ -20,14 +11,16 @@ impl BackendPass {
         self.fuse_muti2imm_br();
         // 在直接跳转到另一个块, 并且跳转目标块没有其它前继的情况下, 可以直接把两个块合成为一个大块
         self.fuse_basic_block();
+    }
+    pub fn block_pass(&mut self) {
         // 若branch的下一条jump指令的目标块，只有一个前驱，则将该jump指令删除，并将其合并到这个块中
         self.merge_br_jump();
         // 清除空块(包括entry块)
         self.clear_empty_block();
+        // 删除0出入度的块
         self.clear_unreachable_block();
         // 如果branch和其紧邻的jump语句的目标块相同，则将jump语句删除
         self.resolve_merge_br();
-        // self.clear_useless_jump();
     }
 
     fn merge_br_jump(&mut self) {
@@ -232,7 +225,7 @@ impl BackendPass {
             func.as_mut().blocks = exist_blocks.clone();
         })
     }
-    
+
     fn resolve_merge_br(&mut self) {
         self.module.name_func.iter().for_each(|(_, func)| {
             if !func.is_extern {

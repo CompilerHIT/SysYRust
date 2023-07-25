@@ -22,21 +22,11 @@ impl BackendPass {
 
     pub fn run_pass(&mut self, pool: &mut BackendPool) {
         self.peephole_pass(pool);
-        // self.module.generate_row_asm(
-        //     &mut OpenOptions::new()
-        //         .create(true)
-        //         .append(true)
-        //         .open("row_asm2.log")
-        //         .unwrap(),
-        //     pool,
-        // );
-        // self.module.print_func();
         self.block_pass_pre_clear(pool);
-        // self.module.print_func();
         self.clear_pass(pool);
         // 清除无用指令之后开始栈空间重排
         // self.rearrange_stack_slot();
-        self.block_pass(pool);
+        self.block_pass();
         self.peephole_pass(pool);
     }
 
