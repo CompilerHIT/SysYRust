@@ -784,7 +784,19 @@ impl AsmModule {
         self.handle_spill_v3(pool);
 
         self.remove_unuse_inst_suf_alloc();
+
         self.anaylyse_for_handle_call_v3(pool);
+
+        // let callee_useds = self.build_callee_used();
+        // let caller_useds = self.build_caller_used();
+        // ///进行一番 ban操作
+        // for (_, func) in self.name_func.iter() {
+        //     if func.is_extern {
+        //         continue;
+        //     }
+        //     func.as_mut()
+        //         .try_ban_certain_reg(&Reg::from_color(18), &caller_useds, &callee_useds);
+        // }
 
         if is_opt {
             self.split_func(pool);
@@ -855,6 +867,23 @@ impl AsmModule {
         for (_, func) in self.name_func.iter() {
             //首先try ban
         }
+    }
+
+    pub fn build_callee_used(&mut self) -> HashMap<String, HashSet<Reg>> {
+        let mut calleed_useds = HashMap::new();
+        for (_, func) in self.name_func.iter() {
+            let callees_used = self.draw_callee_used(*func);
+            calleed_useds.insert(func.label.clone(), callees_used);
+        }
+        calleed_useds
+    }
+    pub fn build_caller_used(&mut self) -> HashMap<String, HashSet<Reg>> {
+        let mut caller_useds = HashMap::new();
+        for (_, func) in self.name_func.iter() {
+            let callers_used = self.draw_caller_used(*func);
+            caller_useds.insert(func.label.clone(), callers_used);
+        }
+        caller_useds
     }
 
     ///重新分析出一个函数递归地影响到的callee saved的寄存器的组成
