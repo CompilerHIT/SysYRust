@@ -842,6 +842,9 @@ impl AsmModule {
     pub fn realloc_reg_with_priority(&mut self) {
         //记录除了main函数外每个函数使用到的 callee saved和caller saved 需要的恢复次数
         let mut callee_saved_times: HashMap<ObjPtr<Func>, HashMap<Reg, usize>> = HashMap::new();
+
+        let mut callee_used = self.build_callee_used();
+
         for (_, func) in self.name_func.iter() {
             if func.is_extern {
                 continue;
@@ -884,16 +887,21 @@ impl AsmModule {
 
         //对每个函数进行试图减少指定寄存器的使用
         for (_, func) in self.name_func.iter() {
+            let func = *func;
             //按照每个函数使用被调用时需要保存的自身使用到的callee saved寄存器的数量
-            let callee_saved_time = callee_saved_times.get(func).unwrap();
+            let callee_saved_time = callee_saved_times.get(&func).unwrap();
             let mut callees: Vec<Reg> = callee_saved_time.iter().map(|(reg, _)| *reg).collect();
             callees.sort_by_cached_key(|reg| callee_saved_time.get(reg));
+            let mut caller_used = self.build_caller_used();
+            let mut callee_used = self.build_callee_used();
+            //对于自身使用到的callee_used的寄存器
+            // let mut self_callee_used
             //从该函数需要保存次数最多的寄存器开始ban
             for reg in callees.iter().rev() {}
         }
     }
 
-    pub fn build_callee_used(&mut self) -> HashMap<String, HashSet<Reg>> {
+    pub fn build_callee_used(&self) -> HashMap<String, HashSet<Reg>> {
         let mut calleed_useds = HashMap::new();
         for (_, func) in self.name_func.iter() {
             let callees_used = self.draw_callee_used(*func);
@@ -901,7 +909,7 @@ impl AsmModule {
         }
         calleed_useds
     }
-    pub fn build_caller_used(&mut self) -> HashMap<String, HashSet<Reg>> {
+    pub fn build_caller_used(&self) -> HashMap<String, HashSet<Reg>> {
         let mut caller_useds = HashMap::new();
         for (_, func) in self.name_func.iter() {
             let callers_used = self.draw_caller_used(*func);
