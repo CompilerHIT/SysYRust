@@ -6,6 +6,9 @@ impl BackendPass {
         self.module.name_func.iter().for_each(|(_, func)| {
             if !func.is_extern {
                 func.blocks.iter().for_each(|block| {
+                    // 经过两次fuse_imm的块合并后会产生mv tmp, src; mv dst, tmp;的可消去的无用phi指令导致的mv
+                    // 匹配模式为：两次相邻的mv指令如果满足上述模式则进行融合。
+                    self.rm_useless_mv();
                     // 在处理handle_overflow前的优化
                     self.rm_useless_overflow(*block, pool);
                     // self.rm_useless_param_overflow(*func, *block, pool);
@@ -13,6 +16,46 @@ impl BackendPass {
                 })
             }
         });
+    }
+
+    fn rm_useless_mv(&self) {
+        self.module.name_func.iter().for_each(|(_, func)| {
+            func.blocks.iter().for_each(|block| {
+                block.as_mut().build_reg_intervals();
+                let mut index = 0;
+                loop {
+                    if block.insts.len() < 2 || index > block.insts.len() - 2 {
+                        break;
+                    }
+
+                    let inst1 = block.insts[index];
+                    let inst2 = block.insts[index + 1];
+
+                    if inst1.get_type() == InstrsType::OpReg(SingleOp::Mv)
+                        && inst2.get_type() == InstrsType::OpReg(SingleOp::Mv)
+                    {
+                        if inst1.get_dst().clone() == inst2.get_lhs().clone() {
+                            let inst2_reg = match inst2.get_lhs().clone() {
+                                Operand::Reg(reg) => reg,
+                                _ => unreachable!("must be reg"),
+                            };
+                            let info = block
+                                .reg_intervals
+                                .iter()
+                                .find(|((reg, _), _)| reg.get_id() == inst2_reg.get_id())
+                                .unwrap();
+                            if index + 1 == info.1.1 as usize {
+                                inst2
+                                    .as_mut()
+                                    .replace_op(vec![inst2.get_dst().clone(), inst1.get_lhs().clone()]);
+                                block.as_mut().insts.remove(index);
+                            }
+                        }
+                    }
+                    index += 1;
+                }
+            })
+        })
     }
 
     fn rm_useless_overflow(&self, block: ObjPtr<BB>, pool: &mut BackendPool) {
@@ -234,7 +277,7 @@ impl BackendPass {
     //     let st = block
     //         .insts
     //         .iter()
-    //         .position(|inst| inst == *same_stores[0]) 
+    //         .position(|inst| inst == *same_stores[0])
     //         .unwrap();
     //     let ed = block
     //         .insts
@@ -256,11 +299,10 @@ impl BackendPass {
 
     //     let (src_st, src_ed) = (src_info.0 .1 as usize, src_info.1 .1 as usize);
     //     let (dst_st, dst_ed) = (dst_info.0 .1 as usize, dst_info.1 .1 as usize);
-        
+
     //     if st >= src_st && ed <= src_ed && st >= dst_st && ed <= dst_ed {
     //         // 说明这一段store是多余的
     //         block.as_mut().insts.drain((st + 1) as usize..=ed as usize);
     //     }
     // }
-
 }
