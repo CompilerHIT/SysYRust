@@ -1562,6 +1562,7 @@ impl Func {
                             if !in_bb.live_out.contains(reg_used) {
                                 continue;
                             }
+                            // unreachable!();
                             to_backward.push_back((*in_bb, *reg_used));
                         }
                     }
@@ -1574,13 +1575,13 @@ impl Func {
                         let (bb, reg) = item;
                         let mut keep_backward = true;
                         for inst in bb.insts.iter().rev() {
-                            if inst.get_reg_use().contains(&reg) {
-                                unchanged_use.insert((*inst, reg));
-                            }
                             if inst.get_reg_def().contains(&reg) {
                                 unchanged_def.insert((*inst, reg));
                                 keep_backward = false;
                                 break;
+                            }
+                            if inst.get_reg_use().contains(&reg) {
+                                unchanged_use.insert((*inst, reg));
                             }
                         }
                         if !keep_backward {
