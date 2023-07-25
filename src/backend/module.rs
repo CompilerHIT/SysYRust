@@ -423,8 +423,8 @@ impl AsmModule {
             self.split_func(pool);
         }
 
-        self.handle_call_v3(pool);
         self.remove_useless_func();
+        self.handle_call_v3(pool);
         self.rearrange_stack_slot();
         self.update_array_offset(pool);
         self.build_stack_info(f);
@@ -782,6 +782,7 @@ impl AsmModule {
         // }
 
         self.handle_spill_v3(pool);
+
         self.remove_unuse_inst_suf_alloc();
         self.anaylyse_for_handle_call_v3(pool);
 
@@ -808,9 +809,143 @@ impl AsmModule {
             });
     }
 
-    //使用进行函数分析后的结果先进行寄存器组成重构
+    ///使用进行函数分析后的结果先进行寄存器组成重构
+    ///该步骤应该放在analyse for handle call 之后
+    pub fn realloc_reg_with_priority(&mut self) {
+        //记录除了main函数外每个函数使用到的 callee saved和caller saved 需要的恢复次数
+        let mut callee_saved_times: HashMap<ObjPtr<Func>, HashMap<Reg, usize>> = HashMap::new();
+        for (_, func) in self.name_func.iter() {
+            if func.is_extern {
+                continue;
+            }
+            for bb in func.blocks.iter() {
+                for inst in bb.insts.iter() {
+                    if inst.get_type() != InstrsType::Call {
+                        continue;
+                    }
+                    let mut callees_to_saved: HashSet<Reg> = HashSet::new();
+                    let func_called = inst.get_func_name().unwrap();
+                    let callee_used = self.callees_saveds.get(func_called.as_str()).unwrap();
+                    let func_called = self.name_func.get(func_called.as_str()).unwrap();
+                    callees_to_saved = callees_to_saved
+                        .iter()
+                        .filter(|reg| callee_used.contains(&reg))
+                        .cloned()
+                        .collect();
+                    if !callee_saved_times.contains_key(func_called) {
+                        callee_saved_times.insert(*func_called, HashMap::new());
+                    }
+                    for callee_to_saved in callees_to_saved.iter() {
+                        let new_times = callee_saved_times
+                            .get(func_called)
+                            .unwrap()
+                            .get(callee_to_saved)
+                            .unwrap_or(&0)
+                            + 1;
+                        callee_saved_times
+                            .get_mut(func_called)
+                            .unwrap()
+                            .insert(*callee_to_saved, new_times);
+                    }
+                }
+            }
+        }
 
-    //函数分裂的同时针对上下文重构寄存器组成
+        //对每个函数进行试图减少指定寄存器的使用
+        for (_, func) in self.name_func.iter() {
+            //首先try ban
+        }
+    }
+
+    ///重新分析出一个函数递归地影响到的callee saved的寄存器的组成
+    pub fn draw_callee_used(&self, func: ObjPtr<Func>) -> HashSet<Reg> {
+        let mut new_callee_uesd: HashSet<Reg> = func.draw_used_callees();
+        // 首先递归地找到这个函数内部调用过地所有函数集合
+        let mut callee_funcs: HashSet<ObjPtr<Func>> = HashSet::new();
+        loop {
+            let last_len = callee_funcs.len();
+            for bb in func.blocks.iter() {
+                for inst in bb.insts.iter() {
+                    if inst.get_type() != InstrsType::Call {
+                        continue;
+                    }
+                    let func_called = inst.get_func_name().unwrap();
+                    let func_called = self.name_func.get(func_called.as_str()).unwrap();
+                    callee_funcs.insert(*func_called);
+                }
+            }
+            let mut new_callee_funcs = HashSet::new();
+            for func_called in callee_funcs.iter() {
+                for bb in func_called.blocks.iter() {
+                    for inst in bb.insts.iter() {
+                        if inst.get_type() != InstrsType::Call {
+                            continue;
+                        }
+                        let func_called = inst.get_func_name().unwrap();
+                        let func_called = self.name_func.get(func_called.as_str()).unwrap();
+                        new_callee_funcs.insert(*func_called);
+                    }
+                }
+            }
+            callee_funcs.extend(new_callee_funcs.iter());
+            if last_len == callee_funcs.len() {
+                break;
+            }
+        }
+        for func_called in callee_funcs.iter() {
+            let callee_used = func_called.draw_used_callees();
+            new_callee_uesd.extend(callee_used);
+        }
+        new_callee_uesd
+    }
+
+    ///递归分析一个函数调用影响到的caller saved寄存器
+    pub fn draw_caller_used(&self, func_called: ObjPtr<Func>) -> HashSet<Reg> {
+        let mut new_callers_used: HashSet<Reg> = func_called.draw_used_callers();
+        // 首先递归地找到这个函数内部调用过地所有函数集合
+        let mut funcs_called: HashSet<ObjPtr<Func>> = HashSet::new();
+        loop {
+            let last_len = funcs_called.len();
+            for bb in func_called.blocks.iter() {
+                for inst in bb.insts.iter() {
+                    if inst.get_type() != InstrsType::Call {
+                        continue;
+                    }
+                    let func_called = inst.get_func_name().unwrap();
+                    let func_called = self.name_func.get(func_called.as_str()).unwrap();
+                    funcs_called.insert(*func_called);
+                }
+            }
+            let mut new_callee_funcs = HashSet::new();
+            for func_called in funcs_called.iter() {
+                for bb in func_called.blocks.iter() {
+                    for inst in bb.insts.iter() {
+                        if inst.get_type() != InstrsType::Call {
+                            continue;
+                        }
+                        let func_called = inst.get_func_name().unwrap();
+                        let func_called = self.name_func.get(func_called.as_str()).unwrap();
+                        new_callee_funcs.insert(*func_called);
+                    }
+                }
+            }
+            funcs_called.extend(new_callee_funcs.iter());
+            if last_len == funcs_called.len() {
+                break;
+            }
+        }
+        for func_called in funcs_called.iter() {
+            let callee_used = func_called.draw_used_callers();
+            new_callers_used.extend(callee_used);
+        }
+        new_callers_used
+    }
+
+    ///函数分裂后减少使用到的特定物理寄存器
+    /// 该函数调用应该在remove useless func之前
+    pub fn reduce_callee_used_after_func_split(&mut self) {
+        //对于 main函数中的情况专门处理, 对于 call前后使用 的 callee saved寄存器,尝试进行recolor
+    }
 }
 
 #[cfg(test)]

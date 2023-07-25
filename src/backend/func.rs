@@ -29,6 +29,7 @@ use crate::ir::basicblock::BasicBlock;
 use crate::ir::function::Function;
 use crate::ir::instruction::Inst;
 use crate::ir::ir_type::IrType;
+use crate::ir::value;
 use crate::utility::{ObjPtr, ScalarType};
 use crate::{config, log_file};
 
@@ -1515,9 +1516,10 @@ impl Func {
     /// 该行为需要在handle call之前执行 (在这个试图看来,一个call前后除了a0的值可能发生改变,其他寄存器的值并不会发生改变)
     ///因为在handle call后有有些寄存器需要通过栈来restore,暂时还没有分析这个行为
     /// 该函数会绝对保留原本程序的结构，并且不会通过构造phi等行为增加指令,不会调整指令顺序,不会合并寄存器等等
-    pub fn p2v_pre_handle_call(&mut self, regs_to_decolor: HashSet<Reg>) {
+    pub fn p2v_pre_handle_call(&mut self, regs_to_decolor: HashSet<Reg>) -> HashSet<Reg> {
         let path = "p2v.txt";
-        // self.print_func();
+        let mut new_v_regs = HashSet::new(); //用来记录新产生的虚拟寄存器
+                                             // self.print_func();
         self.calc_live_for_handle_spill();
         //首先根据call上下文初始化 unchanged use 和 unchanged def.这些告诉我们哪些寄存器不能够p2v
         let mut unchanged_use: HashSet<(ObjPtr<LIRInst>, Reg)> = HashSet::new();
@@ -1731,6 +1733,7 @@ impl Func {
                     continue;
                 }
                 let new_reg = Reg::init(reg.get_type());
+                new_v_regs.insert(new_reg);
                 old_new.insert(*reg, new_reg);
                 backward_passed.insert((*bb, *reg));
                 ///加入到后出表中
@@ -1771,7 +1774,9 @@ impl Func {
                     }
                     debug_assert!(reg_use.is_physic() && regs_to_decolor.contains(&reg_use));
                     if !old_new.contains_key(&reg_use) {
-                        old_new.insert(reg_use, Reg::init(reg_use.get_type()));
+                        let new_v_reg = Reg::init(reg_use.get_type());
+                        new_v_regs.insert(new_v_reg);
+                        old_new.insert(reg_use, new_v_reg);
                     }
                     if !unchanged_use.contains(&(*inst, reg_use)) {
                         // log_file!(
@@ -1894,6 +1899,7 @@ impl Func {
         //从基础搜索单元开始遍历
 
         // self.print_func();
+        new_v_regs
     }
 }
 
@@ -2469,6 +2475,190 @@ impl Func {
         //定位使用到的栈空间(计算它们之间的依赖关系)
 
         //分析栈空间的读写的传递
+    }
+}
+
+// re alloc 实现 ,用于支持build v4
+impl Func {
+    //进行贪心的寄存器分配
+    pub fn alloc_reg_with_priority(&mut self, ordered_regs: Vec<Reg>) {
+        ///按照顺序使用ordered regs中的寄存器进行分配
+        todo!()
+    }
+
+    ///移除对特定的寄存器的使用,转为使用其他已经使用过的寄存器
+    ///该函数只应该main以外的函数调用
+    pub fn try_ban_certain_reg(
+        &mut self,
+        reg_to_ban: &Reg,
+        caller_used: &HashMap<String, HashSet<Reg>>,
+        callee_used: &HashMap<String, HashSet<Reg>>,
+    ) {
+        let ban_path = "ban_certain_reg.txt";
+        debug_assert!(reg_to_ban.is_physic());
+        //首先把所有 regs_to_ban都替换成一个新虚拟寄存器
+        let regs_to_ban: HashSet<Reg> = vec![*reg_to_ban].iter().cloned().collect();
+        let new_v_regs = self.p2v_pre_handle_call(regs_to_ban);
+        let mut callee_avialbled = self.draw_used_callees();
+        let mut callers_aviabled = self.draw_used_callers();
+        callee_avialbled.remove(reg_to_ban);
+        callers_aviabled.remove(reg_to_ban);
+        //对于产生的新虚拟寄存器进行分类
+        let mut first_callee = HashSet::new(); //优先使用calleed saved 的一类寄存器
+        self.calc_live_for_alloc_reg();
+        let interference_graph = &regalloc::build_interference(self);
+        let mut availables =
+            regalloc::build_availables_with_interef_graph(self, interference_graph);
+        //根据上下文给availables 增加新的规则,观察是否能够分配 (如果不能够分配，则ban 流程失败)
+        for bb in self.blocks.iter() {
+            let mut live_now: HashSet<Reg> = HashSet::new();
+            bb.live_out.iter().for_each(|reg| {
+                live_now.insert(*reg);
+            });
+            for inst in bb.insts.iter().rev() {
+                for reg in inst.get_reg_def() {
+                    live_now.remove(&reg);
+                }
+                //如果遇到call 指令,call指令前后的寄存器需要增加新的信息
+                if inst.get_type() == InstrsType::Call {
+                    let func = inst.get_func_name().unwrap();
+                    let callee_used = callee_used.get(func.as_str()).unwrap();
+                    let mut ban_list = RegUsedStat::new();
+                    for other_callee in Reg::get_all_callees_saved().iter() {
+                        if callee_used.contains(other_callee) {
+                            continue;
+                        }
+                        ban_list.use_reg(other_callee.get_color());
+                    }
+                    for reg in live_now.iter() {
+                        if new_v_regs.contains(reg) {
+                            first_callee.insert(*reg);
+                            availables.get_mut(reg).unwrap().merge(&ban_list);
+                        }
+                    }
+                }
+                for reg in inst.get_reg_use() {
+                    live_now.insert(reg);
+                }
+            }
+        }
+
+        //最后对avilable 进行一次修改
+        for reg in new_v_regs.iter() {
+            availables
+                .get_mut(reg)
+                .unwrap()
+                .use_reg(reg_to_ban.get_color());
+            ///对于不在 available 列表内的颜色,进行排除
+            for un_available in Reg::get_all_recolorable_regs() {
+                if !callee_avialbled.contains(&un_available)
+                    && !callers_aviabled.contains(&un_available)
+                {
+                    availables
+                        .get_mut(reg)
+                        .unwrap()
+                        .use_reg(un_available.get_color());
+                }
+            }
+        }
+        //开始着色,着色失败则回退最初颜色
+        let mut colors: HashMap<Reg, i32> = HashMap::new();
+        let mut to_color: Vec<Reg> = Vec::new();
+        for v_reg in new_v_regs.iter() {
+            to_color.push(*v_reg);
+        }
+        loop {
+            debug_assert!(to_color.len() != 0);
+            //初始化 to color
+            to_color.sort_by_key(|reg| {
+                availables
+                    .get(reg)
+                    .unwrap()
+                    .num_available_regs(reg.get_type())
+            });
+            //对to color排序,只着色可用颜色最多的一个
+            let reg = to_color.remove(to_color.len() - 1);
+            let mut color: Option<i32> = None;
+            let available = availables.get(&reg).unwrap();
+            if first_callee.contains(&reg) {
+                for callee_reg in callee_avialbled.iter() {
+                    if color.is_some() {
+                        break;
+                    }
+                    if available.is_available_reg(callee_reg.get_color()) {
+                        color = Some(callee_reg.get_color());
+                    }
+                }
+                for caller_reg in callers_aviabled.iter() {
+                    if color.is_some() {
+                        break;
+                    }
+                    if available.is_available_reg(caller_reg.get_color()) {
+                        color = Some(caller_reg.get_color());
+                    }
+                }
+            } else {
+                for caller_reg in callers_aviabled.iter() {
+                    if color.is_some() {
+                        break;
+                    }
+                    if available.is_available_reg(caller_reg.get_color()) {
+                        color = Some(caller_reg.get_color());
+                    }
+                }
+                for callee_reg in callee_avialbled.iter() {
+                    if color.is_some() {
+                        break;
+                    }
+                    if available.is_available_reg(callee_reg.get_color()) {
+                        color = Some(callee_reg.get_color());
+                    }
+                }
+            }
+            //着色
+            if color.is_none() {
+                to_color.push(reg); //着色失败的寄存器加回去
+                break;
+            }
+            colors.insert(reg, color.unwrap());
+        }
+        if to_color.len() != 0 {
+            log_file!(ban_path, "fail");
+            //ban 失败,恢复原本颜色
+            for bb in self.blocks.iter() {
+                for inst in bb.insts.iter() {
+                    for reg in inst.get_reg_def() {
+                        if new_v_regs.contains(&reg) {
+                            inst.as_mut().replace_only_def_reg(&reg, reg_to_ban);
+                        }
+                    }
+                    for reg in inst.get_reg_use() {
+                        if new_v_regs.contains(&reg) {
+                            inst.as_mut().replace_only_use_reg(&reg, reg_to_ban);
+                        }
+                    }
+                }
+            }
+        } else {
+            log_file!(ban_path, "success");
+            //ban 成功,写入颜色
+            for bb in self.blocks.iter() {
+                for inst in bb.insts.iter() {
+                    for reg in inst.get_reg_def() {
+                        if new_v_regs.contains(&reg) {
+                            let new_reg = Reg::from_color(*colors.get(&reg).unwrap());
+                            inst.as_mut().replace_only_def_reg(&reg, &new_reg);
+                        }
+                    }
+                    for reg in inst.get_reg_use() {
+                        if new_v_regs.contains(&reg) {
+                            let new_reg = Reg::from_color(*colors.get(&reg).unwrap());
+                            inst.as_mut().replace_only_use_reg(&reg, &new_reg);
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
