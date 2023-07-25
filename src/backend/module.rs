@@ -827,13 +827,13 @@ impl AsmModule {
             self.map_v_to_p();
         }
         self.remove_unuse_inst_suf_alloc();
-        //TODO,在寄存器分配后跑两遍寄存器接合
-        // for i in 0..=2 {
-        //     self.p2v();
-        //     self.allocate_reg();
-        //     self.map_v_to_p();
-        //     self.remove_unuse_inst_suf_alloc();
-        // }
+        //在寄存器分配后跑两遍寄存器接合
+        for i in 0..2 {
+            self.p2v();
+            self.allocate_reg();
+            self.map_v_to_p();
+            self.remove_unuse_inst_suf_alloc();
+        }
 
         self.handle_spill_v3(pool);
         self.remove_unuse_inst_suf_alloc();
