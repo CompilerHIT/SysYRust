@@ -585,16 +585,6 @@ impl AsmModule {
                 break;
             }
         }
-
-        //删除externel函数
-        let mut new_name_func = HashMap::new();
-        for (name, func) in self.name_func.iter() {
-            if func.is_extern {
-                continue;
-            }
-            new_name_func.insert(name.clone(), *func);
-        }
-        self.name_func = new_name_func;
     }
 
     ///函数分裂:
