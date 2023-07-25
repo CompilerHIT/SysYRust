@@ -338,15 +338,16 @@ impl AsmModule {
         // self.generate_row_asm(_f2, pool);
         self.map_v_to_p();
 
-        // self.generate_row_asm(_f2, pool);
-        // ///重分配
-        // self.name_func.iter().for_each(|(_, func)| {
-        //     func.as_mut()
-        //         .p2v_pre_handle_call(Reg::get_all_recolorable_regs())
-        // });
-        // self.generate_row_asm(_f2, pool);
-        // self.allocate_reg();
-        // self.map_v_to_p();
+        self.print_func();
+        self.generate_row_asm(_f2, pool);
+        ///重分配
+        self.name_func.iter().for_each(|(_, func)| {
+            func.as_mut()
+                .p2v_pre_handle_call(Reg::get_all_recolorable_regs())
+        });
+        self.generate_row_asm(_f2, pool);
+        self.allocate_reg();
+        self.map_v_to_p();
 
         self.handle_spill_v3(pool);
         self.remove_unuse_inst_suf_alloc();

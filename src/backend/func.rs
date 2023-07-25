@@ -17,6 +17,7 @@ use crate::backend::instrs::{BinaryOp, LIRInst, Operand};
 use crate::backend::module::AsmModule;
 use crate::backend::operand::{Reg, ARG_REG_COUNT};
 use crate::backend::regalloc::regalloc;
+use crate::backend::regalloc::structs::RegUsedStat;
 use crate::backend::{block::*, operand};
 // use crate::backend::regalloc::simulate_assign;
 // use crate::backend::regalloc::{
@@ -1158,9 +1159,6 @@ impl Func {
         // }
         log!("func:{}", self.label);
         for block in self.blocks.iter() {
-            if !block.showed {
-                continue;
-            }
             log!("\tblock:{}", block.label);
             for inst in block.insts.iter() {
                 log!("\t\t{}", inst.as_ref().to_string());
@@ -1658,6 +1656,14 @@ impl Func {
         //然后从entry块开始p2v
         let first_block = *self.entry.unwrap().out_edge.get(0).unwrap();
         let mut live_in: HashSet<Reg> = first_block.live_in.iter().cloned().collect();
+        // if self.label == "param32_rec" {
+        //     debug_assert!(first_block.label == "param32_rec");
+        //     let reg = first_block.insts.first().unwrap();
+        //     let reg = reg.get_reg_use();
+        //     let reg = reg.get(0).unwrap();
+        //     config::set_reg("ff", reg);
+        // }
+
         if live_in.len() != 0 {
             // println!("{}", first_block.label.clone());
             let mut args: HashSet<Reg> = Reg::get_all_args()
@@ -1665,10 +1671,18 @@ impl Func {
                 .filter(|reg| live_in.contains(&reg))
                 .cloned()
                 .collect();
+            // println!("{}{:?}", first_block.label, args);
             //对于参数往后传递
             for inst in first_block.insts.iter() {
                 for reg_use in inst.get_reg_use() {
                     if args.contains(&reg_use) {
+                        log_file!(
+                            path,
+                            "unchanged:{}{}{}",
+                            first_block.label,
+                            inst.as_ref(),
+                            reg_use
+                        );
                         unchanged_use.insert((*inst, reg_use));
                         // println!("unchange used:{:?}\t{}\n", inst, reg_use);
                     }
@@ -1718,6 +1732,7 @@ impl Func {
                 }
                 let new_reg = Reg::init(reg.get_type());
                 old_new.insert(*reg, new_reg);
+                backward_passed.insert((*bb, *reg));
                 ///加入到后出表中
                 for out_bb in bb.out_edge.iter() {
                     if !out_bb.live_in.contains(reg) {
@@ -1759,6 +1774,14 @@ impl Func {
                         old_new.insert(reg_use, Reg::init(reg_use.get_type()));
                     }
                     if !unchanged_use.contains(&(*inst, reg_use)) {
+                        // log_file!(
+                        //     path,
+                        //     "replace use:{}{}{}->{}",
+                        //     bb.label,
+                        //     inst.as_ref(),
+                        //     reg_use,
+                        //     old_new.get(&reg_use).unwrap()
+                        // );
                         inst.as_mut()
                             .replace_only_use_reg(&reg_use, old_new.get(&reg_use).unwrap());
                     }

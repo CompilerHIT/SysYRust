@@ -2,7 +2,7 @@ mod asm_builder;
 pub mod block;
 pub mod func;
 mod generate;
-mod instrs;
+pub mod instrs;
 pub mod module;
 pub mod operand;
 pub mod opt;
