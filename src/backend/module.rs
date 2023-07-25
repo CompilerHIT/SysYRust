@@ -844,14 +844,23 @@ impl AsmModule {
 
         let callee_useds = self.build_callee_used();
         let caller_useds = self.build_caller_used();
-        ///进行一番 ban操作
-        for (_, func) in self.name_func.iter() {
-            if func.is_extern {
-                continue;
-            }
-            func.as_mut()
-                .try_ban_certain_reg(&Reg::from_color(18), &caller_useds, &callee_useds);
-        }
+        // ///进行一番 ban操作
+        // for (_, func) in self.name_func.iter() {
+        //     if func.is_extern {
+        //         continue;
+        //     }
+        //     for reg in Reg::get_all_callees_saved().iter() {
+        //         if reg.get_color() == 2 {
+        //             continue;
+        //         }
+        //         let ok = func
+        //             .as_mut()
+        //             .try_ban_certain_reg(reg, &caller_useds, &callee_useds);
+        //         if !ok {
+        //             break;
+        //         }
+        //     }
+        // }
 
         if is_opt {
             self.split_func(pool);

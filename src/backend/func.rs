@@ -2560,15 +2560,16 @@ impl Func {
     }
 
     ///移除对特定的寄存器的使用,转为使用其他已经使用过的寄存器
+    /// 如果移除成功返回true,移除失败返回false
     ///该函数只应该main以外的函数调用
     pub fn try_ban_certain_reg(
         &mut self,
         reg_to_ban: &Reg,
         caller_used: &HashMap<String, HashSet<Reg>>,
         callee_used: &HashMap<String, HashSet<Reg>>,
-    ) {
+    ) -> bool {
         let ban_path = "ban_certain_reg.txt";
-        debug_assert!(reg_to_ban.is_physic());
+        debug_assert!(reg_to_ban.is_physic() && reg_to_ban != &Reg::get_sp());
         //首先把所有 regs_to_ban都替换成一个新虚拟寄存器
         let regs_to_ban: HashSet<Reg> = vec![*reg_to_ban].iter().cloned().collect();
         let new_v_regs = self.p2v_pre_handle_call(regs_to_ban);
@@ -2735,6 +2736,7 @@ impl Func {
                     }
                 }
             }
+            false
         } else {
             log_file!(ban_path, "success");
             //ban 成功,写入颜色
@@ -2754,6 +2756,7 @@ impl Func {
                     }
                 }
             }
+            true
         }
     }
 }
