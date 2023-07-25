@@ -33,7 +33,7 @@ impl BackendPass {
         // 清除空块(包括entry块)
         self.clear_empty_block();
         // 删除0出入度的块
-        self.clear_unreachable_block();
+        // self.clear_unreachable_block();
         // jump的目标块如果紧邻，则删除jump语句
         self.clear_useless_jump();
     }
