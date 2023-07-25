@@ -1554,7 +1554,46 @@ impl Func {
                 }
                 if used.len() != 0 {
                     //TODO  (暂时不考虑 参数的加入不在同一个块中的情况)
-                    unreachable!();
+                    //used 传递到前文的情况
+                    let mut to_backward: LinkedList<(ObjPtr<BB>, Reg)> = LinkedList::new();
+                    let mut backwarded: HashSet<(ObjPtr<BB>, Reg)> = HashSet::new();
+                    for reg_used in used.iter() {
+                        for in_bb in bb.in_edge.iter() {
+                            if !in_bb.live_out.contains(reg_used) {
+                                continue;
+                            }
+                            to_backward.push_back((*in_bb, *reg_used));
+                        }
+                    }
+                    while !to_backward.is_empty() {
+                        let item = to_backward.pop_front().unwrap();
+                        if backwarded.contains(&item) {
+                            continue;
+                        }
+                        backwarded.insert(item);
+                        let (bb, reg) = item;
+                        let mut keep_backward = true;
+                        for inst in bb.insts.iter().rev() {
+                            if inst.get_reg_use().contains(&reg) {
+                                unchanged_use.insert((*inst, reg));
+                            }
+                            if inst.get_reg_def().contains(&reg) {
+                                unchanged_def.insert((*inst, reg));
+                                keep_backward = false;
+                                break;
+                            }
+                        }
+                        if !keep_backward {
+                            continue;
+                        }
+                        for in_bb in bb.in_edge.iter() {
+                            if !in_bb.live_out.contains(&reg) {
+                                continue;
+                            }
+                            to_backward.push_back((*in_bb, reg));
+                        }
+                    }
+                    debug_assert!(to_backward.is_empty());
                 }
 
                 let mut defined: HashSet<Reg> = inst.get_reg_def().iter().cloned().collect();
@@ -1731,7 +1770,7 @@ impl Func {
                         to_pass.push_back((*out_bb, reg));
                     }
                 }
-                assert!(to_pass.len() == 0);
+                debug_assert!(to_pass.is_empty());
             }
         }
 
@@ -2267,7 +2306,7 @@ impl Func {
             //然后倒序
             for inst in bb.insts.iter().rev() {
                 for reg in inst.get_reg_def() {
-                    debug_assert!(livenow.contains(&reg));
+                    debug_assert!(livenow.contains(&reg), "{}", reg);
                     livenow.remove(&reg);
                 }
                 //分析如果该指令为call指令的时候上下文中需要保存的callee saved

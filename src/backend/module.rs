@@ -792,6 +792,8 @@ impl AsmModule {
 
         self.anaylyse_for_handle_call_v3(pool);
 
+        self.remove_unuse_inst_suf_alloc();
+
         // let callee_useds = self.build_callee_used();
         // let caller_useds = self.build_caller_used();
         // ///进行一番 ban操作
