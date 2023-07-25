@@ -478,6 +478,17 @@ impl AsmModule {
         let memcpy = build_external_func(self, "memcpy@plt", pool);
         let putint = build_external_func(self, "putint", pool);
         let getint = build_external_func(self, "getint", pool);
+        let getarray = build_external_func(self, "getarray", pool);
+        let putarray = build_external_func(self, "putarray", pool);
+        let getch = build_external_func(self, "getch", pool);
+        let putch = build_external_func(self, "putch", pool);
+        let getfloat = build_external_func(self, "getfloat", pool);
+        let putfloat = build_external_func(self, "putfloat", pool);
+        let getfarray = build_external_func(self, "getfarray", pool);
+        let putfarrray = build_external_func(self, "putfarray", pool);
+        let putf = build_external_func(self, "putf", pool);
+        let starttime = build_external_func(self, "_sysy_starttime", pool);
+        let stoptime = build_external_func(self, "_sysy_stoptime", pool);
     }
 
     ///准备 callee save和caller save需要的信息
@@ -825,6 +836,8 @@ impl AsmModule {
         // }
 
         self.handle_spill_v3(pool);
+        self.remove_unuse_inst_suf_alloc();
+
         self.remove_useless_func(); //删除handle spill 后面可能产生的冗余指令
 
         self.anaylyse_for_handle_call_v3(pool);
