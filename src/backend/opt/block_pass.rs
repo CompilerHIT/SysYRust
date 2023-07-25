@@ -15,10 +15,6 @@ impl BackendPass {
     pub fn block_pass(&mut self) {
         // 若branch的下一条jump指令的目标块，只有一个前驱，则将该jump指令删除，并将其合并到这个块中
         self.merge_br_jump();
-        // 清除空块(包括entry块)
-        self.clear_empty_block();
-        // 删除0出入度的块
-        self.clear_unreachable_block();
         // 如果branch和其紧邻的jump语句的目标块相同，则将jump语句删除
         self.resolve_merge_br();
     }
@@ -196,7 +192,7 @@ impl BackendPass {
         })
     }
 
-    fn clear_empty_block(&mut self) {
+    pub fn clear_empty_block(&mut self) {
         self.module.name_func.iter().for_each(|(_, func)| {
             if !func.is_extern {
                 let mut exsit_blocks: Vec<ObjPtr<BB>> = vec![];
@@ -213,7 +209,7 @@ impl BackendPass {
         })
     }
 
-    fn clear_unreachable_block(&mut self) {
+    pub fn clear_unreachable_block(&mut self) {
         self.module.name_func.iter().for_each(|(_, func)| {
             let mut exist_blocks: Vec<ObjPtr<BB>> = vec![];
             func.blocks.iter().for_each(|block| {

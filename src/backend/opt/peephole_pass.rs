@@ -4,7 +4,7 @@ use std::collections::{HashMap, HashSet};
 
 use super::*;
 impl BackendPass {
-    pub fn peephole_pass(&mut self) {
+    pub fn peephole_pass(&mut self, pool: &mut BackendPool) {
         // 经过两次fuse_imm的块合并后会产生mv tmp, src; mv dst, tmp;的可消去的无用phi指令导致的mv
         // 匹配模式为：两次相邻的mv指令如果满足上述模式则进行融合。
         self.rm_useless_mv();
@@ -13,7 +13,7 @@ impl BackendPass {
             if !func.is_extern {
                 func.blocks.iter().for_each(|block| {
                     // 在处理handle_overflow前的优化
-                    // self.rm_useless_overflow(*block, pool);
+                    self.rm_useless_overflow(*block, pool);
                     // self.rm_useless_param_overflow(*func, *block, pool);
                     // self.rm_same_store(*block, pool);
                 })
@@ -26,56 +26,56 @@ impl BackendPass {
         self.module.name_func.iter().for_each(|(_, func)| {
             func.calc_live_for_handle_call();
             func.build_reg_intervals();
-        //     func.blocks.iter().for_each(|block| {
-        //         let mut index = 0;
-        //         loop {
-        //             if block.insts.len() < 2 || index > block.insts.len() - 2 {
-        //                 break;
-        //             }
+            func.blocks.iter().for_each(|block| {
+                let mut index = 0;
+                loop {
+                    if block.insts.len() < 2 || index > block.insts.len() - 2 {
+                        break;
+                    }
 
-        //             let inst1 = block.insts[index];
-        //             let inst2 = block.insts[index + 1];
+                    let inst1 = block.insts[index];
+                    let inst2 = block.insts[index + 1];
 
-        //             if inst1.get_type() == InstrsType::OpReg(SingleOp::Mv)
-        //                 && inst2.get_type() == InstrsType::OpReg(SingleOp::Mv)
-        //             {
-        //                 if inst1.get_dst().clone() == inst2.get_lhs().clone() {
-        //                     let inst2_reg = match inst2.get_lhs().clone() {
-        //                         Operand::Reg(reg) => reg,
-        //                         _ => unreachable!("must be reg"),
-        //                     };
-        //                     let info = block
-        //                         .reg_intervals
-        //                         .iter()
-        //                         .find(|((reg, _), _)| reg.get_id() == inst2_reg.get_id())
-        //                         .unwrap();
-        //                     if index + 1 == info.1 .1 as usize {
-        //                         recard
-        //                             .entry(block.clone())
-        //                             .or_insert(HashSet::new())
-        //                             .insert(inst1);
-        //                         inst2.as_mut().replace_op(vec![
-        //                             inst2.get_dst().clone(),
-        //                             inst1.get_lhs().clone(),
-        //                         ]);
-        //                     }
-        //                 }
-        //             }
-        //             index += 1;
-        //         }
-        //     })
-        // });
+                    if inst1.get_type() == InstrsType::OpReg(SingleOp::Mv)
+                        && inst2.get_type() == InstrsType::OpReg(SingleOp::Mv)
+                    {
+                        if inst1.get_dst().clone() == inst2.get_lhs().clone() {
+                            let inst2_reg = match inst2.get_lhs().clone() {
+                                Operand::Reg(reg) => reg,
+                                _ => unreachable!("must be reg"),
+                            };
+                            let info = block
+                                .reg_intervals
+                                .iter()
+                                .find(|((reg, _), _)| reg.get_id() == inst2_reg.get_id())
+                                .unwrap();
+                            if index + 1 == info.1 .1 as usize {
+                                recard
+                                    .entry(block.clone())
+                                    .or_insert(HashSet::new())
+                                    .insert(inst1);
+                                inst2.as_mut().replace_op(vec![
+                                    inst2.get_dst().clone(),
+                                    inst1.get_lhs().clone(),
+                                ]);
+                            }
+                        }
+                    }
+                    index += 1;
+                }
+            })
+        });
 
-        // self.module.name_func.iter().for_each(|(_, func)| {
-        //     for block in func.blocks.iter() {
-        //         block.as_mut().insts = block
-        //             .as_mut()
-        //             .insts
-        //             .iter()
-        //             .filter(|inst| !recard.get(block).unwrap_or(&HashSet::new()).contains(inst))
-        //             .map(|i| *i)
-        //             .collect::<Vec<ObjPtr<LIRInst>>>();
-        //     }
+        self.module.name_func.iter().for_each(|(_, func)| {
+            for block in func.blocks.iter() {
+                block.as_mut().insts = block
+                    .as_mut()
+                    .insts
+                    .iter()
+                    .filter(|inst| !recard.get(block).unwrap_or(&HashSet::new()).contains(inst))
+                    .map(|i| *i)
+                    .collect::<Vec<ObjPtr<LIRInst>>>();
+            }
         })
     }
 
