@@ -1700,7 +1700,35 @@ impl Func {
                         if !out_bb.live_in.contains(arg) {
                             continue;
                         }
-                        unreachable!();
+                        to_pass.push_back((*out_bb, *arg));
+                    }
+                }
+
+                let mut passed: HashSet<(ObjPtr<BB>, Reg)> = HashSet::new();
+                while !to_pass.is_empty() {
+                    let (bb, reg) = to_pass.pop_front().unwrap();
+                    if passed.contains(&(bb, reg)) {
+                        continue;
+                    }
+                    passed.insert((bb, reg));
+                    let mut if_forward = true;
+                    for inst in bb.insts.iter() {
+                        if inst.get_reg_use().contains(&reg) {
+                            unchanged_use.insert((*inst, reg));
+                        }
+                        if inst.get_reg_def().contains(&reg) {
+                            if_forward = false;
+                            break;
+                        }
+                    }
+                    if !if_forward {
+                        continue;
+                    }
+                    for out_bb in bb.out_edge.iter() {
+                        if !out_bb.live_in.contains(&reg) {
+                            continue;
+                        }
+                        to_pass.push_back((*out_bb, reg));
                     }
                 }
                 assert!(to_pass.len() == 0);
