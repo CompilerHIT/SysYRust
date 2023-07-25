@@ -12,6 +12,7 @@ use crate::ir::function::Function;
 use crate::ir::instruction::{Inst, InstKind};
 use crate::ir::ir_type::IrType;
 use crate::ir::module::Module;
+use crate::ir::CallMap;
 // use crate::log;
 use crate::utility::ObjPtr;
 
@@ -827,6 +828,28 @@ impl AsmModule {
         //删除无用的函数
     }
 
+    //构建函数调用表
+    pub fn build_call_map(
+        name_func: &HashMap<String, ObjPtr<Func>>,
+    ) -> HashMap<String, HashSet<String>> {
+        let mut call_map = HashMap::new();
+        for (name, func) in name_func.iter() {
+            // if func.is_extern {continue;}
+            let mut callee_funcs: HashSet<String> = HashSet::new();
+            for bb in func.blocks.iter() {
+                bb.insts
+                    .iter()
+                    .filter(|inst| inst.get_type() == InstrsType::Call)
+                    .for_each(|inst| {
+                        let func_name = inst.get_func_name().unwrap();
+                        callee_funcs.insert(func_name);
+                    });
+            }
+            call_map.insert(name.clone(), callee_funcs);
+        }
+        call_map
+    }
+
     pub fn p2v(&mut self) {
         self.name_func
             .iter()
@@ -849,37 +872,44 @@ impl AsmModule {
             if func.is_extern {
                 continue;
             }
+            func.calc_live_for_handle_call();
             for bb in func.blocks.iter() {
-                for inst in bb.insts.iter() {
-                    if inst.get_type() != InstrsType::Call {
-                        continue;
+                let mut livenow: HashSet<Reg> = HashSet::new();
+                bb.live_out.iter().for_each(|reg| {
+                    livenow.insert(*reg);
+                });
+                for inst in bb.insts.iter().rev() {
+                    for reg in inst.get_reg_def() {
+                        livenow.remove(&reg);
                     }
-                    let mut callees_to_saved: HashSet<Reg> = HashSet::new();
-                    let func_called = inst.get_func_name().unwrap();
-                    let callee_used = self
-                        .callee_regs_to_saveds
-                        .get(func_called.as_str())
-                        .unwrap();
-                    let func_called = self.name_func.get(func_called.as_str()).unwrap();
-                    callees_to_saved = callees_to_saved
-                        .iter()
-                        .filter(|reg| callee_used.contains(&reg))
-                        .cloned()
-                        .collect();
-                    if !callee_saved_times.contains_key(func_called) {
-                        callee_saved_times.insert(*func_called, HashMap::new());
+                    if inst.get_type() == InstrsType::Call {
+                        let mut callees_to_saved: HashSet<Reg> = HashSet::new();
+                        let func_called = inst.get_func_name().unwrap();
+                        let callee_used = callee_used.get(func_called.as_str()).unwrap();
+                        let func_called = self.name_func.get(func_called.as_str()).unwrap();
+                        callees_to_saved = callees_to_saved
+                            .iter()
+                            .filter(|reg| callee_used.contains(&reg))
+                            .cloned()
+                            .collect();
+                        if !callee_saved_times.contains_key(func_called) {
+                            callee_saved_times.insert(*func_called, HashMap::new());
+                        }
+                        for callee_to_saved in callees_to_saved.iter() {
+                            let new_times = callee_saved_times
+                                .get(func_called)
+                                .unwrap()
+                                .get(callee_to_saved)
+                                .unwrap_or(&0)
+                                + 1;
+                            callee_saved_times
+                                .get_mut(func_called)
+                                .unwrap()
+                                .insert(*callee_to_saved, new_times);
+                        }
                     }
-                    for callee_to_saved in callees_to_saved.iter() {
-                        let new_times = callee_saved_times
-                            .get(func_called)
-                            .unwrap()
-                            .get(callee_to_saved)
-                            .unwrap_or(&0)
-                            + 1;
-                        callee_saved_times
-                            .get_mut(func_called)
-                            .unwrap()
-                            .insert(*callee_to_saved, new_times);
+                    for reg in inst.get_reg_use() {
+                        livenow.insert(reg);
                     }
                 }
             }
@@ -894,6 +924,8 @@ impl AsmModule {
             callees.sort_by_cached_key(|reg| callee_saved_time.get(reg));
             let mut caller_used = self.build_caller_used();
             let mut callee_used = self.build_callee_used();
+            let mut self_used = func.draw_used_callees();
+            // let mut callee_func_used = HashSet::new(); //自身调用的函数调用的
             //对于自身使用到的callee_used的寄存器
             // let mut self_callee_used
             //从该函数需要保存次数最多的寄存器开始ban
