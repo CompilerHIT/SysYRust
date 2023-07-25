@@ -106,7 +106,8 @@ pub fn estimate_spill_cost(func: &Func) -> HashMap<Reg, f32> {
     out
 }
 
-// 获取冲突表
+/// 获取冲突表
+/// 依赖于 外部调用 calc live计算的 live in,out
 pub fn build_interference(func: &Func) -> HashMap<Reg, HashSet<Reg>> {
     // todo,修改逻辑，以能够处理多定义的情况
     let mut interference_graph: HashMap<Reg, HashSet<Reg>> = HashMap::new();
@@ -302,11 +303,11 @@ pub fn merge_alloc(
     let tmp_set = HashSet::new();
     // 计算价值函数,统计一个指令的价值
     let base_count_merge_val = |reg: &Reg,
-                                    _dstr: &HashMap<i32, i32>,
-                                    _other_color: i32,
-                                    _spillings: &HashSet<i32>,
-                                    _nums_neighbor_color: &mut HashMap<Reg, HashMap<i32, i32>>,
-                                    interference_graph: &HashMap<Reg, HashSet<Reg>>|
+                                _dstr: &HashMap<i32, i32>,
+                                _other_color: i32,
+                                _spillings: &HashSet<i32>,
+                                _nums_neighbor_color: &mut HashMap<Reg, HashMap<i32, i32>>,
+                                interference_graph: &HashMap<Reg, HashSet<Reg>>|
      -> f32 {
         let out = interference_graph.get(reg).unwrap_or(&tmp_set).len();
         out as f32

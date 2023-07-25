@@ -296,6 +296,8 @@ impl Reg {
         out
     }
 
+    ///获取所有能够分配的寄存器,除了五个特殊寄存器以外其他都能够分配  (等价于get_all_recolorable_regs)
+
     //获取所有参数寄存器
     pub fn get_all_args() -> HashSet<Reg> {
         let mut args = HashSet::new();
