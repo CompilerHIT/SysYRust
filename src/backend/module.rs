@@ -420,6 +420,8 @@ impl AsmModule {
 
         self.handle_spill_v3(pool);
         self.remove_unuse_inst_suf_alloc();
+
+        self.add_external_func(pool); //加入外部函数以进行分析
         self.anaylyse_for_handle_call_v3(pool);
 
         if is_opt {
@@ -499,41 +501,6 @@ impl AsmModule {
     fn anaylyse_for_handle_call_v3(&mut self, pool: &mut BackendPool) {
         //TODO
         let mut caller_used: HashMap<ObjPtr<Func>, HashSet<Reg>> = HashMap::new();
-        // self.name_func.clear();
-        // for (_, func) in self.func_map.iter() {
-        //     self.name_func.insert(func.label.clone(), *func);
-        //     if !func.is_extern {
-        //         self.callee_regs_to_saveds
-        //             .insert(func.label.clone(), func.draw_used_callees());
-        //         caller_used.insert(*func, func.draw_used_callers());
-        //     } else {
-        //         //对于外部函数(默认内部使用了所有的callers saved函数)
-        //         //同时也默认认为其使用了所有callee saved的函数
-        //         self.callee_regs_to_saveds
-        //             .insert(func.label.clone(), Reg::get_all_callees_saved());
-        //         caller_used.insert(*func, Reg::get_all_callers_saved());
-        //     }
-        // }
-        // debug_assert!(self.name_func.contains_key("putint"));
-        // //加入外部函数
-        // let build_external_func =
-        //     |module: &mut AsmModule, name: &str, pool: &mut BackendPool| -> ObjPtr<Func> {
-        //         let external_context = pool.put_context(Context::new());
-        //         let external_func = pool.put_func(Func::new(name, external_context));
-        //         external_func.as_mut().is_extern = true;
-        //         module.name_func.insert(name.to_string(), external_func);
-        //         external_func
-        //     };
-        // //补充外部函数 memset 和memcpy
-        // let memset = build_external_func(self, "memset@plt", pool);
-        // let memcpy = build_external_func(self, "memcpy@plt", pool);
-        // caller_used.insert(memset, Reg::get_all_callers_saved());
-        // caller_used.insert(memcpy, Reg::get_all_callers_saved());
-        // self.callee_regs_to_saveds
-        //     .insert(memset.label.clone(), Reg::get_all_callees_saved());
-        // self.callee_regs_to_saveds
-        //     .insert(memcpy.label.clone(), Reg::get_all_callees_saved());
-        self.add_external_func(pool);
 
         for (_, func) in self.name_func.iter() {
             if !func.is_extern {
@@ -840,33 +807,17 @@ impl AsmModule {
 
         self.remove_useless_func(); //删除handle spill 后面可能产生的冗余指令
 
+        self.add_external_func(pool);
         self.anaylyse_for_handle_call_v3(pool);
 
-        let callee_useds = self.build_callee_used();
-        let caller_useds = self.build_caller_used();
-        // ///进行一番 ban操作
-        // for (_, func) in self.name_func.iter() {
-        //     if func.is_extern {
-        //         continue;
-        //     }
-        //     for reg in Reg::get_all_callees_saved().iter() {
-        //         if reg.get_color() == 2 {
-        //             continue;
-        //         }
-        //         let ok = func
-        //             .as_mut()
-        //             .try_ban_certain_reg(reg, &caller_useds, &callee_useds);
-        //         if !ok {
-        //             break;
-        //         }
-        //     }
-        // }
+        //寄存器重分配
+
+        // self.realloc_reg_with_priority();
 
         if is_opt {
             self.split_func(pool);
         }
         // self.split_func(pool);
-
         self.remove_useless_func(); //在handle call之前调用,删掉前面往name func中加入的external func
         self.handle_call_v3(pool);
         self.rearrange_stack_slot();
@@ -934,7 +885,11 @@ impl AsmModule {
         //对每个函数进行试图减少指定寄存器的使用
         for (_, func) in self.name_func.iter() {
             //按照每个函数使用被调用时需要保存的自身使用到的callee saved寄存器的数量
-            //来对每个函数被调用时自身需要保存的寄存器进行排序
+            let callee_saved_time = callee_saved_times.get(func).unwrap();
+            let mut callees: Vec<Reg> = callee_saved_time.iter().map(|(reg, _)| *reg).collect();
+            callees.sort_by_cached_key(|reg| callee_saved_time.get(reg));
+            //从该函数需要保存次数最多的寄存器开始ban
+            for reg in callees.iter().rev() {}
         }
     }
 
