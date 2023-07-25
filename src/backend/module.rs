@@ -828,12 +828,12 @@ impl AsmModule {
         }
         self.remove_unuse_inst_suf_alloc();
         //在寄存器分配后跑两遍寄存器接合
-        for i in 0..2 {
-            self.p2v();
-            self.allocate_reg();
-            self.map_v_to_p();
-            self.remove_unuse_inst_suf_alloc();
-        }
+        // for i in 0..2 {
+        //     self.p2v();
+        //     self.allocate_reg();
+        //     self.map_v_to_p();
+        //     self.remove_unuse_inst_suf_alloc();
+        // }
 
         self.handle_spill_v3(pool);
         self.remove_unuse_inst_suf_alloc();
@@ -842,16 +842,16 @@ impl AsmModule {
 
         self.anaylyse_for_handle_call_v3(pool);
 
-        // let callee_useds = self.build_callee_used();
-        // let caller_useds = self.build_caller_used();
-        // ///进行一番 ban操作
-        // for (_, func) in self.name_func.iter() {
-        //     if func.is_extern {
-        //         continue;
-        //     }
-        //     func.as_mut()
-        //         .try_ban_certain_reg(&Reg::from_color(18), &caller_useds, &callee_useds);
-        // }
+        let callee_useds = self.build_callee_used();
+        let caller_useds = self.build_caller_used();
+        ///进行一番 ban操作
+        for (_, func) in self.name_func.iter() {
+            if func.is_extern {
+                continue;
+            }
+            func.as_mut()
+                .try_ban_certain_reg(&Reg::from_color(18), &caller_useds, &callee_useds);
+        }
 
         if is_opt {
             self.split_func(pool);
