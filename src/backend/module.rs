@@ -338,16 +338,16 @@ impl AsmModule {
         // self.generate_row_asm(_f2, pool);
         self.map_v_to_p();
 
-        self.print_func();
-        self.generate_row_asm(_f2, pool);
-        ///重分配
-        self.name_func.iter().for_each(|(_, func)| {
-            func.as_mut()
-                .p2v_pre_handle_call(Reg::get_all_recolorable_regs())
-        });
-        self.generate_row_asm(_f2, pool);
-        self.allocate_reg();
-        self.map_v_to_p();
+        // self.print_func();
+        // self.generate_row_asm(_f2, pool);
+        // ///重分配
+        // self.name_func.iter().for_each(|(_, func)| {
+        //     func.as_mut()
+        //         .p2v_pre_handle_call(Reg::get_all_recolorable_regs())
+        // });
+        // self.generate_row_asm(_f2, pool);
+        // self.allocate_reg();
+        // self.map_v_to_p();
 
         self.handle_spill_v3(pool);
         self.remove_unuse_inst_suf_alloc();
@@ -424,7 +424,7 @@ impl AsmModule {
         }
 
         self.handle_call_v3(pool);
-        // self.remove_useless_func();
+        self.remove_useless_func();
         self.rearrange_stack_slot();
         self.update_array_offset(pool);
         self.build_stack_info(f);
@@ -460,6 +460,7 @@ impl AsmModule {
     /// 1. 准备每个函数需要的callee save,以及进行函数分裂
     /// 2. 针对性地让函数自我转变 , 调整每个函数中使用到的寄存器分布等等
     /// 3. 该函数应该在vtop和handle spill后调用
+    /// 4. 过程中会往name func中加入需要的外部函数的信息
     fn anaylyse_for_handle_call_v3(&mut self, pool: &mut BackendPool) {
         //TODO
         let mut caller_used: HashMap<ObjPtr<Func>, HashSet<Reg>> = HashMap::new();
@@ -599,13 +600,6 @@ impl AsmModule {
     ///函数分裂:
     /// 该函数只应该在analyse for handle call v3后被调用
     fn split_func(&mut self, pool: &mut BackendPool) {
-        //加入一些extern的函数
-        for (_, func) in self.func_map.iter() {
-            if func.is_extern {
-                self.name_func.insert(func.label.clone(), *func);
-            }
-        }
-
         let regs_set_to_string = |regs: &HashSet<Reg>| -> String {
             let mut symbol = "".to_string();
             for id in 0..=63 {
@@ -631,7 +625,7 @@ impl AsmModule {
         let mut new_name_func: HashMap<String, ObjPtr<Func>> = HashMap::new();
         new_name_func.insert("main".to_string(), main_func);
 
-        //然后分析callee save的使用情况,进行裂变,同时产生新的
+        //然后分析callee save的使用情况,进行裂变,同时产生新的name func
         loop {
             let mut if_finish = true;
             let mut new_funcs: Vec<ObjPtr<Func>> = Vec::new();
@@ -747,6 +741,86 @@ impl AsmModule {
             func.print_func();
         }
     }
+}
+
+/// build v4:
+/// 1.寄存器重分配:针对call上下文调整函数寄存器组成
+/// 2.针对函数是否为main调整寄存器组成
+impl AsmModule {
+    pub fn build_v4(&mut self, f: &mut File, _f2: &mut File, pool: &mut BackendPool, is_opt: bool) {
+        self.build_lir(pool);
+        self.remove_unuse_inst_pre_alloc();
+
+        // self.generate_row_asm(_f2, pool); //generate row  asm可能会造成bug
+
+        if is_opt {
+            // 设置一些寄存器为临时变量
+            self.cal_tmp_var();
+
+            self.allocate_reg();
+            self.map_v_to_p();
+            // 代码调度，列表调度法
+            self.list_scheduling_tech();
+
+            // 为临时寄存器分配寄存器
+            self.clear_tmp_var();
+            self.allocate_reg();
+            self.map_v_to_p();
+        } else {
+            // self.generate_row_asm(_f2, pool);
+            self.allocate_reg();
+            // self.generate_row_asm(_f2, pool);
+            // self.map_v_to_p();
+            // self.generate_row_asm(_f2, pool);
+            // // ///重分配
+            // self.name_func.iter().for_each(|(_, func)| {
+            //     func.as_mut()
+            //         .p2v_pre_handle_call(Reg::get_all_recolorable_regs())
+            // });
+            // // self.generate_row_asm(_f2, pool);
+            // self.allocate_reg();
+            self.map_v_to_p();
+        }
+
+        for i in 0..=2 {
+            self.p2v();
+            self.allocate_reg();
+            self.map_v_to_p();
+            self.p2v();
+            self.allocate_reg();
+            self.map_v_to_p();
+        }
+
+        self.handle_spill_v3(pool);
+        self.remove_unuse_inst_suf_alloc();
+        self.anaylyse_for_handle_call_v3(pool);
+
+        if is_opt {
+            self.split_func(pool);
+        }
+
+        self.remove_useless_func();
+        self.handle_call_v3(pool);
+        self.rearrange_stack_slot();
+        self.update_array_offset(pool);
+        self.build_stack_info(f);
+        // self.print_func();
+        //删除无用的函数
+    }
+
+    pub fn p2v(&mut self) {
+        self.name_func
+            .iter()
+            .filter(|(_, f)| !f.is_extern)
+            .for_each(|(_, f)| {
+                f.as_mut()
+                    .p2v_pre_handle_call(Reg::get_all_recolorable_regs());
+            });
+    }
+
+    //使用进行函数分析后的结果先进行寄存器组成重构
+
+    //函数分裂的同时针对上下文重构寄存器组成
 }
 
 #[cfg(test)]
