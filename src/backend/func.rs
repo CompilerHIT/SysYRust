@@ -2441,7 +2441,13 @@ impl Func {
             });
             for inst in bb.insts.iter().rev() {
                 for reg in inst.get_reg_def() {
-                    debug_assert!(live_now.contains(&reg), "reg{}", reg);
+                    debug_assert!(
+                        live_now.contains(&reg),
+                        "blocak:{},inst:{},reg:{}",
+                        bb.label,
+                        inst.as_ref(),
+                        reg
+                    );
                     live_now.remove(&reg);
                 }
 
@@ -2511,13 +2517,13 @@ impl Func {
         // self.print_func();
     }
 
-    pub fn handle_call_v4(
-        &mut self,
-        pool: &mut BackendPool,
-        callers_used: &HashMap<String, HashSet<Reg>>,
-    ) {
-        //根据上下文决定对函数能够使用哪些
-    }
+    // pub fn handle_call_v4(
+    //     &mut self,
+    //     pool: &mut BackendPool,
+    //     callers_used: &HashMap<String, HashSet<Reg>>,
+    // ) {
+    //     //根据上下文决定对函数能够使用哪些
+    // }
 }
 
 // rearrange slot实现 ,for module-build v3

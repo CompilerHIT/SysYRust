@@ -22,8 +22,8 @@ use super::structs::GenerateAsm;
 pub struct AsmModule {
     pub global_var_list: Vec<(ObjPtr<Inst>, GlobalVar)>,
     pub func_map: Vec<(ObjPtr<Function>, ObjPtr<Func>)>,
-    callees_saveds: HashMap<String, HashSet<Reg>>,
-    callers_saveds: HashMap<String, HashSet<Reg>>,
+    callee_regs_to_saveds: HashMap<String, HashSet<Reg>>,
+    caller_regs_to_saveds: HashMap<String, HashSet<Reg>>,
     call_info: HashMap<String, HashMap<Bitmap, String>>, //每个base func name 对应调用的 不同callee need save函数
     pub name_func: HashMap<String, ObjPtr<Func>>,        //记录实际函数名和实际函数
     pub upper_module: Module,
@@ -39,8 +39,8 @@ impl AsmModule {
             upper_module: ir_module,
             call_info: HashMap::new(),
             name_func: HashMap::new(),
-            callees_saveds: HashMap::new(),
-            callers_saveds: HashMap::new(),
+            callee_regs_to_saveds: HashMap::new(),
+            caller_regs_to_saveds: HashMap::new(),
         }
     }
 
@@ -456,32 +456,14 @@ impl AsmModule {
         // 对于 handle call
         for (_, func) in self.name_func.iter() {
             debug_assert!(!func.is_extern);
-            func.as_mut().handle_call_v3(pool, &self.callers_saveds);
+            func.as_mut()
+                .handle_call_v3(pool, &self.caller_regs_to_saveds);
         }
     }
-    ///准备 callee save和caller save需要的信息
-    /// 1. 准备每个函数需要的callee save,以及进行函数分裂
-    /// 2. 针对性地让函数自我转变 , 调整每个函数中使用到的寄存器分布等等
-    /// 3. 该函数应该在vtop和handle spill后调用
-    /// 4. 过程中会往name func中加入需要的外部函数的信息
-    fn anaylyse_for_handle_call_v3(&mut self, pool: &mut BackendPool) {
-        //TODO
-        let mut caller_used: HashMap<ObjPtr<Func>, HashSet<Reg>> = HashMap::new();
-        self.name_func.clear();
-        for (_, func) in self.func_map.iter() {
-            self.name_func.insert(func.label.clone(), *func);
-            if !func.is_extern {
-                self.callees_saveds
-                    .insert(func.label.clone(), func.draw_used_callees());
-                caller_used.insert(*func, func.draw_used_callers());
-            } else {
-                //对于外部函数(默认内部使用了所有的callers saved函数)
-                //同时也默认认为其使用了所有callee saved的函数
-                self.callees_saveds
-                    .insert(func.label.clone(), Reg::get_all_callees_saved());
-                caller_used.insert(*func, Reg::get_all_callers_saved());
-            }
-        }
+
+    ///加入外部函数,
+    pub fn add_external_func(&mut self, pool: &mut BackendPool) {
+        // debug_assert!(self.name_func.contains_key("putint"));
         //加入外部函数
         let build_external_func =
             |module: &mut AsmModule, name: &str, pool: &mut BackendPool| -> ObjPtr<Func> {
@@ -494,12 +476,67 @@ impl AsmModule {
         //补充外部函数 memset 和memcpy
         let memset = build_external_func(self, "memset@plt", pool);
         let memcpy = build_external_func(self, "memcpy@plt", pool);
-        caller_used.insert(memset, Reg::get_all_callers_saved());
-        caller_used.insert(memcpy, Reg::get_all_callers_saved());
-        self.callees_saveds
-            .insert(memset.label.clone(), Reg::get_all_callees_saved());
-        self.callees_saveds
-            .insert(memcpy.label.clone(), Reg::get_all_callees_saved());
+        let putint = build_external_func(self, "putint", pool);
+        let getint = build_external_func(self, "getint", pool);
+    }
+
+    ///准备 callee save和caller save需要的信息
+    /// 1. 准备每个函数需要的callee save,以及进行函数分裂
+    /// 2. 针对性地让函数自我转变 , 调整每个函数中使用到的寄存器分布等等
+    /// 3. 该函数应该在vtop和handle spill后调用
+    /// 4. 过程中会往name func中加入需要的外部函数的信息
+    fn anaylyse_for_handle_call_v3(&mut self, pool: &mut BackendPool) {
+        //TODO
+        let mut caller_used: HashMap<ObjPtr<Func>, HashSet<Reg>> = HashMap::new();
+        // self.name_func.clear();
+        // for (_, func) in self.func_map.iter() {
+        //     self.name_func.insert(func.label.clone(), *func);
+        //     if !func.is_extern {
+        //         self.callee_regs_to_saveds
+        //             .insert(func.label.clone(), func.draw_used_callees());
+        //         caller_used.insert(*func, func.draw_used_callers());
+        //     } else {
+        //         //对于外部函数(默认内部使用了所有的callers saved函数)
+        //         //同时也默认认为其使用了所有callee saved的函数
+        //         self.callee_regs_to_saveds
+        //             .insert(func.label.clone(), Reg::get_all_callees_saved());
+        //         caller_used.insert(*func, Reg::get_all_callers_saved());
+        //     }
+        // }
+        // debug_assert!(self.name_func.contains_key("putint"));
+        // //加入外部函数
+        // let build_external_func =
+        //     |module: &mut AsmModule, name: &str, pool: &mut BackendPool| -> ObjPtr<Func> {
+        //         let external_context = pool.put_context(Context::new());
+        //         let external_func = pool.put_func(Func::new(name, external_context));
+        //         external_func.as_mut().is_extern = true;
+        //         module.name_func.insert(name.to_string(), external_func);
+        //         external_func
+        //     };
+        // //补充外部函数 memset 和memcpy
+        // let memset = build_external_func(self, "memset@plt", pool);
+        // let memcpy = build_external_func(self, "memcpy@plt", pool);
+        // caller_used.insert(memset, Reg::get_all_callers_saved());
+        // caller_used.insert(memcpy, Reg::get_all_callers_saved());
+        // self.callee_regs_to_saveds
+        //     .insert(memset.label.clone(), Reg::get_all_callees_saved());
+        // self.callee_regs_to_saveds
+        //     .insert(memcpy.label.clone(), Reg::get_all_callees_saved());
+        self.add_external_func(pool);
+
+        for (_, func) in self.name_func.iter() {
+            if !func.is_extern {
+                self.callee_regs_to_saveds
+                    .insert(func.label.clone(), func.draw_used_callees());
+                caller_used.insert(*func, func.draw_used_callers());
+            } else {
+                //对于外部函数(默认内部使用了所有的callers saved函数)
+                //同时也默认认为其使用了所有callee saved的函数
+                self.callee_regs_to_saveds
+                    .insert(func.label.clone(), Reg::get_all_callees_saved());
+                caller_used.insert(*func, Reg::get_all_callers_saved());
+            }
+        }
 
         //构造每个函数的caller save regs  (caller save表要递归调用分析)
         //首先获取所有函数的所有call指令 (caller func,callee func)
@@ -547,12 +584,12 @@ impl AsmModule {
 
         //分析完caller saved的使用,把caller used表中的信息更新到func中
         for (func, caller_saved_regs) in caller_used {
-            self.callers_saveds
+            self.caller_regs_to_saveds
                 .insert(func.label.clone(), caller_saved_regs);
         }
         //之后caller_used数据结构就没有用了 (信息已经存入了 self.callers_saved中)
         //
-        self.callees_saveds
+        self.callee_regs_to_saveds
             .insert("main".to_string(), HashSet::new());
 
         //更新基础callees saved uesd 表
@@ -562,20 +599,22 @@ impl AsmModule {
             //更新caller save
             for (caller_func, callee_func) in call_insts.iter() {
                 //
-                let old_caller_func_used_callees =
-                    self.callees_saveds.get(caller_func.label.as_str()).unwrap();
+                let old_caller_func_used_callees = self
+                    .callee_regs_to_saveds
+                    .get(caller_func.label.as_str())
+                    .unwrap();
                 let old_num = old_caller_func_used_callees.len();
                 let new_regs: HashSet<Reg> = self
-                    .callees_saveds
+                    .callee_regs_to_saveds
                     .get(callee_func.label.as_str())
                     .unwrap()
                     .clone();
-                self.callees_saveds
+                self.callee_regs_to_saveds
                     .get_mut(caller_func.as_ref().label.as_str())
                     .unwrap()
                     .extend(new_regs);
                 if self
-                    .callees_saveds
+                    .callee_regs_to_saveds
                     .get(caller_func.label.as_str())
                     .unwrap()
                     .len()
@@ -624,7 +663,7 @@ impl AsmModule {
             let mut new_funcs: Vec<ObjPtr<Func>> = Vec::new();
             //分析调用的上下文
             for func in func_to_process.iter() {
-                let call_insts = func.analyse_for_handle_call(&self.callees_saveds);
+                let call_insts = func.analyse_for_handle_call(&self.callee_regs_to_saveds);
                 //通过对func 的上下文分析 (返回某个call指令附近需要保存的callee saved寄存器)
                 //如果遇到新函数,加入callee saved
                 for (call_inst, callee_regs) in call_insts.iter() {
@@ -663,14 +702,16 @@ impl AsmModule {
                         .insert(map, new_name.clone());
 
                     // 更新新函数的callees map
-                    self.callees_saveds
+                    self.callee_regs_to_saveds
                         .insert(new_name.clone(), callee_regs.iter().cloned().collect());
                     // 继承旧函数的callers map
-                    let old_callers_saved =
-                        self.callers_saveds.get_mut(&callee_func.label).unwrap();
+                    let old_callers_saved = self
+                        .caller_regs_to_saveds
+                        .get_mut(&callee_func.label)
+                        .unwrap();
                     let new_callers_saved: HashSet<Reg> =
                         old_callers_saved.iter().cloned().collect();
-                    self.callers_saveds
+                    self.caller_regs_to_saveds
                         .insert(new_name.clone(), new_callers_saved);
                     // 把新函数加入到名称表
                     new_name_func.insert(new_name.clone(), new_callee_func);
@@ -694,7 +735,7 @@ impl AsmModule {
             if func.label == "main" {
                 func.as_mut().callee_saved.clear(); // main函数不需要保存任何callee saved
             } else {
-                let callees = self.callees_saveds.get_mut(name).unwrap();
+                let callees = self.callee_regs_to_saveds.get_mut(name).unwrap();
                 callees.remove(&Reg::new(2, crate::utility::ScalarType::Int)); //sp虽然是callee saved但不需要通过栈方式restore
                 func.as_mut().callee_saved.extend(callees.iter());
             }
@@ -776,14 +817,15 @@ impl AsmModule {
         }
         self.remove_unuse_inst_suf_alloc();
         //TODO,在寄存器分配后跑两遍寄存器接合
-        for i in 0..=2 {
-            self.p2v();
-            self.allocate_reg();
-            self.map_v_to_p();
-            self.remove_unuse_inst_suf_alloc();
-        }
+        // for i in 0..=2 {
+        //     self.p2v();
+        //     self.allocate_reg();
+        //     self.map_v_to_p();
+        //     self.remove_unuse_inst_suf_alloc();
+        // }
 
         self.handle_spill_v3(pool);
+        self.remove_useless_func(); //删除handle spill 后面可能产生的冗余指令
 
         self.anaylyse_for_handle_call_v3(pool);
 
@@ -798,12 +840,12 @@ impl AsmModule {
         //         .try_ban_certain_reg(&Reg::from_color(18), &caller_useds, &callee_useds);
         // }
 
-        // if is_opt {
-        //     self.split_func(pool);
-        // }
-        self.split_func(pool);
+        if is_opt {
+            self.split_func(pool);
+        }
+        // self.split_func(pool);
 
-        self.remove_useless_func();
+        self.remove_useless_func(); //在handle call之前调用,删掉前面往name func中加入的external func
         self.handle_call_v3(pool);
         self.rearrange_stack_slot();
         self.update_array_offset(pool);
@@ -838,7 +880,10 @@ impl AsmModule {
                     }
                     let mut callees_to_saved: HashSet<Reg> = HashSet::new();
                     let func_called = inst.get_func_name().unwrap();
-                    let callee_used = self.callees_saveds.get(func_called.as_str()).unwrap();
+                    let callee_used = self
+                        .callee_regs_to_saveds
+                        .get(func_called.as_str())
+                        .unwrap();
                     let func_called = self.name_func.get(func_called.as_str()).unwrap();
                     callees_to_saved = callees_to_saved
                         .iter()
@@ -866,7 +911,8 @@ impl AsmModule {
 
         //对每个函数进行试图减少指定寄存器的使用
         for (_, func) in self.name_func.iter() {
-            //首先try ban
+            //按照每个函数使用被调用时需要保存的自身使用到的callee saved寄存器的数量
+            //来对每个函数被调用时自身需要保存的寄存器进行排序
         }
     }
 
