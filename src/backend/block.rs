@@ -2800,7 +2800,13 @@ impl BB {
             let uses = inst.get_reg_use();
             let defs = inst.get_reg_def();
             for reg in uses {
-                debug_assert!(regs.contains_key(&reg));
+                debug_assert!(
+                    regs.contains_key(&reg),
+                    "{}{}{}",
+                    self.label,
+                    inst.as_ref(),
+                    reg
+                );
                 regs.get_mut(&reg).unwrap().1 = index as i32;
             }
             for reg in defs {
