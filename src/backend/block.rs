@@ -1763,12 +1763,6 @@ impl BB {
                 }
 
                 InstrsType::Branch(..) => {
-                    // deal with false branch
-                    // let is_j = match inst_ref.get_type() {
-                    //     InstrsType::Branch(..) => false,
-                    //     InstrsType::Jump => true,
-                    //     _ => unreachable!(),
-                    // };
                     let target = match inst_ref.get_label() {
                         Operand::Addr(label) => label,
                         _ => unreachable!("branch must have a label"),

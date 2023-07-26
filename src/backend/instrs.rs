@@ -8,7 +8,6 @@ pub use crate::backend::block::BB;
 pub use crate::backend::func::Func;
 use crate::backend::operand::*;
 pub use crate::backend::structs::{Context, GenerateAsm};
-use crate::{config, log_file};
 // use crate::log_file;
 pub use crate::utility::{ObjPtr, ScalarType};
 

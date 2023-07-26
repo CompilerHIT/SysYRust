@@ -9,8 +9,6 @@ use std::vec::Vec;
 
 use super::instrs::{InstrsType, SingleOp};
 use super::operand::IImm;
-use biheap::BiHeap;
-// use super::regalloc::structs::RegUsedStat;
 use super::{structs::*, BackendPool};
 use crate::backend::asm_builder::AsmBuilder;
 use crate::backend::instrs::{BinaryOp, LIRInst, Operand};
@@ -18,20 +16,16 @@ use crate::backend::module::AsmModule;
 use crate::backend::operand::{Reg, ARG_REG_COUNT};
 use crate::backend::regalloc::regalloc;
 use crate::backend::regalloc::structs::RegUsedStat;
-use crate::backend::{block::*, operand};
-// use crate::backend::regalloc::simulate_assign;
-// use crate::backend::regalloc::{
-//     easy_ls_alloc::Allocator, regalloc::Regalloc, structs::FuncAllocStat,
-// };
 use crate::backend::regalloc::{regalloc::Regalloc, structs::FuncAllocStat};
+use crate::backend::{block::*, operand};
 use crate::container::bitmap::Bitmap;
 use crate::ir::basicblock::BasicBlock;
 use crate::ir::function::Function;
 use crate::ir::instruction::Inst;
 use crate::ir::ir_type::IrType;
-use crate::ir::value;
 use crate::utility::{ObjPtr, ScalarType};
 use crate::{config, log_file};
+use biheap::BiHeap;
 
 #[derive(Clone)]
 pub struct Func {
@@ -53,10 +47,7 @@ pub struct Func {
 
     pub const_array: HashSet<IntArray>,
     pub float_array: HashSet<FloatArray>,
-    //FIXME: resolve float regs
     pub callee_saved: HashSet<Reg>,
-    // pub caller_saved: HashMap<Reg, Reg>,
-    // pub caller_saved_len: i32,
     pub array_inst: Vec<ObjPtr<LIRInst>>,
     pub array_slot: Vec<i32>,
 
@@ -75,7 +66,6 @@ impl Func {
             params: Vec::new(),
             param_cnt: (0, 0),
             entry: None,
-            // fregs: HashSet::new(),
             context,
             is_header: true,
 
@@ -85,8 +75,6 @@ impl Func {
             const_array: HashSet::new(),
             float_array: HashSet::new(),
             callee_saved: HashSet::new(),
-            // caller_saved: HashMap::new(),
-            // caller_saved_len: 0,
             array_inst: Vec::new(),
             array_slot: Vec::new(),
 
@@ -452,42 +440,6 @@ impl Func {
         }
     }
 
-    // 移除指定id的寄存器的使用信息
-    // pub fn del_inst_reg(&mut self, cur_info: &CurInstrInfo, inst: ObjPtr<LIRInst>) {
-    //     for reg in inst.as_ref().get_reg_use() {
-    //         self.reg_use[reg.get_id() as usize].remove(cur_info);
-    //     }
-    //     for reg in inst.as_ref().get_reg_def() {
-    //         self.reg_def[reg.get_id() as usize].remove(cur_info);
-    //     }
-    // }
-
-    // 添加指定id的寄存器的使用信息
-    // pub fn add_inst_reg(&mut self, cur_info: &CurInstrInfo, inst: ObjPtr<LIRInst>) {
-    //     for reg in inst.as_ref().get_reg_use() {
-    //         self.reg_use[reg.get_id() as usize].insert(cur_info.clone());
-    //     }
-    //     for reg in inst.as_ref().get_reg_def() {
-    //         self.reg_def[reg.get_id() as usize].insert(cur_info.clone());
-    //     }
-    // }
-
-    pub fn build_reg_info(&mut self) {
-        // self.reg_def.clear();
-        // self.reg_use.clear();
-        // self.reg_def.resize(self.reg_num as usize, HashSet::new());
-        // self.reg_use.resize(self.reg_num as usize, HashSet::new());
-        // let mut p: CurInstrInfo = CurInstrInfo::new(0);
-        // for block in self.blocks.clone() {
-        //     p.band_block(block);
-        //     for inst in block.as_ref().insts.iter() {
-        //         p.insts_it = Some(*inst);
-        //         self.add_inst_reg(&p, *inst);
-        //         p.pos += 1;
-        //     }
-        // }
-    }
-
     pub fn calc_live_for_alloc_reg(&self) {
         //TODO, 去除allocable限制!
         let calc_live_file = "callive.txt";
@@ -732,12 +684,14 @@ impl Func {
             })
             .map(|param| param.clone())
             .collect();
+
         let mut fparam: Vec<_> = ir_func
             .get_parameter_list()
             .iter()
             .filter(|param| param.as_ref().get_param_type() == IrType::Float)
             .map(|param| param.clone())
             .collect();
+
         self.param_cnt = (iparam.len() as i32, fparam.len() as i32);
         self.params.append(&mut iparam);
         self.params.append(&mut fparam);
@@ -764,9 +718,6 @@ impl Func {
                 .as_mut()
                 .handle_spill(this, &self.reg_alloc_info.spillings, pool);
         }
-        // for block in self.blocks.iter() {
-        //     block.as_mut().save_reg(this, pool);
-        // }
         self.update(this);
     }
 
@@ -935,9 +886,7 @@ impl Func {
         for block in self.blocks.iter() {
             block.as_mut().handle_overflow(this, pool);
         }
-        // self.print_func();
         self.update(this);
-        // self.print_func();
     }
 
     fn update(&mut self, func: ObjPtr<Func>) {
@@ -950,8 +899,6 @@ impl Func {
         self.const_array = func_ref.const_array.clone();
         self.float_array = func_ref.float_array.clone();
         self.callee_saved = func_ref.callee_saved.clone();
-        // self.caller_saved = func_ref.caller_saved.clone();
-        // self.caller_saved_len = func_ref.caller_saved_len;
         self.array_inst = func_ref.array_inst.clone();
         self.array_slot = func_ref.array_slot.clone();
     }
@@ -987,24 +934,18 @@ impl Func {
         };
         let mut stack_size = self.context.get_offset();
 
-        // log!("stack size: {}", stack_size);
-
         if let Some(addition_stack_info) = self.stack_addr.front() {
             stack_size += addition_stack_info.get_pos();
         }
         if let Some(slot) = self.stack_addr.back() {
             stack_size += slot.get_pos() + slot.get_size();
         };
-        // log!("stack: {:?}", self.stack_addr);
-
-        // stack_size += self.caller_saved_len * ADDR_SIZE;
 
         // 局部数组空间
         for array_size in self.array_slot.iter() {
             stack_size += array_size
         }
 
-        // log!("caller saved: {}", self.caller_saved.len());
         //栈对齐 - 调用func时sp需按16字节对齐
         stack_size = stack_size / 16 * 16 + 16;
         self.context.as_mut().set_offset(stack_size - ADDR_SIZE);
@@ -1150,14 +1091,9 @@ impl Func {
     }
 }
 
-static mut p_time: i32 = 0;
 /// 打印函数当前的汇编形式
 impl Func {
     pub fn print_func(&self) {
-        // unsafe {
-        //     debug_assert!(false, "{p_time},{}", self.label.clone());
-        //     p_time += 1;
-        // }
         log!("func:{}", self.label);
         for block in self.blocks.iter() {
             log!("\tblock:{}", block.label);
@@ -1599,7 +1535,7 @@ impl Func {
 
                 let mut defined: HashSet<Reg> = inst.get_reg_def().iter().cloned().collect();
                 let mut index = i + 1;
-                ///往后继块传递defined
+                // 往后继块传递defined
                 while index < bb.insts.len() && defined.len() != 0 {
                     let inst = *bb.insts.get(index).unwrap();
                     for reg in inst.get_reg_use() {
@@ -1615,9 +1551,9 @@ impl Func {
                     index += 1;
                 }
                 if defined.len() != 0 {
-                    ///按照目前的代码结构来说不应该存在
-                    ///说明define到了live out中(说明其他块使用了这个块中的计算出的a0)
-                    /// 则其他块中计算出的a0也应该使用相同的物理寄存器号(不应该改变)
+                    // 按照目前的代码结构来说不应该存在
+                    // 说明define到了live out中(说明其他块使用了这个块中的计算出的a0)
+                    // 则其他块中计算出的a0也应该使用相同的物理寄存器号(不应该改变)
                     let mut to_pass: LinkedList<(ObjPtr<BB>, Reg)> = LinkedList::new();
                     for out_bb in bb.out_edge.iter() {
                         for reg in defined.iter() {
@@ -1626,7 +1562,7 @@ impl Func {
                             }
                             unreachable!();
                             // debug_assert!(false, "{}->{}", bb.label, out_bb.label);
-                            to_pass.push_back((*out_bb, *reg));
+                            // to_pass.push_back((*out_bb, *reg));
                         }
                     }
                     let mut passed: HashSet<(ObjPtr<BB>, Reg)> = HashSet::new();
@@ -1643,14 +1579,14 @@ impl Func {
                                     unchanged_use.insert((*inst, reg));
                                 }
                             }
-                            let mut ifFinish = false;
+                            let mut if_finish = false;
                             for def_reg in inst.get_reg_def() {
                                 if def_reg == reg {
-                                    ifFinish = true;
+                                    if_finish = true;
                                     break;
                                 }
                             }
-                            if ifFinish {
+                            if if_finish {
                                 break;
                             }
                             index += 1;
@@ -1666,8 +1602,8 @@ impl Func {
             }
         }
 
-        //考虑ret
-        //一个block中只可能出现一条return最多
+        // 考虑ret
+        // 一个block中只可能出现一条return最多
         for bb in self.blocks.iter() {
             if let Some(last_inst) = bb.insts.last() {
                 let use_reg = last_inst.get_reg_use();
@@ -1677,7 +1613,7 @@ impl Func {
                 debug_assert!(use_reg.len() == 1);
                 let use_reg = use_reg.get(0).unwrap();
                 unchanged_use.insert((*last_inst, *use_reg));
-                ///往前直到遇到第一个def为止
+                // 往前直到遇到第一个def为止
                 let mut index = bb.insts.len() - 2;
                 loop {
                     let inst = bb.insts.get(index).unwrap();
@@ -1781,13 +1717,12 @@ impl Func {
         // to_pass.push_back(first_block);
         let mut forward_passed: HashSet<(ObjPtr<BB>, Reg)> = HashSet::new();
         let mut backward_passed: HashSet<(ObjPtr<BB>, Reg)> = HashSet::new();
-        ///搜索单元分为正向搜索单元与反向搜索单元
-        ///
+        // 搜索单元分为正向搜索单元与反向搜索单元
         for bb in self.blocks.iter() {
             let mut old_new: HashMap<Reg, Reg> = HashMap::with_capacity(64);
             let mut to_forward: LinkedList<(ObjPtr<BB>, Reg, Reg)> = LinkedList::new();
             let mut to_backward: LinkedList<(ObjPtr<BB>, Reg, Reg)> = LinkedList::new();
-            ///对于live out的情况(插入一些到forward中)
+            // 对于live out的情况(插入一些到forward中)
             for reg in bb.live_out.iter() {
                 //
                 if !reg.is_physic() {
@@ -1803,7 +1738,7 @@ impl Func {
                 new_v_regs.insert(new_reg);
                 old_new.insert(*reg, new_reg);
                 backward_passed.insert((*bb, *reg));
-                ///加入到后出表中
+                // 加入到后出表中
                 for out_bb in bb.out_edge.iter() {
                     if !out_bb.live_in.contains(reg) {
                         continue;
@@ -1859,10 +1794,10 @@ impl Func {
                     }
                 }
             }
-            ///对于最后剩下来的寄存器,初始化前向表
+            // 对于最后剩下来的寄存器,初始化前向表
             for (old_reg, new_reg) in old_new.iter() {
                 for in_bb in bb.in_edge.iter() {
-                    if (backward_passed.contains(&(*in_bb, *old_reg))) {
+                    if backward_passed.contains(&(*in_bb, *old_reg)) {
                         continue;
                     }
                     backward_passed.insert((*in_bb, *old_reg));
@@ -1905,7 +1840,7 @@ impl Func {
                     if !if_keep_forward {
                         continue;
                     }
-                    ///到了尽头,判断是否后递
+                    // 到了尽头,判断是否后递
                     for out_bb in bb.out_edge.iter() {
                         let key = (*out_bb, old_reg);
                         if forward_passed.contains(&key) {
@@ -2431,7 +2366,6 @@ impl Func {
     ) {
         self.calc_live_for_handle_call();
         let mut slots_for_caller_saved: Vec<StackSlot> = Vec::new();
-        ///
         // self.print_func();
         for bb in self.blocks.iter() {
             let mut new_insts: Vec<ObjPtr<LIRInst>> = Vec::new();
@@ -2555,7 +2489,7 @@ impl Func {
 impl Func {
     //进行贪心的寄存器分配
     pub fn alloc_reg_with_priority(&mut self, ordered_regs: Vec<Reg>) {
-        ///按照顺序使用ordered regs中的寄存器进行分配
+        // 按照顺序使用ordered regs中的寄存器进行分配
         todo!()
     }
 
@@ -2623,7 +2557,7 @@ impl Func {
                 .get_mut(reg)
                 .unwrap()
                 .use_reg(reg_to_ban.get_color());
-            ///对于不在 available 列表内的颜色,进行排除
+            // 对于不在 available 列表内的颜色,进行排除
             for un_available in Reg::get_all_recolorable_regs() {
                 if !callee_avialbled.contains(&un_available)
                     && !callers_aviabled.contains(&un_available)
