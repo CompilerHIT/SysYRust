@@ -13,6 +13,8 @@ impl BackendPass {
             if !func.is_extern {
                 func.blocks.iter().for_each(|block| {
                     // 在处理handle_overflow前的优化
+                    // self.rm_useless(*block);
+                    // self.rm_same_mv(*block);
                     self.rm_useless_overflow(*block, pool);
                     // self.rm_useless_param_overflow(*func, *block, pool);
                     // self.rm_same_store(*block, pool);
@@ -22,10 +24,7 @@ impl BackendPass {
     }
 
     fn rm_useless_mv(&self) {
-        let mut recard: HashMap<ObjPtr<BB>, HashSet<ObjPtr<LIRInst>>> = HashMap::new();
         self.module.name_func.iter().for_each(|(_, func)| {
-            func.calc_live_for_handle_call();
-            func.build_reg_intervals();
             func.blocks.iter().for_each(|block| {
                 let mut index = 0;
                 loop {
@@ -40,43 +39,31 @@ impl BackendPass {
                         && inst2.get_type() == InstrsType::OpReg(SingleOp::Mv)
                     {
                         if inst1.get_dst().clone() == inst2.get_lhs().clone() {
-                            let inst2_reg = match inst2.get_lhs().clone() {
-                                Operand::Reg(reg) => reg,
-                                _ => unreachable!("must be reg"),
-                            };
-                            let info = block
-                                .reg_intervals
-                                .iter()
-                                .find(|((reg, _), _)| reg.get_id() == inst2_reg.get_id())
-                                .unwrap();
-                            if index + 1 == info.1 .1 as usize {
-                                recard
-                                    .entry(block.clone())
-                                    .or_insert(HashSet::new())
-                                    .insert(inst1);
-                                inst2.as_mut().replace_op(vec![
-                                    inst2.get_dst().clone(),
-                                    inst1.get_lhs().clone(),
-                                ]);
-                            }
+                            block.as_mut().insts.remove(index);
+                            inst2
+                                .as_mut()
+                                .replace_op(vec![inst2.get_dst().clone(), inst1.get_lhs().clone()]);
                         }
                     }
                     index += 1;
                 }
             })
         });
+    }
 
-        self.module.name_func.iter().for_each(|(_, func)| {
-            for block in func.blocks.iter() {
-                block.as_mut().insts = block
-                    .as_mut()
-                    .insts
-                    .iter()
-                    .filter(|inst| !recard.get(block).unwrap_or(&HashSet::new()).contains(inst))
-                    .map(|i| *i)
-                    .collect::<Vec<ObjPtr<LIRInst>>>();
+    fn rm_same_mv(&self, block: ObjPtr<BB>) {
+        let mut index = 0;
+        loop {
+            if block.insts.len() < 2 || index >= block.insts.len() - 1 {
+                break;
             }
-        })
+            let inst1 = block.insts[index];
+            let inst2 = block.insts[index+1];
+            if inst1.get_type() == inst2.get_type() && inst1.operands == inst2.operands {
+                block.as_mut().insts.remove(index);
+            }
+            index += 1;
+        }
     }
 
     fn rm_useless_overflow(&self, block: ObjPtr<BB>, pool: &mut BackendPool) {
