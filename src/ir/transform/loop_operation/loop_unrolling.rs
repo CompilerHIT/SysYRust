@@ -18,7 +18,7 @@ pub fn loop_unrolling(
         let loop_list = loop_map.get_mut(&name).unwrap();
         let mut analyzer = SCEVAnalyzer::new();
         let dominator_tree = calculate_dominator(func.get_head());
-        analyzer.set_dominator_tree(ObjPtr::new(&dominator_tree));
+        analyzer.set_loop_list(loop_list.get_loop_list().clone());
         let mut remove_list = None;
         for loop_info in loop_list.get_loop_list().iter() {
             if loop_info.get_sub_loops().len() == 0 && loop_info.get_current_loop_bb().len() == 2 {
