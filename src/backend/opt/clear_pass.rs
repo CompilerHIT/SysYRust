@@ -152,7 +152,7 @@ impl BackendPass {
         });
     }
 
-    fn rm_useless(&self, block: ObjPtr<BB>) {
+    pub fn rm_useless(&self, block: ObjPtr<BB>) {
         let mut index = 0;
         loop {
             if index >= block.insts.len() {
