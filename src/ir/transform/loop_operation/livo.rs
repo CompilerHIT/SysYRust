@@ -13,7 +13,7 @@ pub fn livo_run(
     pools: &mut (&mut ObjPool<BasicBlock>, &mut ObjPool<Inst>),
 ) {
     let mut scev_analyzer = SCEVAnalyzer::new();
-    scev_analyzer.set_dominator_tree(ObjPtr::new(&dominator_tree));
+    scev_analyzer.set_loop_list(loop_list.get_loop_list().clone());
     for loop_info in loop_list.get_loop_list().iter() {
         if !is_break_continue_exist(*loop_info) {
             livo_in_loop(&dominator_tree, *loop_info, &mut scev_analyzer, pools);

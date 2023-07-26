@@ -36,7 +36,7 @@ pub fn loop_optimize(
     });
 
     loop_unrolling::loop_unrolling(module, &mut loop_map, pools);
-    super::functional_optimizer(module, pools, false);
+    super::functional_optimizer(module, pools, true);
 
     // 归纳变量强度削减
     func_process(module, |name, func| {
