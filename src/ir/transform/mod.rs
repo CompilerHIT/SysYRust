@@ -3,6 +3,7 @@ use super::{dump_now, tools::*};
 use crate::utility::ObjPool;
 
 mod array_transform;
+mod condition_transform;
 mod constant_folding;
 mod dead_code_eliminate;
 mod delete_redundant_load_store;
