@@ -308,6 +308,7 @@ impl AsmModule {
                 }
                 if func.label == "main" {
                     asm_order.push(*self.name_func.get("main").unwrap());
+                    continue;
                 }
                 let name = func.label.clone();
                 for name in self.call_info.get(name.as_str()).unwrap() {
@@ -656,6 +657,14 @@ impl AsmModule {
         let mut new_name_func: HashMap<String, ObjPtr<Func>> = HashMap::new();
         new_name_func.insert("main".to_string(), main_func);
 
+        //call info加入非main函数
+        for (name, func) in self.name_func.iter() {
+            if name == "main" {
+                continue;
+            }
+            self.call_info.insert(name.clone(), HashMap::new());
+        }
+
         //然后分析callee save的使用情况,进行裂变,同时产生新的name func
         loop {
             let mut if_finish = true;
@@ -826,7 +835,7 @@ impl AsmModule {
 
         //寄存器重分配
 
-        // self.realloc_reg_with_priority();
+        self.realloc_reg_with_priority();
 
         if is_opt {
             self.split_func(pool);
