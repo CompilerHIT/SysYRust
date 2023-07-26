@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, LinkedList};
 use std::fs::File;
 use std::io::Write;
 
@@ -17,7 +17,7 @@ use crate::ir::CallMap;
 // use crate::log;
 use crate::utility::ObjPtr;
 
-use super::instrs::{Context, InstrsType};
+use super::instrs::{Context, InstrsType, LIRInst, BB};
 use super::operand::Reg;
 use super::structs::GenerateAsm;
 
@@ -836,9 +836,9 @@ impl AsmModule {
         self.add_external_func(pool);
         self.anaylyse_for_handle_call_v3();
 
-        //寄存器重分配
-
-        // self.realloc_reg_with_priority();
+        //寄存器重分配,重分析
+        self.realloc_reg_with_priority();
+        self.anaylyse_for_handle_call_v3();
 
         // if is_opt {
         //     self.split_func(pool);
@@ -1094,10 +1094,153 @@ impl AsmModule {
 
     ///函数分裂后减少使用到的特定物理寄存器
     /// 该函数调用应该在remove useless func之前
+    /// 该函数的调用结果依赖于调用该函数前进行的analyse for handle call
     pub fn reduce_callee_used_after_func_split(&mut self) {
         //对于 main函数中的情况专门处理, 对于 call前后使用 的 callee saved寄存器,尝试进行recolor,(使用任意寄存器)
         let func = self.name_func.get("main").unwrap();
-
+        //标记重整
+        let mut to_recolor: Vec<(ObjPtr<LIRInst>, Reg)> = Vec::new();
+        func.calc_live_for_handle_call();
+        for bb in func.blocks.iter() {
+            let mut live_now: HashSet<Reg> = HashSet::new();
+            bb.live_out.iter().for_each(|reg| {
+                live_now.insert(*reg);
+            });
+            for (index, inst) in bb.insts.iter().enumerate().rev() {
+                for reg in inst.get_reg_def() {
+                    live_now.remove(&reg);
+                }
+                if inst.get_type() == InstrsType::Call {
+                    //
+                    let func_name = inst.get_func_name().unwrap();
+                    let func = self.name_func.get(func_name.as_str()).unwrap();
+                    if !func.is_extern {
+                        let callee_to_saved =
+                            self.callee_regs_to_saveds.get(func_name.as_str()).unwrap();
+                        let mut reg_cross = HashSet::new();
+                        for reg in live_now.iter() {
+                            if !callee_to_saved.contains(reg) {
+                                continue;
+                            }
+                            reg_cross.insert(*reg);
+                        }
+                        //call指令往后,call指令往前
+                        let mut to_forward: LinkedList<(ObjPtr<BB>, i32, Reg)> = LinkedList::new();
+                        let mut to_backward: LinkedList<(ObjPtr<BB>, i32, Reg)> = LinkedList::new();
+                        let mut p2v: HashMap<Reg, Reg> = HashMap::new();
+                        for reg in reg_cross.iter() {
+                            to_forward.push_back((*bb, index as i32, *reg));
+                            to_backward.push_back((*bb, index as i32, *reg));
+                            let v_reg = Reg::init(reg.get_type());
+                            p2v.insert(*reg, v_reg);
+                        }
+                        let p2v: HashMap<Reg, Reg> = p2v;
+                        let mut backward_passed: HashSet<(ObjPtr<BB>, i32, Reg)> = HashSet::new();
+                        let mut forward_passed: HashSet<(ObjPtr<BB>, i32, Reg)> = HashSet::new();
+                        //对遇到的符合要求的物理寄存器进行p2v,并且缓存等待重着色
+                        loop {
+                            while !to_forward.is_empty() {
+                                let item = to_forward.pop_front().unwrap();
+                                if forward_passed.contains(&item) {
+                                    continue;
+                                }
+                                forward_passed.insert(item);
+                                let (bb, mut index, reg) = item;
+                                let v_reg = *p2v.get(&reg).unwrap();
+                                index += 1;
+                                debug_assert!(index >= 0);
+                                while index < bb.insts.len() as i32 {
+                                    let inst = bb.insts.get(index as usize).unwrap();
+                                    if inst.get_reg_use().contains(&reg) {
+                                        inst.as_mut().replace_only_use_reg(&reg, &v_reg);
+                                        to_recolor.push((*inst, v_reg));
+                                    }
+                                    if inst.get_reg_def().contains(&reg) {
+                                        break;
+                                    }
+                                    index += 1;
+                                }
+                                if index < bb.insts.len() as i32 {
+                                    continue;
+                                }
+                                //传播到外界,并且对于进入外界的情况还会反向传播,
+                                let mut new_forward = Vec::new();
+                                for out_bb in bb.out_edge.iter() {
+                                    //out_bb里面通过
+                                    if !out_bb.live_in.contains(&reg) {
+                                        continue;
+                                    }
+                                    to_forward.push_back((*out_bb, -1, reg));
+                                    new_forward.push(out_bb);
+                                }
+                                for bb in new_forward.iter() {
+                                    for in_bb in bb.in_edge.iter() {
+                                        if !in_bb.live_out.contains(&reg) {
+                                            continue;
+                                        }
+                                        to_backward.push_back((
+                                            *in_bb,
+                                            in_bb.insts.len() as i32,
+                                            reg,
+                                        ));
+                                    }
+                                }
+                            }
+                            while !to_backward.is_empty() {
+                                let item = to_backward.pop_front().unwrap();
+                                if backward_passed.contains(&item) {
+                                    continue;
+                                }
+                                backward_passed.insert(item);
+                                let (bb, mut index, reg) = item;
+                                let v_reg = *p2v.get(&reg).unwrap();
+                                index -= 1;
+                                debug_assert!(index < bb.insts.len() as i32);
+                                while index >= 0 {
+                                    let inst = bb.insts.get(index as usize).unwrap();
+                                    if inst.get_reg_def().contains(&reg) {
+                                        inst.as_mut().replace_only_def_reg(&reg, &v_reg);
+                                        to_recolor.push((*inst, v_reg));
+                                        break;
+                                    }
+                                    if inst.get_reg_use().contains(&reg) {
+                                        inst.as_mut().replace_only_use_reg(&reg, &v_reg);
+                                        to_recolor.push((*inst, v_reg));
+                                    }
+                                    index -= 1;
+                                }
+                                if index >= 0 {
+                                    continue;
+                                }
+                                let mut new_backward = Vec::new();
+                                for in_bb in bb.in_edge.iter() {
+                                    if !in_bb.live_out.contains(&reg) {
+                                        continue;
+                                    }
+                                    to_backward.push_back((*in_bb, in_bb.insts.len() as i32, reg));
+                                    new_backward.push(*in_bb);
+                                }
+                                for bb in new_backward.iter() {
+                                    for out_bb in bb.out_edge.iter() {
+                                        if !out_bb.live_in.contains(&reg) {
+                                            continue;
+                                        }
+                                        to_forward.push_back((*out_bb, -1, reg));
+                                    }
+                                }
+                            }
+                            if to_forward.is_empty() && to_backward.is_empty() {
+                                break;
+                            }
+                        }
+                    }
+                }
+                for reg in inst.get_reg_use() {
+                    live_now.insert(reg);
+                }
+            }
+        }
+        ///TODO
         return;
     }
 }
