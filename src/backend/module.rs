@@ -8,6 +8,7 @@ use crate::backend::operand::ToString;
 use crate::backend::structs::{FGlobalVar, FloatArray, GlobalVar, IGlobalVar, IntArray};
 use crate::backend::BackendPool;
 use crate::container::bitmap::Bitmap;
+use crate::frontend::ast::Continue;
 use crate::ir::function::Function;
 use crate::ir::instruction::{Inst, InstKind};
 use crate::ir::ir_type::IrType;
@@ -379,7 +380,7 @@ impl AsmModule {
 
         self.handle_spill_v3(pool);
         self.remove_unuse_inst_suf_alloc();
-        self.anaylyse_for_handle_call_v3(pool);
+        self.anaylyse_for_handle_call_v3();
 
         // let mut is_opt = false;
         // if is_opt {
@@ -447,7 +448,7 @@ impl AsmModule {
         self.remove_unuse_inst_suf_alloc();
 
         self.add_external_func(pool); //加入外部函数以进行分析
-        self.anaylyse_for_handle_call_v3(pool);
+        self.anaylyse_for_handle_call_v3();
 
         if is_opt {
             self.split_func(pool);
@@ -523,8 +524,10 @@ impl AsmModule {
     /// 2. 针对性地让函数自我转变 , 调整每个函数中使用到的寄存器分布等等
     /// 3. 该函数应该在vtop和handle spill后调用
     /// 4. 过程中会往name func中加入需要的外部函数的信息
-    fn anaylyse_for_handle_call_v3(&mut self, pool: &mut BackendPool) {
+    fn anaylyse_for_handle_call_v3(&mut self) {
         //TODO
+        self.callee_regs_to_saveds.clear();
+        self.caller_regs_to_saveds.clear();
         let mut caller_used: HashMap<ObjPtr<Func>, HashSet<Reg>> = HashMap::new();
 
         for (_, func) in self.name_func.iter() {
@@ -831,15 +834,17 @@ impl AsmModule {
         self.remove_useless_func(); //删除handle spill 后面可能产生的冗余指令
 
         self.add_external_func(pool);
-        self.anaylyse_for_handle_call_v3(pool);
+        self.anaylyse_for_handle_call_v3();
 
-        //寄存器重分配
-
-        self.realloc_reg_with_priority();
+        //寄存器重分配,重分析
+        // self.realloc_reg_with_priority();
+        // self.anaylyse_for_handle_call_v3();
 
         if is_opt {
             self.split_func(pool);
         }
+
+        // self.reduce_callee_used_after_func_split();
 
         self.remove_useless_func(); //在handle call之前调用,删掉前面往name func中加入的external func
         self.handle_call_v3(pool);
@@ -983,6 +988,8 @@ impl AsmModule {
                 }
             }
         }
+
+        //对于main函数单独处理
     }
 
     pub fn build_callee_used(&self) -> HashMap<String, HashSet<Reg>> {
@@ -1089,7 +1096,10 @@ impl AsmModule {
     ///函数分裂后减少使用到的特定物理寄存器
     /// 该函数调用应该在remove useless func之前
     pub fn reduce_callee_used_after_func_split(&mut self) {
-        //对于 main函数中的情况专门处理, 对于 call前后使用 的 callee saved寄存器,尝试进行recolor
+        //对于 main函数中的情况专门处理, 对于 call前后使用 的 callee saved寄存器,尝试进行recolor,(使用任意寄存器)
+        let func = self.name_func.get("main").unwrap();
+
+        return;
     }
 }
 
