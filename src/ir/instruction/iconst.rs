@@ -94,6 +94,22 @@ impl Inst {
         }
     }
 
+    /// 判断一个指令是否是整数常量
+    pub fn is_int_const(&self) -> bool {
+        match self.get_kind() {
+            InstKind::ConstInt(_) | InstKind::GlobalConstInt(_) => true,
+            _ => false,
+        }
+    }
+
+    /// 判断一个指令是否是浮点数常量
+    pub fn is_float_const(&self) -> bool {
+        match self.get_kind() {
+            InstKind::ConstFloat(_) | InstKind::GlobalConstFloat(_) => true,
+            _ => false,
+        }
+    }
+
     /// 判断一个指令是否是全局变量或者函数参数
     pub fn is_global_var_or_param(&self) -> bool {
         self.is_global_var() || self.is_param()
