@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use super::*;
 
 impl BackendPass {
@@ -81,11 +83,11 @@ impl BackendPass {
 
     fn fuse_muti2imm_br(&mut self) {
         self.module.name_func.iter().for_each(|(_, func)| {
-            let mut imm_br_pred: Vec<(ObjPtr<BB>, Vec<ObjPtr<BB>>)> = vec![];
+            let mut imm_br_pred: Vec<(ObjPtr<BB>, HashSet<ObjPtr<BB>>)> = vec![];
             func.blocks.iter().for_each(|block| {
                 let afters = block.get_after();
                 // 获取那些通过jump跳到该块的前继
-                let prevs: Vec<_> = block
+                let prevs: HashSet<_> = block
                     .get_prev()
                     .iter()
                     .filter(|&&prev| {
@@ -104,10 +106,9 @@ impl BackendPass {
             });
 
             imm_br_pred.iter().for_each(|(block, prevs)| {
-                log!("get block {}", block.label);
+                let prevs = prevs.iter().map(|x| *x).collect::<Vec<_>>();
                 let after = block.get_after()[0];
                 if prevs.len() == block.get_prev().len() && !exist_br_label(prevs.clone(), &block.label) {
-                    log!("delete block {}", block.label);
                     print_context(block.clone());
                     adjust_after_in(after, prevs.clone(), &block.label);
                     block.as_mut().out_edge.clear();
@@ -127,9 +128,6 @@ impl BackendPass {
                     .filter(|&&b| prevs.iter().all(|&prev| prev != b))
                     .map(|b| *b)
                     .collect::<Vec<ObjPtr<BB>>>();
-                for b in block.in_edge.iter() {
-                    log!("block: {:?} block in edge: {:?}", block.label, b.label);
-                }
             })
         })
     }
