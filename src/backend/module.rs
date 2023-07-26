@@ -299,15 +299,36 @@ impl AsmModule {
     pub fn generate_asm(&mut self, f: &mut File, pool: &mut BackendPool) {
         // 生成全局变量与数组
         self.generate_global_var(f);
-        self.name_func.iter_mut().for_each(|(_, func)| {
+        let mut asm_order: Vec<ObjPtr<Func>> = Vec::new();
+        if self.call_info.len() != 0 {
+            for (_, func) in self.func_map.iter() {
+                if func.is_extern {
+                    continue;
+                }
+                if func.label == "main" {
+                    asm_order.push(*self.name_func.get("main").unwrap());
+                }
+                let name = func.label.clone();
+                for name in self.call_info.get(name.as_str()).unwrap() {
+                    let name = name.1;
+                    // println!("name{}", name.clone());
+                    let func = self.name_func.get(name).unwrap();
+                    asm_order.push(*func);
+                }
+            }
+        } else {
+            for (_, func) in self.func_map.iter() {
+                if func.is_extern {
+                    continue;
+                }
+                asm_order.push(*func);
+            }
+        }
+
+        asm_order.iter_mut().for_each(|func| {
             debug_assert!(!func.is_extern);
             func.as_mut().generate(pool.put_context(Context::new()), f);
-        });
-        // self.func_map.iter_mut().for_each(|(_, func)| {
-        //     if !func.is_extern {
-        //         func.as_mut().generate(pool.put_context(Context::new()), f);
-        //     }
-        // });
+        })
     }
 
     pub fn generate_row_asm(&mut self, f: &mut File, pool: &mut BackendPool) {
@@ -724,13 +745,6 @@ impl AsmModule {
 
     ///删除进行函数分裂后的剩余无用函数
     pub fn remove_useless_func(&mut self) {
-        let mut new_func_map = Vec::new();
-        for (f, func) in self.func_map.iter() {
-            if self.name_func.contains_key(&func.label) {
-                new_func_map.push((*f, *func));
-            }
-        }
-        self.func_map = new_func_map;
         let mut new_name_func = HashMap::new();
         for (name, func) in self.name_func.iter() {
             if func.is_extern {
@@ -813,17 +827,20 @@ impl AsmModule {
 
         //寄存器重分配
 
-        self.realloc_reg_with_priority();
+        // self.realloc_reg_with_priority();
 
         if is_opt {
             self.split_func(pool);
         }
+
         // self.split_func(pool);
         self.remove_useless_func(); //在handle call之前调用,删掉前面往name func中加入的external func
+
         self.handle_call_v3(pool);
         self.rearrange_stack_slot();
         self.update_array_offset(pool);
         self.build_stack_info(f);
+
         // self.print_func();
         //删除无用的函数
     }
