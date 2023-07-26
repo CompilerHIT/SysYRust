@@ -95,5 +95,5 @@ fn run_main() {
     );
 
     // 编译结束后打印记录的属性
-    // config::dump();
+    config::dump();
 }
