@@ -7,8 +7,6 @@ impl BackendPass {
         // 如果一个块的终止指令是直接跳转, 且直接跳转到的基本块里有且只有一条直接跳转的指令, 那么就把这个二次跳转消除
         // 要求中间那个只有一条跳转指令的基本块的前继只有一个,
         self.fuse_imm_br(pool);
-        // 处理fuse_imm_br中，中间的基本块有多个前继的情况
-        self.fuse_muti2imm_br();
         // 在直接跳转到另一个块, 并且跳转目标块没有其它前继的情况下, 可以直接把两个块合成为一个大块
         self.fuse_basic_block();
     }
@@ -17,6 +15,10 @@ impl BackendPass {
         self.merge_br_jump();
         // 如果branch和其紧邻的jump语句的目标块相同，则将jump语句删除
         self.resolve_merge_br();
+        // 处理fuse_imm_br中，中间的基本块有多个前继的情况
+        self.fuse_muti2imm_br();
+        // 删除0出入度的块
+        self.clear_unreachable_block();
     }
 
     fn merge_br_jump(&mut self) {
@@ -82,20 +84,31 @@ impl BackendPass {
             let mut imm_br_pred: Vec<(ObjPtr<BB>, Vec<ObjPtr<BB>>)> = vec![];
             func.blocks.iter().for_each(|block| {
                 let afters = block.get_after();
+                // 获取那些通过jump跳到该块的前继
                 let prevs: Vec<_> = block
                     .get_prev()
                     .iter()
-                    .filter(|&&prev| is_jump(prev))
+                    .filter(|&&prev| {
+                        prev.insts.len() > 0
+                            && prev.get_tail_inst().get_type() == InstrsType::Jump
+                            && (prev.get_tail_inst().get_label().clone()
+                                == Operand::Addr(block.label.clone()))
+                    })
                     .map(|prev| *prev)
                     .collect();
-                if afters.len() == 1 && prevs.len() > 1 {
+
+                // 如果只有一个后继且满足上述条件的前继块数量大于0
+                if afters.len() == 1 && prevs.len() > 0 {
                     imm_br_pred.push((block.clone(), prevs.clone()));
                 }
             });
 
             imm_br_pred.iter().for_each(|(block, prevs)| {
+                log!("get block {}", block.label);
                 let after = block.get_after()[0];
-                if prevs.len() == block.get_prev().len() {
+                if prevs.len() == block.get_prev().len() && !exist_br_label(prevs.clone(), &block.label) {
+                    log!("delete block {}", block.label);
+                    print_context(block.clone());
                     adjust_after_in(after, prevs.clone(), &block.label);
                     block.as_mut().out_edge.clear();
                 } else {
@@ -105,7 +118,7 @@ impl BackendPass {
                     let mut insts = block.insts.clone();
                     prev.as_mut().insts.pop();
                     prev.as_mut().push_back_list(&mut insts);
-                    prev.as_mut().out_edge = vec![after.clone()];
+                    adjust_prev_out(prev.clone(), vec![after.clone()], &block.label);
                 }
                 block.as_mut().in_edge = block
                     .as_mut()
@@ -114,6 +127,9 @@ impl BackendPass {
                     .filter(|&&b| prevs.iter().all(|&prev| prev != b))
                     .map(|b| *b)
                     .collect::<Vec<ObjPtr<BB>>>();
+                for b in block.in_edge.iter() {
+                    log!("block: {:?} block in edge: {:?}", block.label, b.label);
+                }
             })
         })
     }
@@ -123,10 +139,11 @@ impl BackendPass {
             if !func.is_extern {
                 let mut useless_blocks: Vec<ObjPtr<BB>> = vec![];
                 func.blocks.iter().for_each(|block| {
+                    print_context(block.clone());
                     let prevs = block.get_prev();
                     if prevs.len() == 1 {
                         let prev = prevs[0];
-                        if is_jump(prev) {
+                        if is_jump(prev) && prev.get_after().len() == 1 {
                             useless_blocks.push(block.clone());
                         }
                     }
@@ -151,6 +168,7 @@ impl BackendPass {
         self.module.name_func.iter().for_each(|(_, func)| {
             if !func.is_extern {
                 func.blocks.iter().for_each(|block| {
+                    // print_context(block.clone());
                     if block.insts.len() == 1 {
                         let tail = block.get_tail_inst();
                         if tail.get_type() == InstrsType::Jump {
@@ -213,7 +231,6 @@ impl BackendPass {
         self.module.name_func.iter().for_each(|(_, func)| {
             let mut exist_blocks: Vec<ObjPtr<BB>> = vec![];
             func.blocks.iter().for_each(|block| {
-                print_context(block.clone());
                 if block.get_after().len() != 0 || block.get_prev().len() != 0 {
                     exist_blocks.push(block.clone());
                 }
@@ -349,19 +366,21 @@ fn replace_first_block(block: ObjPtr<BB>, func: ObjPtr<Func>) {
     func.as_mut().blocks.insert(0, after.clone());
 }
 
-// fn is_phi_block(block: ObjPtr<BB>) -> bool {
-//     if block.insts.len() > 1 && block.get_tail_inst().get_type() == InstrsType::Jump {
-//         if block.insts.iter().all(|inst| {
-//             inst.get_type() == InstrsType::OpReg(SingleOp::Mv)
-//                 || inst.get_type() == InstrsType::Jump
-//         }) {
-//             return true;
-//         } else {
-//             return false;
-//         }
-//     }
-//     false
-// }
+fn exist_br_label(blocks: Vec<ObjPtr<BB>>, label: &String) -> bool {
+    for b in blocks.iter() {
+        for inst in b.insts.iter() {
+            match inst.get_type() {
+                InstrsType::Branch(..) => {
+                    if inst.get_label().clone() == Operand::Addr(label.clone()) {
+                        return true;
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+    false
+}
 
 fn print_context(block: ObjPtr<BB>) {
     log!("from: {}", block.label);
