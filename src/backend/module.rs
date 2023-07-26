@@ -300,6 +300,7 @@ impl AsmModule {
         // 生成全局变量与数组
         self.generate_global_var(f);
         let mut asm_order: Vec<ObjPtr<Func>> = Vec::new();
+        // println!("{}", self.call_info.len());
         if self.call_info.len() != 0 {
             for (_, func) in self.func_map.iter() {
                 if func.is_extern {
@@ -318,6 +319,7 @@ impl AsmModule {
             }
         } else {
             for (_, func) in self.func_map.iter() {
+                // println!("{}", func.label);
                 if func.is_extern {
                     continue;
                 }
@@ -554,10 +556,6 @@ impl AsmModule {
             }
         }
 
-        for (name, _) in self.name_func.iter() {
-            self.call_info.insert(name.clone(), HashMap::new());
-        }
-
         loop {
             let mut if_finish = true;
             //直到无法发生更新了才退出
@@ -588,9 +586,6 @@ impl AsmModule {
                 .insert(func.label.clone(), caller_saved_regs);
         }
         //之后caller_used数据结构就没有用了 (信息已经存入了 self.callers_saved中)
-        //
-        self.callee_regs_to_saveds
-            .insert("main".to_string(), HashSet::new());
 
         //更新基础callees saved uesd 表
         loop {
@@ -632,6 +627,10 @@ impl AsmModule {
     ///函数分裂:
     /// 该函数只应该在analyse for handle call v3后被调用
     fn split_func(&mut self, pool: &mut BackendPool) {
+        //
+        self.callee_regs_to_saveds
+            .insert("main".to_string(), HashSet::new());
+
         let regs_set_to_string = |regs: &HashSet<Reg>| -> String {
             let mut symbol = "".to_string();
             for id in 0..=63 {
@@ -833,9 +832,7 @@ impl AsmModule {
             self.split_func(pool);
         }
 
-        // self.split_func(pool);
         self.remove_useless_func(); //在handle call之前调用,删掉前面往name func中加入的external func
-
         self.handle_call_v3(pool);
         self.rearrange_stack_slot();
         self.update_array_offset(pool);
