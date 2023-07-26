@@ -1,20 +1,23 @@
 use std::collections::HashMap;
 
 use crate::{
-    ir::instruction::{BinOp, Inst, InstKind},
+    ir::{
+        instruction::{BinOp, Inst, InstKind},
+        ir_type::IrType,
+    },
     utility::{ObjPool, ObjPtr},
 };
 
 use self::scevexp::SCEVExp;
 
-use super::dominator_tree::DominatorTree;
+use super::loop_tree::LoopInfo;
 
 pub mod scevexp;
 
 pub struct SCEVAnalyzer {
     scevexp_pool: ObjPool<SCEVExp>,
     map: HashMap<ObjPtr<Inst>, ObjPtr<SCEVExp>>,
-    dominator_tree: Option<ObjPtr<DominatorTree>>,
+    loop_list: Vec<ObjPtr<LoopInfo>>,
 }
 
 impl SCEVAnalyzer {
@@ -22,12 +25,12 @@ impl SCEVAnalyzer {
         Self {
             scevexp_pool: ObjPool::new(),
             map: HashMap::new(),
-            dominator_tree: None,
+            loop_list: Vec::new(),
         }
     }
 
-    pub fn set_dominator_tree(&mut self, dominator_tree: ObjPtr<DominatorTree>) {
-        self.dominator_tree = Some(dominator_tree);
+    pub fn set_loop_list(&mut self, loop_list: Vec<ObjPtr<LoopInfo>>) {
+        self.loop_list = loop_list;
     }
 
     pub fn clear(&mut self) {
@@ -39,124 +42,132 @@ impl SCEVAnalyzer {
         if let Some(scev) = self.map.get(inst) {
             return *scev;
         }
+        let in_loop = self
+            .loop_list
+            .iter()
+            .find(|li| li.is_in_current_loop(&inst.get_parent_bb()))
+            .cloned();
 
         let scev;
 
         match inst.get_kind() {
             InstKind::Binary(BinOp::Add) => {
-                scev = self.analyze_binary_add(inst);
-                self.map.insert(*inst, scev);
+                scev = self.analyze_binary_add(inst, in_loop);
             }
             InstKind::Binary(BinOp::Sub) => {
-                scev = self.analyze_binary_sub(inst);
+                scev = self.analyze_binary_sub(inst, in_loop);
             }
             InstKind::Binary(BinOp::Mul) => {
-                scev = self.analyze_binary_mul(inst);
-                self.map.insert(*inst, scev);
+                scev = self.analyze_binary_mul(inst, in_loop);
             }
-            InstKind::Gep => {
-                scev = self.analyze_gep(inst);
-                self.map.insert(*inst, scev);
+            InstKind::ConstInt(value) | InstKind::GlobalConstInt(value) => {
+                scev = self.scevexp_pool.make_scev_int_constant(value);
             }
-            InstKind::ConstInt(_)
-            | InstKind::ConstFloat(_)
-            | InstKind::GlobalConstInt(_)
-            | InstKind::GlobalConstFloat(_) => {
-                scev = self.scevexp_pool.make_scev_constant(*inst);
-                self.map.insert(*inst, scev);
+            InstKind::ConstFloat(value) | InstKind::GlobalConstFloat(value) => {
+                scev = self.scevexp_pool.make_scev_float_constant(value);
             }
             InstKind::Phi => {
-                scev = self.analyze_phi(inst);
-                self.map.insert(*inst, scev);
+                scev = self.analyze_phi(inst, in_loop);
             }
             _ => {
-                scev = self.scevexp_pool.make_scev_unknown(*inst);
-                self.map.insert(*inst, scev);
+                scev = self.scevexp_pool.make_scev_unknown(Some(*inst), in_loop);
             }
         }
 
+        self.map.insert(*inst, scev);
         scev
     }
 
-    fn check_rec(inst: &ObjPtr<Inst>, analyzer: &mut Self) -> bool {
-        inst.get_operands()
-            .iter()
-            .any(|op| op.is_phi() && analyzer.analyze(op).is_scev_rec_expr())
+    fn analyze_binary_add(
+        &mut self,
+        inst: &ObjPtr<Inst>,
+        in_loop: Option<ObjPtr<LoopInfo>>,
+    ) -> ObjPtr<SCEVExp> {
+        todo!()
     }
 
-    fn analyze_binary_add(&mut self, inst: &ObjPtr<Inst>) -> ObjPtr<SCEVExp> {
-        if Self::check_rec(inst, self) {
-            self.scevexp_pool.make_scev_add_rec_expr(*inst)
+    fn analyze_binary_sub(
+        &mut self,
+        inst: &ObjPtr<Inst>,
+        in_loop: Option<ObjPtr<LoopInfo>>,
+    ) -> ObjPtr<SCEVExp> {
+        todo!()
+    }
+
+    fn analyze_binary_mul(
+        &mut self,
+        inst: &ObjPtr<Inst>,
+        in_loop: Option<ObjPtr<LoopInfo>>,
+    ) -> ObjPtr<SCEVExp> {
+        todo!()
+    }
+
+    fn analyze_phi(
+        &mut self,
+        inst: &ObjPtr<Inst>,
+        in_loop: Option<ObjPtr<LoopInfo>>,
+    ) -> ObjPtr<SCEVExp> {
+        let cur_loop = if let Some(x) = in_loop {
+            x
         } else {
-            self.scevexp_pool.make_scev_add_expr(*inst)
-        }
-    }
+            return self.scevexp_pool.make_scev_unknown(Some(*inst), None);
+        };
 
-    fn analyze_binary_sub(&mut self, inst: &ObjPtr<Inst>) -> ObjPtr<SCEVExp> {
-        if Self::check_rec(inst, self) {
-            self.scevexp_pool.make_scev_sub_rec_expr(*inst)
-        } else {
-            self.scevexp_pool.make_scev_sub_expr(*inst)
-        }
-    }
-
-    fn analyze_binary_mul(&mut self, inst: &ObjPtr<Inst>) -> ObjPtr<SCEVExp> {
-        if Self::check_rec(inst, self) {
-            self.scevexp_pool.make_scev_mul_rec_expr(*inst)
-        } else {
-            self.scevexp_pool.make_scev_mul_expr(*inst)
-        }
-    }
-
-    fn analyze_gep(&mut self, inst: &ObjPtr<Inst>) -> ObjPtr<SCEVExp> {
-        if Self::check_rec(inst, self) {
-            self.scevexp_pool.make_scev_gep_rec_expr(*inst)
-        } else {
-            self.scevexp_pool.make_scev_gep_expr(*inst)
-        }
-    }
-
-    fn analyze_phi(&mut self, inst: &ObjPtr<Inst>) -> ObjPtr<SCEVExp> {
         if let Some(index) = inst
             .get_operands()
             .iter()
-            .position(|op| op.get_operands().contains(&inst))
+            .position(|x| x.get_operands().contains(inst))
         {
-            let dominator_tree = if let Some(dominator_tree) = self.dominator_tree {
-                dominator_tree
-            } else {
-                return self.scevexp_pool.make_scev_unknown(*inst);
+            let op = inst.get_operand(index);
+            let mut parse = |parsee: ObjPtr<Inst>| -> ObjPtr<SCEVExp> {
+                if parsee.is_int_const() {
+                    self.scevexp_pool
+                        .make_scev_int_constant(parsee.get_int_bond())
+                } else if parsee.is_float_const() {
+                    self.scevexp_pool
+                        .make_scev_float_constant(parsee.get_float_bond())
+                } else {
+                    self.scevexp_pool.make_scev_unknown(Some(parsee), in_loop)
+                }
             };
+            match op.get_kind() {
+                InstKind::Binary(BinOp::Add) => {
+                    let step = op.get_operand((index + 1) % 2);
+                    if step.is_const() || !cur_loop.is_in_loop(&step.get_parent_bb()) {
+                        let start = inst
+                            .get_operands()
+                            .iter()
+                            .find(|x| !cur_loop.is_in_loop(&x.get_parent_bb()))
+                            .unwrap();
 
-            if inst.get_operand(index).get_kind() == InstKind::Binary(BinOp::Add)
-                && dominator_tree.is_dominate(
-                    &inst.get_parent_bb(),
-                    &inst.get_operands()[index].get_parent_bb(),
-                )
-            {
-                let start: Vec<_> = inst
-                    .get_operands()
-                    .iter()
-                    .enumerate()
-                    .filter(|(x, _)| *x != index)
-                    .map(|(_, op)| *op)
-                    .collect();
-                debug_assert_eq!(start.len(), 1);
-                let start = start[0];
+                        return self.scevexp_pool.make_scev_rec_expr(
+                            vec![parse(*start), parse(step)],
+                            Some(*inst),
+                            in_loop,
+                        );
+                    }
+                }
 
-                let step = inst.get_operands()[index]
-                    .get_operands()
-                    .iter()
-                    .find(|x| *x != inst)
-                    .cloned()
-                    .unwrap();
-
-                self.scevexp_pool.make_scev_rec_expr(*inst, start, step)
-            } else {
-                self.scevexp_pool.make_scev_unknown(*inst)
+                InstKind::Binary(BinOp::Sub) => {
+                    let step = op.get_operand(1);
+                    if index == 0
+                        && (step.is_const() || !cur_loop.is_in_loop(&step.get_parent_bb()))
+                    {
+                        let start = inst
+                            .get_operands()
+                            .iter()
+                            .find(|x| !cur_loop.is_in_loop(&x.get_parent_bb()))
+                            .unwrap();
+                        return self.scevexp_pool.make_scev_rec_expr(
+                            vec![parse(*start), parse(step)],
+                            Some(*inst),
+                            in_loop,
+                        );
+                    }
+                }
+                _ => {}
             }
-        } else {
-            self.scevexp_pool.make_scev_unknown(*inst)
         }
+        self.scevexp_pool.make_scev_unknown(Some(*inst), in_loop)
     }
 }
