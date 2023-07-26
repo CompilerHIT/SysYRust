@@ -734,7 +734,12 @@ impl AsmModule {
                 break;
             }
         }
-
+        //加入name_func中的外部函数
+        for (name, func) in self.name_func.iter() {
+            if func.is_extern {
+                new_name_func.insert(name.clone(), *func);
+            }
+        }
         self.name_func = new_name_func; //修改完成后只有名称表内的函数才是有用的函数
                                         // debug_assert!(false, "{}", self.name_func.len())
     }
@@ -756,14 +761,7 @@ impl AsmModule {
 
     ///删除进行函数分裂后的剩余无用函数
     pub fn remove_useless_func(&mut self) {
-        let mut new_name_func = HashMap::new();
-        for (name, func) in self.name_func.iter() {
-            if func.is_extern {
-                continue;
-            }
-            new_name_func.insert(name.clone(), *func);
-        }
-        self.name_func = new_name_func;
+        self.name_func.retain(|_, f| !f.is_extern);
     }
 
     pub fn update_array_offset(&mut self, pool: &mut BackendPool) {
@@ -840,11 +838,13 @@ impl AsmModule {
         self.realloc_reg_with_priority();
         self.anaylyse_for_handle_call_v3();
 
-        // if is_opt {
-        //     self.split_func(pool);
-        // }
+        if is_opt {
+            self.split_func(pool);
+        }
 
-        self.split_func(pool);
+        // self.split_func(pool);
+        // self.reduce_callee_used_after_func_split();
+
         self.remove_useless_func(); //在handle call之前调用,删掉前面往name func中加入的external func
         self.handle_call_v3(pool);
         self.rearrange_stack_slot();
@@ -1113,6 +1113,11 @@ impl AsmModule {
                 if inst.get_type() == InstrsType::Call {
                     //
                     let func_name = inst.get_func_name().unwrap();
+                    debug_assert!(
+                        self.name_func.contains_key(func_name.as_str()),
+                        "{}",
+                        func_name
+                    );
                     let func = self.name_func.get(func_name.as_str()).unwrap();
                     if !func.is_extern {
                         let callee_to_saved =
