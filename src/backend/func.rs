@@ -1666,8 +1666,8 @@ impl Func {
             }
         }
 
-        ///考虑ret
-        ///一个block中只可能出现一条return最多
+        //考虑ret
+        //一个block中只可能出现一条return最多
         for bb in self.blocks.iter() {
             if let Some(last_inst) = bb.insts.last() {
                 let use_reg = last_inst.get_reg_use();
@@ -2551,7 +2551,7 @@ impl Func {
     }
 }
 
-// re alloc 实现 ,用于支持build v4
+// realloc 实现 ,用于支持build v4
 impl Func {
     //进行贪心的寄存器分配
     pub fn alloc_reg_with_priority(&mut self, ordered_regs: Vec<Reg>) {
