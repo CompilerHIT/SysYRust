@@ -14,6 +14,7 @@ use crate::ir::instruction::{Inst, InstKind};
 use crate::ir::ir_type::IrType;
 use crate::ir::module::Module;
 use crate::ir::CallMap;
+use crate::log_file;
 // use crate::log;
 use crate::utility::ObjPtr;
 
@@ -970,6 +971,7 @@ impl AsmModule {
             //对于自身使用到的callee_used的寄存器
             // let mut self_callee_used
             //从该函数需要保存次数最多的寄存器开始ban
+            let mut baned = HashSet::new();
             for reg in callees.iter().rev() {
                 if !self_used.contains(reg) {
                     continue;
@@ -980,11 +982,20 @@ impl AsmModule {
                 let ok = func
                     .as_mut()
                     .try_ban_certain_reg(reg, &caller_used, &callee_used);
-
-                if !ok {
-                    //如果时间不够，失败一次就退出
-                    break;
+                if ok {
+                    baned.insert(*reg);
                 }
+            }
+            for reg in callees.iter().rev() {
+                if !self_used.contains(reg) {
+                    continue;
+                }
+                if baned.contains(reg) {
+                    continue;
+                }
+                let ok = func
+                    .as_mut()
+                    .try_ban_certain_reg(reg, &caller_used, &callee_used);
             }
         }
 
