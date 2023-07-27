@@ -2399,15 +2399,24 @@ impl Func {
 
 // rearrange slot实现 ,for module-build v3
 impl Func {
-    ///分析函数的栈空间的作用区间  (得到 live in 和 live out)
+    ///分析函数的栈空间的作用区间  (得到liveuse,livedef, live in,live out)
     /// 在handle overflow前使用,仅仅对于spill的指令进行分析
     pub fn calc_stackslot_interval(
         &self,
     ) -> (
         HashMap<ObjPtr<BB>, HashSet<StackSlot>>,
         HashMap<ObjPtr<BB>, HashSet<StackSlot>>,
+        HashMap<ObjPtr<BB>, HashSet<StackSlot>>,
+        HashMap<ObjPtr<BB>, HashSet<StackSlot>>,
     ) {
-        todo!()
+        //计算使用的内存地址的活跃区间
+        let mut live_ins: HashMap<ObjPtr<BB>, HashSet<StackSlot>> = HashMap::new();
+        let mut live_outs: HashMap<ObjPtr<BB>, HashSet<StackSlot>> = HashMap::new();
+        let mut live_defs: HashMap<ObjPtr<BB>, HashSet<StackSlot>> = HashMap::new();
+        let mut live_uses: HashMap<ObjPtr<BB>, HashSet<StackSlot>> = HashMap::new();
+        // for bb in self
+
+        (live_uses, live_defs, live_ins, live_outs)
     }
     ///分析函数用到的栈空间的冲突
     pub fn calc_stackslot_interef() -> HashSet<(StackSlot, StackSlot)> {

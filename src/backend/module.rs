@@ -769,7 +769,7 @@ impl AsmModule {
             // self.anaylyse_for_handle_call_v3();
         }
         // self.split_func(pool);
-        // self.print_func();
+        self.print_func();
         self.reduce_caller_to_saved_after_func_split();
 
         self.remove_useless_func(); //在handle call之前调用,删掉前面往name func中加入的external func
@@ -1379,10 +1379,7 @@ impl AsmModule {
             let caller_used = caller_used.get(callee_func_name.as_str()).unwrap();
             let mut reg_cross = live_now.clone();
             reg_cross.retain(|reg| {
-                reg.get_color() > 4
-                    && reg.is_physic()
-                    && reg.is_caller_save()
-                    && !inst.get_regs().contains(reg)
+                reg.get_color() > 4 && reg.is_physic() && !inst.get_regs().contains(reg)
             });
             //call指令往后,call指令往前
             for reg in reg_cross.iter() {
@@ -1531,6 +1528,8 @@ impl AsmModule {
         index: usize,
         p_reg: Reg,
     ) -> Vec<(ObjPtr<LIRInst>, bool)> {
+        let get_to_recolor_path = "get_to_recolor.txt";
+        log_file!(get_to_recolor_path, "start recolor:{}:{}", bb.label, p_reg);
         let mut decolored_insts = Vec::new();
         let mut to_pass: LinkedList<(ObjPtr<BB>, i32, i32)> = LinkedList::new();
         let mut passed = HashSet::new();
@@ -1547,16 +1546,17 @@ impl AsmModule {
                 continue;
             }
             // println!("{}:{}:{}", bb.label, index, refresh);
+            log_file!(get_to_recolor_path, "{}:{}:{}", bb.label, index, refresh);
             passed.insert((bb, index, refresh));
             index += refresh;
             while index >= 0 && index < bb.insts.len() as i32 {
-                // println!("{}:{}:{}", bb.label, index, refresh);
+                log_file!(get_to_recolor_path, "{}:{}:{}", bb.label, index, refresh);
                 passed.insert((bb, index, refresh));
                 let inst = bb.insts.get(index as usize).unwrap();
                 if refresh == 1 {
                     if inst.get_reg_use().contains(&p_reg) {
                         decolored_insts.push((*inst, false));
-                        // println!("{}", inst.as_ref());
+                        log_file!(get_to_recolor_path, "{}", inst.as_ref());
                     }
                     if inst.get_reg_def().contains(&p_reg) {
                         break;
@@ -1564,12 +1564,12 @@ impl AsmModule {
                 } else if refresh == -1 {
                     if inst.get_reg_def().contains(&p_reg) {
                         decolored_insts.push((*inst, true));
-                        // println!("{}", inst.as_ref());
+                        log_file!(get_to_recolor_path, "{}", inst.as_ref());
                         break;
                     }
                     if inst.get_reg_use().contains(&p_reg) {
                         decolored_insts.push((*inst, false));
-                        // println!("{}", inst.as_ref());
+                        log_file!(get_to_recolor_path, "{}", inst.as_ref());
                     }
                 } else {
                     unreachable!()
@@ -1583,25 +1583,41 @@ impl AsmModule {
             let mut new_forward = HashSet::new();
             let mut new_backward = HashSet::new();
             if index < 0 {
+                log_file!(get_to_recolor_path, "expand backward");
                 for in_bb in bb.in_edge.iter() {
+                    log_file!(
+                        get_to_recolor_path,
+                        "{}'s live out:{:?}",
+                        in_bb.label,
+                        in_bb.live_out
+                    );
                     if in_bb.live_out.contains(&p_reg) {
-                        new_backward.insert((*in_bb, in_bb.insts.len(), -1));
+                        new_backward.insert((*in_bb, in_bb.insts.len() as i32, -1));
                     }
                 }
             } else {
+                log_file!(get_to_recolor_path, "expand forward");
                 for out_bb in bb.out_edge.iter() {
+                    log_file!(
+                        get_to_recolor_path,
+                        "{}'s live in:{:?}",
+                        out_bb.label,
+                        out_bb.live_in
+                    );
                     if out_bb.live_in.contains(&p_reg) {
                         new_forward.insert((*out_bb, -1, 1));
                     }
                 }
             }
+            log_file!(get_to_recolor_path, "expand backward");
             for (bb, _, _) in new_forward.iter() {
                 for in_bb in bb.in_edge.iter() {
                     if in_bb.live_out.contains(&p_reg) {
-                        new_backward.insert((*in_bb, in_bb.insts.len(), -1));
+                        new_backward.insert((*in_bb, in_bb.insts.len() as i32, -1));
                     }
                 }
             }
+            log_file!(get_to_recolor_path, "expand forward");
             for (bb, _, _) in new_backward.iter() {
                 for out_bb in bb.out_edge.iter() {
                     if out_bb.live_in.contains(&p_reg) {
@@ -1610,6 +1626,12 @@ impl AsmModule {
                 }
             }
             // todo!();
+            for forward in new_forward {
+                to_pass.push_back(forward);
+            }
+            for backward in new_backward {
+                to_pass.push_back(backward);
+            }
         }
 
         decolored_insts
