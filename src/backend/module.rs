@@ -851,7 +851,7 @@ impl AsmModule {
         }
 
         // self.split_func(pool);
-        self.reduce_callee_used_after_func_split();
+        self.reduce_caller_to_saved_after_func_split();
 
         self.remove_useless_func(); //在handle call之前调用,删掉前面往name func中加入的external func
         self.handle_call_v3(pool);
@@ -994,8 +994,6 @@ impl AsmModule {
                     baned.insert(*reg);
                 }
             }
-            let caller_used = self.build_caller_used();
-            let callee_used = self.build_callee_used();
             for reg in callees.iter().rev() {
                 if !self_used.contains(reg) {
                     continue;
@@ -1011,8 +1009,9 @@ impl AsmModule {
                 }
             }
         }
-
+        return;
         //对于main函数单独处理
+        //记录main上下文遇到的需要保存的callee used寄存器和caller save寄存器都记录,然后重新分配
     }
 
     pub fn build_callee_used(&self) -> HashMap<String, HashSet<Reg>> {
@@ -1119,7 +1118,7 @@ impl AsmModule {
     ///函数分裂后减少使用到的特定物理寄存器
     /// 该函数调用应该在remove useless func之前,
     /// 该函数的调用结果依赖于调用该函数前进行的analyse for handle call
-    pub fn reduce_callee_used_after_func_split(&mut self) {
+    pub fn reduce_caller_to_saved_after_func_split(&mut self) {
         //对于 main函数中的情况专门处理, 对于 call前后使用 的 caller saved函数进行重分配,尝试进行recolor,(使用任意寄存器)
         let func = self.name_func.get("main").unwrap();
         //标记重整
@@ -1278,9 +1277,57 @@ impl AsmModule {
         let alloc_stat = if alloc_stat.spillings.len() == 0 {
             alloc_stat
         } else {
+            //如果有spill,就先用dstr v2p,然后再使用color,
+            let colors = &alloc_stat.dstr;
+            let mut v2p_in_use: Vec<(ObjPtr<LIRInst>, Reg, Reg)> = Vec::new(); // (inst,v_reg,p_reg)
+            let mut v2p_in_def: Vec<(ObjPtr<LIRInst>, Reg, Reg)> = Vec::new(); // (inst,v_reg,p_reg)
+                                                                               //记录里面的 v2p, 用于回退
+            for bb in func.blocks.iter() {
+                for inst in bb.insts.iter() {
+                    for v_reg in inst.get_reg_def() {
+                        if v_reg.is_physic() {
+                            continue;
+                        }
+                        let p_reg = colors.get(&v_reg.get_id());
+                        if p_reg.is_none() {
+                            continue;
+                        }
+                        let p_reg = Reg::from_color(*p_reg.unwrap());
+                        inst.as_mut().replace_only_def_reg(&v_reg, &p_reg);
+                        v2p_in_def.push((*inst, v_reg, p_reg));
+                    }
+                    for v_reg in inst.get_reg_use() {
+                        if v_reg.is_physic() {
+                            continue;
+                        }
+                        let p_reg = colors.get(&v_reg.get_id());
+                        if p_reg.is_none() {
+                            continue;
+                        }
+                        let p_reg = Reg::from_color(*p_reg.unwrap());
+                        inst.as_mut().replace_only_use_reg(&v_reg, &p_reg);
+                        v2p_in_use.push((*inst, v_reg, p_reg));
+                    }
+                }
+            }
+            //p2v完成后再分配一次
+            func.calc_live_for_handle_call();
             let mut allocator = easy_gc_alloc::Allocator::new();
             let alloc_stat = allocator.alloc(func);
-            alloc_stat
+            if alloc_stat.spillings.len() == 0 {
+                alloc_stat
+            } else {
+                //解除v2p
+                for (inst, v_reg, p_reg) in v2p_in_use.iter() {
+                    inst.as_mut().replace_only_use_reg(p_reg, v_reg);
+                }
+                for (inst, v_reg, p_reg) in v2p_in_def.iter() {
+                    inst.as_mut().replace_only_def_reg(p_reg, v_reg);
+                }
+                func.calc_live_for_handle_call();
+                let mut allocator = easy_gc_alloc::Allocator::new();
+                allocator.alloc(&func)
+            }
         };
         debug_assert!(alloc_stat.spillings.len() == 0);
         //使用新分配结果重新v2p
