@@ -613,9 +613,9 @@ impl Func {
         //     }
         // }
         // let mut allocator = crate::backend::regalloc::easy_ls_alloc::Allocator::new();
-        let mut allocator = crate::backend::regalloc::easy_gc_alloc::Allocator::new();
+        // let mut allocator = crate::backend::regalloc::easy_gc_alloc::Allocator::new();
         // let mut allocator = crate::backend::regalloc::opt_ls_alloc::Allocator::new();
-        // let mut allocator = crate::backend::regalloc::opt_gc_alloc2::Allocator::new();
+        let mut allocator = crate::backend::regalloc::opt_gc_alloc2::Allocator::new();
         // let mut allocator = crate::backend::regalloc::opt_gc_alloc::Allocator::new();
         // let mut allocator = crate::backend::regalloc::base_alloc::Allocator::new();
         let alloc_stat = allocator.alloc(self);
@@ -2430,6 +2430,11 @@ impl Func {
                         let load_inst = build_ls(*reg, pos, InstrsType::LoadFromStack);
                         let load_inst = pool.put_inst(load_inst);
                         new_insts.push(load_inst);
+                        config::record_caller_save_sl(
+                            &self.label,
+                            &bb.label,
+                            format!("load{reg}").as_str(),
+                        );
                     }
                     new_insts.push(*inst); //插入该指令
                                            //插入保存指令
@@ -2438,6 +2443,11 @@ impl Func {
                         let store_inst = build_ls(*reg, pos, InstrsType::StoreToStack);
                         let store_inst = pool.put_inst(store_inst);
                         new_insts.push(store_inst);
+                        config::record_caller_save_sl(
+                            &self.label,
+                            &bb.label,
+                            format!("store{reg}").as_str(),
+                        );
                     }
                 } else {
                     new_insts.push(*inst);

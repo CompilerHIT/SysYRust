@@ -69,6 +69,7 @@ impl Allocator {
         // TODO, improve,加入贪心,根据所在的指令类型，以及周围已经分配的颜色的情况选择颜色
         // 比如,获取周围的周围的颜色,按照它们的周围的颜色的数量进行排序
         // 找到color所在的地方
+        return self.get_available(reg).get_available_reg(reg.get_type());
         let available = self.get_available(reg).get_rest_regs_for(reg.get_type());
         if available.len() == 0 {
             return None;

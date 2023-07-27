@@ -18,6 +18,9 @@ use crate::utility::ObjPtr;
 
 use super::instrs::{Context, InstrsType, LIRInst, BB};
 use super::operand::Reg;
+use super::regalloc::regalloc::Regalloc;
+use super::regalloc::structs::RegUsedStat;
+use super::regalloc::{self, easy_gc_alloc};
 use super::structs::GenerateAsm;
 
 pub struct AsmModule {
@@ -847,7 +850,7 @@ impl AsmModule {
         }
 
         // self.split_func(pool);
-        // self.reduce_callee_used_after_func_split();
+        self.reduce_callee_used_after_func_split();
 
         self.remove_useless_func(); //在handle call之前调用,删掉前面往name func中加入的external func
         self.handle_call_v3(pool);
@@ -959,9 +962,9 @@ impl AsmModule {
             let callee_saved_time = callee_saved_time.unwrap();
             let mut callees: Vec<Reg> = callee_saved_time.iter().map(|(reg, _)| *reg).collect();
             callees.sort_by_cached_key(|reg| callee_saved_time.get(reg));
-            let mut caller_used = self.build_caller_used();
-            let mut callee_used = self.build_callee_used();
-            let mut self_used = func.draw_used_callees();
+            let caller_used = self.build_caller_used();
+            let callee_used = self.build_callee_used();
+            let self_used = func.draw_used_callees();
             //自身调用的函数使用到的callee saved寄存器
             let mut callee_func_used: HashSet<Reg> = HashSet::new();
             for func_called in call_map.get(func.label.as_str()).unwrap() {
@@ -986,9 +989,12 @@ impl AsmModule {
                     .as_mut()
                     .try_ban_certain_reg(reg, &caller_used, &callee_used);
                 if ok {
+                    log_file!("ban_reg.txt", "{}", reg);
                     baned.insert(*reg);
                 }
             }
+            let caller_used = self.build_caller_used();
+            let callee_used = self.build_callee_used();
             for reg in callees.iter().rev() {
                 if !self_used.contains(reg) {
                     continue;
@@ -999,6 +1005,9 @@ impl AsmModule {
                 let ok = func
                     .as_mut()
                     .try_ban_certain_reg(reg, &caller_used, &callee_used);
+                if ok {
+                    log_file!("ban_reg.txt", "{}", reg);
+                }
             }
         }
 
@@ -1107,13 +1116,15 @@ impl AsmModule {
     }
 
     ///函数分裂后减少使用到的特定物理寄存器
-    /// 该函数调用应该在remove useless func之前
+    /// 该函数调用应该在remove useless func之前,
     /// 该函数的调用结果依赖于调用该函数前进行的analyse for handle call
     pub fn reduce_callee_used_after_func_split(&mut self) {
-        //对于 main函数中的情况专门处理, 对于 call前后使用 的 callee saved寄存器,尝试进行recolor,(使用任意寄存器)
+        //对于 main函数中的情况专门处理, 对于 call前后使用 的 caller saved函数进行重分配,尝试进行recolor,(使用任意寄存器)
         let func = self.name_func.get("main").unwrap();
         //标记重整
         let mut to_recolor: Vec<(ObjPtr<LIRInst>, Reg)> = Vec::new();
+        let caller_used = AsmModule::build_caller_used(&self);
+        let mut constraints: HashMap<Reg, HashSet<Reg>> = HashMap::new();
         func.calc_live_for_handle_call();
         for bb in func.blocks.iter() {
             let mut live_now: HashSet<Reg> = HashSet::new();
@@ -1134,11 +1145,10 @@ impl AsmModule {
                     );
                     let func = self.name_func.get(func_name.as_str()).unwrap();
                     if !func.is_extern {
-                        let callee_to_saved =
-                            self.callee_regs_to_saveds.get(func_name.as_str()).unwrap();
+                        let caller_to_saved = caller_used.get(func_name.as_str()).unwrap();
                         let mut reg_cross = HashSet::new();
                         for reg in live_now.iter() {
-                            if !callee_to_saved.contains(reg) {
+                            if !caller_to_saved.contains(reg) {
                                 continue;
                             }
                             reg_cross.insert(*reg);
@@ -1152,6 +1162,7 @@ impl AsmModule {
                             to_backward.push_back((*bb, index as i32, *reg));
                             let v_reg = Reg::init(reg.get_type());
                             p2v.insert(*reg, v_reg);
+                            constraints.insert(*reg, caller_to_saved.clone());
                         }
                         let p2v: HashMap<Reg, Reg> = p2v;
                         let mut backward_passed: HashSet<(ObjPtr<BB>, i32, Reg)> = HashSet::new();
@@ -1259,7 +1270,25 @@ impl AsmModule {
                 }
             }
         }
-        ///TODO
+        //获取增加约束的重新分配结果
+        func.calc_live_for_handle_call(); //该处在handle spill之后，应该calc live for handle call
+        let mut allocator = easy_gc_alloc::Allocator::new();
+        let alloc_stat = allocator.alloc_with_constraint(func, &constraints);
+        let alloc_stat = if alloc_stat.spillings.len() == 0 {
+            alloc_stat
+        } else {
+            let mut allocator = easy_gc_alloc::Allocator::new();
+            let alloc_stat = allocator.alloc(func);
+            alloc_stat
+        };
+        debug_assert!(alloc_stat.spillings.len() == 0);
+        //使用新分配结果重新v2p
+        let colors = alloc_stat.dstr;
+        for (inst, v_reg) in to_recolor {
+            let p_color = colors.get(&v_reg.get_id()).unwrap();
+            let p_reg = Reg::from_color(*p_color);
+            inst.as_mut().replace_reg(&v_reg, &p_reg);
+        }
         return;
     }
 }
@@ -1270,6 +1299,17 @@ mod tests {
 
     #[test]
     pub fn test_hash() {
-        // let mut set = HashSet::new();
+        let mut set = HashSet::new();
+        for i in 0..=10000000 {
+            let if_insert: bool = rand::random();
+            if if_insert {
+                set.insert(i);
+            }
+        }
+        let set2 = set.clone();
+        assert!(set.len() == set2.len());
+        for v in set.iter() {
+            assert!(set2.contains(v));
+        }
     }
 }
