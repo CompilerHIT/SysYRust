@@ -7,14 +7,12 @@ use crate::backend::func::Func;
 use crate::backend::operand::ToString;
 use crate::backend::structs::{FGlobalVar, FloatArray, GlobalVar, IGlobalVar, IntArray};
 use crate::backend::BackendPool;
+use crate::backend::opt::BackendPass;
 use crate::container::bitmap::Bitmap;
-use crate::frontend::ast::Continue;
 use crate::ir::function::Function;
 use crate::ir::instruction::{Inst, InstKind};
 use crate::ir::ir_type::IrType;
 use crate::ir::module::Module;
-use crate::ir::CallMap;
-use crate::log_file;
 // use crate::log;
 use crate::utility::ObjPtr;
 
@@ -791,10 +789,15 @@ impl AsmModule {
         // self.generate_row_asm(_f2, pool); //generate row  asm可能会造成bug
 
         if is_opt {
+            // gep偏移计算合并
+            BackendPass::new(ObjPtr::new(self)).opt_gep();
+
             // 设置一些寄存器为临时变量
             self.cal_tmp_var();
 
+            // 对非临时寄存器进行分配
             self.allocate_reg();
+            // 将非临时寄存器映射到物理寄存器
             self.map_v_to_p();
             // 代码调度，列表调度法
             self.list_scheduling_tech();
