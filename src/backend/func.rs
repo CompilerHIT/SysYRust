@@ -2,6 +2,7 @@ use std::cmp::max;
 use std::collections::LinkedList;
 pub use std::collections::{HashSet, VecDeque};
 pub use std::fs::File;
+use std::fs::OpenOptions;
 pub use std::hash::{Hash, Hasher};
 pub use std::io::Result;
 use std::io::Write;
@@ -441,6 +442,7 @@ impl Func {
         }
     }
 
+    // 计算活跃区间的时候, 主动把6个临时寄存器的生存周期设置为无限
     pub fn calc_live_for_alloc_reg(&self) {
         //TODO, 去除allocable限制!
         let calc_live_file = "callive.txt";
@@ -579,7 +581,7 @@ impl Func {
         //把sp和ra寄存器加入到所有的块的live out,live in中，表示这些寄存器永远不能在函数中自由分配使用
         for bb in self.blocks.iter() {
             //0:zero, 1:ra, 2:sp
-            for id in 0..=8 {
+            for id in 0..=7 {
                 bb.as_mut().live_in.insert(Reg::new(id, ScalarType::Int));
                 bb.as_mut().live_out.insert(Reg::new(id, ScalarType::Int));
             }
@@ -983,15 +985,27 @@ impl Func {
 
 /// 打印函数当前的汇编形式
 impl Func {
-    pub fn print_func(&self) {
+    pub fn print_func(func: ObjPtr<Func>) {
         let func_print_path = "print_func.txt";
-        log_file!(func_print_path, "func:{}", self.label);
-        for block in self.blocks.iter() {
-            log_file!(func_print_path, "\tblock:{}", block.label);
-            for inst in block.insts.iter() {
-                log_file!(func_print_path, "\t\t{}", inst.as_ref().to_string());
-            }
-        }
+        let mut bp = BackendPool::new();
+        let context = bp.put_context(Context::new());
+        func.as_mut().generate_row(
+            context,
+            OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(func_print_path)
+                .as_mut()
+                .unwrap(),
+        );
+        bp.free_all();
+        // log_file!(func_print_path, "func:{}", self.label);
+        // for block in self.blocks.iter() {
+        //     log_file!(func_print_path, "\tblock:{}", block.label);
+        //     for inst in block.insts.iter() {
+        //         log_file!(func_print_path, "\t\t{}", inst.as_ref().to_string());
+        //     }
+        // }
     }
 }
 
@@ -1345,6 +1359,10 @@ impl Func {
     /// 该函数会绝对保留原本程序的结构，并且不会通过构造phi等行为增加指令,不会调整指令顺序,不会合并寄存器等等
     pub fn p2v_pre_handle_call(&mut self, regs_to_decolor: HashSet<Reg>) -> HashSet<Reg> {
         let path = "p2v.txt";
+
+        debug_assert!(!regs_to_decolor.contains(&Reg::get_sp()));
+        debug_assert!(!regs_to_decolor.contains(&Reg::get_ra()));
+
         let mut new_v_regs = HashSet::new(); //用来记录新产生的虚拟寄存器
                                              // self.print_func();
         self.calc_live_for_handle_spill();
