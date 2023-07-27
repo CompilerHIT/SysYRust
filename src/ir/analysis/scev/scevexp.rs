@@ -7,15 +7,14 @@ use super::*;
 pub struct SCEVExp {
     kind: SCEVExpKind,
     operands: Vec<ObjPtr<SCEVExp>>,
-    scev_const: (i32, f32),
+    scev_const: i32,
     bond_inst: Option<ObjPtr<Inst>>,
     in_loop: Option<ObjPtr<LoopInfo>>,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum SCEVExpKind {
-    SCEVIntConstant,
-    SCEVFloatConstant,
+    SCEVConstant,
     SCEVUnknown,
     SCEVAddExpr,
     SCEVSubExpr,
@@ -30,7 +29,7 @@ impl SCEVExp {
     pub fn new(
         kind: SCEVExpKind,
         operands: Vec<ObjPtr<SCEVExp>>,
-        scev_const: (i32, f32),
+        scev_const: i32,
         bond_inst: Option<ObjPtr<Inst>>,
         in_loop: Option<ObjPtr<LoopInfo>>,
     ) -> Self {
@@ -43,6 +42,13 @@ impl SCEVExp {
         }
     }
 
+    pub fn get_scev_const(&self) -> i32 {
+        self.scev_const
+    }
+
+    pub fn get_in_loop(&self) -> Option<ObjPtr<LoopInfo>> {
+        self.in_loop
+    }
     pub fn get_kind(&self) -> SCEVExpKind {
         self.kind
     }
@@ -50,13 +56,7 @@ impl SCEVExp {
         self.operands.clone()
     }
     pub fn is_scev_constant(&self) -> bool {
-        self.kind == SCEVExpKind::SCEVIntConstant || self.kind == SCEVExpKind::SCEVFloatConstant
-    }
-    pub fn is_scev_int_constant(&self) -> bool {
-        self.kind == SCEVExpKind::SCEVIntConstant
-    }
-    pub fn is_scev_float_constant(&self) -> bool {
-        self.kind == SCEVExpKind::SCEVFloatConstant
+        self.kind == SCEVExpKind::SCEVConstant
     }
     pub fn is_scev_unknown(&self) -> bool {
         self.kind == SCEVExpKind::SCEVUnknown
@@ -113,21 +113,11 @@ impl SCEVExp {
 }
 
 impl ObjPool<SCEVExp> {
-    pub fn make_scev_int_constant(&mut self, scev_const: i32) -> ObjPtr<SCEVExp> {
+    pub fn make_scev_constant(&mut self, scev_const: i32) -> ObjPtr<SCEVExp> {
         self.put(SCEVExp::new(
-            SCEVExpKind::SCEVIntConstant,
+            SCEVExpKind::SCEVConstant,
             vec![],
-            (scev_const, 0.0),
-            None,
-            None,
-        ))
-    }
-
-    pub fn make_scev_float_constant(&mut self, scev_const: f32) -> ObjPtr<SCEVExp> {
-        self.put(SCEVExp::new(
-            SCEVExpKind::SCEVFloatConstant,
-            vec![],
-            (0, scev_const),
+            scev_const,
             None,
             None,
         ))
@@ -141,7 +131,7 @@ impl ObjPool<SCEVExp> {
         self.put(SCEVExp::new(
             SCEVExpKind::SCEVUnknown,
             vec![],
-            (0, 0.0),
+            0,
             bond_inst,
             in_loop,
         ))
@@ -156,7 +146,7 @@ impl ObjPool<SCEVExp> {
         self.put(SCEVExp::new(
             SCEVExpKind::SCEVAddExpr,
             vec![lhs, rhs],
-            (0, 0.0),
+            0,
             None,
             in_loop,
         ))
@@ -171,7 +161,7 @@ impl ObjPool<SCEVExp> {
         self.put(SCEVExp::new(
             SCEVExpKind::SCEVSubExpr,
             vec![lhs, rhs],
-            (0, 0.0),
+            0,
             None,
             in_loop,
         ))
@@ -186,7 +176,7 @@ impl ObjPool<SCEVExp> {
         self.put(SCEVExp::new(
             SCEVExpKind::SCEVMulExpr,
             vec![lhs, rhs],
-            (0, 0.0),
+            0,
             None,
             in_loop,
         ))
@@ -201,7 +191,7 @@ impl ObjPool<SCEVExp> {
         self.put(SCEVExp::new(
             SCEVExpKind::SCEVMulRecExpr,
             operands,
-            (0, 0.0),
+            0,
             bond_inst,
             in_loop,
         ))
@@ -216,7 +206,7 @@ impl ObjPool<SCEVExp> {
         self.put(SCEVExp::new(
             SCEVExpKind::SCEVAddRecExpr,
             operands,
-            (0, 0.0),
+            0,
             bond_inst,
             in_loop,
         ))
@@ -231,7 +221,7 @@ impl ObjPool<SCEVExp> {
         self.put(SCEVExp::new(
             SCEVExpKind::SCEVSubRecExpr,
             operands,
-            (0, 0.0),
+            0,
             bond_inst,
             in_loop,
         ))
@@ -246,7 +236,7 @@ impl ObjPool<SCEVExp> {
         self.put(SCEVExp::new(
             SCEVExpKind::SCEVRecExpr,
             operands,
-            (0, 0.0),
+            0,
             bond_inst,
             in_loop,
         ))
