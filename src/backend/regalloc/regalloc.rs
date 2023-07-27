@@ -6,6 +6,7 @@ use crate::backend::operand::Reg;
 use crate::backend::regalloc::structs::FuncAllocStat;
 use crate::utility::{ObjPtr, ScalarType};
 use crate::{log, log_file};
+// use crate::{log, log_file};
 
 use super::structs::RegUsedStat;
 
@@ -152,11 +153,11 @@ pub fn build_interference(func: &Func) -> HashMap<Reg, HashSet<Reg>> {
                         interef_graph.insert(reg, HashSet::new());
                     }
                     for live in livenow.iter() {
-                        log_file!("tmp2.txt", "pre {} {}.", live, reg);
+                        // log_file!("tmp2.txt", "pre {} {}.", live, reg);
                         if *live == reg {
                             continue;
                         }
-                        log_file!("tmp2.txt", "suf {} {}.", live, reg);
+                        // log_file!("tmp2.txt", "suf {} {}.", live, reg);
                         interef_graph.get_mut(live).unwrap().insert(reg);
                         interef_graph.get_mut(&reg).unwrap().insert(*live);
                     }
@@ -208,7 +209,7 @@ pub fn build_availables_with_interef_graph(
                 if availables.contains_key(&reg) {
                     continue;
                 }
-                log!("reg {} not in availables.", reg);
+                unreachable!("reg {} not in availables.", reg);
                 return false;
             }
             true

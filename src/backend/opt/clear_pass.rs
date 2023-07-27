@@ -146,11 +146,11 @@ impl BackendPass {
     }
 
     /// ///移除代码中多余的la操作 :(暂时只考虑单链条传递的情况)
-    fn rm_repeated_la(&mut self, pool: &BackendPool) {
-        self.module.name_func.iter().for_each(|(_, func)| {
-            func.as_mut().rm_repeated_la(pool);
-        });
-    }
+    // fn rm_repeated_la(&mut self, pool: &BackendPool) {
+    //     self.module.name_func.iter().for_each(|(_, func)| {
+    //         func.as_mut().rm_repeated_la(pool);
+    //     });
+    // }
 
     pub fn rm_useless(&self, block: ObjPtr<BB>) {
         let mut index = 0;
@@ -254,7 +254,7 @@ impl Func {
         self.build_reg_intervals();
         let first_bb = *self.entry.unwrap().out_edge.get(0).unwrap();
         //从第一个块开始分析能够快速插值的情况(记录所有加入到表中的代码(最后直接一遍删除无用代码))
-        // let labels_bbs = self.draw_name_bbs(); //装入 块label供跳转使用
+        let labels_bbs = self.draw_name_bbs(); //装入 块label供跳转使用
                                                //模拟执行第一个块(同时记录第一个块中到某个位置的时候的可用寄存器),如果遇到了ret则结束
         let mut program_stat = ProgramStat::new();
         //执行到退出函数的时候则退出函数 (执行到io函数的时候则执行特定的过程)
