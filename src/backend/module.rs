@@ -5,14 +5,15 @@ use std::io::Write;
 use crate::backend::block::NUM_SIZE;
 use crate::backend::func::Func;
 use crate::backend::operand::ToString;
+use crate::backend::opt::BackendPass;
 use crate::backend::structs::{FGlobalVar, FloatArray, GlobalVar, IGlobalVar, IntArray};
 use crate::backend::BackendPool;
-use crate::backend::opt::BackendPass;
 use crate::container::bitmap::Bitmap;
 use crate::ir::function::Function;
 use crate::ir::instruction::{Inst, InstKind};
 use crate::ir::ir_type::IrType;
 use crate::ir::module::Module;
+use crate::log_file;
 // use crate::log;
 use crate::utility::ObjPtr;
 
