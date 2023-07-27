@@ -70,54 +70,54 @@ impl Allocator {
         // 比如,获取周围的周围的颜色,按照它们的周围的颜色的数量进行排序
         // 找到color所在的地方
         return self.get_available(reg).get_available_reg(reg.get_type());
-        let available = self.get_available(reg).get_rest_regs_for(reg.get_type());
-        if available.len() == 0 {
-            return None;
-        }
-        let mut colors_weights = HashMap::new();
-        for color in available.iter() {
-            colors_weights.insert(*color, 0);
-        }
-        // 遍历邻居节点的所有活节点
-        let mut passed_regs = Bitmap::new();
-        for neighbor in self
-            .info
-            .as_ref()
-            .unwrap()
-            .all_live_neighbors
-            .get(reg)
-            .unwrap()
-        {
-            for nn in self
-                .info
-                .as_ref()
-                .unwrap()
-                .all_live_neighbors
-                .get(neighbor)
-                .unwrap()
-            {
-                if !self.if_has_been_colored(nn) {
-                    continue;
-                }
-                if passed_regs.contains(nn.bit_code() as usize) {
-                    continue;
-                }
-                passed_regs.insert(nn.bit_code() as usize);
-                let color = self.get_color(nn).unwrap();
-                if !colors_weights.contains_key(&color) {
-                    continue;
-                }
-                *colors_weights.get_mut(&color).unwrap() += 1;
-            }
-        }
+        // let available = self.get_available(reg).get_rest_regs_for(reg.get_type());
+        // if available.len() == 0 {
+        //     return None;
+        // }
+        // let mut colors_weights = HashMap::new();
+        // for color in available.iter() {
+        //     colors_weights.insert(*color, 0);
+        // }
+        // // 遍历邻居节点的所有活节点
+        // let mut passed_regs = Bitmap::new();
+        // for neighbor in self
+        //     .info
+        //     .as_ref()
+        //     .unwrap()
+        //     .all_live_neighbors
+        //     .get(reg)
+        //     .unwrap()
+        // {
+        //     for nn in self
+        //         .info
+        //         .as_ref()
+        //         .unwrap()
+        //         .all_live_neighbors
+        //         .get(neighbor)
+        //         .unwrap()
+        //     {
+        //         if !self.if_has_been_colored(nn) {
+        //             continue;
+        //         }
+        //         if passed_regs.contains(nn.bit_code() as usize) {
+        //             continue;
+        //         }
+        //         passed_regs.insert(nn.bit_code() as usize);
+        //         let color = self.get_color(nn).unwrap();
+        //         if !colors_weights.contains_key(&color) {
+        //             continue;
+        //         }
+        //         *colors_weights.get_mut(&color).unwrap() += 1;
+        //     }
+        // }
 
-        let sort = crate::backend::regalloc::utils::sort;
-        let mut order = Vec::new();
-        sort(&colors_weights, &mut order);
-        match order.get(order.len() - 1) {
-            None => None,
-            Some(color) => Some(*color),
-        }
+        // let sort = crate::backend::regalloc::utils::sort;
+        // let mut order = Vec::new();
+        // sort(&colors_weights, &mut order);
+        // match order.get(order.len() - 1) {
+        //     None => None,
+        //     Some(color) => Some(*color),
+        // }
     }
 
     // 移除某个节点的颜色

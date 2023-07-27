@@ -19,14 +19,15 @@ use crate::utility::ObjPtr;
 
 use super::instrs::{Context, InstrsType, LIRInst, BB};
 use super::operand::Reg;
+use super::regalloc::easy_gc_alloc;
 use super::regalloc::regalloc::Regalloc;
-use super::regalloc::structs::RegUsedStat;
-use super::regalloc::{self, easy_gc_alloc};
+use super::regalloc::structs::FuncAllocStat;
 use super::structs::GenerateAsm;
 
 pub struct AsmModule {
     pub global_var_list: Vec<(ObjPtr<Inst>, GlobalVar)>,
     pub func_map: Vec<(ObjPtr<Function>, ObjPtr<Func>)>,
+    call_map: HashMap<String, HashSet<String>>,
     callee_regs_to_saveds: HashMap<String, HashSet<Reg>>,
     caller_regs_to_saveds: HashMap<String, HashSet<Reg>>,
     call_info: HashMap<String, HashMap<Bitmap, String>>, //每个base func name 对应调用的 不同callee need save函数
@@ -44,6 +45,7 @@ impl AsmModule {
             upper_module: ir_module,
             call_info: HashMap::new(),
             name_func: HashMap::new(),
+            call_map: HashMap::new(),
             callee_regs_to_saveds: HashMap::new(),
             caller_regs_to_saveds: HashMap::new(),
         }
@@ -82,49 +84,6 @@ impl AsmModule {
             .for_each(|(_, func)| {
                 func.as_mut().remove_unuse_inst();
             });
-    }
-
-    pub fn build(&mut self, f: &mut File, _f2: &mut File, pool: &mut BackendPool) {
-        self.build_lir(pool);
-        // TOCHECK 寄存器分配和handlespill前无用指令删除,比如删除mv指令方便寄存器分配
-        // self.generate_row_asm(f2, pool); //注释
-        self.remove_unuse_inst_pre_alloc();
-        self.cal_tmp_var();
-        // self.generate_row_asm(f2, pool); //注释
-
-        self.allocate_reg();
-        // self.generate_row_asm(f2, pool); //注释
-
-        self.handle_spill(pool);
-
-        self.handle_call(pool);
-        self.handle_callee(f);
-
-        // self.generate_row_asm(f2, pool); //注释
-        self.map_v_to_p();
-        // 代码调度
-        self.list_scheduling_tech();
-
-        // self.generate_row_asm(f2, pool);
-
-        // 为临时寄存器分配寄存器
-        self.clear_tmp_var();
-        self.allocate_reg();
-        self.map_v_to_p();
-        // self.generate_row_asm(f2, pool);
-
-        // self.generate_row_asm(f2, pool); //注释
-        self.remove_unuse_inst_suf_alloc();
-        // self.generate_row_asm(f2, pool); //注释
-    }
-    ///处理call前后caller saved 寄存器的保存和恢复
-    /// 该函数应该在handle spill后调用
-    pub fn handle_call(&mut self, pool: &mut BackendPool) {
-        for (_, func) in self.name_func.iter() {
-            debug_assert!(!func.is_extern);
-            func.as_mut().handle_call(pool);
-            func.as_mut().update_array_offset(pool);
-        }
     }
 
     /// 设置栈大小 ，设置开合栈以及进行callee saved的保存和恢复需要的前沿和后沿函数
@@ -190,13 +149,6 @@ impl AsmModule {
             // log!("allocate reg fun: {}", func.as_ref().label);
             debug_assert!(!func.is_extern);
             func.as_mut().allocate_reg();
-        });
-    }
-
-    fn handle_spill(&mut self, pool: &mut BackendPool) {
-        self.name_func.iter_mut().for_each(|(_, func)| {
-            debug_assert!(!func.is_extern);
-            func.as_mut().handle_spill(pool);
         });
     }
 
@@ -356,55 +308,6 @@ impl AsmModule {
     }
 }
 
-/// build v2:
-/// 1.紧缩spill过程使用的栈空间: 先分配后使用
-impl AsmModule {
-    //先进行寄存器分配再handle_spill,
-    pub fn build_v2(&mut self, f: &mut File, _f2: &mut File, pool: &mut BackendPool) {
-        self.build_lir(pool);
-        self.remove_unuse_inst_pre_alloc();
-        // self.generate_row_asm(_f2, pool); //generate row  asm可能会造成bug
-
-        // self.generate_row_asm(_f2, pool);
-        self.allocate_reg();
-        // self.generate_row_asm(_f2, pool);
-        self.map_v_to_p();
-
-        // self.print_func();
-        // self.generate_row_asm(_f2, pool);
-        // ///重分配
-        // self.name_func.iter().for_each(|(_, func)| {
-        //     func.as_mut()
-        //         .p2v_pre_handle_call(Reg::get_all_recolorable_regs())
-        // });
-        // self.generate_row_asm(_f2, pool);
-        // self.allocate_reg();
-        // self.map_v_to_p();
-
-        self.handle_spill_v3(pool);
-        self.remove_unuse_inst_suf_alloc();
-        self.anaylyse_for_handle_call_v3();
-
-        // let mut is_opt = false;
-        // if is_opt {
-        //     self.split_func(pool);
-        // }
-
-        self.handle_call_v3(pool);
-        // self.remove_useless_func();
-        self.rearrange_stack_slot();
-        self.update_array_offset(pool);
-        self.build_stack_info(f);
-    }
-
-    fn handle_spill_v2(&mut self, pool: &mut BackendPool) {
-        self.name_func.iter_mut().for_each(|(_, func)| {
-            debug_assert!(!func.is_extern);
-            func.as_mut().handle_spill_v2(pool);
-        });
-    }
-}
-
 /// build v3:
 /// 1. 实现 函数分裂, 优化callee的保存恢复
 /// 2. 指令级 上下文 caller 选择
@@ -451,7 +354,7 @@ impl AsmModule {
         self.remove_unuse_inst_suf_alloc();
 
         self.add_external_func(pool); //加入外部函数以进行分析
-        self.anaylyse_for_handle_call_v3();
+        self.anaylyse_for_handle_call_v3_pre_split();
 
         if is_opt {
             self.split_func(pool);
@@ -468,9 +371,12 @@ impl AsmModule {
 
     ///处理spillings的虚拟寄存器的临时物理寄存器借用
     pub fn handle_spill_v3(&mut self, pool: &mut BackendPool) {
-        self.name_func
-            .iter()
-            .for_each(|(_, func)| func.as_mut().handle_spill_v3(pool));
+        self.name_func.iter().for_each(|(_, func)| {
+            if func.is_extern {
+                return;
+            }
+            func.as_mut().handle_spill_v3(pool)
+        });
     }
 
     ///对于caller save 和 handle spill  使用到的栈空间 进行紧缩
@@ -504,22 +410,28 @@ impl AsmModule {
                 module.name_func.insert(name.to_string(), external_func);
                 external_func
             };
+        // let extern_func_path = "extern_func.txt";
         //补充外部函数 memset 和memcpy
-        let memset = build_external_func(self, "memset@plt", pool);
-        let memcpy = build_external_func(self, "memcpy@plt", pool);
-        let putint = build_external_func(self, "putint", pool);
-        let getint = build_external_func(self, "getint", pool);
-        let getarray = build_external_func(self, "getarray", pool);
-        let putarray = build_external_func(self, "putarray", pool);
-        let getch = build_external_func(self, "getch", pool);
-        let putch = build_external_func(self, "putch", pool);
-        let getfloat = build_external_func(self, "getfloat", pool);
-        let putfloat = build_external_func(self, "putfloat", pool);
-        let getfarray = build_external_func(self, "getfarray", pool);
-        let putfarrray = build_external_func(self, "putfarray", pool);
-        let putf = build_external_func(self, "putf", pool);
-        let starttime = build_external_func(self, "_sysy_starttime", pool);
-        let stoptime = build_external_func(self, "_sysy_stoptime", pool);
+        let extern_funcs = vec![
+            "memset@plt",
+            "memcpy@plt",
+            "putint",
+            "getint",
+            "getarray",
+            "putarray",
+            "getch",
+            "putch",
+            "getfloat",
+            "putfloat",
+            "getfarray",
+            "putfarray",
+            "putf",
+            "_sysy_starttime",
+            "_sysy_stoptime",
+        ];
+        for name in extern_funcs.iter() {
+            build_external_func(self, &name, pool);
+        }
     }
 
     ///准备 callee save和caller save需要的信息
@@ -527,7 +439,7 @@ impl AsmModule {
     /// 2. 针对性地让函数自我转变 , 调整每个函数中使用到的寄存器分布等等
     /// 3. 该函数应该在vtop和handle spill后调用
     /// 4. 过程中会往name func中加入需要的外部函数的信息
-    fn anaylyse_for_handle_call_v3(&mut self) {
+    fn anaylyse_for_handle_call_v3_pre_split(&mut self) {
         //TODO
         self.callee_regs_to_saveds.clear();
         self.caller_regs_to_saveds.clear();
@@ -664,7 +576,7 @@ impl AsmModule {
         new_name_func.insert("main".to_string(), main_func);
 
         //call info加入非main函数
-        for (name, func) in self.name_func.iter() {
+        for (name, _) in self.name_func.iter() {
             if name == "main" {
                 continue;
             }
@@ -775,10 +687,10 @@ impl AsmModule {
     }
 
     pub fn print_func(&self) {
-        // debug_assert!(false, "{}", self.name_func.len());
-        for (_, func) in self.name_func.iter() {
-            func.print_func();
-        }
+        // // debug_assert!(false, "{}", self.name_func.len());
+        // for (_, func) in self.name_func.iter() {
+        //     func.print_func();
+        // }
     }
 }
 
@@ -834,24 +746,24 @@ impl AsmModule {
         //     self.remove_unuse_inst_suf_alloc();
         // }
 
+        self.build_own_call_map();
+        // //寄存器重分配,重分析
+        self.add_external_func(pool);
+        // self.realloc_reg_with_priority();
+
         self.handle_spill_v3(pool);
         self.remove_unuse_inst_suf_alloc();
 
-        self.remove_useless_func(); //删除handle spill 后面可能产生的冗余指令
-
-        self.add_external_func(pool);
-        self.anaylyse_for_handle_call_v3();
-
-        //寄存器重分配,重分析
-        self.realloc_reg_with_priority();
-        self.anaylyse_for_handle_call_v3();
+        self.anaylyse_for_handle_call_v3_pre_split();
 
         if is_opt {
             self.split_func(pool);
+            self.build_own_call_map();
+            // self.anaylyse_for_handle_call_v3();
         }
 
         // self.split_func(pool);
-        self.reduce_caller_to_saved_after_func_split();
+        // self.reduce_caller_to_saved_after_func_split();
 
         self.remove_useless_func(); //在handle call之前调用,删掉前面往name func中加入的external func
         self.handle_call_v3(pool);
@@ -863,12 +775,9 @@ impl AsmModule {
         //删除无用的函数
     }
 
-    //构建函数调用表
-    pub fn build_call_map(
-        name_func: &HashMap<String, ObjPtr<Func>>,
-    ) -> HashMap<String, HashSet<String>> {
+    pub fn build_own_call_map(&mut self) {
         let mut call_map = HashMap::new();
-        for (name, func) in name_func.iter() {
+        for (name, func) in self.name_func.iter() {
             // if func.is_extern {continue;}
             let mut callee_funcs: HashSet<String> = HashSet::new();
             for bb in func.blocks.iter() {
@@ -882,8 +791,30 @@ impl AsmModule {
             }
             call_map.insert(name.clone(), callee_funcs);
         }
-        call_map
+        self.call_map = call_map;
     }
+
+    //构建函数调用表
+    // pub fn build_call_map(
+    //     name_func: &HashMap<String, ObjPtr<Func>>,
+    // ) -> HashMap<String, HashSet<String>> {
+    //     let mut call_map = HashMap::new();
+    //     for (name, func) in name_func.iter() {
+    //         // if func.is_extern {continue;}
+    //         let mut callee_funcs: HashSet<String> = HashSet::new();
+    //         for bb in func.blocks.iter() {
+    //             bb.insts
+    //                 .iter()
+    //                 .filter(|inst| inst.get_type() == InstrsType::Call)
+    //                 .for_each(|inst| {
+    //                     let func_name = inst.get_func_name().unwrap();
+    //                     callee_funcs.insert(func_name);
+    //                 });
+    //         }
+    //         call_map.insert(name.clone(), callee_funcs);
+    //     }
+    //     call_map
+    // }
 
     pub fn p2v(&mut self) {
         self.name_func
@@ -900,7 +831,7 @@ impl AsmModule {
         //记录除了main函数外每个函数使用到的 callee saved和caller saved 需要的恢复次数
         let mut callee_saved_times: HashMap<ObjPtr<Func>, HashMap<Reg, usize>> = HashMap::new();
 
-        let mut callee_used = self.build_callee_used();
+        let callee_used = self.build_callee_used();
 
         for (_, func) in self.name_func.iter() {
             if func.is_extern {
@@ -917,11 +848,10 @@ impl AsmModule {
                         livenow.remove(&reg);
                     }
                     if inst.get_type() == InstrsType::Call {
-                        let mut callees_to_saved: HashSet<Reg> = HashSet::new();
                         let func_called = inst.get_func_name().unwrap();
                         let callee_used = callee_used.get(func_called.as_str()).unwrap();
                         let func_called = self.name_func.get(func_called.as_str()).unwrap();
-                        callees_to_saved = callees_to_saved
+                        let callees_to_saved: HashSet<Reg> = livenow
                             .iter()
                             .filter(|reg| callee_used.contains(&reg))
                             .cloned()
@@ -948,7 +878,7 @@ impl AsmModule {
                 }
             }
         }
-        let call_map = AsmModule::build_call_map(&self.name_func);
+        let call_map = &self.call_map;
         //对每个函数进行试图减少指定寄存器的使用
         for (_, func) in self.name_func.iter() {
             if func.is_extern {
@@ -961,7 +891,11 @@ impl AsmModule {
                 break;
             }
             let callee_saved_time = callee_saved_time.unwrap();
-            let mut callees: Vec<Reg> = callee_saved_time.iter().map(|(reg, _)| *reg).collect();
+            let mut callees: Vec<Reg> = callee_saved_time
+                .iter()
+                .map(|(reg, _)| *reg)
+                .filter(|reg| reg != &Reg::get_sp())
+                .collect();
             callees.sort_by_cached_key(|reg| callee_saved_time.get(reg));
             let caller_used = self.build_caller_used();
             let callee_used = self.build_callee_used();
@@ -1009,9 +943,103 @@ impl AsmModule {
                 }
             }
         }
-        return;
+        // return;
         //对于main函数单独处理
-        //记录main上下文遇到的需要保存的callee used寄存器和caller save寄存器都记录,然后重新分配
+        //节省callee,能够节省多少节省多少 (然后试图节省caller)
+        let callee_used = self.build_callee_used();
+        let main_func = self.name_func.get("main").unwrap();
+        main_func
+            .as_mut()
+            .p2v_pre_handle_call(Reg::get_all_recolorable_regs());
+        let mut callee_constraints: HashMap<Reg, HashSet<Reg>> = HashMap::new();
+        //然后分析需要加入限制的虚拟寄存器
+        //首先尝试进行一波完全寄存器分配
+        main_func.calc_live_for_handle_call();
+        AsmModule::analyse_inst_with_live_now(&main_func, &mut |inst, live_now| {
+            if inst.get_type() != InstrsType::Call {
+                return;
+            }
+            //对于 call指令,分析上下文造成的依赖关系
+            let func_name = inst.get_func_name().unwrap();
+            let func = self.name_func.get(func_name.as_str()).unwrap();
+            if func.is_extern {
+                //遇到 is_extern的情况,不能节省,也不应节省
+                return;
+            } else {
+                let callee_used = callee_used.get(func.label.as_str()).unwrap();
+                for reg in live_now.iter() {
+                    if reg.is_physic() {
+                        continue;
+                    }
+                    if !callee_constraints.contains_key(reg) {
+                        callee_constraints.insert(*reg, callee_used.clone());
+                    } else {
+                        callee_constraints.get_mut(reg).unwrap().extend(callee_used);
+                    }
+                }
+            }
+        });
+        //约束建立好之后尝试寄存器分配 (如果实在分配后存在spill,就只好存在spill了)
+        let alloc_stat = || -> FuncAllocStat {
+            //首先尝试获取一个基础的分配结果
+            let base_alloc_stat = main_func.as_mut().reg_alloc_info.to_owned(); //首先暂存最初分配结果
+                                                                                // main_func.as_mut().reg_alloc_info = FuncAllocStat::new();
+            let base_spill_num = base_alloc_stat.spillings.len();
+            let try_alloc = |spill_limit_num: usize,
+                             callee_constraints: HashMap<Reg, HashSet<Reg>>|
+             -> Option<FuncAllocStat> {
+                let mut callee_constraints = callee_constraints;
+                loop {
+                    let mut allocator = easy_gc_alloc::Allocator::new();
+                    let alloc_stat =
+                        allocator.alloc_with_constraint(&main_func, &callee_constraints);
+                    //每次减半直到分配成功
+                    if alloc_stat.spillings.len() <= spill_limit_num {
+                        return Some(alloc_stat);
+                    }
+                    //否则分配失败,减少约束再分配
+                    //首先减半
+                    let ord: Vec<Reg> = callee_constraints.iter().map(|(reg, _)| *reg).collect();
+                    for reg in ord.iter() {
+                        let mut new_baned: HashSet<Reg> = HashSet::new();
+                        let old_baneds = callee_constraints.get(reg).unwrap();
+                        for old_ban in old_baneds {
+                            if new_baned.len() >= old_baneds.len() / 2 {
+                                break;
+                            }
+                            new_baned.insert(*old_ban);
+                        }
+                        if new_baned.len() == 0 {
+                            callee_constraints.remove(reg);
+                        } else {
+                            callee_constraints
+                                .get_mut(reg)
+                                .unwrap()
+                                .retain(|reg| new_baned.contains(reg));
+                        }
+                    }
+
+                    //如果约束消失,则退出
+                    if callee_constraints.len() == 0 {
+                        break;
+                    }
+                }
+                None
+            };
+            let alloc_stat = try_alloc(0, callee_constraints.clone());
+            if let Some(alloc_stat) = alloc_stat {
+                return alloc_stat;
+            }
+            main_func.calc_live_for_alloc_reg();
+            let alloc_stat = try_alloc(base_spill_num, callee_constraints);
+            if let Some(alloc_stat) = alloc_stat {
+                return alloc_stat;
+            }
+            return base_alloc_stat;
+        }();
+
+        main_func.as_mut().v2p(&alloc_stat.dstr);
+        main_func.as_mut().reg_alloc_info = alloc_stat;
     }
 
     pub fn build_callee_used(&self) -> HashMap<String, HashSet<Reg>> {
@@ -1036,94 +1064,75 @@ impl AsmModule {
         let mut new_callee_uesd: HashSet<Reg> = func.draw_used_callees();
         // 首先递归地找到这个函数内部调用过地所有函数集合
         let mut callee_funcs: HashSet<ObjPtr<Func>> = HashSet::new();
-        loop {
-            let last_len = callee_funcs.len();
-            for bb in func.blocks.iter() {
-                for inst in bb.insts.iter() {
-                    if inst.get_type() != InstrsType::Call {
-                        continue;
-                    }
-                    let func_called = inst.get_func_name().unwrap();
-                    let func_called = self.name_func.get(func_called.as_str()).unwrap();
-                    callee_funcs.insert(*func_called);
-                }
+        if func.is_extern {
+            return Reg::get_all_callees_saved();
+        }
+        // let call_map = AsmModule::build_call_map(name_func);
+        for func in self.call_map.get(func.label.as_str()).unwrap() {
+            let func = self.name_func.get(func).unwrap();
+            callee_funcs.insert(*func);
+            if func.is_extern {
+                return Reg::get_all_callees_saved();
             }
-            let mut new_callee_funcs = HashSet::new();
-            for func_called in callee_funcs.iter() {
-                for bb in func_called.blocks.iter() {
-                    for inst in bb.insts.iter() {
-                        if inst.get_type() != InstrsType::Call {
-                            continue;
-                        }
-                        let func_called = inst.get_func_name().unwrap();
-                        let func_called = self.name_func.get(func_called.as_str()).unwrap();
-                        new_callee_funcs.insert(*func_called);
-                    }
+            for func in self.call_map.get(func.label.as_str()).unwrap() {
+                let func = self.name_func.get(func).unwrap();
+                if func.is_extern {
+                    return Reg::get_all_callees_saved();
                 }
-            }
-            callee_funcs.extend(new_callee_funcs.iter());
-            if last_len == callee_funcs.len() {
-                break;
+                callee_funcs.insert(*func);
             }
         }
         for func_called in callee_funcs.iter() {
+            debug_assert!(!func_called.is_extern);
             let callee_used = func_called.draw_used_callees();
             new_callee_uesd.extend(callee_used);
         }
+        new_callee_uesd.extend(func.draw_used_callees());
         new_callee_uesd
     }
 
     ///递归分析一个函数调用影响到的caller saved寄存器
-    pub fn draw_caller_used(&self, func_called: ObjPtr<Func>) -> HashSet<Reg> {
-        let mut new_callers_used: HashSet<Reg> = func_called.draw_used_callers();
+    pub fn draw_caller_used(&self, func: ObjPtr<Func>) -> HashSet<Reg> {
+        let mut new_callers_used: HashSet<Reg> = func.draw_used_callers();
         // 首先递归地找到这个函数内部调用过地所有函数集合
-        let mut funcs_called: HashSet<ObjPtr<Func>> = HashSet::new();
-        loop {
-            let last_len = funcs_called.len();
-            for bb in func_called.blocks.iter() {
-                for inst in bb.insts.iter() {
-                    if inst.get_type() != InstrsType::Call {
-                        continue;
-                    }
-                    let func_called = inst.get_func_name().unwrap();
-                    let func_called = self.name_func.get(func_called.as_str()).unwrap();
-                    funcs_called.insert(*func_called);
+        let mut callee_funcs: HashSet<ObjPtr<Func>> = HashSet::new();
+        if func.is_extern {
+            return Reg::get_all_callers_saved();
+        }
+        for func in self.call_map.get(func.label.as_str()).unwrap() {
+            let func = self.name_func.get(func).unwrap();
+            callee_funcs.insert(*func);
+            if func.is_extern {
+                return Reg::get_all_callers_saved();
+            }
+            for func in self.call_map.get(func.label.as_str()).unwrap() {
+                let func = self.name_func.get(func).unwrap();
+                callee_funcs.insert(*func);
+                if func.is_extern {
+                    return Reg::get_all_callers_saved();
                 }
             }
-            let mut new_callee_funcs = HashSet::new();
-            for func_called in funcs_called.iter() {
-                for bb in func_called.blocks.iter() {
-                    for inst in bb.insts.iter() {
-                        if inst.get_type() != InstrsType::Call {
-                            continue;
-                        }
-                        let func_called = inst.get_func_name().unwrap();
-                        let func_called = self.name_func.get(func_called.as_str()).unwrap();
-                        new_callee_funcs.insert(*func_called);
-                    }
-                }
-            }
-            funcs_called.extend(new_callee_funcs.iter());
-            if last_len == funcs_called.len() {
-                break;
-            }
         }
-        for func_called in funcs_called.iter() {
-            let callee_used = func_called.draw_used_callers();
-            new_callers_used.extend(callee_used);
+        for func in callee_funcs.iter() {
+            debug_assert!(!func.is_extern);
+            let caller_used = func.draw_used_callers();
+            new_callers_used.extend(caller_used);
         }
+        new_callers_used.extend(func.draw_used_callers());
         new_callers_used
     }
 
     ///函数分裂后减少使用到的特定物理寄存器
     /// 该函数调用应该在remove useless func之前,
     /// 该函数的调用结果依赖于调用该函数前进行的analyse for handle call
+    /// handlespill->[split func]->reduce_ctsafs->handle call
     pub fn reduce_caller_to_saved_after_func_split(&mut self) {
         //对于 main函数中的情况专门处理, 对于 call前后使用 的 caller saved函数进行重分配,尝试进行recolor,(使用任意寄存器)
         let func = self.name_func.get("main").unwrap();
         //标记重整
         let mut to_recolor: Vec<(ObjPtr<LIRInst>, Reg)> = Vec::new();
         let caller_used = AsmModule::build_caller_used(&self);
+        let callee_used = AsmModule::build_callee_used(&self);
         let mut constraints: HashMap<Reg, HashSet<Reg>> = HashMap::new();
         func.calc_live_for_handle_call();
         for bb in func.blocks.iter() {
@@ -1144,124 +1153,128 @@ impl AsmModule {
                         func_name
                     );
                     let func = self.name_func.get(func_name.as_str()).unwrap();
-                    if !func.is_extern {
-                        let caller_to_saved = caller_used.get(func_name.as_str()).unwrap();
-                        let mut reg_cross = HashSet::new();
-                        for reg in live_now.iter() {
-                            if !caller_to_saved.contains(reg) {
+                    let callee_used = if func.is_extern {
+                        HashSet::new()
+                    } else {
+                        callee_used.get(func_name.as_str()).unwrap().clone()
+                    };
+                    let caller_used = caller_used.get(func_name.as_str()).unwrap();
+                    let mut reg_cross = HashSet::new();
+                    for reg in live_now.iter() {
+                        if !caller_used.contains(reg) {
+                            continue;
+                        }
+                        reg_cross.insert(*reg);
+                    }
+                    //call指令往后,call指令往前
+                    let mut to_forward: LinkedList<(ObjPtr<BB>, i32, Reg)> = LinkedList::new();
+                    let mut to_backward: LinkedList<(ObjPtr<BB>, i32, Reg)> = LinkedList::new();
+                    let mut p2v: HashMap<Reg, Reg> = HashMap::new();
+                    for reg in reg_cross.iter() {
+                        to_forward.push_back((*bb, index as i32, *reg));
+                        to_backward.push_back((*bb, index as i32, *reg));
+                        let v_reg = Reg::init(reg.get_type());
+                        p2v.insert(*reg, v_reg);
+                        constraints.insert(v_reg, caller_used.clone());
+                        constraints
+                            .get_mut(&v_reg)
+                            .unwrap()
+                            .extend(callee_used.iter());
+                    }
+
+                    let p2v: HashMap<Reg, Reg> = p2v;
+                    let mut backward_passed: HashSet<(ObjPtr<BB>, i32, Reg)> = HashSet::new();
+                    let mut forward_passed: HashSet<(ObjPtr<BB>, i32, Reg)> = HashSet::new();
+                    //对遇到的符合要求的物理寄存器进行p2v,并且缓存等待重着色
+                    loop {
+                        while !to_forward.is_empty() {
+                            let item = to_forward.pop_front().unwrap();
+                            if forward_passed.contains(&item) {
                                 continue;
                             }
-                            reg_cross.insert(*reg);
-                        }
-                        //call指令往后,call指令往前
-                        let mut to_forward: LinkedList<(ObjPtr<BB>, i32, Reg)> = LinkedList::new();
-                        let mut to_backward: LinkedList<(ObjPtr<BB>, i32, Reg)> = LinkedList::new();
-                        let mut p2v: HashMap<Reg, Reg> = HashMap::new();
-                        for reg in reg_cross.iter() {
-                            to_forward.push_back((*bb, index as i32, *reg));
-                            to_backward.push_back((*bb, index as i32, *reg));
-                            let v_reg = Reg::init(reg.get_type());
-                            p2v.insert(*reg, v_reg);
-                            constraints.insert(*reg, caller_to_saved.clone());
-                        }
-                        let p2v: HashMap<Reg, Reg> = p2v;
-                        let mut backward_passed: HashSet<(ObjPtr<BB>, i32, Reg)> = HashSet::new();
-                        let mut forward_passed: HashSet<(ObjPtr<BB>, i32, Reg)> = HashSet::new();
-                        //对遇到的符合要求的物理寄存器进行p2v,并且缓存等待重着色
-                        loop {
-                            while !to_forward.is_empty() {
-                                let item = to_forward.pop_front().unwrap();
-                                if forward_passed.contains(&item) {
-                                    continue;
+                            forward_passed.insert(item);
+                            let (bb, mut index, reg) = item;
+                            let v_reg = *p2v.get(&reg).unwrap();
+                            index += 1;
+                            debug_assert!(index >= 0);
+                            while index < bb.insts.len() as i32 {
+                                let inst = bb.insts.get(index as usize).unwrap();
+                                if inst.get_reg_use().contains(&reg) {
+                                    inst.as_mut().replace_only_use_reg(&reg, &v_reg);
+                                    to_recolor.push((*inst, v_reg));
                                 }
-                                forward_passed.insert(item);
-                                let (bb, mut index, reg) = item;
-                                let v_reg = *p2v.get(&reg).unwrap();
+                                if inst.get_reg_def().contains(&reg) {
+                                    break;
+                                }
                                 index += 1;
-                                debug_assert!(index >= 0);
-                                while index < bb.insts.len() as i32 {
-                                    let inst = bb.insts.get(index as usize).unwrap();
-                                    if inst.get_reg_use().contains(&reg) {
-                                        inst.as_mut().replace_only_use_reg(&reg, &v_reg);
-                                        to_recolor.push((*inst, v_reg));
-                                    }
-                                    if inst.get_reg_def().contains(&reg) {
-                                        break;
-                                    }
-                                    index += 1;
-                                }
-                                if index < bb.insts.len() as i32 {
-                                    continue;
-                                }
-                                //传播到外界,并且对于进入外界的情况还会反向传播,
-                                let mut new_forward = Vec::new();
-                                for out_bb in bb.out_edge.iter() {
-                                    //out_bb里面通过
-                                    if !out_bb.live_in.contains(&reg) {
-                                        continue;
-                                    }
-                                    to_forward.push_back((*out_bb, -1, reg));
-                                    new_forward.push(out_bb);
-                                }
-                                for bb in new_forward.iter() {
-                                    for in_bb in bb.in_edge.iter() {
-                                        if !in_bb.live_out.contains(&reg) {
-                                            continue;
-                                        }
-                                        to_backward.push_back((
-                                            *in_bb,
-                                            in_bb.insts.len() as i32,
-                                            reg,
-                                        ));
-                                    }
-                                }
                             }
-                            while !to_backward.is_empty() {
-                                let item = to_backward.pop_front().unwrap();
-                                if backward_passed.contains(&item) {
+                            if index < bb.insts.len() as i32 {
+                                continue;
+                            }
+                            //传播到外界,并且对于进入外界的情况还会反向传播,
+                            let mut new_forward = Vec::new();
+                            for out_bb in bb.out_edge.iter() {
+                                //out_bb里面通过
+                                if !out_bb.live_in.contains(&reg) {
                                     continue;
                                 }
-                                backward_passed.insert(item);
-                                let (bb, mut index, reg) = item;
-                                let v_reg = *p2v.get(&reg).unwrap();
-                                index -= 1;
-                                debug_assert!(index < bb.insts.len() as i32);
-                                while index >= 0 {
-                                    let inst = bb.insts.get(index as usize).unwrap();
-                                    if inst.get_reg_def().contains(&reg) {
-                                        inst.as_mut().replace_only_def_reg(&reg, &v_reg);
-                                        to_recolor.push((*inst, v_reg));
-                                        break;
-                                    }
-                                    if inst.get_reg_use().contains(&reg) {
-                                        inst.as_mut().replace_only_use_reg(&reg, &v_reg);
-                                        to_recolor.push((*inst, v_reg));
-                                    }
-                                    index -= 1;
-                                }
-                                if index >= 0 {
-                                    continue;
-                                }
-                                let mut new_backward = Vec::new();
+                                to_forward.push_back((*out_bb, -1, reg));
+                                new_forward.push(out_bb);
+                            }
+                            for bb in new_forward.iter() {
                                 for in_bb in bb.in_edge.iter() {
                                     if !in_bb.live_out.contains(&reg) {
                                         continue;
                                     }
                                     to_backward.push_back((*in_bb, in_bb.insts.len() as i32, reg));
-                                    new_backward.push(*in_bb);
                                 }
-                                for bb in new_backward.iter() {
-                                    for out_bb in bb.out_edge.iter() {
-                                        if !out_bb.live_in.contains(&reg) {
-                                            continue;
-                                        }
-                                        to_forward.push_back((*out_bb, -1, reg));
+                            }
+                        }
+                        while !to_backward.is_empty() {
+                            let item = to_backward.pop_front().unwrap();
+                            if backward_passed.contains(&item) {
+                                continue;
+                            }
+                            backward_passed.insert(item);
+                            let (bb, mut index, reg) = item;
+                            let v_reg = *p2v.get(&reg).unwrap();
+                            index -= 1;
+                            debug_assert!(index < bb.insts.len() as i32);
+                            while index >= 0 {
+                                let inst = bb.insts.get(index as usize).unwrap();
+                                if inst.get_reg_def().contains(&reg) {
+                                    inst.as_mut().replace_only_def_reg(&reg, &v_reg);
+                                    to_recolor.push((*inst, v_reg));
+                                    break;
+                                }
+                                if inst.get_reg_use().contains(&reg) {
+                                    inst.as_mut().replace_only_use_reg(&reg, &v_reg);
+                                    to_recolor.push((*inst, v_reg));
+                                }
+                                index -= 1;
+                            }
+                            if index >= 0 {
+                                continue;
+                            }
+                            let mut new_backward = Vec::new();
+                            for in_bb in bb.in_edge.iter() {
+                                if !in_bb.live_out.contains(&reg) {
+                                    continue;
+                                }
+                                to_backward.push_back((*in_bb, in_bb.insts.len() as i32, reg));
+                                new_backward.push(*in_bb);
+                            }
+                            for bb in new_backward.iter() {
+                                for out_bb in bb.out_edge.iter() {
+                                    if !out_bb.live_in.contains(&reg) {
+                                        continue;
                                     }
+                                    to_forward.push_back((*out_bb, -1, reg));
                                 }
                             }
-                            if to_forward.is_empty() && to_backward.is_empty() {
-                                break;
-                            }
+                        }
+                        if to_forward.is_empty() && to_backward.is_empty() {
+                            break;
                         }
                     }
                 }
@@ -1272,78 +1285,93 @@ impl AsmModule {
         }
         //获取增加约束的重新分配结果
         func.calc_live_for_handle_call(); //该处在handle spill之后，应该calc live for handle call
-        let mut allocator = easy_gc_alloc::Allocator::new();
-        let alloc_stat = allocator.alloc_with_constraint(func, &constraints);
-        let alloc_stat = if alloc_stat.spillings.len() == 0 {
-            alloc_stat
-        } else {
-            //如果有spill,就先用dstr v2p,然后再使用color,
-            let colors = &alloc_stat.dstr;
-            let mut v2p_in_use: Vec<(ObjPtr<LIRInst>, Reg, Reg)> = Vec::new(); // (inst,v_reg,p_reg)
-            let mut v2p_in_def: Vec<(ObjPtr<LIRInst>, Reg, Reg)> = Vec::new(); // (inst,v_reg,p_reg)
-                                                                               //记录里面的 v2p, 用于回退
-            for bb in func.blocks.iter() {
-                for inst in bb.insts.iter() {
-                    for v_reg in inst.get_reg_def() {
-                        if v_reg.is_physic() {
-                            continue;
-                        }
-                        let p_reg = colors.get(&v_reg.get_id());
-                        if p_reg.is_none() {
-                            continue;
-                        }
-                        let p_reg = Reg::from_color(*p_reg.unwrap());
-                        inst.as_mut().replace_only_def_reg(&v_reg, &p_reg);
-                        v2p_in_def.push((*inst, v_reg, p_reg));
-                    }
-                    for v_reg in inst.get_reg_use() {
-                        if v_reg.is_physic() {
-                            continue;
-                        }
-                        let p_reg = colors.get(&v_reg.get_id());
-                        if p_reg.is_none() {
-                            continue;
-                        }
-                        let p_reg = Reg::from_color(*p_reg.unwrap());
-                        inst.as_mut().replace_only_use_reg(&v_reg, &p_reg);
-                        v2p_in_use.push((*inst, v_reg, p_reg));
+        let alloc_stat = || -> FuncAllocStat {
+            //不断地减少约束,直到能够完美分配 (约束中关于callee的约束不能够减少,关于caller的约束可以减少)
+
+            //首先统计可以减少的约束数量
+            let mut num_to_reduce_constraint = 0;
+            for (_, constraint) in constraints.iter() {
+                for r_inter in constraint.iter() {
+                    if r_inter.is_caller_save() {
+                        num_to_reduce_constraint += 1;
                     }
                 }
             }
-            //p2v完成后再分配一次
-            func.calc_live_for_handle_call();
-            let mut allocator = easy_gc_alloc::Allocator::new();
-            let alloc_stat = allocator.alloc(func);
-            if alloc_stat.spillings.len() == 0 {
-                alloc_stat
-            } else {
-                //解除v2p
-                for (inst, v_reg, p_reg) in v2p_in_use.iter() {
-                    inst.as_mut().replace_only_use_reg(p_reg, v_reg);
-                }
-                for (inst, v_reg, p_reg) in v2p_in_def.iter() {
-                    inst.as_mut().replace_only_def_reg(p_reg, v_reg);
-                }
-                func.calc_live_for_handle_call();
+
+            loop {
                 let mut allocator = easy_gc_alloc::Allocator::new();
-                allocator.alloc(&func)
+                func.print_func();
+                let alloc_stat = allocator.alloc_with_constraint(func, &constraints);
+                if alloc_stat.spillings.len() == 0 {
+                    return alloc_stat;
+                }
+                if num_to_reduce_constraint == 0 {
+                    break;
+                }
+                //减少约束 (以随机的方式(因为难以衡量约束))
+                let old_num = num_to_reduce_constraint;
+                let keys: Vec<Reg> = constraints.iter().map(|(reg, _)| *reg).collect();
+                while num_to_reduce_constraint > old_num * 4 / 5 {
+                    //随机找一个约束目标,随机地减少其约束
+                    let target_reg: usize = rand::random();
+                    let target_reg = target_reg % keys.len();
+                    let target_reg = *keys.get(target_reg).unwrap();
+                    let r_inter: Vec<Reg> = constraints
+                        .get(&target_reg)
+                        .unwrap()
+                        .iter()
+                        .filter(|reg| reg.is_caller_save())
+                        .cloned()
+                        .collect();
+                    for i in 0..r_inter.len() {
+                        let if_rm: bool = rand::random();
+                        if !if_rm {
+                            continue;
+                        }
+                        let r_inter = r_inter.get(i).unwrap();
+                        constraints.get_mut(&target_reg).unwrap().remove(r_inter);
+                        num_to_reduce_constraint -= 1;
+                    }
+                }
             }
-        };
+            easy_gc_alloc::Allocator::new().alloc(func)
+        }();
         debug_assert!(alloc_stat.spillings.len() == 0);
         //使用新分配结果重新v2p
-        let colors = alloc_stat.dstr;
-        for (inst, v_reg) in to_recolor {
-            let p_color = colors.get(&v_reg.get_id()).unwrap();
-            let p_reg = Reg::from_color(*p_color);
-            inst.as_mut().replace_reg(&v_reg, &p_reg);
-        }
+        func.as_mut().v2p(&alloc_stat.dstr);
+        func.as_mut().reg_alloc_info = alloc_stat;
         return;
+    }
+}
+
+///一些进行分析需要用到的工具
+impl AsmModule {
+    pub fn analyse_inst_with_live_now(
+        func: &Func,
+        inst_analyser: &mut dyn FnMut(ObjPtr<LIRInst>, &HashSet<Reg>),
+    ) {
+        for bb in func.blocks.iter() {
+            let mut livenow: HashSet<Reg> = HashSet::new();
+            bb.live_out.iter().for_each(|reg| {
+                livenow.insert(*reg);
+            });
+            for inst in bb.insts.iter().rev() {
+                for reg in inst.get_reg_def() {
+                    livenow.remove(&reg);
+                }
+                //
+                inst_analyser(*inst, &livenow);
+                for reg in inst.get_reg_use() {
+                    livenow.insert(reg);
+                }
+            }
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashSet;
+    use std::collections::{HashMap, HashSet};
 
     #[test]
     pub fn test_hash() {
@@ -1358,6 +1386,24 @@ mod tests {
         assert!(set.len() == set2.len());
         for v in set.iter() {
             assert!(set2.contains(v));
+        }
+    }
+
+    //该测试表明HashMap的clone也是深clone
+    #[test]
+    pub fn test_hash_map() {
+        let mut set = HashMap::new();
+        for i in 0..=100000 {
+            let if_insert: bool = rand::random();
+            if if_insert {
+                let vb: bool = rand::random();
+                set.insert(i, vb);
+            }
+        }
+        let set2 = set.clone();
+        assert!(set.len() == set2.len());
+        for (k, v) in set.iter() {
+            assert!(set2.contains_key(k) && set2.get(k).unwrap() == v);
         }
     }
 }

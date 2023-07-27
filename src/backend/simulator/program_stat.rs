@@ -2,14 +2,12 @@ use super::{execute_stat::ExecuteStat, structs::*};
 
 use crate::{
     backend::{
-        instrs::{AsmBuilder, BinaryOp, CmpOp, Func, InstrsType, LIRInst, Operand, SingleOp, BB},
-        operand::{IImm, Reg},
-        BackendPool,
+        instrs::{BinaryOp, CmpOp, InstrsType, LIRInst, Operand, SingleOp, BB},
+        operand::Reg,
     },
-    ir::CallMap,
-    utility::{ObjPool, ObjPtr, ScalarType},
+    utility::ObjPtr,
 };
-use std::collections::{HashMap, HashSet, LinkedList};
+use std::collections::HashMap;
 
 ///程序资源状态
 #[derive(Clone)]

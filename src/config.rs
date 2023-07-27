@@ -226,13 +226,13 @@ pub fn record_callee_save_sl(func: &str, msg: &str) {
 }
 
 //实现一个全局寄存器表
-static mut str_reg: Option<HashMap<String, Reg>> = None;
-static mut str_inst: Option<HashMap<String, ObjPtr<crate::backend::instrs::LIRInst>>> = None;
+static mut STR_REG: Option<HashMap<String, Reg>> = None;
+static mut STR_INST: Option<HashMap<String, ObjPtr<crate::backend::instrs::LIRInst>>> = None;
 
 fn init_str_reg() {
     unsafe {
-        if str_reg.is_none() {
-            str_reg = Some(HashMap::new());
+        if STR_REG.is_none() {
+            STR_REG = Some(HashMap::new());
         }
     }
 }
@@ -240,35 +240,28 @@ fn init_str_reg() {
 pub fn set_reg(key: &str, reg: &Reg) {
     init_str_reg();
     unsafe {
-        str_reg.as_mut().unwrap().insert(key.to_string(), *reg);
+        STR_REG.as_mut().unwrap().insert(key.to_string(), *reg);
     }
 }
 
 pub fn get_reg(key: &str) -> Option<Reg> {
     init_str_reg();
-    let reg = unsafe { str_reg.as_ref().unwrap().get(key) };
+    let reg = unsafe { STR_REG.as_ref().unwrap().get(key) };
     if reg.is_none() {
         return None;
     }
     Some(*reg.unwrap())
 }
 
-fn init_str_inst() {
-    unsafe {
-        if str_inst.is_none() {
-            str_inst = Some(HashMap::new());
-        }
-    }
-}
 pub fn set_inst(key: &str, reg: &ObjPtr<LIRInst>) {
     init_str_reg();
     unsafe {
-        str_inst.as_mut().unwrap().insert(key.to_string(), *reg);
+        STR_INST.as_mut().unwrap().insert(key.to_string(), *reg);
     }
 }
 pub fn get_inst(key: &str) -> Option<ObjPtr<LIRInst>> {
     init_str_reg();
-    let out = unsafe { str_inst.as_ref().unwrap().get(key) };
+    let out = unsafe { STR_INST.as_ref().unwrap().get(key) };
     if out.is_none() {
         return None;
     }

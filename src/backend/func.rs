@@ -711,17 +711,6 @@ impl Func {
         self.blocks[1].clone()
     }
 
-    ///做了 spill操作以及caller save和callee save的保存和恢复
-    pub fn handle_spill(&mut self, pool: &mut BackendPool) {
-        let this = pool.put_func(self.clone());
-        for block in self.blocks.iter() {
-            block
-                .as_mut()
-                .handle_spill(this, &self.reg_alloc_info.spillings, pool);
-        }
-        self.update(this);
-    }
-
     /// 能够在 vtop 之前调用的 , 根据regallocinfo得到callee 表的方法
     /// 该方法应该在handle spill之后调用
     pub fn build_callee_map(&mut self) {
@@ -740,106 +729,6 @@ impl Func {
                     }
                 }
             }
-        }
-    }
-
-    ///该handle call在进行 vtop之前可以调用
-    /// 但应该在handle spill之后调用
-    pub fn handle_call(&mut self, pool: &mut BackendPool) {
-        self.calc_live_for_handle_call();
-        // self.print_func();
-        let mut slots_for_caller_saved: Vec<StackSlot> = Vec::new();
-        //先计算所有需要的空间
-        // self.print_func();
-        for bb in self.blocks.iter() {
-            let mut new_insts: Vec<ObjPtr<LIRInst>> = Vec::new();
-            let mut live_now: HashSet<Reg> = HashSet::new();
-            bb.live_out.iter().for_each(|reg| {
-                if reg.is_physic() {
-                    live_now.insert(*reg);
-                } else if self.reg_alloc_info.dstr.contains_key(&reg.get_id()) {
-                    let p_reg =
-                        Reg::from_color(*self.reg_alloc_info.dstr.get(&reg.get_id()).unwrap());
-                    live_now.insert(p_reg);
-                } else {
-                    unreachable!();
-                }
-            });
-
-            for inst in bb.insts.iter().rev() {
-                for reg in inst.get_reg_def() {
-                    if reg.is_physic() {
-                        live_now.remove(&reg);
-                    } else if self.reg_alloc_info.dstr.contains_key(&reg.get_id()) {
-                        let p_reg =
-                            Reg::from_color(*self.reg_alloc_info.dstr.get(&reg.get_id()).unwrap());
-                        live_now.remove(&p_reg);
-                    } else {
-                        unreachable!();
-                    }
-                }
-                if inst.get_type() == InstrsType::Call {
-                    //找出 caller saved
-                    let mut to_saved: Vec<Reg> = Vec::new();
-                    for reg in live_now.iter() {
-                        if reg.is_caller_save() && reg.get_id() != 1 {
-                            to_saved.push(*reg);
-                        }
-                    }
-                    //TODO to_check, 根据指令判断是否使用
-                    //根据调用的函数的情况,判断这个函数使用了哪些caller save寄存器
-                    // 准备栈空间
-                    while slots_for_caller_saved.len() < to_saved.len() {
-                        let last_slot = self.stack_addr.back().unwrap();
-                        let new_pos = last_slot.get_pos() + last_slot.get_size();
-                        let new_slot = StackSlot::new(new_pos, ADDR_SIZE);
-                        self.stack_addr.push_back(new_slot);
-                        slots_for_caller_saved.push(new_slot);
-                    }
-                    //产生一条指令
-                    let build_ls = |reg: Reg, offset: i32, kind: InstrsType| -> LIRInst {
-                        debug_assert!(
-                            (kind == InstrsType::LoadFromStack || kind == InstrsType::StoreToStack)
-                        );
-                        let mut ins = LIRInst::new(
-                            kind,
-                            vec![Operand::Reg(reg), Operand::IImm(IImm::new(offset))],
-                        );
-                        ins.set_double();
-                        ins
-                    };
-                    // 插入恢复指令
-                    for (index, reg) in to_saved.iter().enumerate() {
-                        let pos = slots_for_caller_saved.get(index).unwrap().get_pos();
-                        let load_inst = build_ls(*reg, pos, InstrsType::LoadFromStack);
-                        let load_inst = pool.put_inst(load_inst);
-                        new_insts.push(load_inst);
-                    }
-                    new_insts.push(*inst); //插入该指令
-                                           //插入保存指令
-                    for (index, reg) in to_saved.iter().enumerate() {
-                        let pos = slots_for_caller_saved.get(index).unwrap().get_pos();
-                        let store_inst = build_ls(*reg, pos, InstrsType::StoreToStack);
-                        let store_inst = pool.put_inst(store_inst);
-                        new_insts.push(store_inst);
-                    }
-                } else {
-                    new_insts.push(*inst);
-                }
-                for reg in inst.get_reg_use() {
-                    if reg.is_physic() {
-                        live_now.insert(reg);
-                    } else if self.reg_alloc_info.dstr.contains_key(&reg.get_id()) {
-                        let p_reg =
-                            Reg::from_color(*self.reg_alloc_info.dstr.get(&reg.get_id()).unwrap());
-                        live_now.insert(p_reg);
-                    } else {
-                        unreachable!();
-                    }
-                }
-            }
-            new_insts.reverse();
-            bb.as_mut().insts = new_insts;
         }
     }
 
@@ -1095,11 +984,12 @@ impl Func {
 /// 打印函数当前的汇编形式
 impl Func {
     pub fn print_func(&self) {
-        log!("func:{}", self.label);
+        let func_print_path = "print_func.txt";
+        log_file!(func_print_path, "func:{}", self.label);
         for block in self.blocks.iter() {
-            log!("\tblock:{}", block.label);
+            log_file!(func_print_path, "\tblock:{}", block.label);
             for inst in block.insts.iter() {
-                log!("\t\t{}", inst.as_ref().to_string());
+                log_file!(func_print_path, "\t\t{}", inst.as_ref().to_string());
             }
         }
     }
@@ -1468,9 +1358,9 @@ impl Func {
                 }
                 let mut used: HashSet<Reg> = inst.get_reg_use().iter().cloned().collect();
                 if i != 0 {
-                    let mut index = i - 1;
+                    let mut index: i32 = i as i32 - 1;
                     while index >= 0 && used.len() != 0 {
-                        let inst = *bb.insts.get(index).unwrap();
+                        let inst = *bb.insts.get(index as usize).unwrap();
                         for reg_def in inst.get_reg_def() {
                             if !used.contains(&reg_def) {
                                 continue;
@@ -1633,7 +1523,7 @@ impl Func {
         //考虑使用参数寄存器传参的情况,该情况只会发生在函数的第一个块
         //然后从entry块开始p2v
         let first_block = *self.entry.unwrap().out_edge.get(0).unwrap();
-        let mut live_in: HashSet<Reg> = first_block.live_in.iter().cloned().collect();
+        let live_in: HashSet<Reg> = first_block.live_in.iter().cloned().collect();
         // if self.label == "param32_rec" {
         //     debug_assert!(first_block.label == "param32_rec");
         //     let reg = first_block.insts.first().unwrap();
@@ -1911,6 +1801,9 @@ impl Func {
             for inst in bb.insts.iter() {
                 for reg in inst.get_regs() {
                     if reg.is_physic() {
+                        continue;
+                    }
+                    if !colors.contains_key(&reg.get_id()) {
                         continue;
                     }
                     let color = colors.get(&reg.get_id()).unwrap();
@@ -2513,11 +2406,11 @@ impl Func {
 
 // realloc 实现 ,用于支持build v4
 impl Func {
-    //进行贪心的寄存器分配
-    pub fn alloc_reg_with_priority(&mut self, ordered_regs: Vec<Reg>) {
-        // 按照顺序使用ordered regs中的寄存器进行分配
-        todo!()
-    }
+    // //进行贪心的寄存器分配
+    // pub fn alloc_reg_with_priority(&mut self, ordered_regs: Vec<Reg>) {
+    //     // 按照顺序使用ordered regs中的寄存器进行分配
+    //     todo!()
+    // }
 
     ///移除对特定的寄存器的使用,转为使用其他已经使用过的寄存器
     /// 如果移除成功返回true,移除失败返回false
@@ -2535,8 +2428,11 @@ impl Func {
         let new_v_regs = self.p2v_pre_handle_call(regs_to_ban);
         let mut callee_avialbled = self.draw_used_callees();
         let mut callers_aviabled = self.draw_used_callers();
+        callee_avialbled.extend(callee_used.get(self.label.as_str()).unwrap());
+        callers_aviabled.extend(caller_used.get(self.label.as_str()).unwrap());
         callee_avialbled.remove(reg_to_ban);
         callers_aviabled.remove(reg_to_ban);
+
         //对于产生的新虚拟寄存器进行分类
         let mut first_callee = HashSet::new(); //优先使用calleed saved 的一类寄存器
         self.calc_live_for_alloc_reg();

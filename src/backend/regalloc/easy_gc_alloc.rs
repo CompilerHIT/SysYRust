@@ -194,6 +194,7 @@ impl Allocator {
         self.colors.insert(reg.get_id(), color);
         if let Some(neighbors) = self.interference_graph.get(&reg) {
             for neighbor in neighbors {
+                debug_assert!(self.availables.contains_key(&neighbor), "{neighbor}");
                 self.availables.get_mut(&neighbor).unwrap().use_reg(color);
                 let nums_neighbor_color = self.nums_neighbor_color.get_mut(neighbor).unwrap();
                 nums_neighbor_color
@@ -374,16 +375,16 @@ impl Regalloc for Allocator {
         self.build_interference_graph(func);
         self.count_spill_costs(func);
 
-        log_file!("tocolor.txt", "{:?}", self.regs);
-        // 打印冲突图
-        let intereref_path = "interference_graph.txt";
-        self.interference_graph.iter().for_each(|(reg, neighbors)| {
-            log_file_uln!(intereref_path, "node {reg}\n{{");
-            neighbors
-                .iter()
-                .for_each(|neighbor| log_file_uln!(intereref_path, "({},{})", reg, neighbor));
-            log_file!(intereref_path, "}}\n");
-        });
+        // log_file!("tocolor.txt", "{:?}", self.regs);
+        // // 打印冲突图
+        // let intereref_path = "interference_graph.txt";
+        // self.interference_graph.iter().for_each(|(reg, neighbors)| {
+        //     log_file_uln!(intereref_path, "node {reg}\n{{");
+        //     neighbors
+        //         .iter()
+        //         .for_each(|neighbor| log_file_uln!(intereref_path, "({},{})", reg, neighbor));
+        //     log_file!(intereref_path, "}}\n");
+        // });
 
         // TODO,加入化简后单步合并检查 以及 分配完成后合并检查
         while !self.color() {
@@ -393,6 +394,12 @@ impl Regalloc for Allocator {
             self.spill();
         }
 
+        log_file!(
+            "easygc_spill.txt",
+            "{}:{:?}",
+            self.spillings.len(),
+            self.spillings
+        );
         let (spillings, dstr) = self.alloc_register();
         let (func_stack_size, bb_sizes) = regalloc::count_stack_size(func, &spillings);
 
@@ -430,11 +437,12 @@ impl Allocator {
                     continue;
                 }
                 //否则加入图中
-                self.interference_graph
-                    .get_mut(&p_reg)
-                    .unwrap()
-                    .insert(*reg);
-                self.interference_graph.get_mut(reg).unwrap().insert(*p_reg);
+                // self.interference_graph
+                //     .get_mut(&p_reg)
+                //     .unwrap()
+                //     .insert(*reg);
+                // self.interference_graph.get_mut(reg).unwrap().insert(*p_reg);
+                debug_assert!(self.availables.contains_key(reg), "{reg}");
                 self.availables
                     .get_mut(reg)
                     .unwrap()
@@ -461,7 +469,15 @@ impl Allocator {
             }
             self.spill();
         }
+
+        log_file!(
+            "easygc_spill_with_constraints.txt",
+            "{}:{:?}",
+            self.spillings.len(),
+            self.spillings
+        );
         let (spillings, dstr) = self.alloc_register();
+
         let (func_stack_size, bb_sizes) = regalloc::count_stack_size(func, &spillings);
         FuncAllocStat {
             stack_size: func_stack_size,
