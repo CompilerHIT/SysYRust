@@ -218,6 +218,7 @@ impl Func {
     /// 识别根据def use识别局部变量，窗口设为3，若存活区间少于3则认为是局部变量
     /// 局部变量一定在块内，对于born为-1的一定是非局部变量
     pub fn cal_tmp_var(&mut self) {
+        self.calc_live_for_handle_call();
         self.build_reg_intervals();
         for block in self.blocks.iter() {
             for (st, ed) in block.reg_intervals.iter() {
