@@ -1333,13 +1333,26 @@ impl AsmModule {
         //对于 main函数中的情况专门处理, 对于 call前后使用 的 caller saved函数进行重分配,尝试进行recolor,(使用任意寄存器)
         let func = self.name_func.get("main").unwrap();
         //标记重整
-        let mut inst_vreg_preg: Vec<(ObjPtr<LIRInst>, Reg, Reg)> = Vec::new();
-        let mut passed_i_p: HashSet<(ObjPtr<LIRInst>, Reg)> = HashSet::new();
+        let mut inst_vreg_preg: Vec<(ObjPtr<LIRInst>, Reg, Reg, bool)> = Vec::new();
+        let mut passed_i_p: HashSet<(ObjPtr<LIRInst>, Reg, bool)> = HashSet::new();
         let caller_used = AsmModule::build_caller_used(&self);
         let callee_used = AsmModule::build_callee_used(&self);
         let mut constraints: HashMap<Reg, HashSet<Reg>> = HashMap::new();
         func.calc_live_for_handle_call();
         debug_assert!(func.label == "main");
+
+        //首先对于所有的函数定义和使用的寄存器进行记录,都不能够进行反着色
+        AsmModule::analyse_inst_with_live_now(func, &mut |inst, live_now| {
+            if inst.get_type() != InstrsType::Call {
+                return;
+            }
+            for reg in inst.get_reg_def() {
+                passed_i_p.insert((inst, reg, true));
+            }
+            for reg in inst.get_reg_use() {
+                passed_i_p.insert((inst, reg, false));
+            }
+        });
 
         //对于handle call这一步已经没有物理寄存器了,所有遇到的虚拟寄存器都是该处产生的
         AsmModule::analyse_inst_with_index_and_live_now(func, &mut |inst, index, live_now, bb| {
@@ -1375,29 +1388,41 @@ impl AsmModule {
             }
             //call指令往后,call指令往前
             for reg in reg_cross.iter() {
-                let v_reg = Reg::init(reg.get_type());
-                println!("{}{reg}{v_reg}", callee_func.label);
+                let dinsts = AsmModule::get_to_recolor(bb, index, *reg);
 
-                Func::print_func(*func);
-                let dinsts = AsmModule::get_to_recolor(bb, index, *reg, v_reg);
-                Func::print_func(*func);
                 debug_assert!(dinsts.len() != 0);
-                if passed_i_p.contains(&(inst, *reg)) {
+                let inst = *dinsts.first().unwrap();
+                let if_replace_def = inst.1.clone();
+                let inst: ObjPtr<LIRInst> = inst.0.clone();
+                if passed_i_p.contains(&(inst, *reg, if_replace_def)) {
                     continue;
                 }
+                let v_reg = Reg::init(reg.get_type());
+                // println!("{}{reg}{v_reg}", callee_func.label);
                 constraints.insert(v_reg, caller_used.clone());
                 constraints
                     .get_mut(&v_reg)
                     .unwrap()
                     .extend(callee_used.iter());
-                passed_i_p.insert((inst, *reg));
-                dinsts.iter().for_each(|ist| {
-                    inst_vreg_preg.push((*ist, v_reg, *reg));
+                // passed_i_p.insert((inst, *reg));
+                dinsts.iter().for_each(|(ist, if_replace_def)| {
+                    passed_i_p.insert((*ist, *reg, *if_replace_def));
+                    inst_vreg_preg.push((*ist, v_reg, *reg, *if_replace_def));
                 });
             }
         });
         //获取增加约束的重新分配结果
+
         //p2v
+        Func::print_func(*func);
+        for (inst, v_reg, p_reg, if_replace_def) in inst_vreg_preg.iter() {
+            if *if_replace_def {
+                inst.as_mut().replace_only_def_reg(p_reg, v_reg);
+            } else {
+                inst.as_mut().replace_only_use_reg(p_reg, v_reg);
+            }
+        }
+        Func::print_func(*func);
 
         func.calc_live_for_handle_call(); //该处在handle spill之后，应该calc live for handle call
         let alloc_stat = || -> FuncAllocStat {
@@ -1508,13 +1533,13 @@ impl AsmModule {
         bb: ObjPtr<BB>,
         index: usize,
         p_reg: Reg,
-        v_reg: Reg,
-    ) -> Vec<ObjPtr<LIRInst>> {
+    ) -> Vec<(ObjPtr<LIRInst>, bool)> {
         let mut decolored_insts = Vec::new();
         let mut to_pass: LinkedList<(ObjPtr<BB>, i32, i32)> = LinkedList::new();
         let mut passed = HashSet::new();
         if bb.insts.len() > index && bb.insts.get(index).unwrap().get_reg_def().contains(&p_reg) {
-            decolored_insts.push(*bb.insts.get(index).unwrap());
+            unreachable!();
+            // decolored_insts.push((*bb.insts.get(index).unwrap(),));
         } else {
             to_pass.push_back((bb, index as i32, -1));
         }
@@ -1524,24 +1549,30 @@ impl AsmModule {
             if passed.contains(&(bb, index, refresh)) {
                 continue;
             }
+            // println!("{}:{}:{}", bb.label, index, refresh);
             passed.insert((bb, index, refresh));
             index += refresh;
             while index >= 0 && index < bb.insts.len() as i32 {
+                // println!("{}:{}:{}", bb.label, index, refresh);
+                passed.insert((bb, index, refresh));
                 let inst = bb.insts.get(index as usize).unwrap();
                 if refresh == 1 {
                     if inst.get_reg_use().contains(&p_reg) {
-                        decolored_insts.push(*inst);
+                        decolored_insts.push((*inst, false));
+                        // println!("{}", inst.as_ref());
                     }
                     if inst.get_reg_def().contains(&p_reg) {
                         break;
                     }
                 } else if refresh == -1 {
                     if inst.get_reg_def().contains(&p_reg) {
-                        decolored_insts.push(*inst);
+                        decolored_insts.push((*inst, true));
+                        // println!("{}", inst.as_ref());
                         break;
                     }
                     if inst.get_reg_use().contains(&p_reg) {
-                        decolored_insts.push(*inst);
+                        decolored_insts.push((*inst, false));
+                        // println!("{}", inst.as_ref());
                     }
                 } else {
                     unreachable!()
