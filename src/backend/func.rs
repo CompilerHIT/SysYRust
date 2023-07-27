@@ -1904,6 +1904,21 @@ impl Func {
         // self.print_func();
         new_v_regs
     }
+
+    ///着色
+    pub fn v2p(&mut self, colors: &HashMap<i32, i32>) {
+        for bb in self.blocks.iter() {
+            for inst in bb.insts.iter() {
+                for reg in inst.get_regs() {
+                    if reg.is_physic() {
+                        continue;
+                    }
+                    let color = colors.get(&reg.get_id()).unwrap();
+                    inst.as_mut().replace(reg.get_id(), *color);
+                }
+            }
+        }
+    }
 }
 
 /// handle spill v3实现
