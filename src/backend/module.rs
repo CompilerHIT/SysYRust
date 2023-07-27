@@ -691,9 +691,12 @@ impl AsmModule {
 
     pub fn print_func(&self) {
         // // debug_assert!(false, "{}", self.name_func.len());
-        // for (_, func) in self.name_func.iter() {
-        //     func.print_func();
-        // }
+        for (_, func) in self.name_func.iter() {
+            if func.is_extern {
+                continue;
+            }
+            Func::print_func(*func);
+        }
     }
 }
 
@@ -766,6 +769,7 @@ impl AsmModule {
             // self.anaylyse_for_handle_call_v3();
         }
         // self.split_func(pool);
+        // self.print_func();
         self.reduce_caller_to_saved_after_func_split();
 
         self.remove_useless_func(); //在handle call之前调用,删掉前面往name func中加入的external func
@@ -1373,24 +1377,17 @@ impl AsmModule {
                 callee_used.get(callee_func_name.as_str()).unwrap().clone()
             };
             let caller_used = caller_used.get(callee_func_name.as_str()).unwrap();
-            let mut reg_cross = HashSet::new();
-            for reg in live_now.iter() {
-                if !reg.is_physic() {
-                    continue;
-                }
-                if reg.get_color() <= 4 {
-                    continue;
-                }
-                reg_cross.insert(*reg);
-            }
-            for reg in inst.get_regs() {
-                reg_cross.remove(&reg);
-            }
+            let mut reg_cross = live_now.clone();
+            reg_cross.retain(|reg| {
+                reg.get_color() > 4
+                    && reg.is_physic()
+                    && reg.is_caller_save()
+                    && !inst.get_regs().contains(reg)
+            });
             //call指令往后,call指令往前
             for reg in reg_cross.iter() {
                 let dinsts = AsmModule::get_to_recolor(bb, index, *reg);
-
-                debug_assert!(dinsts.len() != 0);
+                debug_assert!(dinsts.len() != 0, "func:{},reg:{}", callee_func_name, reg);
                 let inst = *dinsts.first().unwrap();
                 let if_replace_def = inst.1.clone();
                 let inst: ObjPtr<LIRInst> = inst.0.clone();
@@ -1414,7 +1411,7 @@ impl AsmModule {
         //获取增加约束的重新分配结果
 
         //p2v
-        Func::print_func(*func);
+        // Func::print_func(*func);
         for (inst, v_reg, p_reg, if_replace_def) in inst_vreg_preg.iter() {
             if *if_replace_def {
                 inst.as_mut().replace_only_def_reg(p_reg, v_reg);
@@ -1422,7 +1419,7 @@ impl AsmModule {
                 inst.as_mut().replace_only_use_reg(p_reg, v_reg);
             }
         }
-        Func::print_func(*func);
+        // Func::print_func(*func);
 
         func.calc_live_for_handle_call(); //该处在handle spill之后，应该calc live for handle call
         let alloc_stat = || -> FuncAllocStat {
