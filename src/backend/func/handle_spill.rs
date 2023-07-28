@@ -180,140 +180,7 @@ impl Func {
     ///为handle spill 计算寄存器活跃区间
     /// 会认为zero,ra,sp,tp,gp在所有块中始终活跃
     pub fn calc_live_for_handle_spill(&self) {
-        //TODO, 去除allocable限制!
-        let calc_live_file = "callive_for_spill.txt";
-        // fs::remove_file(calc_live_file);
-        log_file!(
-            calc_live_file,
-            "-----------------------------------cal live func:{}---------------------------",
-            self.label
-        );
-        // 打印函数里面的寄存器活跃情况
-        let printinterval = || {
-            let mut que: VecDeque<ObjPtr<BB>> = VecDeque::new();
-            let mut passed_bb = HashSet::new();
-            que.push_front(self.entry.unwrap());
-            passed_bb.insert(self.entry.unwrap());
-            log_file!(calc_live_file, "func:{}", self.label);
-            while !que.is_empty() {
-                let cur_bb = que.pop_front().unwrap();
-                log_file!(calc_live_file, "block {}:", cur_bb.label);
-                log_file!(calc_live_file, "live in:");
-                log_file!(calc_live_file, "{:?}", cur_bb.live_in);
-                log_file!(calc_live_file, "live out:");
-                log_file!(calc_live_file, "{:?}", cur_bb.live_out);
-                log_file!(calc_live_file, "live use:");
-                log_file!(calc_live_file, "{:?}", cur_bb.live_use);
-                log_file!(calc_live_file, "live def:");
-                log_file!(calc_live_file, "{:?}", cur_bb.live_def);
-                for next in cur_bb.out_edge.iter() {
-                    if passed_bb.contains(next) {
-                        continue;
-                    }
-                    passed_bb.insert(*next);
-                    que.push_back(*next);
-                }
-            }
-        };
-
-        // 计算公式，live in 来自于所有前继的live out的集合 + 自身的live use
-        // live out等于所有后继块的live in的集合与 (自身的livein 和live def的并集) 的交集
-        // 以块为遍历单位进行更新
-        // TODO 重写
-        // 首先计算出live def和live use
-        // if self.label == "main" {
-        //     log!("to");
-        // }
-
-        let mut queue: VecDeque<(ObjPtr<BB>, Reg)> = VecDeque::new();
-        for block in self.blocks.iter() {
-            log_file!(calc_live_file, "block:{}", block.label);
-            block.as_mut().live_use.clear();
-            block.as_mut().live_def.clear();
-            for it in block.as_ref().insts.iter().rev() {
-                log_file!(calc_live_file, "{}", it.as_ref());
-                for reg in it.as_ref().get_reg_def().into_iter() {
-                    block.as_mut().live_use.remove(&reg);
-                    block.as_mut().live_def.insert(reg);
-                }
-                for reg in it.as_ref().get_reg_use().into_iter() {
-                    block.as_mut().live_def.remove(&reg);
-                    block.as_mut().live_use.insert(reg);
-                }
-            }
-            log_file!(
-                calc_live_file,
-                "live def:{:?},live use:{:?}",
-                block
-                    .live_def
-                    .iter()
-                    .map(|e| e.get_id())
-                    .collect::<Vec<i32>>(),
-                block
-                    .live_use
-                    .iter()
-                    .map(|e| e.get_id())
-                    .collect::<Vec<i32>>()
-            );
-            //
-            for reg in block.as_ref().live_use.iter() {
-                queue.push_back((block.clone(), reg.clone()));
-            }
-
-            block.as_mut().live_in = block.as_ref().live_use.clone();
-            block.as_mut().live_out.clear();
-            //a0从reg处往前传递
-            // if let Some(last_isnt) = block.insts.last() {
-            //     match last_isnt.get_type() {
-            //         InstrsType::Ret(r_type) => {
-            //             match r_type {
-            //                 ScalarType::Int => {
-            //                     let ret_reg = Reg::new(10, r_type);
-            //                     block.as_mut().live_out.insert(ret_reg);
-            //                     if !block.live_def.contains(&ret_reg) {
-            //                         queue.push_front((*block, ret_reg));
-            //                     }
-            //                 }
-            //                 ScalarType::Float => {
-            //                     let ret_reg = Reg::new(10 + FLOAT_BASE, r_type);
-            //                     block.as_mut().live_out.insert(ret_reg);
-            //                     if !block.live_def.contains(&ret_reg) {
-            //                         queue.push_front((*block, ret_reg));
-            //                     }
-            //                 }
-            //                 _ => (),
-            //             };
-            //         }
-            //         _ => (),
-            //     }
-            // }
-        }
-        //然后计算live in 和live out
-        while let Some(value) = queue.pop_front() {
-            let (block, reg) = value;
-            log_file!(
-                calc_live_file,
-                "block {} 's ins:{:?}, transport live out:{}",
-                block.label,
-                block
-                    .in_edge
-                    .iter()
-                    .map(|b| &b.label)
-                    .collect::<HashSet<&String>>(),
-                reg
-            );
-            for pred in block.as_ref().in_edge.iter() {
-                if pred.as_mut().live_out.insert(reg) {
-                    if pred.as_mut().live_def.contains(&reg) {
-                        continue;
-                    }
-                    if pred.as_mut().live_in.insert(reg) {
-                        queue.push_back((pred.clone(), reg));
-                    }
-                }
-            }
-        }
-
+        self.calc_live_base();
         //把sp和ra寄存器加入到所有的块的live out,live in中，表示这些寄存器永远不能在函数中自由分配使用
         for bb in self.blocks.iter() {
             //0:zero, 1:ra, 2:sp 3:gp 4:tp
@@ -321,10 +188,10 @@ impl Func {
                 bb.as_mut().live_in.insert(Reg::new(id, ScalarType::Int));
                 bb.as_mut().live_out.insert(Reg::new(id, ScalarType::Int));
             }
+            //加入s0,避免在handle spill中使用了s0
+            bb.as_mut().live_in.insert(Reg::new(8, ScalarType::Int));
+            bb.as_mut().live_out.insert(Reg::new(8, ScalarType::Int));
         }
-
-        log_file!(calc_live_file,"-----------------------------------after count live in,live out----------------------------");
-        printinterval();
     }
 
     ///精细化的handle spill:
@@ -338,6 +205,7 @@ impl Func {
     /// * 一定要spill到内存上的时候,使用递增的slot,把slot记录到数组的表中,等待重排
     pub fn handle_spill_v3(&mut self, pool: &mut BackendPool) {
         self.calc_live_for_handle_spill();
+        self.build_reg_intervals();
         //先分配空间
         self.assign_stack_slot_for_spill();
         let this = pool.put_func(self.clone());
