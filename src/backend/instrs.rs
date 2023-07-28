@@ -719,3 +719,20 @@ impl LIRInst {
         todo!()
     }
 }
+impl Operand {
+    // 增加直接导出reg的接口
+    #[inline]
+    pub fn drop_reg(&self) -> Reg {
+        match self {
+            Operand::Reg(reg) => *reg,
+            _ => unreachable!(),
+        }
+    }
+    #[inline]
+    pub fn drop_addr(&self) -> String {
+        match self {
+            Operand::Addr(addr) => addr.clone(),
+            _ => unreachable!(),
+        }
+    }
+}
