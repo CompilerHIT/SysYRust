@@ -16,8 +16,8 @@ impl Func {
                 bb.as_mut().live_out.insert(Reg::new(id, ScalarType::Int));
             }
             //加入s0,handle call发生在handle overflow之前,把s0标记为无限存活以避免被使用
-            bb.as_mut().live_in.insert(Reg::new(8, ScalarType::Int));
-            bb.as_mut().live_out.insert(Reg::new(8, ScalarType::Int));
+            bb.as_mut().live_in.insert(Reg::get_s0());
+            bb.as_mut().live_out.insert(Reg::get_s0());
         }
     }
 

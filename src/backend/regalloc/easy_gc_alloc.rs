@@ -432,10 +432,9 @@ impl Allocator {
         }
         //加入约束
         for (reg, constraints) in constraints.iter() {
+            debug_assert!(!reg.is_physic());
             for p_reg in constraints.iter() {
-                if self.interference_graph.get(&p_reg).unwrap().contains(reg) {
-                    continue;
-                }
+                debug_assert!(p_reg.is_physic());
                 //否则加入图中
                 // self.interference_graph
                 //     .get_mut(&p_reg)

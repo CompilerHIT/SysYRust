@@ -319,14 +319,4 @@ impl AsmModule {
             func.as_mut().update_array_offset(pool);
         }
     }
-
-    pub fn print_func(&self) {
-        // // debug_assert!(false, "{}", self.name_func.len());
-        for (_, func) in self.name_func.iter() {
-            if func.is_extern {
-                continue;
-            }
-            Func::print_func(*func);
-        }
-    }
 }

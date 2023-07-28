@@ -56,6 +56,19 @@ impl Func {
         });
         passed
     }
+
+    // 获取所有虚拟寄存器和用到的物理寄存器
+    pub fn draw_all_regs(&self) -> HashSet<Reg> {
+        let mut passed = HashSet::new();
+        self.blocks.iter().for_each(|bb| {
+            bb.insts.iter().for_each(|inst| {
+                for reg in inst.get_regs() {
+                    passed.insert(reg);
+                }
+            })
+        });
+        passed
+    }
 }
 
 ///为函数创建寄存器活跃区间
