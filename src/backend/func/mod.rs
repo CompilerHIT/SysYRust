@@ -225,6 +225,46 @@ impl Func {
         self.update(this);
     }
 
+    ///无额外约束的计算寄存器活跃区间
+    fn calc_live_base(&self) {
+        let mut queue: VecDeque<(ObjPtr<BB>, Reg)> = VecDeque::new();
+        for block in self.blocks.iter() {
+            block.as_mut().live_use.clear();
+            block.as_mut().live_def.clear();
+            for it in block.as_ref().insts.iter().rev() {
+                for reg in it.as_ref().get_reg_def().into_iter() {
+                    block.as_mut().live_use.remove(&reg);
+                    block.as_mut().live_def.insert(reg);
+                }
+                for reg in it.as_ref().get_reg_use().into_iter() {
+                    block.as_mut().live_def.remove(&reg);
+                    block.as_mut().live_use.insert(reg);
+                }
+            }
+            //
+            for reg in block.as_ref().live_use.iter() {
+                queue.push_back((block.clone(), reg.clone()));
+            }
+            block.as_mut().live_in = block.as_ref().live_use.clone();
+            block.as_mut().live_out.clear();
+        }
+        //然后计算live in 和live out
+        while let Some(value) = queue.pop_front() {
+            let (block, reg) = value;
+
+            for pred in block.as_ref().in_edge.iter() {
+                if pred.as_mut().live_out.insert(reg) {
+                    if pred.as_mut().live_def.contains(&reg) {
+                        continue;
+                    }
+                    if pred.as_mut().live_in.insert(reg) {
+                        queue.push_back((pred.clone(), reg));
+                    }
+                }
+            }
+        }
+    }
+
     fn handle_parameters(&mut self, ir_func: &Function) {
         let mut iparam: Vec<_> = ir_func
             .get_parameter_list()

@@ -3,107 +3,11 @@ use super::*;
 ///handle call v3的实现
 impl Func {
     ///calc_live for handle call v3
-    /// 仅仅对五个特殊寄存器x0-x4认为始终活跃
+    /// 仅仅对6个特殊寄存器x0-x4以及s0认为始终活跃
     /// 其他寄存器都动态分析
     pub fn calc_live_for_handle_call(&self) {
         //TODO, 去除allocable限制!
-        let calc_live_file = "callive_for_call.txt";
-        // fs::remove_file(calc_live_file);
-        log_file!(
-            calc_live_file,
-            "-----------------------------------cal live func:{}---------------------------",
-            self.label
-        );
-        // 打印函数里面的寄存器活跃情况
-        let printinterval = || {
-            let mut que: VecDeque<ObjPtr<BB>> = VecDeque::new();
-            let mut passed_bb = HashSet::new();
-            que.push_front(self.entry.unwrap());
-            passed_bb.insert(self.entry.unwrap());
-            log_file!(calc_live_file, "func:{}", self.label);
-            while !que.is_empty() {
-                let cur_bb = que.pop_front().unwrap();
-                log_file!(calc_live_file, "block {}:", cur_bb.label);
-                log_file!(calc_live_file, "live in:");
-                log_file!(calc_live_file, "{:?}", cur_bb.live_in);
-                log_file!(calc_live_file, "live out:");
-                log_file!(calc_live_file, "{:?}", cur_bb.live_out);
-                log_file!(calc_live_file, "live use:");
-                log_file!(calc_live_file, "{:?}", cur_bb.live_use);
-                log_file!(calc_live_file, "live def:");
-                log_file!(calc_live_file, "{:?}", cur_bb.live_def);
-                for next in cur_bb.out_edge.iter() {
-                    if passed_bb.contains(next) {
-                        continue;
-                    }
-                    passed_bb.insert(*next);
-                    que.push_back(*next);
-                }
-            }
-        };
-
-        let mut queue: VecDeque<(ObjPtr<BB>, Reg)> = VecDeque::new();
-        for block in self.blocks.iter() {
-            log_file!(calc_live_file, "block:{}", block.label);
-            block.as_mut().live_use.clear();
-            block.as_mut().live_def.clear();
-            for it in block.as_ref().insts.iter().rev() {
-                for reg in it.as_ref().get_reg_def().into_iter() {
-                    block.as_mut().live_use.remove(&reg);
-                    block.as_mut().live_def.insert(reg);
-                }
-                for reg in it.as_ref().get_reg_use().into_iter() {
-                    block.as_mut().live_def.remove(&reg);
-                    block.as_mut().live_use.insert(reg);
-                }
-            }
-            for reg in block.as_ref().live_use.iter() {
-                queue.push_back((block.clone(), reg.clone()));
-            }
-
-            block.as_mut().live_in = block.as_ref().live_use.clone();
-            block.as_mut().live_out.clear();
-            // if let Some(last_isnt) = block.insts.last() {
-            //     match last_isnt.get_type() {
-            //         InstrsType::Ret(r_type) => {
-            //             match r_type {
-            //                 ScalarType::Int => {
-            //                     let ret_reg = Reg::new(10, r_type);
-            //                     block.as_mut().live_out.insert(ret_reg);
-            //                     if !block.live_def.contains(&ret_reg) {
-            //                         queue.push_front((*block, ret_reg));
-            //                     }
-            //                 }
-            //                 ScalarType::Float => {
-            //                     let ret_reg = Reg::new(10 + FLOAT_BASE, r_type);
-            //                     block.as_mut().live_out.insert(ret_reg);
-            //                     if !block.live_def.contains(&ret_reg) {
-            //                         queue.push_front((*block, ret_reg));
-            //                     }
-            //                 }
-            //                 _ => (),
-            //             };
-            //         }
-            //         _ => (),
-            //     }
-            // }
-        }
-
-        //然后计算live in 和live out
-        while let Some(value) = queue.pop_front() {
-            let (block, reg) = value;
-            for pred in block.as_ref().in_edge.iter() {
-                if pred.as_mut().live_out.insert(reg) {
-                    if pred.as_mut().live_def.contains(&reg) {
-                        continue;
-                    }
-                    if pred.as_mut().live_in.insert(reg) {
-                        queue.push_back((pred.clone(), reg));
-                    }
-                }
-            }
-        }
-
+        self.calc_live_base();
         //把 特殊寄存器 (加入自己的in 和 out)
         for bb in self.blocks.iter() {
             //0:zero, 1:ra, 2:sp 3:gp ,4,tp
@@ -111,9 +15,10 @@ impl Func {
                 bb.as_mut().live_in.insert(Reg::new(id, ScalarType::Int));
                 bb.as_mut().live_out.insert(Reg::new(id, ScalarType::Int));
             }
+            //加入s0,handle call发生在handle overflow之前,把s0标记为无限存活以避免被使用
+            bb.as_mut().live_in.insert(Reg::new(8, ScalarType::Int));
+            bb.as_mut().live_out.insert(Reg::new(8, ScalarType::Int));
         }
-        log_file!(calc_live_file,"-----------------------------------after count live in,live out----------------------------");
-        printinterval();
     }
 
     /// 在handle spill之后调用

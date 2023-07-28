@@ -347,6 +347,20 @@ impl Reg {
             r_type: ScalarType::Int,
         }
     }
+    #[inline]
+    pub fn get_gp() -> Reg {
+        Reg {
+            id: 3,
+            r_type: ScalarType::Int,
+        }
+    }
+    #[inline]
+    pub fn get_tp() -> Reg {
+        Reg {
+            id: 4,
+            r_type: ScalarType::Int,
+        }
+    }
 }
 
 impl Operand {
