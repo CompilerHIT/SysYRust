@@ -438,10 +438,7 @@ impl AsmModule {
     }
 
     ///准备 callee save和caller save需要的信息
-    /// 1. 准备每个函数需要的callee save,以及进行函数分裂
-    /// 2. 针对性地让函数自我转变 , 调整每个函数中使用到的寄存器分布等等
-    /// 3. 该函数应该在vtop和handle spill后调用
-    /// 4. 过程中会往name func中加入需要的外部函数的信息
+    /// 1. 该函数应该在vtop和handle spill后调用
     fn anaylyse_for_handle_call_v3_pre_split(&mut self) {
         //TODO
         self.callee_regs_to_saveds.clear();
@@ -764,8 +761,8 @@ impl AsmModule {
         self.handle_spill_v3(pool);
         self.remove_unuse_inst_suf_alloc();
 
-        self.anaylyse_for_handle_call_v3_pre_split();
-        // self.anaylyse_for_handle_call_v4();
+        // self.anaylyse_for_handle_call_v3_pre_split();
+        self.anaylyse_for_handle_call_v4();
 
         if is_opt {
             self.split_func(pool);
@@ -831,7 +828,7 @@ impl AsmModule {
         //对于name func里面的东西,根据上下文准备对应内容
         let caller_used = self.build_caller_used();
         let callee_used = self.build_callee_used();
-        ///对于name_func里面的每个函数,除了externel,都要总结个to save
+        //对于name_func里面的每个函数,除了externel,都要总结个to save
         self.callee_regs_to_saveds.clear();
         self.caller_regs_to_saveds.clear();
         for (name, func) in self.name_func.iter() {
@@ -1329,7 +1326,6 @@ impl AsmModule {
             let caller_used = func.draw_used_callers();
             new_callers_used.extend(caller_used);
         }
-        new_callers_used.extend(func.draw_used_callers());
         new_callers_used
     }
 
