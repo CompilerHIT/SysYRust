@@ -752,16 +752,20 @@ impl AsmModule {
         //     self.remove_unuse_inst_suf_alloc();
         // }
 
-        self.build_own_call_map();
-        // //寄存器重分配,重分析
+        //加入外部函数
         self.add_external_func(pool);
-        self.realloc_reg_with_priority();
+
+        //建立调用表
+        self.build_own_call_map();
+        //寄存器重分配,重分析
+
+        // self.realloc_reg_with_priority();
 
         self.handle_spill_v3(pool);
         self.remove_unuse_inst_suf_alloc();
 
-        // self.anaylyse_for_handle_call_v3_pre_split();
-        self.anaylyse_for_handle_call_v4();
+        self.anaylyse_for_handle_call_v3_pre_split();
+        // self.anaylyse_for_handle_call_v4();
 
         if is_opt {
             self.split_func(pool);
@@ -769,8 +773,8 @@ impl AsmModule {
             // self.anaylyse_for_handle_call_v3();
         }
         // self.split_func(pool);
-        self.print_func();
-        self.reduce_caller_to_saved_after_func_split();
+        // self.print_func();
+        // self.reduce_caller_to_saved_after_func_split();
 
         self.remove_useless_func(); //在handle call之前调用,删掉前面往name func中加入的external func
         self.handle_call_v3(pool);
@@ -1336,27 +1340,14 @@ impl AsmModule {
     pub fn reduce_caller_to_saved_after_func_split(&mut self) {
         //对于 main函数中的情况专门处理, 对于 call前后使用 的 caller saved函数进行重分配,尝试进行recolor,(使用任意寄存器)
         let func = self.name_func.get("main").unwrap();
+        let mut passed_i_p: HashSet<(ObjPtr<LIRInst>, Reg, bool)> = HashSet::new();
         //标记重整
         let mut inst_vreg_preg: Vec<(ObjPtr<LIRInst>, Reg, Reg, bool)> = Vec::new();
-        let mut passed_i_p: HashSet<(ObjPtr<LIRInst>, Reg, bool)> = HashSet::new();
         let caller_used = AsmModule::build_caller_used(&self);
         let callee_used = AsmModule::build_callee_used(&self);
         let mut constraints: HashMap<Reg, HashSet<Reg>> = HashMap::new();
         func.calc_live_for_handle_call();
         debug_assert!(func.label == "main");
-
-        //首先对于所有的函数定义和使用的寄存器进行记录,都不能够进行反着色
-        AsmModule::analyse_inst_with_live_now(func, &mut |inst, live_now| {
-            if inst.get_type() != InstrsType::Call {
-                return;
-            }
-            for reg in inst.get_reg_def() {
-                passed_i_p.insert((inst, reg, true));
-            }
-            for reg in inst.get_reg_use() {
-                passed_i_p.insert((inst, reg, false));
-            }
-        });
 
         //对于handle call这一步已经没有物理寄存器了,所有遇到的虚拟寄存器都是该处产生的
         AsmModule::analyse_inst_with_index_and_live_now(func, &mut |inst, index, live_now, bb| {
@@ -1381,16 +1372,22 @@ impl AsmModule {
             reg_cross.retain(|reg| {
                 reg.get_color() > 4 && reg.is_physic() && !inst.get_regs().contains(reg)
             });
-            //call指令往后,call指令往前
             for reg in reg_cross.iter() {
                 let dinsts = AsmModule::get_to_recolor(bb, index, *reg);
-                debug_assert!(dinsts.len() != 0, "func:{},reg:{}", callee_func_name, reg);
-                let inst = *dinsts.first().unwrap();
-                let if_replace_def = inst.1.clone();
-                let inst: ObjPtr<LIRInst> = inst.0.clone();
-                if passed_i_p.contains(&(inst, *reg, if_replace_def)) {
+                let mut ok = true;
+                dinsts.iter().for_each(|item| {
+                    let (inst, if_replace_def) = item.clone();
+                    if inst.get_type() == InstrsType::Call {
+                        ok = false;
+                    }
+                    if passed_i_p.contains(&(inst, *reg, if_replace_def)) {
+                        ok = false;
+                    }
+                });
+                if !ok {
                     continue;
                 }
+                debug_assert!(dinsts.len() != 0, "func:{},reg:{}", callee_func_name, reg);
                 let v_reg = Reg::init(reg.get_type());
                 // println!("{}{reg}{v_reg}", callee_func.label);
                 constraints.insert(v_reg, caller_used.clone());
@@ -1410,6 +1407,11 @@ impl AsmModule {
         //p2v
         // Func::print_func(*func);
         for (inst, v_reg, p_reg, if_replace_def) in inst_vreg_preg.iter() {
+            log_file!(
+                "p2v_for_reduce_caller.txt",
+                "{},{v_reg},{p_reg},{if_replace_def}",
+                inst.as_ref()
+            );
             if *if_replace_def {
                 inst.as_mut().replace_only_def_reg(p_reg, v_reg);
             } else {
