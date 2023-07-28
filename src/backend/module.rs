@@ -761,8 +761,8 @@ impl AsmModule {
         self.handle_spill_v3(pool);
         self.remove_unuse_inst_suf_alloc();
 
-        // self.anaylyse_for_handle_call_v3_pre_split();
-        self.anaylyse_for_handle_call_v4();
+        self.anaylyse_for_handle_call_v3_pre_split();
+        // self.anaylyse_for_handle_call_v4();
 
         if is_opt {
             self.split_func(pool);
