@@ -326,7 +326,7 @@ impl Func {
                             format!("load{reg}").as_str(),
                         );
                     }
-                    new_insts.push(*inst); //插入该指令
+                    new_insts.push(*inst); //插入call指令
                                            //插入保存指令
                     for (index, reg) in to_saved.iter().enumerate() {
                         let pos = slots_for_caller_saved.get(index).unwrap().get_pos();

@@ -175,9 +175,9 @@ impl Func {
         //     }
         // }
         // let mut allocator = crate::backend::regalloc::easy_ls_alloc::Allocator::new();
-        // let mut allocator = crate::backend::regalloc::easy_gc_alloc::Allocator::new();
+        let mut allocator = crate::backend::regalloc::easy_gc_alloc::Allocator::new();
         // let mut allocator = crate::backend::regalloc::opt_ls_alloc::Allocator::new();
-        let mut allocator = crate::backend::regalloc::opt_gc_alloc2::Allocator::new();
+        // let mut allocator = crate::backend::regalloc::opt_gc_alloc2::Allocator::new();
         // let mut allocator = crate::backend::regalloc::opt_gc_alloc::Allocator::new();
         // let mut allocator = crate::backend::regalloc::base_alloc::Allocator::new();
         let alloc_stat = allocator.alloc(self);

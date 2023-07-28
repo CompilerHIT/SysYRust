@@ -1,5 +1,3 @@
-use core::time;
-
 use super::*;
 
 // rearrange slot实现 ,for module-build v3
@@ -35,9 +33,8 @@ impl Func {
                     InstrsType::StoreToStack => {
                         let offset = inst.get_stack_offset().get_data();
                         let stackslot = StackSlot::new(offset, ADDR_SIZE);
-
-                        live_use.insert(stackslot);
-                        live_def.remove(&stackslot);
+                        live_use.remove(&stackslot);
+                        live_def.insert(stackslot);
                     }
                     _ => (),
                 }
@@ -57,7 +54,7 @@ impl Func {
                 let live_in = live_ins.get_mut(bb).unwrap();
                 let def = live_defs.get(bb).unwrap();
                 let mut new_in = live_outs.get(bb).unwrap().clone();
-                new_in.retain(|sst| def.contains(sst));
+                new_in.retain(|sst| !def.contains(sst));
                 new_in.extend(live_in.iter());
                 if new_in.len() > live_in.len() {
                     finish_flag = false;
@@ -144,7 +141,7 @@ impl Func {
         );
         let mut times: HashMap<StackSlot, i32> = HashMap::new();
         //分析虚拟栈单元使用次数
-        analyse_each_inst(&self, &mut |inst| match inst.get_type() {
+        iter_each_inst(&self, &mut |inst| match inst.get_type() {
             InstrsType::LoadFromStack | InstrsType::StoreToStack => {
                 let sst = inst.get_stackslot_with_addr_size();
                 if all_rearrangable_stackslot.contains(&sst) {
@@ -157,14 +154,52 @@ impl Func {
         //对于虚拟栈单元,按照使用次数从高到低进行排序
         let mut ordered_ssts: Vec<StackSlot> = all_rearrangable_stackslot.iter().cloned().collect();
         ordered_ssts.sort_by_cached_key(|sst| -times.get(sst).unwrap());
-        //进行重分配
-        self.spill_stack_map.clear();
-
-        return;
+        let old_stack_size = all_rearrangable_stackslot.len() * 8;
+        let mut allocated_ssts: Vec<StackSlot> = Vec::new();
+        let mut v_p_ssts: HashMap<StackSlot, StackSlot> = HashMap::new();
+        for sst in ordered_ssts.iter() {
+            //记录所有已经用过的冲突的空间
+            let mut unavailables_ssts: HashSet<StackSlot> = HashSet::new();
+            for inter_sst in interef.get(sst).unwrap() {
+                if let Some(p_sst) = v_p_ssts.get(inter_sst) {
+                    unavailables_ssts.insert(*p_sst);
+                }
+            }
+            let mut to_assign_with: Option<StackSlot> = None;
+            for p_sst in allocated_ssts.iter() {
+                if unavailables_ssts.contains(p_sst) {
+                    continue;
+                }
+                to_assign_with = Some(*p_sst);
+                break;
+            }
+            if to_assign_with.is_none() {
+                let back = self.stack_addr.back().unwrap();
+                let new_pos = back.get_pos() + back.get_size();
+                let new_p_sst = StackSlot::new(new_pos, ADDR_SIZE);
+                self.stack_addr.push_back(new_p_sst);
+                allocated_ssts.push(new_p_sst);
+                to_assign_with = Some(new_p_sst);
+            }
+            v_p_ssts.insert(*sst, to_assign_with.unwrap());
+        }
+        //进行重分配 (主要是更新spilling大小)
+        let new_stack_size = allocated_ssts.len() * 8;
+        config::record_mem_rearrange(&self.label, old_stack_size, new_stack_size);
+        //进行栈空间替换
+        iter_each_inst(&self, &mut |inst| match inst.get_type() {
+            InstrsType::LoadFromStack | InstrsType::StoreToStack => {
+                let old_sst = inst.get_stackslot_with_addr_size();
+                if let Some(p_sst) = v_p_ssts.get(&old_sst) {
+                    inst.as_mut().set_stack_offset(IImm::new(p_sst.get_pos()));
+                }
+            }
+            _ => (),
+        });
     }
 }
 
-pub fn analyse_each_inst(func: &Func, analyser: &mut dyn FnMut(&ObjPtr<LIRInst>)) {
+pub fn iter_each_inst(func: &Func, analyser: &mut dyn FnMut(&ObjPtr<LIRInst>)) {
     for bb in func.blocks.iter() {
         for inst in bb.insts.iter() {
             analyser(inst);
