@@ -2,7 +2,7 @@
 use crate::utility::ScalarType;
 use std::{collections::HashSet, fmt::Display};
 
-use super::{block::FLOAT_BASE, instrs::Operand};
+use super::block::FLOAT_BASE;
 pub const REG_COUNT: i32 = 32;
 pub const ARG_REG_COUNT: i32 = 8;
 pub const REG_SP: i32 = 2;
@@ -387,24 +387,6 @@ impl Reg {
         Reg {
             id: 4,
             r_type: ScalarType::Int,
-        }
-    }
-}
-
-impl Operand {
-    // 增加直接导出reg的接口
-    #[inline]
-    pub fn drop_reg(&self) -> Reg {
-        match self {
-            Operand::Reg(reg) => *reg,
-            _ => unreachable!(),
-        }
-    }
-    #[inline]
-    pub fn drop_addr(&self) -> String {
-        match self {
-            Operand::Addr(addr) => addr.clone(),
-            _ => unreachable!(),
         }
     }
 }
