@@ -31,7 +31,9 @@ pub struct AsmModule {
     pub global_var_list: Vec<(ObjPtr<Inst>, GlobalVar)>,
     pub func_map: Vec<(ObjPtr<Function>, ObjPtr<Func>)>,
     call_map: HashMap<String, HashSet<String>>,
+    ///记录该被调用函数需要保存的所有寄存器
     callee_regs_to_saveds: HashMap<String, HashSet<Reg>>,
+    ///记录调用该函数的函数应该保存的寄存器
     caller_regs_to_saveds: HashMap<String, HashSet<Reg>>,
     call_info: HashMap<String, HashMap<Bitmap, String>>, //每个base func name 对应调用的 不同callee need save函数
     pub name_func: HashMap<String, ObjPtr<Func>>,        //记录实际函数名和实际函数
@@ -761,16 +763,14 @@ impl AsmModule {
         self.handle_spill_v3(pool);
         self.remove_unuse_inst_suf_alloc();
 
-        self.anaylyse_for_handle_call_v3_pre_split();
-        // self.anaylyse_for_handle_call_v4();
+        // self.anaylyse_for_handle_call_v3_pre_split();
+        self.anaylyse_for_handle_call_v4();
 
         if is_opt {
             self.split_func(pool);
             self.build_own_call_map();
             // self.anaylyse_for_handle_call_v3();
         }
-        // self.split_func(pool);
-        // self.print_func();
         // self.reduce_caller_to_saved_after_func_split();
 
         self.remove_useless_func(); //在handle call之前调用,删掉前面往name func中加入的external func
@@ -824,6 +824,7 @@ impl AsmModule {
             });
     }
 
+    ///v4的analyse for handle call 依赖于前文调用build call map构建的call map
     pub fn anaylyse_for_handle_call_v4(&mut self) {
         //对于name func里面的东西,根据上下文准备对应内容
         let caller_used = self.build_caller_used();
