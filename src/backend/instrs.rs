@@ -4,6 +4,7 @@ pub use std::io::Result;
 use std::{fmt, vec};
 
 pub use crate::backend::asm_builder::AsmBuilder;
+use crate::backend::block::ADDR_SIZE;
 pub use crate::backend::block::BB;
 pub use crate::backend::func::Func;
 use crate::backend::operand::*;
@@ -12,6 +13,7 @@ pub use crate::backend::structs::{Context, GenerateAsm};
 pub use crate::utility::{ObjPtr, ScalarType};
 
 use super::block::FLOAT_BASE;
+use super::structs::StackSlot;
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum Operand {
@@ -603,6 +605,14 @@ impl LIRInst {
             Operand::IImm(offset) => offset,
             _ => unreachable!("only support imm sp offset, {:?}", self),
         }
+    }
+
+    pub fn get_stackslot_with_addr_size(&self) -> StackSlot {
+        debug_assert!(
+            self.get_type() == InstrsType::LoadFromStack
+                || self.get_type() == InstrsType::LoadFromStack
+        );
+        StackSlot::new(self.get_stack_offset().get_data(), ADDR_SIZE)
     }
 
     pub fn set_double(&mut self) {
