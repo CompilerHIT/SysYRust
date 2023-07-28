@@ -16,8 +16,8 @@ impl Func {
         }());
     }
 
-    pub fn print_func(func: ObjPtr<Func>) {
-        let func_print_path = "print_func.txt";
+    pub fn print_func(func: ObjPtr<Func>, path: &str) {
+        let func_print_path = path.to_string();
         let mut bp = BackendPool::new();
         let context = bp.put_context(Context::new());
         func.as_mut().generate_row(
@@ -30,12 +30,5 @@ impl Func {
                 .unwrap(),
         );
         bp.free_all();
-        // log_file!(func_print_path, "func:{}", self.label);
-        // for block in self.blocks.iter() {
-        //     log_file!(func_print_path, "\tblock:{}", block.label);
-        //     for inst in block.insts.iter() {
-        //         log_file!(func_print_path, "\t\t{}", inst.as_ref().to_string());
-        //     }
-        // }
     }
 }

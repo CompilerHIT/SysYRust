@@ -34,9 +34,9 @@ use crate::{config, log_file};
 use biheap::BiHeap;
 pub mod dump;
 pub mod handle_call;
+pub mod p2v;
 pub mod schedule;
 pub mod utils;
-
 #[derive(Clone)]
 pub struct Func {
     pub is_extern: bool,

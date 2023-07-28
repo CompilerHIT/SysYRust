@@ -1,3 +1,5 @@
+use crate::backend::regalloc::opt_gc_alloc2;
+
 use super::*;
 
 /// build v4:
@@ -53,12 +55,12 @@ impl AsmModule {
         //对于name_func里面的每个函数,除了externel,都要总结个to save
         self.callee_regs_to_saveds.clear();
         self.caller_regs_to_saveds.clear();
-        for (name, func) in self.name_func.iter() {
+        for (name, _) in self.name_func.iter() {
             //
             self.callee_regs_to_saveds
-                .insert(name.clone(), func.draw_used_callees());
+                .insert(name.clone(), callee_used.get(name).unwrap().clone());
             self.caller_regs_to_saveds
-                .insert(name.clone(), func.draw_used_callers());
+                .insert(name.clone(), caller_used.get(name).unwrap().clone());
         }
         for (_name, func) in self.name_func.iter() {
             if func.is_extern {
@@ -552,43 +554,38 @@ impl AsmModule {
     }
 
     ///函数分裂后减少使用到的特定物理寄存器
-    /// 该函数调用应该在remove useless func之前,
+    /// 该函数调用应该在handle call之前,
     /// 该函数的调用结果依赖于调用该函数前进行的analyse for handle call
     /// handlespill->[split func]->reduce_ctsafs->handle call
     pub fn reduce_caller_to_saved_after_func_split(&mut self) {
         //对于 main函数中的情况专门处理, 对于 call前后使用 的 caller saved函数进行重分配,尝试进行recolor,(使用任意寄存器)
         let func = self.name_func.get("main").unwrap();
+        // debug_assert!(func.as_ref().)
         let mut passed_i_p: HashSet<(ObjPtr<LIRInst>, Reg, bool)> = HashSet::new();
         //标记重整
         let mut inst_vreg_preg: Vec<(ObjPtr<LIRInst>, Reg, Reg, bool)> = Vec::new();
         let caller_used = AsmModule::build_caller_used(&self);
         let callee_used = AsmModule::build_callee_used(&self);
+        let mut new_v_regs: HashSet<Reg> = HashSet::new();
         let mut constraints: HashMap<Reg, HashSet<Reg>> = HashMap::new();
         func.calc_live_for_handle_call();
         debug_assert!(func.label == "main");
+        debug_assert!(!func.draw_all_regs().contains(&Reg::get_s0()));
 
         //对于handle call这一步已经没有物理寄存器了,所有遇到的虚拟寄存器都是该处产生的
+        //搜索并记录需要重分配列表
         AsmModule::analyse_inst_with_index_and_live_now(func, &mut |inst, index, live_now, bb| {
             //
             if inst.get_type() != InstrsType::Call {
                 return;
             }
             let callee_func_name = inst.get_func_name().unwrap();
-            debug_assert!(
-                self.name_func.contains_key(callee_func_name.as_str()),
-                "{}",
-                callee_func_name
-            );
-            let callee_func = self.name_func.get(callee_func_name.as_str()).unwrap();
-            let callee_used = if callee_func.is_extern {
-                HashSet::new()
-            } else {
-                callee_used.get(callee_func_name.as_str()).unwrap().clone()
-            };
-            let caller_used = caller_used.get(callee_func_name.as_str()).unwrap();
             let mut reg_cross = live_now.clone();
             reg_cross.retain(|reg| {
-                reg.get_color() > 4 && reg.is_physic() && !inst.get_regs().contains(reg)
+                reg.get_color() > 4
+                    && reg != &Reg::get_s0()
+                    && reg.is_physic()
+                    && !inst.get_regs().contains(reg)
             });
             for reg in reg_cross.iter() {
                 let dinsts = AsmModule::get_to_recolor(bb, index, *reg);
@@ -607,23 +604,17 @@ impl AsmModule {
                 }
                 debug_assert!(dinsts.len() != 0, "func:{},reg:{}", callee_func_name, reg);
                 let v_reg = Reg::init(reg.get_type());
-                // println!("{}{reg}{v_reg}", callee_func.label);
-                constraints.insert(v_reg, caller_used.clone());
-                constraints
-                    .get_mut(&v_reg)
-                    .unwrap()
-                    .extend(callee_used.iter());
-                // passed_i_p.insert((inst, *reg));
+                new_v_regs.insert(v_reg);
+                constraints.insert(v_reg, HashSet::new());
                 dinsts.iter().for_each(|(ist, if_replace_def)| {
                     passed_i_p.insert((*ist, *reg, *if_replace_def));
                     inst_vreg_preg.push((*ist, v_reg, *reg, *if_replace_def));
                 });
             }
         });
-        //获取增加约束的重新分配结果
 
         //p2v
-        // Func::print_func(*func);
+        Func::print_func(*func, "p1.txt");
         for (inst, v_reg, p_reg, if_replace_def) in inst_vreg_preg.iter() {
             log_file!(
                 "p2v_for_reduce_caller.txt",
@@ -636,10 +627,37 @@ impl AsmModule {
                 inst.as_mut().replace_only_use_reg(p_reg, v_reg);
             }
         }
-        // Func::print_func(*func);
 
         func.calc_live_for_handle_call(); //该处在handle spill之后，应该calc live for handle call
-        let alloc_stat = || -> FuncAllocStat {
+
+        AsmModule::analyse_inst_with_live_now(func, &mut |inst, live_now| {
+            if inst.get_type() != InstrsType::Call {
+                return;
+            }
+            let callee_func_name = inst.get_func_name().unwrap();
+            debug_assert!(
+                self.name_func.contains_key(callee_func_name.as_str()),
+                "{}",
+                callee_func_name
+            );
+            let callee_func = self.name_func.get(callee_func_name.as_str()).unwrap();
+            let callee_used = if callee_func.is_extern {
+                HashSet::new()
+            } else {
+                callee_used.get(callee_func_name.as_str()).unwrap().clone()
+            };
+            let caller_used = caller_used.get(callee_func_name.as_str()).unwrap();
+            live_now
+                .iter()
+                .filter(|reg| !reg.is_physic())
+                .for_each(|reg| {
+                    debug_assert!(new_v_regs.contains(reg));
+                    constraints.get_mut(reg).unwrap().extend(caller_used);
+                    constraints.get_mut(reg).unwrap().extend(callee_used.iter());
+                });
+        }); //为新产生的虚拟寄存器建立约束
+
+        let alloc_stat = || -> Option<FuncAllocStat> {
             //不断地减少约束,直到能够完美分配 (约束中关于callee的约束不能够减少,关于caller的约束可以减少)
 
             //首先统计可以减少的约束数量
@@ -656,7 +674,7 @@ impl AsmModule {
                 let mut allocator = easy_gc_alloc::Allocator::new();
                 let alloc_stat = allocator.alloc_with_constraint(func, &constraints);
                 if alloc_stat.spillings.len() == 0 {
-                    return alloc_stat;
+                    return Some(alloc_stat);
                 }
                 if num_to_reduce_constraint == 0 {
                     break;
@@ -687,12 +705,38 @@ impl AsmModule {
                     }
                 }
             }
-            easy_gc_alloc::Allocator::new().alloc(func)
+
+            //使用optgc2则如果理论上存在完全分配的话则一定能够分配出来
+            None
         }();
-        debug_assert!(alloc_stat.spillings.len() == 0);
+        debug_assert!(alloc_stat.is_none() || alloc_stat.as_ref().unwrap().spillings.len() == 0);
         //使用新分配结果重新v2p
-        func.as_mut().v2p(&alloc_stat.dstr);
-        func.as_mut().reg_alloc_info = alloc_stat;
-        return;
+        if let Some(alloc_stat) = alloc_stat {
+            AsmModule::iter_insts(*func, &mut |inst| {
+                for reg in inst.get_regs() {
+                    if reg.is_physic() {
+                        continue;
+                    }
+                    let color = alloc_stat.dstr.get(&reg.get_id()).unwrap();
+                    inst.as_mut().replace(reg.get_id(), *color);
+                }
+            });
+            func.as_mut().reg_alloc_info = alloc_stat;
+        } else {
+            //否则原样恢复
+            for (inst, v_reg, p_reg, if_replace_def) in inst_vreg_preg.iter() {
+                log_file!(
+                    "v2p_suf_reduce_caller.txt",
+                    "{},{v_reg},{p_reg},{if_replace_def}",
+                    inst.as_ref()
+                );
+                if *if_replace_def {
+                    inst.as_mut().replace_only_def_reg(v_reg, p_reg);
+                } else {
+                    inst.as_mut().replace_only_use_reg(v_reg, p_reg);
+                }
+            }
+        }
+        Func::print_func(*func, "p2.txt");
     }
 }

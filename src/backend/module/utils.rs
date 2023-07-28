@@ -45,6 +45,14 @@ impl AsmModule {
         }
     }
 
+    pub fn iter_insts(func: ObjPtr<Func>, processor: &mut dyn FnMut(&ObjPtr<LIRInst>)) {
+        for bb in func.blocks.iter() {
+            for inst in bb.insts.iter() {
+                processor(inst);
+            }
+        }
+    }
+
     //从某个指令出发,往左右两边延申,反着色某个物理寄存器 (返回去色成功后的指令列表,(所有涉及去色的指令))
     pub fn get_to_recolor(
         bb: ObjPtr<BB>,
@@ -158,5 +166,17 @@ impl AsmModule {
         }
 
         decolored_insts
+    }
+}
+
+impl AsmModule {
+    pub fn print_func(&self) {
+        // // debug_assert!(false, "{}", self.name_func.len());
+        for (_, func) in self.name_func.iter() {
+            if func.is_extern {
+                continue;
+            }
+            Func::print_func(*func, "print_all_funcs.txt");
+        }
     }
 }
