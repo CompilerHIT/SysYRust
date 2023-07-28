@@ -110,6 +110,7 @@ impl Func {
                                 let new_times = interef.get(&key).unwrap_or(&0) + 1;
                                 interef.insert(key, new_times);
                             }
+                            live_now.insert(sst);
                         }
                     }
                     InstrsType::StoreToStack => {
@@ -136,6 +137,8 @@ impl Func {
         let (_, _, _, live_outs) = self.calc_stackslot_interval();
         let interef = self
             .calc_stackslot_interef_with_rearrangable_set(&all_rearrangable_stackslot, &live_outs);
+
+        //
 
         //根据interef统计stackslot的使用次数,
         //对于使用次数最多的stackslot,给它分配最新的stackslot

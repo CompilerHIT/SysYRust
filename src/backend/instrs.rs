@@ -610,7 +610,7 @@ impl LIRInst {
     pub fn get_stackslot_with_addr_size(&self) -> StackSlot {
         debug_assert!(
             self.get_type() == InstrsType::LoadFromStack
-                || self.get_type() == InstrsType::LoadFromStack
+                || self.get_type() == InstrsType::StoreToStack
         );
         StackSlot::new(self.get_stack_offset().get_data(), ADDR_SIZE)
     }
