@@ -1241,20 +1241,21 @@ impl AsmModule {
     }
 
     ///重新分析出一个函数递归地影响到的callee saved的寄存器的组成
+    /// 它只会统计该函数用到的callee saved以及它调用的非外部函数用到的callee saved寄存器
     pub fn draw_callee_used(&self, func: ObjPtr<Func>) -> HashSet<Reg> {
+        if func.is_extern {
+            return HashSet::new();
+        }
         let mut new_callee_uesd: HashSet<Reg> = func.draw_used_callees();
         // 首先递归地找到这个函数内部调用过地所有函数集合
         let mut callee_funcs: HashSet<ObjPtr<Func>> = HashSet::new();
-        if func.is_extern {
-            return Reg::get_all_callees_saved();
-        }
         // let call_map = AsmModule::build_call_map(name_func);
         for func in self.call_map.get(func.label.as_str()).unwrap() {
             let func = self.name_func.get(func).unwrap();
-            callee_funcs.insert(*func);
             if func.is_extern {
-                return Reg::get_all_callees_saved();
+                continue;
             }
+            callee_funcs.insert(*func);
         }
         //处理多重递归调用的情况
         loop {
@@ -1265,7 +1266,7 @@ impl AsmModule {
                 for func in self.call_map.get(func.label.as_str()).unwrap() {
                     let func = *self.name_func.get(func).unwrap();
                     if func.is_extern {
-                        return Reg::get_all_callees_saved();
+                        continue;
                     }
                     if !callee_funcs.contains(&func) && !callee_to_add.contains(&func) {
                         callee_to_add.insert(func);
@@ -1283,7 +1284,6 @@ impl AsmModule {
             let callee_used = func_called.draw_used_callees();
             new_callee_uesd.extend(callee_used);
         }
-        new_callee_uesd.extend(func.draw_used_callees());
         new_callee_uesd
     }
 
