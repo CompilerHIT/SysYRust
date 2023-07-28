@@ -60,6 +60,7 @@ pub fn init() {
             info.times.insert("branch_overflow".to_string(), 0);
             info.times.insert("caller_save".to_string(), 0);
             info.times.insert("callee_save".to_string(), 0);
+            info.times.insert("mem_rearrange".to_string(), 0);
         }
         if SRC_PATH.is_none() {
             SRC_PATH = Some(String::from("default.sy"));
@@ -93,6 +94,7 @@ pub fn dump() {
             "branch_overflow",
             "caller_save",
             "callee_save",
+            "mem_rearrange",
         ];
         for kind in order.iter() {
             let times = CONFIG_INFO
@@ -103,6 +105,7 @@ pub fn dump() {
                 .unwrap();
             log_file!("performance_eval.txt", "{}\t:{} times", kind, times);
         }
+        //打印栈重排效果,
     }
 }
 
@@ -223,6 +226,21 @@ pub fn record_callee_save_sl(func: &str, msg: &str) {
             .unwrap()
             .push_back(msg);
     }
+}
+
+pub fn record_mem_rearrange(func: &str, old_mem: usize, new_mem: usize) {
+    init();
+    let path = "rearrange_mem.txt".to_string();
+    let info = unsafe { CONFIG_INFO.as_mut().unwrap() };
+    if !info.file_infos.contains_key(path.as_str()) {
+        info.file_infos.insert(path.clone(), LinkedList::new());
+    }
+    info.file_infos
+        .get_mut(path.as_str())
+        .unwrap()
+        .push_back(format!("realloc mem func{}:{}/{}", func, old_mem, new_mem).to_string());
+    let time = info.times.get_mut("mem_rearrange").unwrap();
+    *time += old_mem as i32 - new_mem as i32;
 }
 
 //实现一个全局寄存器表

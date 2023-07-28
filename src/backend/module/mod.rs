@@ -1,11 +1,6 @@
-use super::*;
-
 use std::collections::{HashMap, HashSet, LinkedList};
 use std::fs::File;
-use std::hash::Hash;
 use std::io::Write;
-
-use rand::seq::index;
 
 use crate::backend::block::NUM_SIZE;
 use crate::backend::func::Func;

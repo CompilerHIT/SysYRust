@@ -598,6 +598,10 @@ impl LIRInst {
 
     // LoadFromStack, StoreToStack
     pub fn set_stack_offset(&mut self, offset: IImm) {
+        debug_assert!(
+            self.get_type() == InstrsType::StoreToStack
+                || self.get_type() == InstrsType::LoadFromStack
+        );
         self.operands[1] = Operand::IImm(offset);
     }
     pub fn get_stack_offset(&self) -> IImm {

@@ -136,7 +136,7 @@ impl AsmModule {
         self.remove_useless_func(); //在handle call之前调用,删掉前面往name func中加入的external func
         self.handle_call_v3(pool);
 
-        // self.rearrange_stack_slot();
+        self.rearrange_stack_slot();
         self.update_array_offset(pool);
         self.build_stack_info(f);
 
