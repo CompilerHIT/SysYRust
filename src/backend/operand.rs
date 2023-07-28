@@ -334,6 +334,13 @@ impl Reg {
         }
     }
     #[inline]
+    pub fn get_s0() -> Reg {
+        Reg {
+            id: 8,
+            r_type: ScalarType::Int,
+        }
+    }
+    #[inline]
     pub fn get_ra() -> Reg {
         Reg {
             id: 1,

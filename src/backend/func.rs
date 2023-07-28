@@ -580,8 +580,9 @@ impl Func {
 
         //把sp和ra寄存器加入到所有的块的live out,live in中，表示这些寄存器永远不能在函数中自由分配使用
         for bb in self.blocks.iter() {
-            //0:zero, 1:ra, 2:sp
-            for id in 0..=7 {
+            //0:zero, 1:ra, 2:sp,3:gp,4:tp 是必须保存的,5-7做临时寄存器
+            //8:s0用于处理overflow
+            for id in 0..=8 {
                 bb.as_mut().live_in.insert(Reg::new(id, ScalarType::Int));
                 bb.as_mut().live_out.insert(Reg::new(id, ScalarType::Int));
             }
@@ -1362,6 +1363,7 @@ impl Func {
 
         debug_assert!(!regs_to_decolor.contains(&Reg::get_sp()));
         debug_assert!(!regs_to_decolor.contains(&Reg::get_ra()));
+        debug_assert!(!regs_to_decolor.contains(&Reg::get_s0()));
 
         let mut new_v_regs = HashSet::new(); //用来记录新产生的虚拟寄存器
                                              // self.print_func();
