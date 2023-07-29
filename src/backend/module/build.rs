@@ -62,8 +62,10 @@ impl AsmModule {
         self.handle_spill_v3(pool);
         self.remove_unuse_inst_suf_alloc();
 
-        self.anaylyse_for_handle_call_v3_pre_split();
+        // self.anaylyse_for_handle_call_v3_pre_split();
         // self.anaylyse_for_handle_call_v4();
+        self.callee_regs_to_saveds = self.build_callee_used();
+        self.caller_regs_to_saveds = self.build_caller_used();
 
         // let is_opt = true;
         // if is_opt {

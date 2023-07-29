@@ -49,18 +49,6 @@ impl Func {
             let mut finish_flag = true;
             // new in =  (old_out-def)+old_in
             // new out= [out_edge:uses]
-            //更新live in
-            for bb in func.blocks.iter() {
-                let live_in = live_ins.get_mut(bb).unwrap();
-                let def = live_defs.get(bb).unwrap();
-                let mut new_in = live_outs.get(bb).unwrap().clone();
-                new_in.retain(|sst| !def.contains(sst));
-                new_in.extend(live_in.iter());
-                if new_in.len() > live_in.len() {
-                    finish_flag = false;
-                    *live_in = new_in;
-                }
-            }
             //更新 live out
             for bb in func.blocks.iter() {
                 let live_out = live_outs.get_mut(bb).unwrap();
@@ -71,6 +59,18 @@ impl Func {
                 if new_live_out.len() > live_out.len() {
                     *live_out = new_live_out;
                     finish_flag = false;
+                }
+            }
+            //更新live in
+            for bb in func.blocks.iter() {
+                let live_in = live_ins.get_mut(bb).unwrap();
+                let def = live_defs.get(bb).unwrap();
+                let mut new_in = live_outs.get(bb).unwrap().clone();
+                new_in.retain(|sst| !def.contains(sst));
+                new_in.extend(live_in.iter());
+                if new_in.len() > live_in.len() {
+                    finish_flag = false;
+                    *live_in = new_in;
                 }
             }
             if finish_flag {
@@ -93,6 +93,13 @@ impl Func {
             live_out.iter().for_each(|sst| {
                 if rearrangables.contains(sst) {
                     if !interef.contains_key(sst) {
+                        if !interef.contains_key(sst) {
+                            interef.insert(*sst, HashSet::new());
+                        }
+                        for live in live_now.iter() {
+                            interef.get_mut(live).unwrap().insert(*sst);
+                            interef.get_mut(sst).unwrap().insert(*live);
+                        }
                         interef.insert(*sst, HashSet::new());
                     }
                     live_now.insert(*sst);
