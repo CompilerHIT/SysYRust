@@ -44,8 +44,7 @@ impl Allocator {
     // 建立虚拟寄存器之间的冲突图
     pub fn build_interference_graph(&mut self, func: &Func) {
         self.interference_graph = regalloc::build_interference(func);
-        self.availables =
-            regalloc::build_availables_with_interef_graph(func, &self.interference_graph);
+        self.availables = regalloc::build_availables_with_interef_graph(&self.interference_graph);
         self.nums_neighbor_color =
             regalloc::build_nums_neighbor_color(func, &self.interference_graph);
         let mut bitmap: Bitmap = Bitmap::with_cap(5000);
@@ -459,6 +458,7 @@ impl Allocator {
                     .insert(p_reg.get_color(), new_times);
             }
         }
+
         self.count_spill_costs(func);
 
         // TODO,加入化简后单步合并检查 以及 分配完成后合并检查

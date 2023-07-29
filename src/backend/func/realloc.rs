@@ -32,8 +32,7 @@ impl Func {
         let mut first_callee = HashSet::new(); //优先使用calleed saved 的一类寄存器
         self.calc_live_for_alloc_reg();
         let interference_graph = &regalloc::build_interference(self);
-        let mut availables =
-            regalloc::build_availables_with_interef_graph(self, interference_graph);
+        let mut availables = regalloc::build_availables_with_interef_graph(interference_graph);
         //根据上下文给availables 增加新的规则,观察是否能够分配 (如果不能够分配，则ban 流程失败)
         for bb in self.blocks.iter() {
             let mut live_now: HashSet<Reg> = HashSet::new();
