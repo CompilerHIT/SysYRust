@@ -32,6 +32,7 @@ pub struct AsmModule {
     pub global_var_list: Vec<(ObjPtr<Inst>, GlobalVar)>,
     pub func_map: Vec<(ObjPtr<Function>, ObjPtr<Func>)>,
     call_map: HashMap<String, HashSet<String>>,
+    func_groups: HashMap<String, HashSet<String>>,
     ///记录该被调用函数需要保存的所有寄存器
     callee_regs_to_saveds: HashMap<String, HashSet<Reg>>,
     ///记录调用该函数的函数应该保存的寄存器
@@ -49,6 +50,7 @@ impl AsmModule {
             global_var_list,
             // global_fvar_list,
             func_map: Vec::new(),
+            func_groups: HashMap::new(),
             upper_module: ir_module,
             call_info: HashMap::new(),
             name_func: HashMap::new(),

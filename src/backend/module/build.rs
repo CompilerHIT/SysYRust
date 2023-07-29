@@ -103,13 +103,6 @@ impl AsmModule {
             self.map_v_to_p();
         }
         self.remove_unuse_inst_suf_alloc();
-        //在寄存器分配后跑两遍寄存器接合
-        // for i in 0..2 {
-        //     self.p2v();
-        //     self.allocate_reg();
-        //     self.map_v_to_p();
-        //     self.remove_unuse_inst_suf_alloc();
-        // }
 
         //加入外部函数
         self.add_external_func(pool);
@@ -129,10 +122,11 @@ impl AsmModule {
         if is_opt {
             self.split_func(pool);
             self.build_own_call_map();
-            self.anaylyse_for_handle_call_v4();
+            // self.anaylyse_for_handle_call_v4();
         }
-        // self.reduce_caller_to_saved_after_func_split();
-        // self.anaylyse_for_handle_call_v4();
+        self.reduce_caller_to_saved_after_func_split();
+        self.analyse_caller_regs_to_saved();
+
         self.remove_useless_func(); //在handle call之前调用,删掉前面往name func中加入的external func
         self.handle_call_v3(pool);
 
