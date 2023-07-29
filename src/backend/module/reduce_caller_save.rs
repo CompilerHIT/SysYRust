@@ -30,10 +30,6 @@ impl AsmModule {
                 return;
             }
             let callee_func_name = inst.get_func_name().unwrap();
-            let callee_save = self
-                .callee_regs_to_saveds
-                .get(callee_func_name.as_str())
-                .unwrap();
             let mut reg_cross = live_now.clone();
             reg_cross.retain(|reg| {
                 reg.get_color() > 4
