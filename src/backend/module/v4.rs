@@ -604,7 +604,7 @@ impl AsmModule {
                 reg.get_color() > 4
                     && reg != &Reg::get_s0()
                     && reg.is_physic()
-                    && reg.is_caller_save()
+                    // && reg.is_caller_save()
                     && !inst.get_regs().contains(reg)
             });
             for reg in reg_cross.iter() {
@@ -701,8 +701,8 @@ impl AsmModule {
 
             let mut keys: Vec<Reg> = constraints.iter().map(|(reg, _)| *reg).collect();
             loop {
-                println!("{num_to_reduce_constraint}");
-                let mut allocator = opt_gc_alloc2::Allocator::new();
+                // println!("{num_to_reduce_constraint}");
+                let mut allocator = easy_gc_alloc::Allocator::new();
                 let alloc_stat = allocator.alloc_with_constraints(func, &constraints);
                 if alloc_stat.spillings.len() == 0 {
                     return Some(alloc_stat);
