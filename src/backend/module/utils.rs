@@ -180,3 +180,47 @@ impl AsmModule {
         }
     }
 }
+
+impl AsmModule {
+    ///创建一个函数调用族群(包括族长以及族长调用和简接调用的所有函数)
+    ///调用该函数前应该先调用call map建立直接调用关系表
+    pub fn build_func_groups(
+        call_map: &HashMap<String, HashSet<String>>,
+    ) -> HashMap<String, HashSet<String>> {
+        let mut func_groups = HashMap::new();
+        //建族
+        for (name, _) in call_map.iter() {
+            func_groups.insert(name.clone(), HashSet::from_iter(vec![name.clone()]));
+        }
+        //通过call map初步发展成员
+        for (caller, callees) in call_map.iter() {
+            for callee in callees.iter() {
+                func_groups.get_mut(caller).unwrap().insert(callee.clone());
+            }
+        }
+        //递归发展成员
+        loop {
+            let mut finish_flag = true;
+            let mut to_add = Vec::new();
+            for (master, members) in func_groups.iter() {
+                let mut new_members = members.clone();
+                for member in members.iter() {
+                    for callee in call_map.get(member).unwrap() {
+                        new_members.insert(callee.clone());
+                    }
+                }
+                to_add.push((master.clone(), new_members));
+            }
+            for (master, new_members) in to_add {
+                if func_groups.get(&master).unwrap().len() < new_members.len() {
+                    finish_flag = false;
+                    func_groups.get_mut(&master).unwrap().extend(new_members);
+                }
+            }
+            if finish_flag {
+                break;
+            }
+        }
+        func_groups
+    }
+}

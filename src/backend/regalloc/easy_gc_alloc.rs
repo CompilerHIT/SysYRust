@@ -418,7 +418,7 @@ impl Regalloc for Allocator {
 impl Allocator {
     //专门为简单图作色寄存器加入的约束列表,该约束列表会禁止某些寄存器使用某些颜色
     //constraint里面是限制指定虚拟寄存器不能够用来着色的寄存器
-    pub fn alloc_with_constraint(
+    pub fn alloc_with_constraints(
         &mut self,
         func: &Func,
         constraints: &HashMap<Reg, HashSet<Reg>>,

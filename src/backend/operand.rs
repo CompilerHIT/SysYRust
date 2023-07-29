@@ -256,12 +256,8 @@ impl Reg {
     ///获取所有caller saved寄存器
     pub fn get_all_callers_saved() -> HashSet<Reg> {
         let mut callers_saved = HashSet::new();
-        for id in 0..=31 {
-            let reg = Reg::new(id, ScalarType::Int);
-            if reg.is_caller_save() {
-                callers_saved.insert(reg);
-            }
-            let reg = Reg::new(id + FLOAT_BASE, ScalarType::Float);
+        for id in 0..=63 {
+            let reg = Reg::from_color(id);
             if reg.is_caller_save() {
                 callers_saved.insert(reg);
             }
@@ -271,17 +267,12 @@ impl Reg {
     ///获取所有callee saved寄存器
     pub fn get_all_callees_saved() -> HashSet<Reg> {
         let mut callees_saved = HashSet::new();
-        for id in 0..=31 {
-            let reg = Reg::new(id, ScalarType::Int);
-            if reg.is_callee_save() {
-                callees_saved.insert(reg);
-            }
-            let reg = Reg::new(id + FLOAT_BASE, ScalarType::Float);
+        for id in 0..=63 {
+            let reg = Reg::from_color(id);
             if reg.is_callee_save() {
                 callees_saved.insert(reg);
             }
         }
-
         callees_saved
     }
 
