@@ -13,7 +13,6 @@ impl AsmModule {
 
         //检查是否有存在name func里面没有,但是被调用了的函数
 
-        let is_opt = true;
         if is_opt {
             // // gep偏移计算合并
             BackendPass::new(ObjPtr::new(self)).opt_gep();
@@ -46,24 +45,21 @@ impl AsmModule {
         self.build_own_call_map();
         //寄存器重分配,重分析
 
-        // self.realloc_reg_with_priority();
+        self.realloc_reg_with_priority();
 
         self.handle_spill_v3(pool);
         self.remove_unuse_inst_suf_alloc();
 
         // self.anaylyse_for_handle_call_v3_pre_split();
-        // self.anaylyse_for_handle_call_v4();
-        self.callee_regs_to_saveds = self.build_callee_used();
-        self.caller_regs_to_saveds = self.build_caller_used();
+        self.anaylyse_for_handle_call_v4();
 
-        // let is_opt = true;
-        // if is_opt {
-        //     self.split_func(pool);
-        //     self.build_own_call_map();
-        //     // self.anaylyse_for_handle_call_v4();
-        // }
-        // self.reduce_caller_to_saved_after_func_split();
-        // self.analyse_caller_regs_to_saved();
+        if is_opt {
+            self.split_func(pool);
+            self.build_own_call_map();
+            // self.anaylyse_for_handle_call_v4();
+        }
+        self.reduce_caller_to_saved_after_func_split();
+        self.analyse_caller_regs_to_saved();
 
         self.remove_useless_func(); //在handle call之前调用,删掉前面往name func中加入的external func
         self.handle_call_v3(pool);
