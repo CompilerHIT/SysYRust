@@ -119,9 +119,7 @@ impl Func {
                             if !out_bb.live_in.contains(reg) {
                                 continue;
                             }
-                            unreachable!();
-                            // debug_assert!(false, "{}->{}", bb.label, out_bb.label);
-                            // to_pass.push_back((*out_bb, *reg));
+                            to_pass.push_back((*out_bb, *reg));
                         }
                     }
                     let mut passed: HashSet<(ObjPtr<BB>, Reg)> = HashSet::new();
@@ -132,28 +130,25 @@ impl Func {
                         }
                         passed.insert((bb, reg));
                         let mut index = 0;
-                        for inst in bb.insts.iter() {
+                        while index < bb.insts.len() {
+                            let inst = bb.insts.get(index).unwrap();
                             for use_reg in inst.get_reg_use() {
                                 if use_reg == reg {
                                     unchanged_use.insert((*inst, reg));
                                 }
                             }
-                            let mut if_finish = false;
-                            for def_reg in inst.get_reg_def() {
-                                if def_reg == reg {
-                                    if_finish = true;
-                                    break;
-                                }
-                            }
-                            if if_finish {
+                            if inst.get_reg_def().contains(&reg) {
                                 break;
                             }
                             index += 1;
                         }
+
                         if index == bb.insts.len() {
                             //说明可能传到live out中
                             for out_bb in bb.out_edge.iter() {
-                                to_pass.push_back((*out_bb, reg));
+                                if out_bb.live_in.contains(&reg) {
+                                    to_pass.push_back((*out_bb, reg));
+                                }
                             }
                         }
                     }
@@ -192,14 +187,6 @@ impl Func {
         //然后从entry块开始p2v
         let first_block = *self.entry.unwrap().out_edge.get(0).unwrap();
         let live_in: HashSet<Reg> = first_block.live_in.iter().cloned().collect();
-        // if self.label == "param32_rec" {
-        //     debug_assert!(first_block.label == "param32_rec");
-        //     let reg = first_block.insts.first().unwrap();
-        //     let reg = reg.get_reg_use();
-        //     let reg = reg.get(0).unwrap();
-        //     config::set_reg("ff", reg);
-        // }
-
         if live_in.len() != 0 {
             // println!("{}", first_block.label.clone());
             let mut args: HashSet<Reg> = Reg::get_all_args()

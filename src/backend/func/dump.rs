@@ -2,18 +2,15 @@ use super::*;
 /// 打印函数当前的汇编形式
 impl Func {
     pub fn generate_row(&mut self, _: ObjPtr<Context>, f: &mut File) {
-        debug_assert!(|| -> bool {
-            AsmBuilder::new(f).show_func(&self.label);
-            // self.context.as_mut().call_prologue_event();
-            let mut _size = 0;
-            for block in self.blocks.iter() {
-                _size += block.insts.len();
-            }
-            for block in self.blocks.iter() {
-                block.as_mut().generate_row(self.context, f);
-            }
-            true
-        }());
+        AsmBuilder::new(f).show_func(&self.label);
+        // self.context.as_mut().call_prologue_event();
+        let mut _size = 0;
+        for block in self.blocks.iter() {
+            _size += block.insts.len();
+        }
+        for block in self.blocks.iter() {
+            block.as_mut().generate_row(self.context, f);
+        }
     }
 
     pub fn print_func(func: ObjPtr<Func>, path: &str) {

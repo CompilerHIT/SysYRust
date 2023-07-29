@@ -188,7 +188,7 @@ impl AsmModule {
         call_map: &HashMap<String, HashSet<String>>,
     ) -> HashMap<String, HashSet<String>> {
         let mut func_groups = HashMap::new();
-        //建族
+        //建族,加入自身
         for (name, _) in call_map.iter() {
             func_groups.insert(name.clone(), HashSet::from_iter(vec![name.clone()]));
         }
@@ -205,6 +205,7 @@ impl AsmModule {
             for (master, members) in func_groups.iter() {
                 let mut new_members = members.clone();
                 for member in members.iter() {
+                    assert!(call_map.contains_key(member), "{}", member);
                     for callee in call_map.get(member).unwrap() {
                         new_members.insert(callee.clone());
                     }
