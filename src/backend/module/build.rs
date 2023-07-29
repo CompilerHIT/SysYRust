@@ -12,29 +12,8 @@ impl AsmModule {
         self.remove_unuse_inst_pre_alloc();
 
         //检查是否有存在name func里面没有,但是被调用了的函数
-        self.add_external_func(pool);
-        let mut funcs_in_name: HashSet<String> =
-            self.name_func.iter().map(|(key, _)| key.clone()).collect();
-        for (name, func) in self.name_func.iter() {
-            if func.is_extern {
-                continue;
-            }
-            AsmModule::iter_insts(*func, &mut |inst| {
-                if inst.get_type() != InstrsType::Call {
-                    return;
-                }
-                let func_name = inst.get_func_name();
-                let func_name = func_name.as_ref().unwrap();
-                assert!(funcs_in_name.contains(func_name), "{}", {
-                    Func::print_func(*func, "wrong_func.txt");
-                    func_name
-                });
-            });
-        }
-        assert!(false, "ok");
-        // self.generate_row_asm(_f2, pool); //generate row  asm可能会造成bug
 
-        let is_opt = false;
+        let is_opt = true;
         if is_opt {
             // // gep偏移计算合并
             // BackendPass::new(ObjPtr::new(self)).opt_gep();
@@ -78,22 +57,24 @@ impl AsmModule {
         self.build_own_call_map();
         //寄存器重分配,重分析
 
-        self.realloc_reg_with_priority();
+        // self.realloc_reg_with_priority();
 
         self.handle_spill_v3(pool);
         self.remove_unuse_inst_suf_alloc();
 
         // self.anaylyse_for_handle_call_v3_pre_split();
-        self.anaylyse_for_handle_call_v4();
+        self.callee_regs_to_saveds = self.build_callee_used();
+        self.caller_regs_to_saveds = self.build_caller_used();
+        // self.anaylyse_for_handle_call_v4();
 
-        let is_opt = false;
-        if is_opt {
-            self.split_func(pool);
-            self.build_own_call_map();
-            self.anaylyse_for_handle_call_v4();
-        }
-        self.reduce_caller_to_saved_after_func_split();
-        self.analyse_caller_regs_to_saved();
+        // let is_opt = true;
+        // if is_opt {
+        //     self.split_func(pool);
+        //     // self.build_own_call_map();
+        //     // self.anaylyse_for_handle_call_v4();
+        // }
+        // self.reduce_caller_to_saved_after_func_split();
+        // self.analyse_caller_regs_to_saved();
 
         self.remove_useless_func(); //在handle call之前调用,删掉前面往name func中加入的external func
         self.handle_call_v3(pool);
