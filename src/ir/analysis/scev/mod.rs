@@ -96,74 +96,45 @@ impl SCEVAnalyzer {
         let lhs = self.analyze(&inst.get_lhs());
         let rhs = self.analyze(&inst.get_rhs());
 
-        let mut lhs_rhs_op = |lhs: ObjPtr<SCEVExp>, rhs: ObjPtr<SCEVExp>| -> ObjPtr<SCEVExp> {
-            let mut new_op: Vec<ObjPtr<SCEVExp>> = Vec::new();
-            if rhs.is_scev_constant() {
-                new_op = lhs
-                    .get_operands()
-                    .iter()
-                    .map(|op| {
-                        if op.is_scev_constant() {
-                            self.scevexp_pool
-                                .make_scev_constant(op.get_scev_const() + rhs.get_scev_const())
-                        } else {
-                            self.scevexp_pool.make_scev_add_expr(*op, rhs, in_loop)
-                        }
-                    })
-                    .collect();
-            } else if rhs.get_in_loop().unwrap() != cur_loop
-                && cur_loop.is_a_sub_loop(rhs.get_in_loop().unwrap())
-            {
-                new_op = lhs
-                    .get_operands()
-                    .iter()
-                    .map(|op| self.scevexp_pool.make_scev_add_expr(*op, rhs, in_loop))
-                    .collect();
-            } else {
-                return self.scevexp_pool.make_scev_unknown(Some(*inst), in_loop);
-            }
-            self.scevexp_pool
-                .make_scev_add_rec_expr(new_op, Some(*inst), in_loop)
-        };
-
         match Self::check_rec_available(lhs, rhs, cur_loop) {
             (true, true) => {
                 let lhs_op = lhs.get_operands();
                 let rhs_op = rhs.get_operands();
 
-                let max_index = if lhs_op.len() > rhs_op.len() {
-                    lhs_op.len()
-                } else {
-                    rhs_op.len()
-                };
-
-                let mut new_op = Vec::new();
-
-                for index in 0..max_index {
-                    if index >= lhs_op.len() {
-                        new_op.push(rhs_op[index]);
-                    } else if index >= rhs_op.len() {
-                        new_op.push(lhs_op[index]);
-                    } else {
-                        if lhs_op[index].is_scev_constant() && rhs_op[index].is_scev_constant() {
-                            new_op.push(self.scevexp_pool.make_scev_constant(
-                                lhs_op[index].get_scev_const() + rhs_op[index].get_scev_const(),
-                            ));
-                        } else {
-                            new_op.push(self.scevexp_pool.make_scev_add_expr(
-                                lhs_op[index],
-                                rhs_op[index],
-                                in_loop,
-                            ));
-                        }
-                    }
-                }
-
-                self.scevexp_pool
-                    .make_scev_add_rec_expr(new_op, Some(*inst), in_loop)
+                self.scevexp_pool.make_scev_add_rec_expr(
+                    self.parse_add(&lhs_op, &rhs_op, in_loop),
+                    Some(*inst),
+                    in_loop,
+                )
             }
-            (true, false) => lhs_rhs_op(lhs, rhs),
-            (false, true) => lhs_rhs_op(rhs, lhs),
+            (true, false) => {
+                if rhs.is_scev_constant()
+                    || rhs.get_in_loop().unwrap() != cur_loop
+                        && cur_loop.is_a_sub_loop(rhs.get_in_loop().unwrap())
+                {
+                    self.scevexp_pool.make_scev_add_rec_expr(
+                        self.parse_add(&lhs.get_operands(), &[rhs], in_loop),
+                        Some(*inst),
+                        in_loop,
+                    )
+                } else {
+                    self.scevexp_pool.make_scev_unknown(Some(*inst), in_loop)
+                }
+            }
+            (false, true) => {
+                if lhs.is_scev_constant()
+                    || lhs.get_in_loop().unwrap() != cur_loop
+                        && cur_loop.is_a_sub_loop(lhs.get_in_loop().unwrap())
+                {
+                    self.scevexp_pool.make_scev_add_rec_expr(
+                        self.parse_add(&rhs.get_operands(), &[lhs], in_loop),
+                        Some(*inst),
+                        in_loop,
+                    )
+                } else {
+                    self.scevexp_pool.make_scev_unknown(Some(*inst), in_loop)
+                }
+            }
             (false, false) => self.scevexp_pool.make_scev_unknown(Some(*inst), in_loop),
         }
     }
@@ -186,101 +157,41 @@ impl SCEVAnalyzer {
                 let lhs_op = lhs.get_operands();
                 let rhs_op = rhs.get_operands();
 
-                let max_index = if lhs_op.len() > rhs_op.len() {
-                    lhs_op.len()
-                } else {
-                    rhs_op.len()
-                };
-
-                let mut new_op = Vec::new();
-
-                for index in 0..max_index {
-                    if index >= lhs_op.len() {
-                        let rhs_op = rhs_op[index];
-                        if rhs_op.is_scev_constant() {
-                            new_op.push(
-                                self.scevexp_pool
-                                    .make_scev_constant(-rhs_op.get_scev_const()),
-                            );
-                        } else {
-                            new_op.push(self.scevexp_pool.make_scev_sub_expr(
-                                self.scevexp_pool.make_scev_constant(0),
-                                rhs_op,
-                                in_loop,
-                            ));
-                        }
-                    } else if index >= rhs_op.len() {
-                        new_op.push(lhs_op[index]);
-                    } else {
-                        if lhs_op[index].is_scev_constant() && rhs_op[index].is_scev_constant() {
-                            new_op.push(self.scevexp_pool.make_scev_constant(
-                                lhs_op[index].get_scev_const() - rhs_op[index].get_scev_const(),
-                            ));
-                        } else {
-                            new_op.push(self.scevexp_pool.make_scev_sub_expr(
-                                lhs_op[index],
-                                rhs_op[index],
-                                in_loop,
-                            ));
-                        }
-                    }
-                }
-                self.scevexp_pool
-                    .make_scev_sub_rec_expr(new_op, Some(*inst), in_loop)
+                self.scevexp_pool.make_scev_sub_rec_expr(
+                    self.parse_sub(&lhs_op, &rhs_op, in_loop),
+                    Some(*inst),
+                    in_loop,
+                )
             }
             (true, false) => {
                 let lhs_op = lhs.get_operands();
-                let mut new_op = Vec::new();
-                if rhs.is_scev_constant() {
-                    for (index, op) in lhs_op.iter().enumerate() {
-                        if op.is_scev_constant() {
-                            new_op
-                                .push(self.scevexp_pool.make_scev_constant(
-                                    op.get_scev_const() - rhs.get_scev_const(),
-                                ));
-                        } else {
-                            new_op.push(self.scevexp_pool.make_scev_sub_expr(*op, rhs, in_loop));
-                        }
-                    }
-                } else if rhs.get_in_loop().unwrap() != cur_loop
-                    && !cur_loop.is_a_sub_loop(rhs.get_in_loop().unwrap())
+                if rhs.is_scev_constant()
+                    || rhs.get_in_loop().unwrap() != cur_loop
+                        && !cur_loop.is_a_sub_loop(rhs.get_in_loop().unwrap())
                 {
-                    lhs_op.iter().for_each(|op| {
-                        new_op.push(self.scevexp_pool.make_scev_sub_expr(*op, rhs, in_loop));
-                    })
+                    self.scevexp_pool.make_scev_sub_rec_expr(
+                        self.parse_sub(&lhs_op, &[rhs], in_loop),
+                        Some(*inst),
+                        in_loop,
+                    )
                 } else {
-                    return self.scevexp_pool.make_scev_unknown(Some(*inst), in_loop);
+                    self.scevexp_pool.make_scev_unknown(Some(*inst), in_loop)
                 }
-
-                self.scevexp_pool
-                    .make_scev_sub_rec_expr(new_op, Some(*inst), in_loop)
             }
             (false, true) => {
                 let rhs_op = rhs.get_operands();
-                let mut new_op = Vec::new();
-                if lhs.is_scev_constant() {
-                    for (index, op) in rhs_op.iter().enumerate() {
-                        if op.is_scev_constant() {
-                            new_op
-                                .push(self.scevexp_pool.make_scev_constant(
-                                    lhs.get_scev_const() - op.get_scev_const(),
-                                ));
-                        } else {
-                            new_op.push(self.scevexp_pool.make_scev_sub_expr(lhs, *op, in_loop));
-                        }
-                    }
-                } else if lhs.get_in_loop().unwrap() != cur_loop
-                    && !cur_loop.is_a_sub_loop(lhs.get_in_loop().unwrap())
+                if lhs.is_scev_constant()
+                    || lhs.get_in_loop().unwrap() != cur_loop
+                        && !cur_loop.is_a_sub_loop(lhs.get_in_loop().unwrap())
                 {
-                    rhs_op.iter().for_each(|op| {
-                        new_op.push(self.scevexp_pool.make_scev_sub_expr(lhs, *op, in_loop));
-                    })
+                    self.scevexp_pool.make_scev_sub_rec_expr(
+                        self.parse_sub(&rhs_op, &[lhs], in_loop),
+                        Some(*inst),
+                        in_loop,
+                    )
                 } else {
-                    return self.scevexp_pool.make_scev_unknown(Some(*inst), in_loop);
+                    self.scevexp_pool.make_scev_unknown(Some(*inst), in_loop)
                 }
-
-                self.scevexp_pool
-                    .make_scev_sub_rec_expr(new_op, Some(*inst), in_loop)
             }
             (false, false) => self.scevexp_pool.make_scev_unknown(Some(*inst), in_loop),
         }
@@ -303,99 +214,44 @@ impl SCEVAnalyzer {
             (true, true) => {
                 let lhs_op = lhs.get_operands();
                 let rhs_op = rhs.get_operands();
-                let mut new_op = Vec::new();
 
-                for new_op_index in 0..(lhs_op.len() + rhs_op.len() - 2) {
-                    let mut op = self.scevexp_pool.make_scev_constant(0);
-                    for l_i in 0..=new_op_index {
-                        let r_i = new_op_index - l_i;
-                        if l_i >= lhs_op.len() || r_i >= rhs_op.len() {
-                            continue;
-                        }
-
-                        let cur_op;
-                        if lhs_op[l_i].is_scev_constant() && rhs_op[r_i].is_scev_constant() {
-                            cur_op = self.scevexp_pool.make_scev_constant(
-                                lhs_op[l_i].get_scev_const() * rhs_op[r_i].get_scev_const(),
-                            );
-                        } else {
-                            cur_op = self.scevexp_pool.make_scev_mul_expr(
-                                lhs_op[l_i],
-                                rhs_op[r_i],
-                                in_loop,
-                            );
-                        }
-
-                        if op.is_scev_constant() && cur_op.is_scev_constant() {
-                            op = self
-                                .scevexp_pool
-                                .make_scev_constant(op.get_scev_const() + cur_op.get_scev_const());
-                        } else {
-                            op = self.scevexp_pool.make_scev_add_expr(op, cur_op, in_loop);
-                        }
-                    }
-
-                    new_op.push(op);
-                }
-
-                self.scevexp_pool
-                    .make_scev_mul_rec_expr(new_op, Some(*inst), in_loop)
+                self.scevexp_pool.make_scev_mul_rec_expr(
+                    self.parse_mul(&lhs_op, &rhs_op, in_loop),
+                    Some(*inst),
+                    in_loop,
+                )
             }
             (true, false) => {
                 let lhs_op = lhs.get_operands();
-                let mut new_op = Vec::new();
 
-                if rhs.is_scev_constant() {
-                    for (index, op) in lhs_op.iter().enumerate() {
-                        if op.is_scev_constant() {
-                            new_op
-                                .push(self.scevexp_pool.make_scev_constant(
-                                    op.get_scev_const() * rhs.get_scev_const(),
-                                ));
-                        } else {
-                            new_op.push(self.scevexp_pool.make_scev_mul_expr(*op, rhs, in_loop));
-                        }
-                    }
-                } else if rhs.get_in_loop().unwrap() != cur_loop
-                    && !cur_loop.is_a_sub_loop(rhs.get_in_loop().unwrap())
+                if rhs.is_scev_constant()
+                    || rhs.get_in_loop().unwrap() != cur_loop
+                        && !cur_loop.is_a_sub_loop(rhs.get_in_loop().unwrap())
                 {
-                    lhs_op.iter().for_each(|op| {
-                        new_op.push(self.scevexp_pool.make_scev_mul_expr(*op, rhs, in_loop));
-                    })
+                    self.scevexp_pool.make_scev_mul_rec_expr(
+                        self.parse_mul(&lhs_op, &[rhs], in_loop),
+                        Some(*inst),
+                        in_loop,
+                    )
                 } else {
-                    return self.scevexp_pool.make_scev_unknown(Some(*inst), in_loop);
+                    self.scevexp_pool.make_scev_unknown(Some(*inst), in_loop)
                 }
-
-                self.scevexp_pool
-                    .make_scev_mul_rec_expr(new_op, Some(*inst), in_loop)
             }
             (false, true) => {
                 let rhs_op = rhs.get_operands();
-                let mut new_op = Vec::new();
 
-                if lhs.is_scev_constant() {
-                    for (index, op) in rhs_op.iter().enumerate() {
-                        if op.is_scev_constant() {
-                            new_op
-                                .push(self.scevexp_pool.make_scev_constant(
-                                    lhs.get_scev_const() * op.get_scev_const(),
-                                ));
-                        } else {
-                            new_op.push(self.scevexp_pool.make_scev_mul_expr(lhs, *op, in_loop));
-                        }
-                    }
-                } else if lhs.get_in_loop().unwrap() != cur_loop
-                    && !cur_loop.is_a_sub_loop(lhs.get_in_loop().unwrap())
+                if lhs.is_scev_constant()
+                    || lhs.get_in_loop().unwrap() != cur_loop
+                        && !cur_loop.is_a_sub_loop(lhs.get_in_loop().unwrap())
                 {
-                    rhs_op.iter().for_each(|op| {
-                        new_op.push(self.scevexp_pool.make_scev_mul_expr(lhs, *op, in_loop));
-                    })
+                    self.scevexp_pool.make_scev_mul_rec_expr(
+                        self.parse_mul(&[lhs], &rhs_op, in_loop),
+                        Some(*inst),
+                        in_loop,
+                    )
                 } else {
-                    return self.scevexp_pool.make_scev_unknown(Some(*inst), in_loop);
+                    self.scevexp_pool.make_scev_unknown(Some(*inst), in_loop)
                 }
-
-                self.scevexp_pool
-                    .make_scev_mul_rec_expr(new_op, Some(*inst), in_loop)
             }
             (false, false) => self.scevexp_pool.make_scev_unknown(Some(*inst), in_loop),
         }
@@ -411,6 +267,10 @@ impl SCEVAnalyzer {
         } else {
             return self.scevexp_pool.make_scev_unknown(Some(*inst), None);
         };
+
+        if inst.get_operands().len() != 2 {
+            return self.scevexp_pool.make_scev_unknown(Some(*inst), None);
+        }
 
         if let Some(index) = inst
             .get_operands()
@@ -466,5 +326,147 @@ impl SCEVAnalyzer {
             }
         }
         self.scevexp_pool.make_scev_unknown(Some(*inst), in_loop)
+    }
+
+    fn parse_add(
+        &mut self,
+        l_slice: &[ObjPtr<SCEVExp>],
+        r_slice: &[ObjPtr<SCEVExp>],
+        in_loop: Option<ObjPtr<LoopInfo>>,
+    ) -> Vec<ObjPtr<SCEVExp>> {
+        let mut op_vec = Vec::new();
+        debug_assert_ne!(l_slice.len(), 0);
+        debug_assert_ne!(r_slice.len(), 0);
+
+        let max_len = if l_slice.len() > r_slice.len() {
+            l_slice.len()
+        } else {
+            r_slice.len()
+        };
+
+        for i in 0..max_len {
+            if i < l_slice.len() && i < r_slice.len() {
+                if l_slice[i].is_scev_constant() && r_slice[i].is_scev_constant() {
+                    op_vec.push(self.scevexp_pool.make_scev_constant(
+                        l_slice[i].get_scev_const() + r_slice[i].get_scev_const(),
+                    ));
+                } else {
+                    op_vec.push(
+                        self.scevexp_pool
+                            .make_scev_add_expr(l_slice[i], r_slice[i], in_loop),
+                    );
+                }
+            } else if i < l_slice.len() {
+                op_vec.push(l_slice[i]);
+            } else {
+                op_vec.push(r_slice[i]);
+            }
+        }
+
+        op_vec
+    }
+
+    fn parse_sub(
+        &mut self,
+        l_slice: &[ObjPtr<SCEVExp>],
+        r_slice: &[ObjPtr<SCEVExp>],
+        in_loop: Option<ObjPtr<LoopInfo>>,
+    ) -> Vec<ObjPtr<SCEVExp>> {
+        let mut op_vec = Vec::new();
+        debug_assert_ne!(l_slice.len(), 0);
+        debug_assert_ne!(r_slice.len(), 0);
+
+        let max_len = if l_slice.len() > r_slice.len() {
+            l_slice.len()
+        } else {
+            r_slice.len()
+        };
+
+        for i in 0..max_len {
+            if i < l_slice.len() && i < r_slice.len() {
+                if l_slice[i].is_scev_constant() && r_slice[i].is_scev_constant() {
+                    op_vec.push(self.scevexp_pool.make_scev_constant(
+                        l_slice[i].get_scev_const() - r_slice[i].get_scev_const(),
+                    ));
+                } else {
+                    op_vec.push(
+                        self.scevexp_pool
+                            .make_scev_sub_expr(l_slice[i], r_slice[i], in_loop),
+                    );
+                }
+            } else if i < l_slice.len() {
+                op_vec.push(l_slice[i]);
+            } else {
+                if r_slice[i].is_scev_constant() {
+                    op_vec.push(
+                        self.scevexp_pool
+                            .make_scev_constant(-r_slice[i].get_scev_const()),
+                    );
+                } else {
+                    op_vec.push(self.scevexp_pool.make_scev_sub_expr(
+                        self.scevexp_pool.make_scev_constant(0),
+                        r_slice[i],
+                        in_loop,
+                    ));
+                }
+            }
+        }
+
+        op_vec
+    }
+
+    fn parse_mul(
+        &mut self,
+        l_slice: &[ObjPtr<SCEVExp>],
+        r_slice: &[ObjPtr<SCEVExp>],
+        in_loop: Option<ObjPtr<LoopInfo>>,
+    ) -> Vec<ObjPtr<SCEVExp>> {
+        let mut op_vec = Vec::new();
+        debug_assert_ne!(l_slice.len(), 0);
+        debug_assert_ne!(r_slice.len(), 0);
+        if l_slice.len() == 1 {
+            for op in r_slice {
+                if l_slice[0].is_scev_constant() && op.is_scev_constant() {
+                    op_vec.push(
+                        self.scevexp_pool
+                            .make_scev_constant(l_slice[0].get_scev_const() * op.get_scev_const()),
+                    );
+                } else {
+                    op_vec.push(
+                        self.scevexp_pool
+                            .make_scev_mul_expr(l_slice[0], *op, in_loop),
+                    );
+                }
+            }
+        } else if r_slice.len() == 1 {
+            for op in l_slice {
+                if op.is_scev_constant() && r_slice[0].is_scev_constant() {
+                    op_vec.push(
+                        self.scevexp_pool
+                            .make_scev_constant(op.get_scev_const() * r_slice[0].get_scev_const()),
+                    );
+                } else {
+                    op_vec.push(
+                        self.scevexp_pool
+                            .make_scev_mul_expr(*op, r_slice[0], in_loop),
+                    );
+                }
+            }
+        } else {
+            let l_0 = l_slice[0];
+            let r_0 = r_slice[0];
+            let l_left = &l_slice[1..];
+            let r_left = &r_slice[1..];
+
+            let l_res = self.parse_mul(l_left, r_slice, in_loop);
+            let r_res = self.parse_mul(l_slice, r_left, in_loop);
+            let res = self.parse_mul(l_left, r_left, in_loop);
+
+            op_vec.extend(self.parse_add(&[l_0], &[r_0], in_loop));
+
+            op_vec.extend(self.parse_add(&self.parse_add(&l_res, &r_res, in_loop), &res, in_loop));
+        }
+
+        op_vec
     }
 }
