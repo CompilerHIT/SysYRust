@@ -97,6 +97,9 @@ impl Allocator {
                     .get_mut(reg)
                     .unwrap()
                     .insert(p_reg.get_color(), new_times);
+
+                all_neighbors.get_mut(reg).unwrap().push_back(*p_reg);
+                all_neighbors.get_mut(p_reg).unwrap().push_back(*reg);
             }
         }
 

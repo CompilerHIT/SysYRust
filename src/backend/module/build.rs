@@ -119,10 +119,11 @@ impl AsmModule {
         // self.anaylyse_for_handle_call_v3_pre_split();
         self.anaylyse_for_handle_call_v4();
 
+        let is_opt = true;
         if is_opt {
             self.split_func(pool);
             self.build_own_call_map();
-            // self.anaylyse_for_handle_call_v4();
+            self.anaylyse_for_handle_call_v4();
         }
         self.reduce_caller_to_saved_after_func_split();
         self.analyse_caller_regs_to_saved();

@@ -93,7 +93,6 @@ impl Allocator {
         constraints: &HashMap<Reg, HashSet<Reg>>,
     ) -> FuncAllocStat {
         self.init_with_constraints(func, constraints);
-        //TODO,加入约束
         loop {
             let mut stat = self.color();
             while stat == ActionResult::Success || stat == ActionResult::Fail {
