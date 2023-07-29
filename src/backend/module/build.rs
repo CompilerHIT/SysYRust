@@ -131,8 +131,8 @@ impl AsmModule {
             self.build_own_call_map();
             self.anaylyse_for_handle_call_v4();
         }
-        self.reduce_caller_to_saved_after_func_split();
-        self.anaylyse_for_handle_call_v4();
+        // self.reduce_caller_to_saved_after_func_split();
+        // self.anaylyse_for_handle_call_v4();
         self.remove_useless_func(); //在handle call之前调用,删掉前面往name func中加入的external func
         self.handle_call_v3(pool);
 
