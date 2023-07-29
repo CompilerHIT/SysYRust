@@ -715,9 +715,6 @@ impl AsmModule {
             keys.sort_by_key(|key| constraints_times.get(key).unwrap());
             let mut keys: LinkedList<(Reg, Reg)> = keys.iter().cloned().collect();
             loop {
-                println!("{}", keys.len());
-                // let mut allocator = easy_gc_alloc::Allocator::new();
-                // let alloc_stat = allocator.alloc_with_constraints(func, &constraints);
                 let alloc_stat = perfect_alloc::alloc(func, &constraints);
                 if alloc_stat.is_some() {
                     return alloc_stat;
