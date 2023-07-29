@@ -1,5 +1,5 @@
 use crate::{
-    backend::{func, opt, regalloc::opt_gc_alloc2},
+    backend::{func, opt},
     ir::CallMap,
 };
 
