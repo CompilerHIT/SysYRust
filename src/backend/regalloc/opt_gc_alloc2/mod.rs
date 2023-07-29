@@ -31,12 +31,6 @@ pub struct Allocator {
 impl Regalloc for Allocator {
     fn alloc(&mut self, func: &crate::backend::func::Func) -> FuncAllocStat {
         self.init(func);
-        // panic!("gg");
-        log_file!("opt2.txt", "func:{}", func.label);
-        // self.dump_all_neighbors();
-        self.dump_live_neighbors(func.label.to_owned());
-        self.dump_last_colors();
-        self.dump_tocolor();
 
         loop {
             let mut stat = self.color();
@@ -64,69 +58,69 @@ impl Regalloc for Allocator {
             }
             break;
         }
-
-        // loop {
-        //     while self.color() != ActionResult::Finish {}
-        //     self.dump_colors();
-        //     self.dump_spillings();
-        //     while self.simpilfy() != ActionResult::Finish {}
-        //     self.dump_colors();
-        //     self.dump_spillings();
-        //     while self.spill() != ActionResult::Finish {}
-        //     self.dump_colors();
-        //     self.dump_spillings();
-        //     if self.check_k_graph() == ActionResult::Success {
-        //         break;
-        //     }
-        //     continue;
-        // }
-
-        // loop {
-        //     loop {
-        //         let mut stat = self.color();
-        //         if stat == ActionResult::Fail {
-        //             stat = self.simpilfy();
-        //             if stat == ActionResult::Success {
-        //                 continue;
-        //             }
-        //             stat = self.spill();
-        //         } else if stat == ActionResult::Finish {
-        //             break;
-        //         }
-        //     }
-        //     let mut stat = ActionResult::Finish;
-        //     loop {
-        //         stat = self.simpilfy();
-        //         if stat == ActionResult::Finish {
-        //             break;
-        //         }
-        //         if stat == ActionResult::Success {
-        //             break;
-        //         }
-        //     }
-        //     if stat == ActionResult::Success {
-        //         continue;
-        //     }
-        //     loop {
-        //         stat = self.spill();
-        //         if stat == ActionResult::Finish || stat == ActionResult::Success {
-        //             break;
-        //         }
-        //     }
-        //     if stat == ActionResult::Success {
-        //         continue;
-        //     }
-        //     let mut stat = self.check_k_graph();
-        //     if stat == ActionResult::Success {
-        //         break;
-        //     } else {
-        //         continue;
-        //     }
-        // }
         self.color_k_graph();
-        // while self.merge() == ActionResult::Success {
-        //     self.rescue();
-        // }
+        self.color_last();
+        let (dstr, spillings) = self.draw_dstr_spillings();
+        let (func_stack_size, bb_sizes) = regalloc::count_stack_size(func, &spillings);
+
+        // 检查分配结果
+        let p = "tmp4.txt";
+        let regs = func.draw_all_virtual_regs();
+        //
+        log_file!(p, "func:{}", func.label);
+        // log_file!(p, "{:?}", regs);
+        for reg in regs {
+            if dstr.contains_key(&reg.get_id()) || spillings.contains(&reg.get_id()) {
+                continue;
+            }
+            log_file!(p, "{},", reg);
+        }
+
+        FuncAllocStat {
+            dstr: dstr,
+            spillings: spillings,
+            stack_size: func_stack_size,
+            bb_stack_sizes: bb_sizes,
+        }
+    }
+}
+
+//为它实现带约束分配trait
+impl Allocator {
+    pub fn alloc_with_constraints(
+        &mut self,
+        func: &Func,
+        constraints: &HashMap<Reg, HashSet<Reg>>,
+    ) -> FuncAllocStat {
+        self.init_with_constraints(func, constraints);
+        //TODO,加入约束
+        loop {
+            let mut stat = self.color();
+            while stat == ActionResult::Success || stat == ActionResult::Fail {
+                if stat == ActionResult::Fail {
+                    if self.simpilfy() == ActionResult::Success {
+                        continue;
+                    } else {
+                        break;
+                    }
+                }
+                stat = self.color();
+            }
+            while self.simpilfy() != ActionResult::Finish {
+                continue;
+            }
+            while self.spill() != ActionResult::Finish {
+                continue;
+            }
+            if self.check_k_graph() != ActionResult::Success {
+                continue;
+            }
+            if self.color() != ActionResult::Finish {
+                continue;
+            }
+            break;
+        }
+        self.color_k_graph();
         self.color_last();
         let (dstr, spillings) = self.draw_dstr_spillings();
         let (func_stack_size, bb_sizes) = regalloc::count_stack_size(func, &spillings);

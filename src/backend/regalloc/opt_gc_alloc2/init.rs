@@ -54,6 +54,77 @@ impl Allocator {
         self.init_tocolor();
     }
 
+    pub fn init_with_constraints(&mut self, func: &Func, constraints: &HashMap<Reg, HashSet<Reg>>) {
+        let num_estimate_regs = func.num_regs();
+        // let ends_index_bb = regalloc::build_ends_index_bb(func);
+        let mut all_neighbors = regalloc::build_interference_into_lst(func);
+        let mut inter_ference_graph = regalloc::build_interference(func);
+        let mut nums_neighbor_color =
+            regalloc::build_nums_neighbor_color(func, &inter_ference_graph);
+        let mut availables =
+            regalloc::build_availables_with_interef_graph(func, &inter_ference_graph);
+        let spill_cost = regalloc::estimate_spill_cost(func);
+
+        //使用constraints
+        for color in 0..=63 {
+            let p_reg = Reg::from_color(color);
+            if !inter_ference_graph.contains_key(&p_reg) {
+                inter_ference_graph.insert(p_reg, HashSet::new());
+                debug_assert!(!all_neighbors.contains_key(&p_reg));
+                all_neighbors.insert(p_reg, LinkedList::new());
+            }
+        }
+        //加入约束
+        for (reg, constraints) in constraints.iter() {
+            debug_assert!(!reg.is_physic());
+            for p_reg in constraints.iter() {
+                debug_assert!(p_reg.is_physic());
+                //否则加入图中
+                // self.interference_graph
+                //     .get_mut(&p_reg)
+                //     .unwrap()
+                //     .insert(*reg);
+                // self.interference_graph.get_mut(reg).unwrap().insert(*p_reg);
+                debug_assert!(availables.contains_key(reg), "{reg}");
+                availables.get_mut(reg).unwrap().use_reg(p_reg.get_color());
+                let new_times = nums_neighbor_color
+                    .get_mut(reg)
+                    .unwrap()
+                    .get(&p_reg.get_color())
+                    .unwrap_or(&0)
+                    + 1;
+                nums_neighbor_color
+                    .get_mut(reg)
+                    .unwrap()
+                    .insert(p_reg.get_color(), new_times);
+            }
+        }
+
+        let (last_colors, last_colors_lst, all_live_neighbors_bitmap, all_live_neigbhors) =
+            Allocator::build_live_graph_and_last_colors(&all_neighbors, &availables);
+
+        let info = AllocatorInfo {
+            to_color: BiHeap::new(),
+            to_simplify: BiHeap::new(),
+            to_spill: BiHeap::new(),
+            to_rescue: BiHeap::new(),
+            colored: BiHeap::new(),
+            k_graph: (BiHeap::new(), Bitmap::with_cap(num_estimate_regs / 8 + 1)),
+            spill_cost: spill_cost,
+            all_neighbors,
+            nums_neighbor_color: nums_neighbor_color,
+            availables: availables,
+            colors: HashMap::new(),
+            spillings: HashSet::new(),
+            all_live_neighbors: all_live_neigbhors,
+            last_colors: last_colors,
+            last_colors_lst: last_colors_lst,
+            all_live_neigbhors_bitmap: all_live_neighbors_bitmap,
+        };
+        self.info = Some(info);
+        self.init_tocolor();
+    }
+
     /// build last colors 和livegraph,
     /// 传入的参数为all_neighbors,返回的参数为last_colos_set,last_colors_lst,live_graph,live_graph_bitmap
     fn build_live_graph_and_last_colors(
