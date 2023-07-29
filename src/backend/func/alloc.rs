@@ -30,7 +30,7 @@ impl Func {
     pub fn allocate_reg(&mut self) {
         //分类分配
         //不保留临时寄存器的分配方式,这个时候采用完美试探分配,
-        self.calc_live_for_handle_call();
+        self.calc_live_for_alloc_reg();
         let alloc_stat = perfect_alloc::alloc(self, &HashMap::new());
         if alloc_stat.is_some() {
             let alloc_stat = alloc_stat.unwrap();
