@@ -89,23 +89,23 @@ impl ProgramStat {
                 let mut is_double = inst.is_double();
                 let dst_reg = inst.get_dst().drop_reg();
                 match op {
-                    BinaryOp::Add => {
-                        let lhs = inst.get_lhs().drop_reg();
-                        let lhs = self.reg_val.get(&lhs);
-                        if lhs.is_none() {
-                            self.reg_val.insert(dst_reg, Value::Inst(*inst));
-                        } else {
-                            let rhs = inst.get_rhs();
-                            match rhs {
-                                _ => unreachable!(),
-                            }
-                            todo!()
-                        }
-                    }
-                    BinaryOp::Sub => {
-                        //对减法的计算
-                        todo!()
-                    }
+                    // BinaryOp::Add => {
+                    //     let lhs = inst.get_lhs().drop_reg();
+                    //     let lhs = self.reg_val.get(&lhs);
+                    //     if lhs.is_none() {
+                    //         self.reg_val.insert(dst_reg, Value::Inst(*inst));
+                    //     } else {
+                    //         let rhs = inst.get_rhs();
+                    //         match rhs {
+                    //             _ => unreachable!(),
+                    //         }
+                    //         todo!()
+                    //     }
+                    // }
+                    // BinaryOp::Sub => {
+                    //     //对减法的计算
+                    //     todo!()
+                    // }
                     _ => {
                         self.reg_val.insert(dst_reg, Value::Inst(*inst));
                     }
@@ -147,11 +147,11 @@ impl ProgramStat {
                     let dst_reg = inst.get_dst().drop_reg();
                     let src_reg = inst.get_lhs().drop_reg();
                     let old_val = self.reg_val.get(&dst_reg);
-                    if old_val.is_none() {
-                        self.reg_val.insert(dst_reg, Value::Inst(*inst));
-                    } else {
-                        let old_val = old_val.unwrap();
-                        self.reg_val.insert(src_reg, old_val.clone());
+                    match old_val {
+                        Some(old_val) => {
+                            self.reg_val.insert(src_reg, old_val.clone());
+                        }
+                        None => (),
                     }
                 }
                 _ => (),
@@ -163,8 +163,11 @@ impl ProgramStat {
                 let addr = inst.get_lhs().drop_reg();
                 let addr = self.reg_val.get(&addr);
                 if addr.is_none() {
-                    ///从不知名内存写东西(不可能)  (或者说从某个数组的运行时未知偏移写东西)
-                    debug_assert!(false, "try to load val from a unknown addr");
+                    unreachable!();
+                    //从未知地址取值,则取值用指令表示
+                    self.reg_val.insert(dst_reg, Value::Inst(*inst));
+                } else if addr.unwrap().get_type() != ValueType::Addr {
+                    unreachable!();
                 } else {
                     let offset = inst.get_offset().get_data() as i64;
                     let mut addr = addr.unwrap().get_addr().unwrap().clone();
@@ -180,8 +183,34 @@ impl ProgramStat {
                     }
                 }
             }
-            InstrsType::Store => {}
-
+            InstrsType::Store => {
+                //把值写入内存某区域
+                //从内存位置加载一个值
+                //首先要判断该位置有没有值(以及是否是从一个未知地址加载值)
+                let dst_reg = inst.get_dst().drop_reg();
+                let addr = inst.get_lhs().drop_reg();
+                let addr = self.reg_val.get(&addr);
+                let val = self.reg_val.get(&dst_reg);
+                if addr.is_none() {
+                    //从未知地址取值,则取值用指令表示
+                    unreachable!();
+                } else if addr.unwrap().get_type() != ValueType::Addr {
+                    unreachable!();
+                } else {
+                    let offset = inst.get_offset().get_data() as i64;
+                    let mut addr = addr.unwrap().get_addr().unwrap().clone();
+                    addr.1 += offset;
+                    let addr = Value::Addr(addr);
+                    match val {
+                        Some(val) => {
+                            self.mem_val.insert(addr, val.clone());
+                        }
+                        None => {
+                            self.mem_val.insert(addr, Value::Inst(*inst));
+                        }
+                    }
+                }
+            }
             InstrsType::StoreToStack => {
                 let src_reg = inst.get_dst().drop_reg();
                 let offset = inst.get_stack_offset().get_data();
