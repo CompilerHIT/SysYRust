@@ -257,11 +257,14 @@ impl Func {
         // self.print_func();
     }
 
-    // pub fn handle_call_v4(
-    //     &mut self,
-    //     pool: &mut BackendPool,
-    //     callers_used: &HashMap<String, HashSet<Reg>>,
-    // ) {
-    //     //根据上下文决定对函数能够使用哪些
-    // }
+    ///其中欧冠callers_used为指定函数使用的callers used寄存器
+    /// callee_used_bug unsaved为指定函数使用了但是没有保存的寄存器
+    pub fn handle_call_v4(
+        &mut self,
+        pool: &mut BackendPool,
+        callers_used: &HashMap<String, HashSet<Reg>>,
+        callees_used_but_unsaved: &HashMap<String, HashSet<Reg>>,
+    ) {
+        //根据上下文使用中转寄存器来中转caller saved寄存器的使用
+    }
 }
