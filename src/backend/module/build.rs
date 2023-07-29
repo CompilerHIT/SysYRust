@@ -16,7 +16,7 @@ impl AsmModule {
         let is_opt = true;
         if is_opt {
             // // gep偏移计算合并
-            // BackendPass::new(ObjPtr::new(self)).opt_gep();
+            BackendPass::new(ObjPtr::new(self)).opt_gep();
 
             // 设置一些寄存器为临时变量
             self.cal_tmp_var();
@@ -33,18 +33,7 @@ impl AsmModule {
             self.allocate_reg();
             self.map_v_to_p();
         } else {
-            // self.generate_row_asm(_f2, pool);
             self.allocate_reg();
-            // self.generate_row_asm(_f2, pool);
-            // self.map_v_to_p();
-            // self.generate_row_asm(_f2, pool);
-            // 重分配
-            // self.name_func.iter().for_each(|(_, func)| {
-            //     func.as_mut()
-            //         .p2v_pre_handle_call(Reg::get_all_recolorable_regs())
-            // });
-            // // self.generate_row_asm(_f2, pool);
-            // self.allocate_reg();
             self.map_v_to_p();
         }
 
@@ -70,7 +59,7 @@ impl AsmModule {
         // let is_opt = true;
         // if is_opt {
         //     self.split_func(pool);
-        //     // self.build_own_call_map();
+        //     self.build_own_call_map();
         //     // self.anaylyse_for_handle_call_v4();
         // }
         // self.reduce_caller_to_saved_after_func_split();

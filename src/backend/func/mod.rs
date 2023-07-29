@@ -263,6 +263,20 @@ impl Func {
                 }
             }
         }
+
+        // //TODO ban掉大量寄存器以查看栈空间压缩效果
+        // for bb in self.blocks.iter() {
+        //     for color in 18..=31 {
+        //         let reg = Reg::from_color(color);
+        //         bb.as_mut().live_in.insert(reg);
+        //         bb.as_mut().live_out.insert(reg);
+        //     }
+        //     for color in 0..=9 {
+        //         let reg = Reg::from_color(FLOAT_BASE + color);
+        //         bb.as_mut().live_in.insert(reg);
+        //         bb.as_mut().live_out.insert(reg);
+        //     }
+        // }
     }
 
     fn handle_parameters(&mut self, ir_func: &Function) {

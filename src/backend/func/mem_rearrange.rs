@@ -92,7 +92,7 @@ impl Func {
             let mut live_now = HashSet::new();
             live_out.iter().for_each(|sst| {
                 if rearrangables.contains(sst) {
-                    if !interef.contains_key(sst) {
+                    if !live_now.contains(sst) {
                         if !interef.contains_key(sst) {
                             interef.insert(*sst, HashSet::new());
                         }
@@ -100,9 +100,8 @@ impl Func {
                             interef.get_mut(live).unwrap().insert(*sst);
                             interef.get_mut(sst).unwrap().insert(*live);
                         }
-                        interef.insert(*sst, HashSet::new());
+                        live_now.insert(*sst);
                     }
-                    live_now.insert(*sst);
                 }
             });
             for inst in bb.insts.iter().rev() {
