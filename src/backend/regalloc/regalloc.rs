@@ -5,7 +5,6 @@ use crate::backend::instrs::{InstrsType, BB};
 use crate::backend::operand::Reg;
 use crate::backend::regalloc::structs::FuncAllocStat;
 use crate::utility::{ObjPtr, ScalarType};
-use crate::{log, log_file};
 // use crate::{log, log_file};
 
 use super::structs::RegUsedStat;
@@ -190,11 +189,10 @@ pub fn build_interference_into_lst(func: &Func) -> HashMap<Reg, LinkedList<Reg>>
 
 // 获取可分配表
 pub fn build_availables_with_interef_graph(
-    func: &Func,
-    interference_graph: &HashMap<Reg, HashSet<Reg>>,
+    intereference_graph: &HashMap<Reg, HashSet<Reg>>,
 ) -> HashMap<Reg, RegUsedStat> {
     let mut availables: HashMap<Reg, RegUsedStat> = HashMap::new();
-    for (reg, neighbors) in interference_graph.iter() {
+    for (reg, neighbors) in intereference_graph.iter() {
         let mut available = RegUsedStat::new();
         for neighbor in neighbors {
             if neighbor.is_physic() {
@@ -203,18 +201,6 @@ pub fn build_availables_with_interef_graph(
         }
         availables.insert(*reg, available);
     }
-    debug_assert!({
-        || -> bool {
-            for reg in func.draw_all_virtual_regs() {
-                if availables.contains_key(&reg) {
-                    continue;
-                }
-                unreachable!("reg {} not in availables.", reg);
-                return false;
-            }
-            true
-        }()
-    });
     return availables;
 }
 

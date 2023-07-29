@@ -1,3 +1,5 @@
+use std::collections::VecDeque;
+
 use crate::{
     backend::{func, opt},
     ir::CallMap,
@@ -649,6 +651,9 @@ impl AsmModule {
 
         func.calc_live_for_handle_call(); //该处在handle spill之后，应该calc live for handle call
 
+        //统计约束对次数 (vreg,p_reg)->times
+        let mut constraints_times: HashMap<(Reg, Reg), usize> = HashMap::new();
+        //统计对每个虚拟寄存器不同约束出现的次数,对于每个虚拟寄存器,减少约束的时候应该优先减少约束出现次数最少的
         AsmModule::analyse_inst_with_live_now(func, &mut |inst, live_now| {
             if inst.get_type() != InstrsType::Call {
                 return;
@@ -681,6 +686,15 @@ impl AsmModule {
                 .filter(|reg| !reg.is_physic())
                 .for_each(|reg| {
                     debug_assert!(new_v_regs.contains(reg));
+                    let v_reg = *reg;
+                    let mut p_regs = caller_used.clone();
+                    p_regs.extend(callee_used.iter());
+                    for p_reg in p_regs {
+                        let key = (v_reg, p_reg);
+                        let new_times = constraints_times.get(&key).unwrap_or(&0) + 1;
+                        constraints_times.insert(key, new_times);
+                    }
+                    //加入约束
                     constraints.get_mut(reg).unwrap().extend(caller_used);
                     constraints.get_mut(reg).unwrap().extend(callee_used.iter());
                 });
@@ -690,55 +704,31 @@ impl AsmModule {
             //不断地减少约束,直到能够完美分配 (约束中关于callee的约束不能够减少,关于caller的约束可以减少)
 
             //首先统计可以减少的约束数量
-            let mut num_to_reduce_constraint = 0;
-            for (_, constraint) in constraints.iter() {
-                for r_inter in constraint.iter() {
-                    if r_inter.is_caller_save() {
-                        num_to_reduce_constraint += 1;
-                    }
-                }
-            }
-
-            let mut keys: Vec<Reg> = constraints.iter().map(|(reg, _)| *reg).collect();
+            let mut keys: Vec<(Reg, Reg)> = constraints_times
+                .iter()
+                .map(|(k, _)| *k)
+                .filter(|(v, p)| p.is_caller_save())
+                .collect();
+            keys.sort_by_key(|key| constraints_times.get(key).unwrap());
+            let mut keys: LinkedList<(Reg, Reg)> = keys.iter().cloned().collect();
             loop {
-                // println!("{num_to_reduce_constraint}");
+                println!("{}", keys.len());
                 let mut allocator = easy_gc_alloc::Allocator::new();
                 let alloc_stat = allocator.alloc_with_constraints(func, &constraints);
                 if alloc_stat.spillings.len() == 0 {
                     return Some(alloc_stat);
                 }
-                if num_to_reduce_constraint == 0 {
+                if keys.is_empty() {
                     break;
                 }
-                //减少约束 (以随机的方式(因为难以衡量约束))
-
-                let old_num = num_to_reduce_constraint;
-                let mut index = 0;
-                while num_to_reduce_constraint > old_num - 1 {
-                    //随机找一个约束目标,随机地减少一个约束,
-                    index = index % keys.len();
-                    let target_reg = *keys.get(index).unwrap();
-                    let inter: Vec<&Reg> = constraints
-                        .get(&target_reg)
-                        .unwrap()
-                        .iter()
-                        .filter(|reg| reg.is_caller_save())
-                        .collect();
-                    if inter.len() == 0 {
-                        keys.remove(index);
-                        continue;
-                    }
-                    let inter = inter.get(0).unwrap();
-                    let inter = **inter;
-                    constraints.get_mut(&target_reg).unwrap().remove(&inter);
-                    num_to_reduce_constraint -= 1;
-                    if constraints.get(&target_reg).unwrap().len() == 0 {
-                        keys.remove(index);
-                    }
-                    index = index + 1;
+                let to_de_constraint = keys.pop_front().unwrap();
+                let (v_reg, p_reg) = to_de_constraint;
+                let tmp = constraints.get_mut(&v_reg).unwrap();
+                tmp.remove(&p_reg);
+                if tmp.len() == 0 {
+                    constraints.remove(&v_reg);
                 }
             }
-
             //使用optgc2则如果理论上存在完全分配的话则一定能够分配出来
             None
         }();
