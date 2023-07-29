@@ -1,4 +1,4 @@
-use crate::backend::regalloc::opt_gc_alloc2;
+use crate::backend::{func, regalloc::opt_gc_alloc2};
 
 use super::*;
 
@@ -51,14 +51,11 @@ impl AsmModule {
     pub fn anaylyse_for_handle_call_v4(&mut self) {
         //对于name func里面的东西,根据上下文准备对应内容
         let caller_used = self.build_caller_used();
-        let callee_used = self.build_callee_used();
         //对于name_func里面的每个函数,除了externel,都要总结个to save
         self.callee_regs_to_saveds.clear();
         self.caller_regs_to_saveds.clear();
+        //首先建立caller save表
         for (name, _) in self.name_func.iter() {
-            //
-            self.callee_regs_to_saveds
-                .insert(name.clone(), callee_used.get(name).unwrap().clone());
             self.caller_regs_to_saveds
                 .insert(name.clone(), caller_used.get(name).unwrap().clone());
         }
@@ -76,20 +73,42 @@ impl AsmModule {
                     .get(name_of_func_called.as_str())
                     .unwrap()
                     .clone();
-                let mut callee_used = callee_used
-                    .get(name_of_func_called.as_str())
-                    .unwrap()
-                    .clone();
                 caller_used.retain(|reg| live_now.contains(reg));
-                callee_used.retain(|reg| live_now.contains(reg));
-                self.callee_regs_to_saveds
-                    .get_mut(name_of_func_called.as_str())
-                    .unwrap()
-                    .extend(callee_used);
                 self.caller_regs_to_saveds
                     .get_mut(name_of_func_called.as_str())
                     .unwrap()
                     .extend(caller_used);
+            });
+        }
+        //然后建立callee save表
+        for (name, func) in self.name_func.iter() {
+            //
+            if func.is_extern {
+                self.callee_regs_to_saveds
+                    .insert(name.clone(), Reg::get_all_callees_saved());
+            } else {
+                self.callee_regs_to_saveds
+                    .insert(name.clone(), HashSet::new());
+            }
+        }
+        for (_name, func) in self.name_func.iter() {
+            if func.is_extern {
+                continue;
+            }
+            func.calc_live_for_handle_call();
+            AsmModule::analyse_inst_with_live_now(func, &mut |inst, live_now| {
+                if inst.get_type() != InstrsType::Call {
+                    return;
+                }
+                let func_name = inst.get_func_name().unwrap();
+                let func = self.name_func.get(func_name.as_str()).unwrap();
+                let callee_used = func.draw_used_callees();
+                let mut callee_to_saved = live_now.clone();
+                callee_to_saved.retain(|reg| callee_used.contains(reg));
+                self.callee_regs_to_saveds
+                    .get_mut(func_name.as_str())
+                    .unwrap()
+                    .extend(callee_to_saved);
             });
         }
     }
@@ -552,7 +571,9 @@ impl AsmModule {
         }
         new_callers_used
     }
+}
 
+impl AsmModule {
     ///函数分裂后减少使用到的特定物理寄存器
     /// 该函数调用应该在handle call之前,
     /// 该函数的调用结果依赖于调用该函数前进行的analyse for handle call
@@ -614,7 +635,6 @@ impl AsmModule {
         });
 
         //p2v
-        Func::print_func(*func, "p1.txt");
         for (inst, v_reg, p_reg, if_replace_def) in inst_vreg_preg.iter() {
             log_file!(
                 "p2v_for_reduce_caller.txt",
@@ -630,6 +650,8 @@ impl AsmModule {
 
         func.calc_live_for_handle_call(); //该处在handle spill之后，应该calc live for handle call
 
+        let func_groups = self.build_func_groups();
+
         AsmModule::analyse_inst_with_live_now(func, &mut |inst, live_now| {
             if inst.get_type() != InstrsType::Call {
                 return;
@@ -644,7 +666,17 @@ impl AsmModule {
             let callee_used = if callee_func.is_extern {
                 HashSet::new()
             } else {
-                callee_used.get(callee_func_name.as_str()).unwrap().clone()
+                //约定原本的约束,原本存在的对物理寄存器的约束仍然要存在
+                //此前使用了的但是函数中并没有保存到的寄存器被认为是 现在使用的,需要保存的,从而需要约束的
+                let mut callee_used = HashSet::new();
+                for member in func_groups.get(callee_func_name.as_str()).unwrap().iter() {
+                    let mut mem_callee_used =
+                        self.name_func.get(member).unwrap().draw_used_callees();
+                    let member_callee_saved = self.callee_regs_to_saveds.get(member).unwrap();
+                    mem_callee_used.retain(|reg| !member_callee_saved.contains(reg));
+                    callee_used.extend(mem_callee_used);
+                }
+                callee_used
             };
             let caller_used = caller_used.get(callee_func_name.as_str()).unwrap();
             live_now
@@ -670,7 +702,9 @@ impl AsmModule {
                 }
             }
 
+            let mut keys: Vec<Reg> = constraints.iter().map(|(reg, _)| *reg).collect();
             loop {
+                println!("{num_to_reduce_constraint}");
                 let mut allocator = easy_gc_alloc::Allocator::new();
                 let alloc_stat = allocator.alloc_with_constraint(func, &constraints);
                 if alloc_stat.spillings.len() == 0 {
@@ -680,29 +714,31 @@ impl AsmModule {
                     break;
                 }
                 //减少约束 (以随机的方式(因为难以衡量约束))
+
                 let old_num = num_to_reduce_constraint;
-                let keys: Vec<Reg> = constraints.iter().map(|(reg, _)| *reg).collect();
-                while num_to_reduce_constraint > old_num * 4 / 5 {
-                    //随机找一个约束目标,随机地减少其约束
-                    let target_reg: usize = rand::random();
-                    let target_reg = target_reg % keys.len();
-                    let target_reg = *keys.get(target_reg).unwrap();
-                    let r_inter: Vec<Reg> = constraints
+                let mut index = 0;
+                while num_to_reduce_constraint > old_num - 2 {
+                    //随机找一个约束目标,随机地减少一个约束,
+                    index = index % keys.len();
+                    let target_reg = *keys.get(index).unwrap();
+                    let inter: Vec<&Reg> = constraints
                         .get(&target_reg)
                         .unwrap()
                         .iter()
                         .filter(|reg| reg.is_caller_save())
-                        .cloned()
                         .collect();
-                    for i in 0..r_inter.len() {
-                        let if_rm: bool = rand::random();
-                        if !if_rm {
-                            continue;
-                        }
-                        let r_inter = r_inter.get(i).unwrap();
-                        constraints.get_mut(&target_reg).unwrap().remove(r_inter);
-                        num_to_reduce_constraint -= 1;
+                    if inter.len() == 0 {
+                        keys.remove(index);
+                        continue;
                     }
+                    let inter = inter.get(0).unwrap();
+                    let inter = **inter;
+                    constraints.get_mut(&target_reg).unwrap().remove(&inter);
+                    num_to_reduce_constraint -= 1;
+                    if constraints.get(&target_reg).unwrap().len() == 0 {
+                        keys.remove(index);
+                    }
+                    index = index + 1;
                 }
             }
 
@@ -737,6 +773,45 @@ impl AsmModule {
                 }
             }
         }
-        Func::print_func(*func, "p2.txt");
+    }
+
+    ///创建一个函数调用族群(包括族长以及族长调用和简接调用的所有函数)
+    ///调用该函数前应该先调用call map建立直接调用关系表
+    pub fn build_func_groups(&self) -> HashMap<String, HashSet<String>> {
+        let mut func_groups = HashMap::new();
+        //建族
+        for (name, _) in self.name_func.iter() {
+            func_groups.insert(name.clone(), HashSet::from_iter(vec![name.clone()]));
+        }
+        //通过call map初步发展成员
+        for (caller, callees) in self.call_map.iter() {
+            for callee in callees.iter() {
+                func_groups.get_mut(caller).unwrap().insert(callee.clone());
+            }
+        }
+        //递归发展成员
+        loop {
+            let mut finish_flag = true;
+            let mut to_add = Vec::new();
+            for (master, members) in func_groups.iter() {
+                let mut new_members = members.clone();
+                for member in members.iter() {
+                    for callee in self.call_map.get(member).unwrap() {
+                        new_members.insert(callee.clone());
+                    }
+                }
+                to_add.push((master.clone(), new_members));
+            }
+            for (master, new_members) in to_add {
+                if func_groups.get(&master).unwrap().len() < new_members.len() {
+                    finish_flag = false;
+                    func_groups.get_mut(&master).unwrap().extend(new_members);
+                }
+            }
+            if finish_flag {
+                break;
+            }
+        }
+        func_groups
     }
 }

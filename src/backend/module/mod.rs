@@ -20,7 +20,6 @@ use crate::utility::ObjPtr;
 use super::instrs::{Context, InstrsType, LIRInst, BB};
 use super::operand::Reg;
 use super::regalloc::easy_gc_alloc;
-use super::regalloc::regalloc::Regalloc;
 use super::regalloc::structs::FuncAllocStat;
 use super::structs::GenerateAsm;
 pub mod build;

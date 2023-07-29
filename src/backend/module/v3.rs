@@ -301,7 +301,7 @@ impl AsmModule {
                 func.as_mut().callee_saved.clear(); // main函数不需要保存任何callee saved
             } else {
                 let callees = self.callee_regs_to_saveds.get_mut(name).unwrap();
-                callees.remove(&Reg::new(2, crate::utility::ScalarType::Int)); //sp虽然是callee saved但不需要通过栈方式restore
+                callees.remove(&Reg::get_sp()); //sp虽然是callee saved但不需要通过栈方式restore
                 func.as_mut().callee_saved.extend(callees.iter());
             }
             func.as_mut().save_callee(f);
