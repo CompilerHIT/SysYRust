@@ -1,7 +1,7 @@
 use std::collections::VecDeque;
 
 use crate::{
-    backend::{func, opt},
+    backend::{func, opt, regalloc::perfect_alloc},
     ir::CallMap,
 };
 
@@ -601,12 +601,15 @@ impl AsmModule {
                 return;
             }
             let callee_func_name = inst.get_func_name().unwrap();
+            let callee_save = self
+                .callee_regs_to_saveds
+                .get(callee_func_name.as_str())
+                .unwrap();
             let mut reg_cross = live_now.clone();
             reg_cross.retain(|reg| {
                 reg.get_color() > 4
                     && reg != &Reg::get_s0()
                     && reg.is_physic()
-                    // && reg.is_caller_save()
                     && !inst.get_regs().contains(reg)
             });
             for reg in reg_cross.iter() {
@@ -713,10 +716,11 @@ impl AsmModule {
             let mut keys: LinkedList<(Reg, Reg)> = keys.iter().cloned().collect();
             loop {
                 println!("{}", keys.len());
-                let mut allocator = easy_gc_alloc::Allocator::new();
-                let alloc_stat = allocator.alloc_with_constraints(func, &constraints);
-                if alloc_stat.spillings.len() == 0 {
-                    return Some(alloc_stat);
+                // let mut allocator = easy_gc_alloc::Allocator::new();
+                // let alloc_stat = allocator.alloc_with_constraints(func, &constraints);
+                let alloc_stat = perfect_alloc::alloc(func, &constraints);
+                if alloc_stat.is_some() {
+                    return alloc_stat;
                 }
                 if keys.is_empty() {
                     break;

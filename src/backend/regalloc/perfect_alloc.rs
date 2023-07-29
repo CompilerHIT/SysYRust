@@ -1,7 +1,5 @@
 use std::collections::{HashMap, HashSet, LinkedList};
 
-use biheap::BiHeap;
-
 use crate::backend::{instrs::Func, operand::Reg};
 
 use super::{structs::FuncAllocStat, *};
