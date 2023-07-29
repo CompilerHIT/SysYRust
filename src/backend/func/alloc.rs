@@ -1,3 +1,5 @@
+use crate::backend::regalloc::perfect_alloc;
+
 use super::*;
 
 impl Func {
@@ -27,12 +29,12 @@ impl Func {
 
     pub fn allocate_reg(&mut self) {
         //分类分配
-        //不保留临时寄存器的分配方式
+        //不保留临时寄存器的分配方式,这个时候采用完美试探分配,
         self.calc_live_for_handle_call();
-        let mut allocator = crate::backend::regalloc::easy_gc_alloc::Allocator::new();
-        let alloc_stat = allocator.alloc(self);
-        regalloc::check_alloc_v2(&self, &alloc_stat.dstr, &alloc_stat.spillings);
-        if alloc_stat.spillings.len() == 0 {
+        let alloc_stat = perfect_alloc::alloc(self, &HashMap::new());
+        if alloc_stat.is_some() {
+            let alloc_stat = alloc_stat.unwrap();
+            regalloc::check_alloc_v2(&self, &alloc_stat.dstr, &alloc_stat.spillings);
             self.reg_alloc_info = alloc_stat;
             self.context.as_mut().set_reg_map(&self.reg_alloc_info.dstr);
             return;
