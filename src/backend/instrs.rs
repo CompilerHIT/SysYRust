@@ -677,3 +677,30 @@ impl LIRInst {
         }
     }
 }
+
+//生成指令
+impl LIRInst {
+    pub fn build_loadstack_inst(dst_reg: &Reg, stack_offset: i32) -> LIRInst {
+        let mut ins = LIRInst::new(
+            InstrsType::LoadFromStack,
+            vec![
+                Operand::Reg(*dst_reg),
+                Operand::IImm(IImm::new(stack_offset)),
+            ],
+        );
+        ins.set_double();
+        ins
+    }
+
+    pub fn build_storetostack_inst(from_reg: &Reg, stack_offset: i32) -> LIRInst {
+        let mut ins = LIRInst::new(
+            InstrsType::StoreToStack,
+            vec![
+                Operand::Reg(*from_reg),
+                Operand::IImm(IImm::new(stack_offset)),
+            ],
+        );
+        ins.set_double();
+        ins
+    }
+}

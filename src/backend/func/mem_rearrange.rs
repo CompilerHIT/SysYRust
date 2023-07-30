@@ -131,13 +131,30 @@ impl Func {
         //获取用于rearrange需要的栈空间
         interef
     }
-    ///统计指定栈空间使用次数
+    ///统计指定栈空间使用次数,并依据次数进行重排,
+    /// 使用频率比较高的空间会被分配到靠近栈顶,靠近sp的位置
+    /// 使用该函数前应该清除无用栈空间,
     pub fn rearrange_stack_slot(&mut self) {
         let mut all_rearrangable_stackslot: HashSet<StackSlot> = HashSet::new();
         //首先统计所有的可重排地址
         while self.stack_addr.back().unwrap().get_pos() != 0 {
             all_rearrangable_stackslot.insert(self.stack_addr.pop_back().unwrap());
         }
+
+        //统计所有活着的栈空间
+        let mut all_live_stackslots: HashSet<StackSlot> = HashSet::new();
+        iter_each_inst(&self, &mut |inst| match inst.get_type() {
+            InstrsType::StoreToStack | InstrsType::LoadFromStack => {
+                let sst = inst.get_stackslot_with_addr_size();
+                all_live_stackslots.insert(sst);
+            }
+            _ => (),
+        });
+        //判断这两个集合是否相等
+        // debug_assert!(all_live_stackslots == all_rearrangable_stackslot);
+        //只保留活着的栈空间
+        all_rearrangable_stackslot.retain(|sst| all_live_stackslots.contains(sst));
+
         let (_, _, _, live_outs) = Func::calc_stackslot_interval(self);
 
         let interef = Func::calc_stackslot_interef_with_rearrangable_set(
@@ -210,5 +227,20 @@ pub fn iter_each_inst(func: &Func, analyser: &mut dyn FnMut(&ObjPtr<LIRInst>)) {
         for inst in bb.insts.iter() {
             analyser(inst);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashSet;
+
+    #[test]
+    pub fn test_eq_of_set() {
+        let mut s1: HashSet<i32> = HashSet::new();
+        let mut s2: HashSet<i32> = HashSet::new();
+        s1.insert(3);
+        assert!(s1 != s2);
+        s2.insert(3);
+        assert!(s1 == s2)
     }
 }

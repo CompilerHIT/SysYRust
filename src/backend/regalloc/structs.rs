@@ -15,7 +15,7 @@ pub struct RegUsedStat {
 
 // 对于regusedstat来说，通用寄存器映射到0-31，浮点寄存器映射到32-63
 impl RegUsedStat {
-    pub fn new() -> RegUsedStat {
+    pub const fn new() -> RegUsedStat {
         RegUsedStat {
             iregs_used: 0,
             fregs_used: 0,
@@ -300,9 +300,31 @@ impl BlockAllocStat {
     }
 }
 
+impl RegUsedStat {
+    pub const fn init_unspecial_regs() -> RegUsedStat {
+        RegUsedStat {
+            iregs_used: 0b_0000_0000_0000_0000_0000_0001_0001_1111,
+            fregs_used: 0,
+        }
+    }
+}
+
 #[cfg(test)]
 mod test_regusestat {
+    use crate::backend::operand::Reg;
+
     use super::RegUsedStat;
+
+    #[test]
+    fn test_unspecial() {
+        let mut reg_use_stat = RegUsedStat::init_unspecial_regs();
+        for reg in Reg::get_all_specials() {
+            assert!(!reg_use_stat.is_available_reg(reg.get_color()));
+        }
+        for reg in Reg::get_all_not_specials() {
+            assert!(reg_use_stat.is_available_reg(reg.get_color()));
+        }
+    }
 
     #[test]
     fn test_merge() {
