@@ -12,7 +12,9 @@ impl AsmModule {
             if func.is_extern {
                 return;
             }
-            func.as_mut().handle_spill_v3(pool)
+            func.as_mut().handle_spill_v2(pool);
+            // TODO,等待替换为v3
+            // func.as_mut().handle_spill_v3(pool)
         });
     }
 
