@@ -64,8 +64,7 @@ pub struct Func {
     pub tmp_vars: HashSet<Reg>,
 }
 
-/// reg_num, stack_addr, caller_stack_addr考虑借助回填实现
-/// 是否需要caller_stack_addr？caller函数sp保存在s0中
+/// 函数的构造
 impl Func {
     pub fn new(name: &str, context: ObjPtr<Context>) -> Self {
         Self {
@@ -223,60 +222,6 @@ impl Func {
             _size += block.insts.len();
         }
         self.update(this);
-    }
-
-    ///无额外约束的计算寄存器活跃区间
-    fn calc_live_base(&self) {
-        let mut queue: VecDeque<(ObjPtr<BB>, Reg)> = VecDeque::new();
-        for block in self.blocks.iter() {
-            block.as_mut().live_use.clear();
-            block.as_mut().live_def.clear();
-            for it in block.as_ref().insts.iter().rev() {
-                for reg in it.as_ref().get_reg_def().into_iter() {
-                    block.as_mut().live_use.remove(&reg);
-                    block.as_mut().live_def.insert(reg);
-                }
-                for reg in it.as_ref().get_reg_use().into_iter() {
-                    block.as_mut().live_def.remove(&reg);
-                    block.as_mut().live_use.insert(reg);
-                }
-            }
-            //
-            for reg in block.as_ref().live_use.iter() {
-                queue.push_back((block.clone(), reg.clone()));
-            }
-            block.as_mut().live_in = block.as_ref().live_use.clone();
-            block.as_mut().live_out.clear();
-        }
-        //然后计算live in 和live out
-        while let Some(value) = queue.pop_front() {
-            let (block, reg) = value;
-
-            for pred in block.as_ref().in_edge.iter() {
-                if pred.as_mut().live_out.insert(reg) {
-                    if pred.as_mut().live_def.contains(&reg) {
-                        continue;
-                    }
-                    if pred.as_mut().live_in.insert(reg) {
-                        queue.push_back((pred.clone(), reg));
-                    }
-                }
-            }
-        }
-
-        // //TODO ban掉大量寄存器以查看栈空间压缩效果
-        // for bb in self.blocks.iter() {
-        //     for color in 18..=31 {
-        //         let reg = Reg::from_color(color);
-        //         bb.as_mut().live_in.insert(reg);
-        //         bb.as_mut().live_out.insert(reg);
-        //     }
-        //     for color in 0..=9 {
-        //         let reg = Reg::from_color(FLOAT_BASE + color);
-        //         bb.as_mut().live_in.insert(reg);
-        //         bb.as_mut().live_out.insert(reg);
-        //     }
-        // }
     }
 
     fn handle_parameters(&mut self, ir_func: &Function) {
@@ -569,6 +514,64 @@ impl Func {
     }
 }
 
+///函数的基础功能
+impl Func {
+    ///无额外约束的计算寄存器活跃区间
+    fn calc_live_base(&self) {
+        let mut queue: VecDeque<(ObjPtr<BB>, Reg)> = VecDeque::new();
+        for block in self.blocks.iter() {
+            block.as_mut().live_use.clear();
+            block.as_mut().live_def.clear();
+            for it in block.as_ref().insts.iter().rev() {
+                for reg in it.as_ref().get_reg_def().into_iter() {
+                    block.as_mut().live_use.remove(&reg);
+                    block.as_mut().live_def.insert(reg);
+                }
+                for reg in it.as_ref().get_reg_use().into_iter() {
+                    block.as_mut().live_def.remove(&reg);
+                    block.as_mut().live_use.insert(reg);
+                }
+            }
+            //
+            for reg in block.as_ref().live_use.iter() {
+                queue.push_back((block.clone(), reg.clone()));
+            }
+            block.as_mut().live_in = block.as_ref().live_use.clone();
+            block.as_mut().live_out.clear();
+        }
+        //然后计算live in 和live out
+        while let Some(value) = queue.pop_front() {
+            let (block, reg) = value;
+
+            for pred in block.as_ref().in_edge.iter() {
+                if pred.as_mut().live_out.insert(reg) {
+                    if pred.as_mut().live_def.contains(&reg) {
+                        continue;
+                    }
+                    if pred.as_mut().live_in.insert(reg) {
+                        queue.push_back((pred.clone(), reg));
+                    }
+                }
+            }
+        }
+
+        // //TODO ban掉大量寄存器以查看栈空间压缩效果
+        // for bb in self.blocks.iter() {
+        //     for color in 18..=31 {
+        //         let reg = Reg::from_color(color);
+        //         bb.as_mut().live_in.insert(reg);
+        //         bb.as_mut().live_out.insert(reg);
+        //     }
+        //     for color in 0..=9 {
+        //         let reg = Reg::from_color(FLOAT_BASE + color);
+        //         bb.as_mut().live_in.insert(reg);
+        //         bb.as_mut().live_out.insert(reg);
+        //     }
+        // }
+    }
+}
+
+///函数汇编生成
 impl GenerateAsm for Func {
     fn generate(&mut self, _: ObjPtr<Context>, f: &mut File) {
         if self.const_array.len() > 0 || self.float_array.len() > 0 {

@@ -208,9 +208,27 @@ impl Func {
         self.build_reg_intervals();
         //先分配空间
         self.assign_stack_slot_for_spill();
-        let this = pool.put_func(self.clone());
+        self.build_reg_intervals();
+
+        //为物理寄存器相关的借还开辟空间
+        let mut phisic_mems = HashMap::new();
+        for reg in Reg::get_all_args() {
+            if !reg.is_special() {
+                let last = self.stack_addr.back().unwrap();
+                let new_pos = last.get_pos() + last.get_size();
+                let new_stack_slot = StackSlot::new(new_pos, ADDR_SIZE);
+                self.stack_addr.push_back(new_stack_slot);
+                phisic_mems.insert(reg, new_stack_slot);
+            }
+        }
+
         for bb in self.blocks.iter() {
-            bb.as_mut().handle_spill_v3(this, pool);
+            Func::handle_spill_of_block(
+                bb,
+                &self.reg_alloc_info.spillings,
+                &self.spill_stack_map,
+                &phisic_mems,
+            );
         }
     }
 
@@ -244,5 +262,82 @@ impl Func {
             }
         }
         callers
+    }
+}
+
+impl Func {
+    ///考虑有临时寄存器可以用
+    /// 该操作应该在p2v之后进行
+    fn handle_spill_of_block(
+        bb: &ObjPtr<BB>,
+        spillings: &HashSet<i32>,
+        spill_stack_map: &HashMap<Reg, StackSlot>,
+        phisic_mem: &HashMap<Reg, StackSlot>,
+    ) {
+        //优先使用临时寄存器,然后使用其他空余寄存器
+        //使用越密集的寄存器倾向于分配更远的虚拟寄存器
+        //抽象 （index,v_reg) 获取一个物理寄存器造成的代价
+        // (index,v_reg,p_reg)
+        //遇到spllings的时候选择一个归还日期最接近该spilling寄存器的块内终结日期的寄存器
+        //ps 理论上一个块内一个寄存器只可能存在一次定义,但是可能存在若干次使用
+        let mut ends_of_spilling_reg_in_block: HashMap<Reg, ObjPtr<LIRInst>> = HashMap::new();
+        for inst in bb.insts.iter().rev() {
+            for reg in inst.get_reg_use() {
+                if !reg.is_physic() {
+                    debug_assert!(spillings.contains(&reg.get_id()));
+                    if ends_of_spilling_reg_in_block.contains_key(&reg) {
+                        continue;
+                    }
+                    ends_of_spilling_reg_in_block.insert(reg, *inst);
+                }
+            }
+        }
+
+        //维护一个表,记录当前各个物理寄存器的持有者
+        #[derive(Clone)]
+        enum RegHolder {
+            Reg(Reg),
+            StackOffset(i32),
+        }
+        let mut holders: HashMap<Reg, RegHolder> = HashMap::new();
+        //初始化holder
+        bb.live_in.iter().for_each(|reg| {
+            if reg.is_physic() {
+                holders.insert(*reg, RegHolder::Reg(*reg));
+            }
+        });
+        // 维护一个物理寄存器的作用区间队列,每次的def和use压入栈中
+        let mut next_occurs: HashMap<Reg, LinkedList<usize>> = HashMap::new();
+        for (index, inst) in bb.insts.iter().enumerate() {
+            for reg in inst.get_reg_use() {
+                if !next_occurs.contains_key(&reg) {
+                    next_occurs.insert(reg, LinkedList::new());
+                }
+                next_occurs.get_mut(&reg).unwrap().push_back(index);
+            }
+            for reg in inst.get_reg_def() {
+                if !next_occurs.contains_key(&reg) {
+                    next_occurs.insert(reg, LinkedList::new());
+                }
+                next_occurs.get_mut(&reg).unwrap().push_back(index);
+            }
+        }
+
+        let mut new_insts: Vec<ObjPtr<LIRInst>> = Vec::new();
+        //正式分配流程,
+        let mut index = 0;
+        while index < bb.insts.len() {
+            let inst = bb.insts.get(index).unwrap();
+            //分析该指令使用到的寄存器,判断是否有持有者不是当前寄存器本身的
+            for reg in inst.get_reg_use() {
+                //判断是否有需要归还的寄存器 (把值取回物理寄存器,此处需要一个物理寄存器相关的空间)
+            }
+            //判断是否有需要把值存回栈上的寄存器
+            for reg in inst.get_reg_def() {}
+
+            index += 1;
+        }
+        bb.as_mut().insts = new_insts;
+        unimplemented!()
     }
 }

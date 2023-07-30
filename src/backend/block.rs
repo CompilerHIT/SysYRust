@@ -2561,20 +2561,6 @@ impl BB {
     }
 }
 
-//for build v3
-impl BB {
-    ///在handle spill v3之前应该已经对func调用了buildreg interval
-    ///并且在handle spill v3之前应该已经对func调用了calc live for handle call
-    pub fn handle_spill_v3(&mut self, func: ObjPtr<Func>, pool: &mut BackendPool) {
-        self.handle_spill_v2(func, &func.reg_alloc_info.spillings, pool);
-        return;
-        let intervals = self.reg_intervals;
-        //初始当前存活的可用的寄存器以及它们死亡日期和使用密度
-        //局部使用密度越大,死亡日期越近的虚拟寄存器越是会被分配到归还期越远的物理寄存器
-        todo!();
-    }
-}
-
 /// build reg intervals
 impl BB {
     pub fn build_reg_intervals(&mut self) {
