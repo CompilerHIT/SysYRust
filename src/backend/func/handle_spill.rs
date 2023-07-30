@@ -17,9 +17,9 @@ impl Func {
     }
 
     /// 为了分配spill的虚拟寄存器所需的栈空间使用的而构建冲突图
+    /// 依赖于外部调用的calc live
     fn build_interferench_for_assign_stack_slot_for_spill(&mut self) -> HashMap<Reg, HashSet<Reg>> {
         let mut out: HashMap<Reg, HashSet<Reg>> = HashMap::new();
-        self.calc_live_for_alloc_reg();
         for bb in self.blocks.iter() {
             //
             let bb = *bb;
@@ -65,10 +65,10 @@ impl Func {
         out
     }
 
-    /// 分析spill空间之间的冲突关系,进行紧缩
+    /// 分析spill空间之间的冲突关系,进行紧缩式分配
+    /// 依赖外部调用的calc live
     fn assign_stack_slot_for_spill(&mut self) {
         let path = "assign_mem.txt";
-
         // 给spill的寄存器空间,如果出现重复的情况,则说明后端可能空间存在冲突
         // 建立spill寄存器之间的冲突关系(如果两个spill的寄存器之间是相互冲突的,则它们不能够共享相同内存)
         let mut spill_coes: HashMap<i32, i32> = HashMap::new();
@@ -208,17 +208,15 @@ impl Func {
         self.build_reg_intervals();
         //先分配空间
         self.assign_stack_slot_for_spill();
-
+        Func::print_func(ObjPtr::new(&self), "mm.txt");
         //为物理寄存器相关的借还开辟空间
         let mut phisic_mems = HashMap::new();
         for reg in Reg::get_all_not_specials() {
-            if !reg.is_special() {
-                let last = self.stack_addr.back().unwrap();
-                let new_pos = last.get_pos() + last.get_size();
-                let new_stack_slot = StackSlot::new(new_pos, ADDR_SIZE);
-                self.stack_addr.push_back(new_stack_slot);
-                phisic_mems.insert(reg, new_stack_slot);
-            }
+            let last = self.stack_addr.back().unwrap();
+            let new_pos = last.get_pos() + last.get_size();
+            let new_stack_slot = StackSlot::new(new_pos, ADDR_SIZE);
+            self.stack_addr.push_back(new_stack_slot);
+            phisic_mems.insert(reg, new_stack_slot);
         }
 
         for bb in self.blocks.iter() {
@@ -296,16 +294,9 @@ impl Func {
 
         //维护一个表,记录当前各个物理寄存器的持有者
         let mut next_occurs: HashMap<Reg, LinkedList<(usize, bool)>> = HashMap::new();
-        let mut holders: HashMap<Reg, Reg> = HashMap::new();
         //初始化holder
         bb.live_in.iter().for_each(|reg| {
-            if reg.is_physic() {
-                holders.insert(*reg, *reg);
-                next_occurs.insert(*reg, LinkedList::new());
-            } else {
-                //对于虚拟寄存器先不给它们分配要用的物理寄存器,等到要借的时候再分配
-                next_occurs.insert(*reg, LinkedList::new());
-            }
+            next_occurs.insert(*reg, LinkedList::new());
         });
         // 维护一个物理寄存器的作用区间队列,每次的def和use压入栈中 (先压入use,再压入def)
         // 每个链表元素为(reg,if_def)
@@ -330,7 +321,7 @@ impl Func {
                 .push_back((bb.insts.len(), false));
         });
         //对于其他的没有加入到表中的寄存器,也添加列表
-        for reg in Reg::get_all_specials() {
+        for reg in Reg::get_all_not_specials() {
             if next_occurs.contains_key(&reg) {
                 continue;
             }
@@ -375,6 +366,7 @@ impl Func {
                 } else {
                     &reg
                 };
+                debug_assert!(next_occurs.contains_key(old_holder), "{old_holder}");
                 let next_occur = next_occurs.get(old_holder).unwrap().front().unwrap();
                 let (index, if_def) = next_occur;
                 //因为def的情况代价更小更适合选,所以相同前置的情况下先设置为1,
@@ -385,7 +377,7 @@ impl Func {
             choices.sort_by_key(|item| item.1);
             //获取该虚拟寄存器的下一次出现
             debug_assert!(choices.len() != 0);
-            let to_borrow_from = choices.get(0).unwrap().0;
+            let to_borrow_from = choices.last().unwrap().0;
             if to_borrow_from.is_physic() {
                 to_borrow_from
             } else {
@@ -405,15 +397,28 @@ impl Func {
                 Some(holder) => {
                     if !holder.is_physic() {
                         //判断是否需要把该寄存器的值还回去
-                        let if_turn_back = next_occurs.get(holder).unwrap().front().unwrap().1;
-                        if if_turn_back {
+                        //如果下一个不是def,就需要把值归还回去
+                        let if_then_def = next_occurs.get(holder).unwrap().front().unwrap().1;
+                        debug_assert!(!if_then_def);
+                        if !if_then_def {
                             let pos = spill_stack_map.get(holder).unwrap().get_pos();
                             let back_inst = LIRInst::build_storetostack_inst(borrowed, pos);
                             new_insts.push(pool.put_inst(back_inst));
                         }
-                        rentors.remove(holder);
-                        holders.remove(borrowed);
+                    } else {
+                        debug_assert!(holder == borrowed);
+                        //对于持有者当前为物理寄存器的情况,根据下一次使用
+                        let if_then_def = next_occurs.get(holder).unwrap().front().unwrap().1;
+                        if !if_then_def {
+                            //需要暂时保存该值到栈上,以待下次使用
+                            debug_assert!(phisic_mem.contains_key(borrowed), "{}", borrowed);
+                            let pos = phisic_mem.get(borrowed).unwrap().get_pos();
+                            let back_inst = LIRInst::build_storetostack_inst(borrowed, pos);
+                            new_insts.push(pool.put_inst(back_inst));
+                        }
                     }
+                    rentors.remove(holder);
+                    holders.remove(borrowed);
                 }
                 None => (),
             };
@@ -429,8 +434,10 @@ impl Func {
             rentors.insert(*rentor, *borrowed);
         };
         //寄存器归还逻辑
-        let return_reg = |rentor: &Reg,
+        let return_reg = |inst: ObjPtr<LIRInst>,
+                          rentor: &Reg,
                           borrowed: &Reg,
+                          next_occurs: &HashMap<Reg, LinkedList<(usize, bool)>>,
                           rentors: &mut HashMap<Reg, Reg>,
                           holders: &mut HashMap<Reg, Reg>,
                           pool: &mut BackendPool,
@@ -438,14 +445,19 @@ impl Func {
             debug_assert!(spillings.contains(&rentor.get_id()));
             debug_assert!(rentors.get(rentor).unwrap() == borrowed);
             debug_assert!(holders.get(borrowed).unwrap() == rentor);
+            //虽然但是一个块中不应该出现虚拟寄存器的两次写,so
+            debug_assert!(next_occurs.get(rentor).unwrap().front().unwrap().1 != true);
             let pos = spill_stack_map.get(rentor).unwrap().get_pos();
             //把spilling寄存器的值还回栈上
             let self_back_inst = LIRInst::build_storetostack_inst(&borrowed, pos);
             new_insts.push(pool.put_inst(self_back_inst));
-            //把物理寄存器的值取回
-            let owner_pos = phisic_mem.get(&borrowed).unwrap().get_pos();
-            let return_inst = LIRInst::build_loadstack_inst(&borrowed, owner_pos);
-            new_insts.push(pool.put_inst(return_inst));
+            //判断是否要把物理寄存器的值取回
+            let if_use = inst.get_reg_use().contains(borrowed);
+            if if_use {
+                let owner_pos = phisic_mem.get(&borrowed).unwrap().get_pos();
+                let return_inst = LIRInst::build_loadstack_inst(&borrowed, owner_pos);
+                new_insts.push(pool.put_inst(return_inst));
+            }
             //更新rentor 和rentor的状态
             rentors.remove(rentor);
             holders.insert(*borrowed, *borrowed);
@@ -453,6 +465,13 @@ impl Func {
         //归还物理寄存器的逻辑
         let mut new_insts: Vec<ObjPtr<LIRInst>> = Vec::new();
         let mut rentors: HashMap<Reg, Reg> = HashMap::new();
+        let mut holders: HashMap<Reg, Reg> = HashMap::new();
+        //初始化holder
+        bb.live_in.iter().for_each(|reg| {
+            if reg.is_physic() {
+                holders.insert(*reg, *reg);
+            }
+        });
         //正式分配流程,
         let mut index = 0;
         while index < bb.insts.len() {
@@ -469,26 +488,61 @@ impl Func {
                     break;
                 }
             }
-
-            //先归还
-            for reg in inst.get_regs() {
+            //然后归还
+            for reg in inst.get_reg_use() {
                 //判断是否有需要归还的寄存器 (把值取回物理寄存器,此处需要一个物理寄存器相关的空间)
                 if reg.is_physic() && holders.contains_key(&reg) {
                     //遇到的物理寄存器一定有持有者
-                    let rentor = holders.get(&reg).unwrap();
-                    if &reg != rentor {
+                    let holder = holders.get(&reg).unwrap();
+                    if &reg != holder {
                         //如果寄存器不在当前phisicreg 手上,则进行归还
                         //统一归还操作为归还到栈空间上,无用访存指令后面会删除
-                        let rentor = *rentor;
+                        let rentor = *holder;
+                        debug_assert!(
+                            next_occurs.get(&rentor).unwrap().front().unwrap().0 <= bb.insts.len()
+                        );
                         return_reg(
+                            *inst,
                             &rentor,
                             &reg,
+                            &next_occurs,
                             &mut rentors,
                             &mut holders,
                             pool,
                             &mut new_insts,
                         );
                     }
+                } else if reg.is_physic() {
+                    let pos = phisic_mem.get(&reg).unwrap().get_pos();
+                    let load_inst = LIRInst::build_loadstack_inst(&reg, pos);
+                    new_insts.push(pool.put_inst(load_inst));
+                    holders.insert(reg, reg);
+                }
+            }
+            for reg in inst.get_reg_def() {
+                if reg.is_physic() && holders.contains_key(&reg) {
+                    //遇到的物理寄存器一定有持有者
+                    let holder = holders.get(&reg).unwrap();
+                    if &reg != holder {
+                        //如果寄存器不在当前phisicreg 手上,则进行归还
+                        //统一归还操作为归还到栈空间上,无用访存指令后面会删除
+                        let rentor = *holder;
+                        debug_assert!(
+                            next_occurs.get(&rentor).unwrap().front().unwrap().0 <= bb.insts.len()
+                        );
+                        return_reg(
+                            *inst,
+                            &rentor,
+                            &reg,
+                            &next_occurs,
+                            &mut rentors,
+                            &mut holders,
+                            pool,
+                            &mut new_insts,
+                        );
+                    }
+                } else if reg.is_physic() {
+                    holders.insert(reg, reg);
                 }
             }
 

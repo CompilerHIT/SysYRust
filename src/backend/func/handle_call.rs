@@ -170,15 +170,17 @@ impl Func {
             bb.live_out.iter().for_each(|reg| {
                 live_now.insert(*reg);
             });
-
+            let mut index = bb.insts.len();
             for inst in bb.insts.iter().rev() {
+                index -= 1;
                 for reg in inst.get_reg_def() {
                     debug_assert!(
-                        live_now.contains(&reg),
-                        "blocak:{},inst:{:?},reg:{}",
+                        live_now.contains(&reg) || inst.get_type() == InstrsType::Call,
+                        "blocak:{},inst:{:?},reg:{},index:{}",
                         bb.label,
                         inst.as_ref(),
-                        reg
+                        reg,
+                        index
                     );
                     live_now.remove(&reg);
                 }
