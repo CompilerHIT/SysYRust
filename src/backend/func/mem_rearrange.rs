@@ -180,9 +180,14 @@ impl Func {
         let old_stack_size = all_rearrangable_stackslot.len() * 8;
         let mut allocated_ssts: Vec<StackSlot> = Vec::new();
         let mut v_p_ssts: HashMap<StackSlot, StackSlot> = HashMap::new();
+
         for sst in ordered_ssts.iter() {
             //记录所有已经用过的冲突的空间
             let mut unavailables_ssts: HashSet<StackSlot> = HashSet::new();
+            debug_assert!(interef.contains_key(sst), "{}", {
+                Func::print_func(ObjPtr::new(self), "an_mem_re.txt");
+                sst.get_pos()
+            });
             for inter_sst in interef.get(sst).unwrap() {
                 if let Some(p_sst) = v_p_ssts.get(inter_sst) {
                     unavailables_ssts.insert(*p_sst);

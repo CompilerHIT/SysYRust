@@ -47,9 +47,8 @@ impl AsmModule {
 
         // self.realloc_reg_with_priority();
 
-        self.handle_spill_v3(pool);
-
         self.remove_unuse_inst_suf_alloc();
+        self.handle_spill_v3(pool);
 
         // // self.anaylyse_for_handle_call_v3_pre_split();
         self.anaylyse_for_handle_call_v4();
