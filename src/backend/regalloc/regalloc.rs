@@ -255,24 +255,6 @@ pub fn build_ends_index_bb(func: &Func) -> HashMap<(usize, ObjPtr<BB>), HashSet<
     out
 }
 
-//
-// pub fn merge_alloc_total(
-//     func: &Func,
-//     dstr: &mut HashMap<i32, i32>,
-//     spillings: &mut HashSet<i32>,
-//     ends_index_bb: &HashMap<(i32, ObjPtr<BB>), HashSet<Reg>>,
-//     nums_neighbor_color: &mut HashMap<Reg, HashMap<i32, i32>>,
-//     availables: &mut HashMap<Reg, RegUsedStat>,
-//     spill_cost: &HashMap<Reg, f32>,
-//     interference_graph: &HashMap<Reg, HashSet<Reg>>,
-// ) -> bool {
-//     //
-//     let mut color_regs: HashMap<i32, Bitmap> = HashMap::new();
-//     let mut map: HashMap<(Reg, i32), i32> = HashMap::new();
-
-//     false //合并结束不可能存在新的合并了
-// }
-
 /// 通用寄存器合并
 /// 依赖外部 调用某种 calc live (比如 calc live for alloc)
 pub fn merge_alloc(
@@ -299,78 +281,6 @@ pub fn merge_alloc(
         let out = interference_graph.get(reg).unwrap_or(&tmp_set).len();
         out as f32
     };
-
-    // let mut only_virtual_merge_val = |reg: &Reg,
-    //                                   dstr: &HashMap<i32, i32>,
-    //                                   other_color: i32,
-    //                                   spillings: &HashSet<i32>,
-    //                                   nums_neighbor_color: &mut HashMap<Reg, HashMap<i32, i32>>,
-    //                                   interference_graph: &HashMap<Reg, HashSet<Reg>>|
-    //  -> f32 {
-    //     let mut out = 0;
-    //     interference_graph
-    //         .get(&reg)
-    //         .unwrap_or(&tmp_set)
-    //         .iter()
-    //         .for_each(|reg| {
-    //             if reg.is_physic() {
-    //                 return;
-    //             }
-    //             out += 1;
-    //         });
-    //     out as f32
-    // };
-    // let mut real_affect_merge_val0 = |reg: &Reg,
-    //                                   dstr: &HashMap<i32, i32>,
-    //                                   other_color: i32,
-    //                                   spillings: &HashSet<i32>,
-    //                                   nums_neighbor_color: &mut HashMap<Reg, HashMap<i32, i32>>,
-    //                                   interference_graph: &HashMap<Reg, HashSet<Reg>>|
-    //  -> f32 {
-    //     let n = interference_graph.get(reg).unwrap_or(&tmp_set).len() as f32;
-    //     let self_color = dstr.get(&reg.get_id()).unwrap();
-    //     let mut out = 1.0;
-    //     if spillings.contains(&reg.get_id()) {
-    //         out += spill_cost.get(reg).unwrap();
-    //     }
-    //     interference_graph
-    //         .get(reg)
-    //         .unwrap_or(&tmp_set)
-    //         .iter()
-    //         .for_each(|reg| {
-    //             if reg.is_physic() {
-    //                 return;
-    //             }
-
-    //             let nums_neighbor_color = nums_neighbor_color.get(reg).unwrap();
-    //             if spillings.contains(&reg.get_id()) {
-    //                 let num = nums_neighbor_color.get(&other_color).unwrap_or(&0);
-    //                 if *num == 0 {
-    //                     out -= 1 as f32 * spill_cost.get(reg).unwrap();
-    //                 } else {
-    //                     // out -= 1 as f32
-    //                     //     / (*num as f32 + 1.0)
-    //                     //     / (*num as f32 + 1.0)
-    //                     //     / (*num as f32 + 1.0)
-    //                     //     / (*num as f32 + 1.0)
-    //                     //     * spill_cost.get(reg).unwrap();
-    //                 }
-    //                 let num = nums_neighbor_color.get(&self_color).unwrap_or(&0);
-    //                 if *num == 1 {
-    //                     out += 1 as f32 * spill_cost.get(reg).unwrap();
-    //                 } else if *num > 1 {
-    //                     // out += 1 as f32
-    //                     //     / (*num as f32)
-    //                     //     / (*num as f32)
-    //                     //     / (*num as f32)
-    //                     //     / (*num as f32)
-    //                     //     * spill_cost.get(reg).unwrap();
-    //                 }
-    //             } else {
-    //             }
-    //         });
-    //     out
-    // };
 
     // 统计每个寄存器辅助减少的指令数
     // let mut vals: HashMap<Reg, i32> = HashMap::new();

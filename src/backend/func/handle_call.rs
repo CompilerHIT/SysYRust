@@ -163,17 +163,19 @@ impl Func {
         self.calc_live_for_handle_call();
         let mut slots_for_caller_saved: Vec<StackSlot> = Vec::new();
         // self.print_func();
+        Func::print_func(ObjPtr::new(&self), "test_spill.txt");
         for bb in self.blocks.iter() {
             let mut new_insts: Vec<ObjPtr<LIRInst>> = Vec::new();
             let mut live_now: HashSet<Reg> = HashSet::new();
             bb.live_out.iter().for_each(|reg| {
                 live_now.insert(*reg);
             });
+
             for inst in bb.insts.iter().rev() {
                 for reg in inst.get_reg_def() {
                     debug_assert!(
                         live_now.contains(&reg),
-                        "blocak:{},inst:{},reg:{}",
+                        "blocak:{},inst:{:?},reg:{}",
                         bb.label,
                         inst.as_ref(),
                         reg

@@ -289,7 +289,7 @@ impl Reg {
 
     ///获取所有能够分配的寄存器,除了五个特殊寄存器以外其他都能够分配  (等价于get_all_recolorable_regs)
 
-    //获取所有参数寄存器
+    ///获取所有参数寄存器
     pub fn get_all_args() -> HashSet<Reg> {
         let mut args = HashSet::new();
         //通用参数寄存器a0-a7 :10-17
@@ -301,6 +301,29 @@ impl Reg {
             args.insert(Reg::from_color(i));
         }
         args
+    }
+
+    ///获取所有非特殊寄存器
+    ///也就是不包括0-4,以及s0
+    pub fn get_all_not_specials() -> HashSet<Reg> {
+        let mut out = HashSet::new();
+        for reg in 5..=63 {
+            let reg = Reg::from_color(reg);
+            out.insert(reg);
+        }
+        out.remove(&Reg::get_s0());
+        out
+    }
+
+    ///获取所有的特殊寄存器
+    pub fn get_all_specials() -> HashSet<Reg> {
+        let mut out = HashSet::new();
+        for reg in 0..=4 {
+            let reg = Reg::from_color(reg);
+            out.insert(reg);
+        }
+        out.insert(Reg::get_s0());
+        out
     }
 }
 
@@ -325,7 +348,7 @@ impl Reg {
         }
     }
     #[inline]
-    pub fn get_s0() -> Reg {
+    pub const fn get_s0() -> Reg {
         Reg {
             id: 8,
             r_type: ScalarType::Int,
