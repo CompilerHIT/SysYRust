@@ -101,22 +101,18 @@ impl SCEVAnalyzer {
                 let lhs_op = lhs.get_operands();
                 let rhs_op = rhs.get_operands();
 
-                self.scevexp_pool.make_scev_add_rec_expr(
-                    self.parse_add(&lhs_op, &rhs_op, in_loop),
-                    Some(*inst),
-                    in_loop,
-                )
+                let result = self.parse_add(&lhs_op, &rhs_op, in_loop);
+                self.scevexp_pool
+                    .make_scev_add_rec_expr(result, Some(*inst), in_loop)
             }
             (true, false) => {
                 if rhs.is_scev_constant()
                     || rhs.get_in_loop().unwrap() != cur_loop
                         && cur_loop.is_a_sub_loop(rhs.get_in_loop().unwrap())
                 {
-                    self.scevexp_pool.make_scev_add_rec_expr(
-                        self.parse_add(&lhs.get_operands(), &[rhs], in_loop),
-                        Some(*inst),
-                        in_loop,
-                    )
+                    let result = self.parse_add(&lhs.get_operands(), &[rhs], in_loop);
+                    self.scevexp_pool
+                        .make_scev_add_rec_expr(result, Some(*inst), in_loop)
                 } else {
                     self.scevexp_pool.make_scev_unknown(Some(*inst), in_loop)
                 }
@@ -126,11 +122,9 @@ impl SCEVAnalyzer {
                     || lhs.get_in_loop().unwrap() != cur_loop
                         && cur_loop.is_a_sub_loop(lhs.get_in_loop().unwrap())
                 {
-                    self.scevexp_pool.make_scev_add_rec_expr(
-                        self.parse_add(&rhs.get_operands(), &[lhs], in_loop),
-                        Some(*inst),
-                        in_loop,
-                    )
+                    let result = self.parse_add(&rhs.get_operands(), &[lhs], in_loop);
+                    self.scevexp_pool
+                        .make_scev_add_rec_expr(result, Some(*inst), in_loop)
                 } else {
                     self.scevexp_pool.make_scev_unknown(Some(*inst), in_loop)
                 }
@@ -157,11 +151,9 @@ impl SCEVAnalyzer {
                 let lhs_op = lhs.get_operands();
                 let rhs_op = rhs.get_operands();
 
-                self.scevexp_pool.make_scev_sub_rec_expr(
-                    self.parse_sub(&lhs_op, &rhs_op, in_loop),
-                    Some(*inst),
-                    in_loop,
-                )
+                let result = self.parse_sub(&lhs_op, &rhs_op, in_loop);
+                self.scevexp_pool
+                    .make_scev_sub_rec_expr(result, Some(*inst), in_loop)
             }
             (true, false) => {
                 let lhs_op = lhs.get_operands();
@@ -169,11 +161,9 @@ impl SCEVAnalyzer {
                     || rhs.get_in_loop().unwrap() != cur_loop
                         && !cur_loop.is_a_sub_loop(rhs.get_in_loop().unwrap())
                 {
-                    self.scevexp_pool.make_scev_sub_rec_expr(
-                        self.parse_sub(&lhs_op, &[rhs], in_loop),
-                        Some(*inst),
-                        in_loop,
-                    )
+                    let result = self.parse_sub(&lhs_op, &[rhs], in_loop);
+                    self.scevexp_pool
+                        .make_scev_sub_rec_expr(result, Some(*inst), in_loop)
                 } else {
                     self.scevexp_pool.make_scev_unknown(Some(*inst), in_loop)
                 }
@@ -184,11 +174,9 @@ impl SCEVAnalyzer {
                     || lhs.get_in_loop().unwrap() != cur_loop
                         && !cur_loop.is_a_sub_loop(lhs.get_in_loop().unwrap())
                 {
-                    self.scevexp_pool.make_scev_sub_rec_expr(
-                        self.parse_sub(&rhs_op, &[lhs], in_loop),
-                        Some(*inst),
-                        in_loop,
-                    )
+                    let result = self.parse_sub(&rhs_op, &[lhs], in_loop);
+                    self.scevexp_pool
+                        .make_scev_sub_rec_expr(result, Some(*inst), in_loop)
                 } else {
                     self.scevexp_pool.make_scev_unknown(Some(*inst), in_loop)
                 }
@@ -215,11 +203,9 @@ impl SCEVAnalyzer {
                 let lhs_op = lhs.get_operands();
                 let rhs_op = rhs.get_operands();
 
-                self.scevexp_pool.make_scev_mul_rec_expr(
-                    self.parse_mul(&lhs_op, &rhs_op, in_loop),
-                    Some(*inst),
-                    in_loop,
-                )
+                let result = self.parse_mul(&lhs_op, &rhs_op, in_loop);
+                self.scevexp_pool
+                    .make_scev_mul_rec_expr(result, Some(*inst), in_loop)
             }
             (true, false) => {
                 let lhs_op = lhs.get_operands();
@@ -228,11 +214,9 @@ impl SCEVAnalyzer {
                     || rhs.get_in_loop().unwrap() != cur_loop
                         && !cur_loop.is_a_sub_loop(rhs.get_in_loop().unwrap())
                 {
-                    self.scevexp_pool.make_scev_mul_rec_expr(
-                        self.parse_mul(&lhs_op, &[rhs], in_loop),
-                        Some(*inst),
-                        in_loop,
-                    )
+                    let result = self.parse_mul(&lhs_op, &[rhs], in_loop);
+                    self.scevexp_pool
+                        .make_scev_mul_rec_expr(result, Some(*inst), in_loop)
                 } else {
                     self.scevexp_pool.make_scev_unknown(Some(*inst), in_loop)
                 }
@@ -244,11 +228,9 @@ impl SCEVAnalyzer {
                     || lhs.get_in_loop().unwrap() != cur_loop
                         && !cur_loop.is_a_sub_loop(lhs.get_in_loop().unwrap())
                 {
-                    self.scevexp_pool.make_scev_mul_rec_expr(
-                        self.parse_mul(&[lhs], &rhs_op, in_loop),
-                        Some(*inst),
-                        in_loop,
-                    )
+                    let result = self.parse_mul(&[lhs], &rhs_op, in_loop);
+                    self.scevexp_pool
+                        .make_scev_mul_rec_expr(result, Some(*inst), in_loop)
                 } else {
                     self.scevexp_pool.make_scev_unknown(Some(*inst), in_loop)
                 }
@@ -297,11 +279,10 @@ impl SCEVAnalyzer {
                             .find(|x| !cur_loop.is_in_loop(&x.get_parent_bb()))
                             .unwrap();
 
-                        return self.scevexp_pool.make_scev_rec_expr(
-                            vec![parse(*start), parse(step)],
-                            Some(*inst),
-                            in_loop,
-                        );
+                        let result = vec![parse(*start), parse(step)];
+                        return self
+                            .scevexp_pool
+                            .make_scev_rec_expr(result, Some(*inst), in_loop);
                     }
                 }
 
@@ -315,11 +296,10 @@ impl SCEVAnalyzer {
                             .iter()
                             .find(|x| !cur_loop.is_in_loop(&x.get_parent_bb()))
                             .unwrap();
-                        return self.scevexp_pool.make_scev_rec_expr(
-                            vec![parse(*start), parse(step)],
-                            Some(*inst),
-                            in_loop,
-                        );
+                        let result = vec![parse(*start), parse(step)];
+                        return self
+                            .scevexp_pool
+                            .make_scev_rec_expr(result, Some(*inst), in_loop);
                     }
                 }
                 _ => {}
@@ -403,11 +383,11 @@ impl SCEVAnalyzer {
                             .make_scev_constant(-r_slice[i].get_scev_const()),
                     );
                 } else {
-                    op_vec.push(self.scevexp_pool.make_scev_sub_expr(
-                        self.scevexp_pool.make_scev_constant(0),
-                        r_slice[i],
-                        in_loop,
-                    ));
+                    let result = self.scevexp_pool.make_scev_constant(0);
+                    op_vec.push(
+                        self.scevexp_pool
+                            .make_scev_sub_expr(result, r_slice[i], in_loop),
+                    );
                 }
             }
         }
@@ -464,7 +444,8 @@ impl SCEVAnalyzer {
 
             op_vec.extend(self.parse_add(&[l_0], &[r_0], in_loop));
 
-            op_vec.extend(self.parse_add(&self.parse_add(&l_res, &r_res, in_loop), &res, in_loop));
+            let result = self.parse_add(&l_res, &r_res, in_loop);
+            op_vec.extend(self.parse_add(&result, &res, in_loop));
         }
 
         op_vec

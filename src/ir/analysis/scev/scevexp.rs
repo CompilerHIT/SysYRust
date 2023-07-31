@@ -94,21 +94,9 @@ impl SCEVExp {
     pub fn set_operands(&mut self, operands: Vec<ObjPtr<SCEVExp>>) {
         self.operands = operands;
     }
-    pub fn get_scev_rec_start(&self) -> ObjPtr<SCEVExp> {
-        debug_assert_eq!(self.kind, SCEVExpKind::SCEVRecExpr);
-        self.get_operands()[0]
-    }
-    pub fn get_scev_rec_step(&self) -> ObjPtr<SCEVExp> {
-        debug_assert_eq!(self.kind, SCEVExpKind::SCEVRecExpr);
-        self.get_operands()[1]
-    }
-    pub fn get_scev_rec_end_cond(&self, mut loop_info: ObjPtr<LoopInfo>) -> Vec<ObjPtr<Inst>> {
-        debug_assert_eq!(self.get_kind(), SCEVExpKind::SCEVRecExpr);
-        loop_info
-            .get_exit_blocks()
-            .iter()
-            .map(|bb| bb.get_tail_inst().get_br_cond())
-            .collect()
+    pub fn get_bond_inst(&self) -> ObjPtr<Inst> {
+        debug_assert!(self.is_scev_rec_expr() || self.is_scev_unknown());
+        self.bond_inst.unwrap()
     }
 }
 
