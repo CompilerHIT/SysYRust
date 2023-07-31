@@ -2,7 +2,10 @@ use std::collections::HashSet;
 
 use crate::ir::analysis::{
     dominator_tree::DominatorTree,
-    scev::{scevexp::SCEVExpKind, SCEVAnalyzer},
+    scev::{
+        scevexp::{SCEVExp, SCEVExpKind},
+        SCEVAnalyzer,
+    },
 };
 
 use super::*;
@@ -12,10 +15,10 @@ pub fn livo_run(
     loop_list: &mut LoopList,
     pools: &mut (&mut ObjPool<BasicBlock>, &mut ObjPool<Inst>),
 ) {
-    let mut scev_analyzer = SCEVAnalyzer::new();
-    scev_analyzer.set_loop_list(loop_list.get_loop_list().clone());
     for loop_info in loop_list.get_loop_list().iter() {
         if !is_break_continue_exist(*loop_info) {
+            let mut scev_analyzer = SCEVAnalyzer::new();
+            scev_analyzer.set_loop_list(loop_list.get_loop_list().clone());
             livo_in_loop(&dominator_tree, *loop_info, &mut scev_analyzer, pools);
         }
     }
@@ -29,34 +32,21 @@ fn livo_in_loop(
 ) {
     // 获得当前循环的归纳变量
     let mut rec_set = HashSet::new();
-    inst_process_in_bb(loop_info.get_header().get_head_inst(), |inst| {
-        if let SCEVExpKind::SCEVRecExpr = scev_analyzer.analyze(&inst).get_kind() {
-            rec_set.insert(inst);
-        }
+    loop_info.get_current_loop_bb().iter().for_each(|bb| {
+        inst_process_in_bb(bb.get_head_inst(), |inst| {
+            if let SCEVExpKind::SCEVMulExpr = scev_analyzer.analyze(&inst).get_kind() {
+                rec_set.insert(inst);
+            }
+        })
     });
 
     let latchs = loop_info.get_latchs();
+    debug_assert_eq!(latchs.len(), 1);
+    let latch = latchs[0];
 
-    loop {
-        let mut flag = false;
-        for inst in rec_set.iter() {
-            for user in inst.get_use_list().iter() {
-                if !loop_info.is_in_loop(&user.get_parent_bb()) {
-                    continue;
-                }
-                if scev_analyzer.analyze(user).is_scev_mul_rec_expr()
-                    && latchs
-                        .iter()
-                        .all(|bb| dominator_tree.is_dominate(&user.get_parent_bb(), bb))
-                {
-                    flag = mul_livo(*user, loop_info, pools, scev_analyzer);
-                    break;
-                }
-            }
-        }
-
-        if !flag {
-            break;
+    for inst in rec_set.iter() {
+        if dominator_tree.is_dominate(&inst.get_parent_bb(), &latch) {
+            mul_livo(*inst, loop_info, pools, scev_analyzer);
         }
     }
 }
@@ -67,94 +57,120 @@ fn mul_livo(
     loop_info: ObjPtr<LoopInfo>,
     pools: &mut (&mut ObjPool<BasicBlock>, &mut ObjPool<Inst>),
     scev_analyzer: &mut SCEVAnalyzer,
-) -> bool {
-    let (rec_phi, other) = if let SCEVExpKind::SCEVRecExpr =
-        scev_analyzer.analyze(&inst.get_operands()[0]).get_kind()
-    {
-        (inst.get_operands()[0], inst.get_operands()[1])
-    } else {
-        (inst.get_operands()[1], inst.get_operands()[0])
-    };
+) {
+    let scev_exp = scev_analyzer.analyze(&inst);
+    debug_assert!(scev_exp.get_operands().len() > 2);
 
-    if !other.is_param() && loop_info.is_in_loop(&other.get_parent_bb()) {
-        return false;
-    }
+    let mut tail_inst = loop_info.get_preheader().get_tail_inst();
+    let op_vec = scev_exp
+        .get_operands()
+        .iter()
+        .map(|x| {
+            let cur_op_vec = parse_scev_exp(*x, pools);
+            cur_op_vec.iter().for_each(|op| {
+                tail_inst.insert_before(*op);
+            });
+            cur_op_vec[cur_op_vec.len() - 1]
+        })
+        .collect::<Vec<_>>();
 
-    let rec_exp = scev_analyzer.analyze(&rec_phi);
-    let start = rec_exp.get_scev_rec_start();
-    let step = rec_exp.get_scev_rec_step();
+    let new_inst = parse_step(inst, pools, loop_info, &op_vec);
 
-    // 在preheader中插入start-step乘other的指令
-    let sub = pools.1.make_sub(start, step);
-    let mut init = pools.1.make_mul(sub, other);
-    loop_info
-        .get_preheader()
-        .get_tail_inst()
-        .insert_before(init);
-    init.insert_before(sub);
-
-    // 在inst前插入step乘other指令
-    let temp = pools.1.make_mul(step, other);
-    inst.insert_before(temp);
-
-    // 在inst前插入一条phi加temp的指令
-    let phi = find_point_inst(init, inst.get_parent_bb(), pools);
-    let phi_add = pools.1.make_add(phi, temp);
-    inst.insert_before(phi_add);
-    // 把使用phi的地方都替换成phi_add
-    phi.get_use_list().clone().iter_mut().for_each(|user| {
-        if user.is_phi() {
-            let index = user.get_operand_index(phi);
-            user.set_operand(phi_add, index);
-        }
-    });
-
-    // 把所有使用inst的地方都替换成phi_add
     inst.get_use_list().clone().iter_mut().for_each(|user| {
         let index = user.get_operand_index(inst);
-        user.set_operand(phi_add, index);
+        user.set_operand(new_inst, index);
     });
 
     inst.remove_self();
-
-    scev_analyzer.clear();
-
-    true
 }
 
-/// 递归向上找到指定的inst，在寻找的过程中会插phi指令
-fn find_point_inst(
-    inst: ObjPtr<Inst>,
-    current_bb: ObjPtr<BasicBlock>,
+fn parse_step(
+    mut inst: ObjPtr<Inst>,
     pools: &mut (&mut ObjPool<BasicBlock>, &mut ObjPool<Inst>),
+    loop_info: ObjPtr<LoopInfo>,
+    op_slice: &[ObjPtr<Inst>],
 ) -> ObjPtr<Inst> {
-    let mut set = HashSet::new();
-    set.insert(inst);
-    find_inst_in_set(&mut set, current_bb, pools)
-}
+    let start = op_slice[0];
+    let step;
 
-/// 递归向上寻找指定的inst集合，在寻找的过程中会插phi指令
-fn find_inst_in_set(
-    map: &mut HashSet<ObjPtr<Inst>>,
-    current_bb: ObjPtr<BasicBlock>,
-    pools: &mut (&mut ObjPool<BasicBlock>, &mut ObjPool<Inst>),
-) -> ObjPtr<Inst> {
-    let mut target = None;
-    inst_process_in_bb(current_bb.get_head_inst(), |inst| {
-        if map.contains(&inst) {
-            target = Some(inst);
-        }
-    });
-
-    if let Some(inst) = target {
-        inst
+    if op_slice.len() == 2 {
+        step = op_slice[1];
     } else {
-        let mut phi = pools.1.make_int_phi();
-        current_bb.as_mut().push_front(phi);
-        map.insert(phi);
-        for bb in current_bb.get_up_bb().iter() {
-            phi.add_operand(find_inst_in_set(map, *bb, pools));
-        }
-        phi
+        step = parse_step(inst, pools, loop_info, &op_slice[1..])
     }
+
+    let mut header = loop_info.get_header();
+    let mut preheader = loop_info.get_preheader();
+    let mut phi = pools.1.make_phi(start.get_ir_type());
+    header.push_front(phi);
+    preheader.push_back(start);
+    let adder = pools.1.make_add(phi, step);
+    inst.insert_after(adder);
+
+    if header.get_up_bb()[0] == preheader {
+        phi.add_operand(start);
+        phi.add_operand(adder);
+    } else {
+        phi.add_operand(adder);
+        phi.add_operand(start);
+    }
+
+    adder
+}
+
+fn parse_scev_exp(
+    exp: ObjPtr<SCEVExp>,
+    pools: &mut (&mut ObjPool<BasicBlock>, &mut ObjPool<Inst>),
+) -> Vec<ObjPtr<Inst>> {
+    let mut l_d = false;
+    let mut lhs = if exp.is_scev_constant() {
+        vec![pools.1.make_int_const(exp.get_scev_const())]
+    } else if exp.get_operands()[0].is_scev_rec() || exp.get_operands()[0].is_scev_unknown() {
+        l_d = true;
+        vec![exp.get_operands()[0].get_bond_inst()]
+    } else {
+        parse_scev_exp(exp.get_operands()[0], pools)
+    };
+
+    let mut r_d = false;
+    let mut rhs = if exp.is_scev_constant() {
+        vec![pools.1.make_int_const(exp.get_scev_const())]
+    } else if exp.get_operands()[1].is_scev_rec() || exp.get_operands()[1].is_scev_unknown() {
+        r_d = true;
+        vec![exp.get_operands()[1].get_bond_inst()]
+    } else {
+        parse_scev_exp(exp.get_operands()[1], pools)
+    };
+
+    let l_i = lhs.len() - 1;
+    let r_i = rhs.len() - 1;
+    let result;
+
+    match exp.get_kind() {
+        SCEVExpKind::SCEVAddExpr => {
+            debug_assert_eq!(exp.get_operands().len(), 2);
+            result = pools.1.make_add(lhs[l_i], rhs[r_i]);
+        }
+        SCEVExpKind::SCEVSubExpr => {
+            debug_assert_eq!(exp.get_operands().len(), 2);
+            result = pools.1.make_sub(lhs[l_i], rhs[r_i]);
+        }
+        SCEVExpKind::SCEVMulExpr => {
+            debug_assert_eq!(exp.get_operands().len(), 2);
+            result = pools.1.make_mul(lhs[l_i], rhs[r_i]);
+        }
+        _ => unreachable!(),
+    }
+
+    if l_d {
+        lhs.pop();
+    }
+
+    if r_d {
+        rhs.pop();
+    }
+
+    lhs.extend(rhs);
+    lhs.push(result);
+    lhs
 }
