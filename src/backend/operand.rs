@@ -303,6 +303,20 @@ impl Reg {
         args
     }
 
+    /// 获取所有用于handle spill用的临时寄存器
+    pub fn get_all_tmps() -> HashSet<Reg> {
+        let mut args = HashSet::new();
+        //通用参数寄存器a0-a7 :10-17
+        //浮点参数寄存器 : 42-49
+        for i in 5..=7 {
+            args.insert(Reg::from_color(i));
+        }
+        for i in 18..=20 {
+            args.insert(Reg::from_color(i));
+        }
+        args
+    }
+
     ///获取所有非特殊寄存器
     ///也就是不包括0-4,以及s0
     pub fn get_all_not_specials() -> HashSet<Reg> {
