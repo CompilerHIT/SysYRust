@@ -485,6 +485,12 @@ impl Func {
                             let pos = spill_stack_map.get(holder).unwrap().get_pos();
                             let back_inst = LIRInst::build_storetostack_inst(borrowed, pos);
                             new_insts.push(pool.put_inst(back_inst));
+                            config::record_spill(
+                                "",
+                                &bb.label.as_str(),
+                                format!("把虚拟寄存器{}值从{}写回栈{}上", rentor, borrowed, pos,)
+                                    .as_str(),
+                            );
                         }
                     } else {
                         debug_assert!(holder == borrowed);
@@ -496,6 +502,11 @@ impl Func {
                             let pos = phisic_mem.get(borrowed).unwrap().get_pos();
                             let back_inst = LIRInst::build_storetostack_inst(borrowed, pos);
                             new_insts.push(pool.put_inst(back_inst));
+                            config::record_spill(
+                                "",
+                                &bb.label.as_str(),
+                                format!("把物理寄存器{}原值暂存到栈{}上", borrowed, pos,).as_str(),
+                            );
                         }
                     }
                     rentors.remove(holder);
@@ -509,6 +520,11 @@ impl Func {
                 let pos = spill_stack_map.get(rentor).unwrap().get_pos();
                 let load_back_inst = LIRInst::build_loadstack_inst(borrowed, pos);
                 new_insts.push(pool.put_inst(load_back_inst));
+                config::record_spill(
+                    "",
+                    &bb.label.as_str(),
+                    format!("从{}取回虚拟寄存器{}原值到{}", pos, rentor, borrowed).as_str(),
+                );
             }
             //修改 rent hold表
             holders.insert(*borrowed, *rentor);
@@ -530,6 +546,11 @@ impl Func {
             debug_assert!(next_occurs.get(rentor).unwrap().front().unwrap().1 != true);
             let pos = spill_stack_map.get(rentor).unwrap().get_pos();
             //把spilling寄存器的值还回栈上
+            config::record_spill(
+                "",
+                &bb.label.as_str(),
+                format!("把spilling寄存器{}值从{}写回栈{}处", rentor, borrowed, pos).as_str(),
+            );
             let self_back_inst = LIRInst::build_storetostack_inst(&borrowed, pos);
             new_insts.push(pool.put_inst(self_back_inst));
             //判断是否要把物理寄存器的值取回
@@ -538,6 +559,11 @@ impl Func {
                 let owner_pos = phisic_mem.get(&borrowed).unwrap().get_pos();
                 let return_inst = LIRInst::build_loadstack_inst(&borrowed, owner_pos);
                 new_insts.push(pool.put_inst(return_inst));
+                config::record_spill(
+                    "",
+                    &bb.label.as_str(),
+                    format!("取回物理寄存器{}原值", borrowed).as_str(),
+                );
             }
             //更新rentor 和rentor的状态
             rentors.remove(rentor);
