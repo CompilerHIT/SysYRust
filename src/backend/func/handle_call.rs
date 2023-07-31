@@ -321,8 +321,12 @@ impl Func {
                 let caller_used = callers_used.get(func_called.as_str()).unwrap();
                 let mut caller_to_saved = live_now.clone();
                 caller_to_saved.retain(|reg| caller_used.contains(reg));
+                for reg in inst.get_reg_def() {
+                    caller_to_saved.remove(&reg);
+                }
                 let caller_to_saved = caller_to_saved;
                 let mut borrowables = available_tmp_regs;
+                //若函数有返回值,返回值对应的参数寄存器不需要保存
                 for reg in live_now.iter() {
                     borrowables.use_reg(reg.get_color());
                 }

@@ -168,6 +168,10 @@ impl Func {
                 let use_reg = use_reg.get(0).unwrap();
                 unchanged_use.insert((*last_inst, *use_reg));
                 // 往前直到遇到第一个def为止
+                debug_assert!(bb.insts.len() >= 2, "{}", {
+                    Func::print_func(ObjPtr::new(self), "p2v.txt");
+                    bb.label.as_str()
+                });
                 let mut index = bb.insts.len() - 2;
                 loop {
                     let inst = bb.insts.get(index).unwrap();
