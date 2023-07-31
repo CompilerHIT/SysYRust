@@ -29,7 +29,9 @@ impl AsmModule {
         // 分析并刷新每个函数的call指令前后需要保存的caller save信息,以及call内部的函数需要保存的callee save信息
         // 对于 handle call
         for (_, func) in self.name_func.iter() {
-            debug_assert!(!func.is_extern);
+            if func.is_extern {
+                continue;
+            }
             func.as_mut()
                 .handle_call_v3(pool, &self.caller_regs_to_saveds);
         }
@@ -309,7 +311,7 @@ impl AsmModule {
     }
 
     ///删除进行函数分裂后的剩余无用函数
-    pub fn remove_useless_func(&mut self) {
+    pub fn remove_external_func(&mut self) {
         self.name_func.retain(|_, f| !f.is_extern);
     }
 

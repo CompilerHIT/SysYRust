@@ -703,4 +703,19 @@ impl LIRInst {
         ins.set_double();
         ins
     }
+
+    ///创建指令,from_reg为值来源,to_reg为值去向
+    pub fn build_mv(from_reg: &Reg, to_reg: &Reg) -> LIRInst {
+        if from_reg.get_type() == to_reg.get_type() {
+            let mut out = LIRInst::new(
+                InstrsType::OpReg(SingleOp::Mv),
+                vec![Operand::Reg(*to_reg), Operand::Reg(*from_reg)],
+            );
+            if from_reg.get_type() == ScalarType::Float {
+                out.set_float();
+            }
+            return out;
+        }
+        todo!()
+    }
 }

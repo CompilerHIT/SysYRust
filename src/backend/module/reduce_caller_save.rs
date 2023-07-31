@@ -188,9 +188,3 @@ impl AsmModule {
         }
     }
 }
-
-impl AsmModule {
-    pub fn handle_call_v4(&mut self) {
-        unimplemented!()
-    }
-}

@@ -259,22 +259,156 @@ impl Func {
 
     ///其中欧冠callers_used为指定函数使用的callers used寄存器
     /// callee_used_bug unsaved为指定函数使用了但是没有保存的寄存器
-    /// 使用浮点寄存器作为中转而不是栈空间作为中转的方式减少load store
-    /// 使用临时栈空间而不是固定栈空间处理handle call
+    /// 使用中转寄存器
+    /// 使用临时栈空间
     pub fn handle_call_v4(
         &mut self,
         pool: &mut BackendPool,
         callers_used: &HashMap<String, HashSet<Reg>>,
         callees_used: &HashMap<String, HashSet<Reg>>,
         callees_be_saved: &HashMap<String, HashSet<Reg>>,
-        callers_need_saved: &HashMap<String, HashSet<Reg>>,
     ) {
+        debug_assert!(self.draw_all_virtual_regs().len() == 0);
         //对于main函数来说,可以任意地使用上下文中当前还存活地寄存器作为中转
         //根据上下文使用中转寄存器来中转caller saved寄存器的使用
         self.calc_live_for_handle_call();
+        //记录能够使用的中转寄存器 (自身递归使用到的)
+        let mut available_tmp_regs: RegUsedStat = RegUsedStat::init_unavailable();
+        if self.label != "main" {
+            for reg in callees_used.get(self.label.as_str()).unwrap() {
+                available_tmp_regs.release_reg(reg.get_color());
+            }
+            for reg in callers_used.get(self.label.as_str()).unwrap() {
+                available_tmp_regs.release_reg(reg.get_color());
+            }
+        } else {
+            for reg in Reg::get_all_not_specials() {
+                available_tmp_regs.release_reg(reg.get_color());
+            }
+        }
+        for reg in Reg::get_all_specials() {
+            available_tmp_regs.use_reg(reg.get_color());
+        }
 
-        for bb in self.blocks.iter() {}
+        //覆盖原本使之不可变
+        let available_tmp_regs = available_tmp_regs;
+        //定义中转者
+        enum TmpHolder {
+            Reg(Reg),
+            StackOffset(i32),
+        }
+        let build_tmp_slot = |func: &mut Func| -> i32 {
+            let back = func.stack_addr.back().unwrap();
+            let pos = back.get_pos() + back.get_size();
+            let new_stack_slot = StackSlot::new(pos, ADDR_SIZE);
+            func.stack_addr.push_back(new_stack_slot);
+            new_stack_slot.get_pos()
+        };
 
+        let this_func = ObjPtr::new(&self);
+        for bb in self.blocks.iter() {
+            let mut new_insts = Vec::new();
+            Func::analyse_inst_with_live_now_backorder(*bb, &mut |inst, live_now| {
+                match inst.get_type() {
+                    InstrsType::Call => (),
+                    _ => {
+                        new_insts.push(inst);
+                        return;
+                    }
+                };
+                //分析当前需要保存的caller save 寄存器
+                let func_called = inst.get_func_name().unwrap();
+                let caller_used = callers_used.get(func_called.as_str()).unwrap();
+                let mut caller_to_saved = live_now.clone();
+                caller_to_saved.retain(|reg| caller_used.contains(reg));
+                let caller_to_saved = caller_to_saved;
+                let mut borrowables = available_tmp_regs;
+                for reg in live_now.iter() {
+                    borrowables.use_reg(reg.get_color());
+                }
+                for reg in inst.get_regs() {
+                    borrowables.use_reg(reg.get_color());
+                }
+                let mut callee_used = callees_used.get(func_called.as_str()).unwrap().clone();
+                callee_used.retain(|reg| {
+                    !callees_be_saved
+                        .get(func_called.as_str())
+                        .unwrap()
+                        .contains(reg)
+                });
+                for callee_used in callee_used {
+                    borrowables.use_reg(callee_used.get_color());
+                }
+                for reg in caller_used {
+                    borrowables.use_reg(reg.get_color());
+                }
+
+                //剩下的borrowables就是能够借用来中转的寄存器
+                let mut tmp_map: HashMap<Reg, TmpHolder> = HashMap::new();
+                //寻找中转
+                for reg in caller_to_saved.iter() {
+                    //首先试图找同色的,
+                    let tmp_holder = borrowables.get_available_reg(reg.get_type());
+                    if let Some(tmp_holder) = tmp_holder {
+                        borrowables.use_reg(tmp_holder);
+                        tmp_map.insert(*reg, TmpHolder::Reg(Reg::from_color(tmp_holder)));
+                        continue;
+                    }
+                    // //同色的没有,就找异色的,暂时关闭,等待LIR接口写好
+                    // let tmp_holder =
+                    //     borrowables.get_available_reg(if reg.get_type() == ScalarType::Int {
+                    //         ScalarType::Float
+                    //     } else {
+                    //         ScalarType::Int
+                    //     });
+
+                    // if let Some(tmp_holder) = tmp_holder {
+                    //     borrowables.use_reg(tmp_holder);
+                    //     tmp_map.insert(*reg, TmpHolder::Reg(Reg::from_color(tmp_holder)));
+                    //     continue;
+                    // }
+
+                    //如果异色的都没有那么分配临时栈空间
+                    let tmp_holder = build_tmp_slot(this_func.as_mut());
+                    tmp_map.insert(*reg, TmpHolder::StackOffset(tmp_holder));
+                }
+
+                //先插入值的恢复
+                for reg in caller_to_saved.iter() {
+                    let tmp_holder = tmp_map.get(reg).unwrap();
+                    match tmp_holder {
+                        TmpHolder::Reg(tmp_reg) => {
+                            let get_back = LIRInst::build_mv(tmp_reg, reg);
+                            new_insts.push(pool.put_inst(get_back));
+                        }
+                        TmpHolder::StackOffset(offset) => {
+                            config::record_callee_save_sl(&self.label, "");
+                            let restore_inst = LIRInst::build_loadstack_inst(reg, *offset);
+                            new_insts.push(pool.put_inst(restore_inst));
+                        }
+                    }
+                }
+                //再插入call指令
+                new_insts.push(inst);
+                //再插入值的暂存
+                for reg in caller_to_saved.iter() {
+                    let tmp_holder = tmp_map.get(reg).unwrap();
+                    match tmp_holder {
+                        TmpHolder::Reg(tmp_reg) => {
+                            let store_to = LIRInst::build_mv(reg, tmp_reg);
+                            new_insts.push(pool.put_inst(store_to));
+                        }
+                        TmpHolder::StackOffset(offset) => {
+                            config::record_callee_save_sl(&self.label, "");
+                            let store_inst = LIRInst::build_storetostack_inst(reg, *offset);
+                            new_insts.push(pool.put_inst(store_inst));
+                        }
+                    }
+                }
+            });
+            new_insts.reverse();
+            bb.as_mut().insts = new_insts;
+        }
         // self.print_func();
     }
 }
