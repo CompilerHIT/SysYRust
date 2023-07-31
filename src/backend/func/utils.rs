@@ -88,7 +88,7 @@ impl Func {
 impl Func {
     pub fn analyse_inst_with_live_now_backorder(
         bb: ObjPtr<BB>,
-        analyser: &mut dyn FnMut(ObjPtr<LIRInst>),
+        analyser: &mut dyn FnMut(ObjPtr<LIRInst>, &HashSet<Reg>),
     ) {
         let mut live_now = HashSet::new();
         bb.live_out.iter().for_each(|reg| {
@@ -98,7 +98,7 @@ impl Func {
             for reg in inst.get_reg_def() {
                 live_now.remove(&reg);
             }
-            analyser(*inst);
+            analyser(*inst, &live_now);
             for reg in inst.get_reg_use() {
                 live_now.insert(reg);
             }

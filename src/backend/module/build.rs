@@ -66,9 +66,10 @@ impl AsmModule {
         self.reduce_caller_to_saved_after_func_split();
         self.analyse_caller_regs_to_saved();
 
-        self.remove_useless_func(); //在handle call之前调用,删掉前面往name func中加入的external func
-        self.handle_call_v3(pool);
+        // self.handle_call_v3(pool);
 
+        self.handle_call_v4(pool);
+        self.remove_external_func(); //在handle call之前调用,删掉前面往name func中加入的external func
         self.rearrange_stack_slot();
         self.update_array_offset(pool);
         self.build_stack_info(f);

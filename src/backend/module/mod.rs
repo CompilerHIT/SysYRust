@@ -23,6 +23,7 @@ use super::regalloc::easy_gc_alloc;
 use super::regalloc::structs::FuncAllocStat;
 use super::structs::GenerateAsm;
 pub mod build;
+pub mod handle_call;
 pub mod reduce_caller_save;
 pub mod schedule;
 mod test;

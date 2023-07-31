@@ -306,6 +306,12 @@ impl RegUsedStat {
             fregs_used: 0,
         }
     }
+    pub const fn init_unavailable() -> RegUsedStat {
+        RegUsedStat {
+            iregs_used: 0b_1111_1111_1111_1111_1111_1111_1111_1111,
+            fregs_used: 0b_1111_1111_1111_1111_1111_1111_1111_1111,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -313,6 +319,14 @@ mod test_regusestat {
     use crate::backend::operand::Reg;
 
     use super::RegUsedStat;
+
+    #[test]
+    fn test_unavailable() {
+        let reg_use_stat = RegUsedStat::init_unavailable();
+        for reg in 0..=63 {
+            assert!(!reg_use_stat.is_available_reg(reg));
+        }
+    }
 
     #[test]
     fn test_unspecial() {
