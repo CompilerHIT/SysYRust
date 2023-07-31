@@ -83,3 +83,25 @@ impl Func {
         }
     }
 }
+
+///带live now分析block的inst
+impl Func {
+    pub fn analyse_inst_with_live_now_backorder(
+        bb: ObjPtr<BB>,
+        analyser: &mut dyn FnMut(ObjPtr<LIRInst>),
+    ) {
+        let mut live_now = HashSet::new();
+        bb.live_out.iter().for_each(|reg| {
+            live_now.insert(*reg);
+        });
+        for inst in bb.insts.iter().rev() {
+            for reg in inst.get_reg_def() {
+                live_now.remove(&reg);
+            }
+            analyser(*inst);
+            for reg in inst.get_reg_use() {
+                live_now.insert(reg);
+            }
+        }
+    }
+}

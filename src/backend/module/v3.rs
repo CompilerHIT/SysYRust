@@ -12,10 +12,7 @@ impl AsmModule {
             if func.is_extern {
                 return;
             }
-            // Func::print_func(*func, "pre_spill.txt");
             func.as_mut().handle_spill_v3(pool);
-            // Func::print_func(*func, "suf_spill.txt");
-            // func.as_mut().handle_spill_v2(pool);
         });
     }
 

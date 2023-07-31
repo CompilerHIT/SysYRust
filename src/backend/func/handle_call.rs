@@ -253,19 +253,28 @@ impl Func {
             new_insts.reverse();
             bb.as_mut().insts = new_insts;
         }
+
         // self.print_func();
     }
 
     ///其中欧冠callers_used为指定函数使用的callers used寄存器
     /// callee_used_bug unsaved为指定函数使用了但是没有保存的寄存器
     /// 使用浮点寄存器作为中转而不是栈空间作为中转的方式减少load store
+    /// 使用临时栈空间而不是固定栈空间处理handle call
     pub fn handle_call_v4(
         &mut self,
         pool: &mut BackendPool,
         callers_used: &HashMap<String, HashSet<Reg>>,
-        callees_used_but_unsaved: &HashMap<String, HashSet<Reg>>,
+        callees_used: &HashMap<String, HashSet<Reg>>,
+        callees_be_saved: &HashMap<String, HashSet<Reg>>,
+        callers_need_saved: &HashMap<String, HashSet<Reg>>,
     ) {
         //对于main函数来说,可以任意地使用上下文中当前还存活地寄存器作为中转
         //根据上下文使用中转寄存器来中转caller saved寄存器的使用
+        self.calc_live_for_handle_call();
+
+        for bb in self.blocks.iter() {}
+
+        // self.print_func();
     }
 }
