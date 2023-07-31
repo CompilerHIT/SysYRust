@@ -176,6 +176,7 @@ impl Func {
         });
         //对于虚拟栈单元,按照使用次数从高到低进行排序
         let mut ordered_ssts: Vec<StackSlot> = all_rearrangable_stackslot.iter().cloned().collect();
+        // println!("{:?}", ordered_ssts);
         ordered_ssts.sort_by_cached_key(|sst| -times.get(sst).unwrap());
         let old_stack_size = all_rearrangable_stackslot.len() * 8;
         let mut allocated_ssts: Vec<StackSlot> = Vec::new();
@@ -185,7 +186,7 @@ impl Func {
             //记录所有已经用过的冲突的空间
             let mut unavailables_ssts: HashSet<StackSlot> = HashSet::new();
             debug_assert!(interef.contains_key(sst), "{}", {
-                Func::print_func(ObjPtr::new(self), "an_mem_re.txt");
+                // Func::print_func(ObjPtr::new(self), "an_mem_re.txt");
                 sst.get_pos()
             });
             for inter_sst in interef.get(sst).unwrap() {

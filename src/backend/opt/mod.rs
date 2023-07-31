@@ -25,8 +25,6 @@ impl BackendPass {
     pub fn run_pass(&mut self, pool: &mut BackendPool) {
         self.block_pass_pre_clear(pool);
         self.clear_pass(pool);
-        // 清除无用指令之后开始栈空间重排
-        // self.rearrange_stack_slot();
         self.block_pass();
         self.peephole_pass(pool);
     }

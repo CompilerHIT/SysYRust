@@ -4,6 +4,7 @@ use std::fmt::Display;
 use std::vec;
 
 use crate::backend::block::BB;
+use crate::backend::operand::Reg;
 use crate::utility::ObjPtr;
 use crate::utility::ScalarType;
 
@@ -23,21 +24,19 @@ impl RegUsedStat {
     }
 
     // 产生i专用的初始使用情况
-    pub fn init_for_i() -> RegUsedStat {
-        let mut out = RegUsedStat::new();
-        for reg in out.get_rest_fregs() {
-            out.use_reg(reg);
+    pub const fn init_for_i() -> RegUsedStat {
+        RegUsedStat {
+            iregs_used: 0b_0000_0000_0000_0000_0000_0000_0000_0000,
+            fregs_used: 0b_1111_1111_1111_1111_1111_1111_1111_1111,
         }
-        out
     }
 
     // 产生f专用的初始使用情况
-    pub fn init_for_f() -> RegUsedStat {
-        let mut out = RegUsedStat::new();
-        for reg in out.get_rest_iregs() {
-            out.use_reg(reg);
+    pub const fn init_for_f() -> RegUsedStat {
+        RegUsedStat {
+            iregs_used: 0b_1111_1111_1111_1111_1111_1111_1111_1111,
+            fregs_used: 0b_0000_0000_0000_0000_0000_0000_0000_0000,
         }
-        out
     }
 
     pub fn init_for_reg(kind: ScalarType) -> RegUsedStat {

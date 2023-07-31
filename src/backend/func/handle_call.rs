@@ -90,11 +90,6 @@ impl Func {
         }
     }
 
-    /// 给局部静态数组改名,加上指定后缀
-    // pub fn suffix_local_arr(&mut self, suffix: &String) {
-    //     todo!();
-    // }
-
     ///函数分裂用到的函数的真实深度克隆
     pub fn real_deep_clone(&self, pool: &mut BackendPool) -> ObjPtr<Func> {
         let context = pool.put_context(Context::new());
@@ -163,7 +158,7 @@ impl Func {
         self.calc_live_for_handle_call();
         let mut slots_for_caller_saved: Vec<StackSlot> = Vec::new();
         // self.print_func();
-        Func::print_func(ObjPtr::new(&self), "test_spill.txt");
+        // Func::print_func(ObjPtr::new(&self), "test_call.txt");
         for bb in self.blocks.iter() {
             let mut new_insts: Vec<ObjPtr<LIRInst>> = Vec::new();
             let mut live_now: HashSet<Reg> = HashSet::new();
@@ -263,12 +258,14 @@ impl Func {
 
     ///其中欧冠callers_used为指定函数使用的callers used寄存器
     /// callee_used_bug unsaved为指定函数使用了但是没有保存的寄存器
+    /// 使用浮点寄存器作为中转而不是栈空间作为中转的方式减少load store
     pub fn handle_call_v4(
         &mut self,
         pool: &mut BackendPool,
         callers_used: &HashMap<String, HashSet<Reg>>,
         callees_used_but_unsaved: &HashMap<String, HashSet<Reg>>,
     ) {
+        //对于main函数来说,可以任意地使用上下文中当前还存活地寄存器作为中转
         //根据上下文使用中转寄存器来中转caller saved寄存器的使用
     }
 }
