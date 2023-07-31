@@ -76,6 +76,39 @@ impl Func {
                 break;
             }
         }
-        // self.print_func();
+
+        //TODO,等待前端修改main的ret指令的类型为ScarlarType::Int
+        // 循环删除无用def
+        // loop {
+        //     self.calc_live_base();
+        //     let mut finish_flag = true;
+        //     for bb in self.blocks.iter() {
+        //         let mut new_insts = Vec::new();
+        //         Func::analyse_inst_with_live_now_backorder(*bb, &mut |inst, live_now| {
+        //             match inst.get_type() {
+        //                 InstrsType::Call => {
+        //                     new_insts.push(inst);
+        //                     return;
+        //                 }
+        //                 _ => (),
+        //             }
+        //             let def_reg = inst.get_def_reg();
+        //             if def_reg.is_none() {
+        //                 new_insts.push(inst);
+        //                 return;
+        //             }
+        //             let def_reg = def_reg.unwrap();
+        //             if !live_now.contains(def_reg) {
+        //                 finish_flag = false;
+        //                 return;
+        //             }
+        //             new_insts.push(inst);
+        //         });
+        //         bb.as_mut().insts = new_insts;
+        //     }
+        //     if finish_flag {
+        //         break;
+        //     }
+        // }
     }
 }
