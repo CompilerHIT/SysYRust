@@ -20,9 +20,13 @@ impl BackendPass {
         // 处理fuse_imm_br中，中间的基本块有多个前继的情况
         self.fuse_muti2imm_br();
         // 对于指令数量较少的那些块，复制上提
-        self.copy_exec();
+        // self.copy_exec();
         // 删除0出入度的块
         self.clear_unreachable_block();
+        // 清除空块(包括entry块)
+        self.clear_empty_block();
+        // jump的目标块如果紧邻，则删除jump语句
+        self.clear_useless_jump();
     }
 
     fn merge_br_jump(&mut self) {
@@ -111,7 +115,6 @@ impl BackendPass {
                 let prevs = prevs.iter().map(|x| *x).collect::<Vec<_>>();
                 let after = block.get_after()[0];
                 if prevs.len() == block.get_prev().len() && !exist_br_label(prevs.clone(), &block.label) {
-                    print_context(block.clone());
                     adjust_after_in(after, prevs.clone(), &block.label);
                     block.as_mut().out_edge.clear();
                 } else {
@@ -192,7 +195,6 @@ impl BackendPass {
             if !func.is_extern {
                 let mut useless_blocks: Vec<ObjPtr<BB>> = vec![];
                 func.blocks.iter().for_each(|block| {
-                    print_context(block.clone());
                     let prevs = block.get_prev();
                     if prevs.len() == 1 {
                         let prev = prevs[0];
@@ -221,7 +223,6 @@ impl BackendPass {
         self.module.name_func.iter().for_each(|(_, func)| {
             if !func.is_extern {
                 func.blocks.iter().for_each(|block| {
-                    // print_context(block.clone());
                     if block.insts.len() == 1 {
                         let tail = block.get_tail_inst();
                         if tail.get_type() == InstrsType::Jump {
@@ -442,5 +443,12 @@ fn print_context(block: ObjPtr<BB>) {
     }
     for after in block.get_after().iter() {
         log!("after: {}", after.label);
+    }
+}
+
+fn print_insts(block: ObjPtr<BB>) {
+    log!("block: {}", block.label);
+    for inst in block.insts.iter() {
+        log!("inst: {:?}", inst.as_ref());
     }
 }

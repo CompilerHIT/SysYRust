@@ -91,8 +91,11 @@ pub fn generate_asm(
     // 检查地址溢出，插入间接寻址
     module.handle_overflow(&mut pool);
 
-    //TODO: 块重排
     if is_opt {
+        // 再次进行指令重排
+        module.re_list_scheduling();
+
+        // 额外的块优化处理
         BackendPass::new(ObjPtr::new(module)).run_addition_block_pass();
     }
 
