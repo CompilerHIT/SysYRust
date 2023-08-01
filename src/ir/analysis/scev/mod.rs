@@ -39,11 +39,14 @@ impl SCEVAnalyzer {
         if let Some(scev) = self.map.get(inst) {
             return *scev;
         }
-        let in_loop = self
-            .loop_list
-            .iter()
-            .find(|li| li.is_in_current_loop(&inst.get_parent_bb()))
-            .cloned();
+        let in_loop = if inst.is_param() || inst.is_global_var() {
+            None
+        } else {
+            self.loop_list
+                .iter()
+                .find(|li| li.is_in_current_loop(&inst.get_parent_bb()))
+                .cloned()
+        };
 
         let scev;
 
@@ -83,6 +86,13 @@ impl SCEVAnalyzer {
         )
     }
 
+    fn chech_constant_or_no_in_loop(exp: ObjPtr<SCEVExp>, cur_loop: ObjPtr<LoopInfo>) -> bool {
+        exp.is_scev_constant()
+            || exp.get_in_loop() == None
+            || exp.get_in_loop().unwrap() != cur_loop
+                && cur_loop.is_a_sub_loop(exp.get_in_loop().unwrap())
+    }
+
     fn analyze_binary_add(
         &mut self,
         inst: &ObjPtr<Inst>,
@@ -106,10 +116,7 @@ impl SCEVAnalyzer {
                     .make_scev_add_rec_expr(result, Some(*inst), in_loop)
             }
             (true, false) => {
-                if rhs.is_scev_constant()
-                    || rhs.get_in_loop().unwrap() != cur_loop
-                        && cur_loop.is_a_sub_loop(rhs.get_in_loop().unwrap())
-                {
+                if Self::chech_constant_or_no_in_loop(rhs, cur_loop) {
                     let result = self.parse_add(&lhs.get_operands(), &[rhs], in_loop);
                     self.scevexp_pool
                         .make_scev_add_rec_expr(result, Some(*inst), in_loop)
@@ -118,10 +125,7 @@ impl SCEVAnalyzer {
                 }
             }
             (false, true) => {
-                if lhs.is_scev_constant()
-                    || lhs.get_in_loop().unwrap() != cur_loop
-                        && cur_loop.is_a_sub_loop(lhs.get_in_loop().unwrap())
-                {
+                if Self::chech_constant_or_no_in_loop(lhs, cur_loop) {
                     let result = self.parse_add(&rhs.get_operands(), &[lhs], in_loop);
                     self.scevexp_pool
                         .make_scev_add_rec_expr(result, Some(*inst), in_loop)
@@ -157,10 +161,7 @@ impl SCEVAnalyzer {
             }
             (true, false) => {
                 let lhs_op = lhs.get_operands();
-                if rhs.is_scev_constant()
-                    || rhs.get_in_loop().unwrap() != cur_loop
-                        && !cur_loop.is_a_sub_loop(rhs.get_in_loop().unwrap())
-                {
+                if Self::chech_constant_or_no_in_loop(rhs, cur_loop) {
                     let result = self.parse_sub(&lhs_op, &[rhs], in_loop);
                     self.scevexp_pool
                         .make_scev_sub_rec_expr(result, Some(*inst), in_loop)
@@ -170,10 +171,7 @@ impl SCEVAnalyzer {
             }
             (false, true) => {
                 let rhs_op = rhs.get_operands();
-                if lhs.is_scev_constant()
-                    || lhs.get_in_loop().unwrap() != cur_loop
-                        && !cur_loop.is_a_sub_loop(lhs.get_in_loop().unwrap())
-                {
+                if Self::chech_constant_or_no_in_loop(lhs, cur_loop) {
                     let result = self.parse_sub(&rhs_op, &[lhs], in_loop);
                     self.scevexp_pool
                         .make_scev_sub_rec_expr(result, Some(*inst), in_loop)
@@ -210,10 +208,7 @@ impl SCEVAnalyzer {
             (true, false) => {
                 let lhs_op = lhs.get_operands();
 
-                if rhs.is_scev_constant()
-                    || rhs.get_in_loop().unwrap() != cur_loop
-                        && !cur_loop.is_a_sub_loop(rhs.get_in_loop().unwrap())
-                {
+                if Self::chech_constant_or_no_in_loop(rhs, cur_loop) {
                     let result = self.parse_mul(&lhs_op, &[rhs], in_loop);
                     self.scevexp_pool
                         .make_scev_mul_rec_expr(result, Some(*inst), in_loop)
@@ -224,10 +219,7 @@ impl SCEVAnalyzer {
             (false, true) => {
                 let rhs_op = rhs.get_operands();
 
-                if lhs.is_scev_constant()
-                    || lhs.get_in_loop().unwrap() != cur_loop
-                        && !cur_loop.is_a_sub_loop(lhs.get_in_loop().unwrap())
-                {
+                if Self::chech_constant_or_no_in_loop(lhs, cur_loop) {
                     let result = self.parse_mul(&[lhs], &rhs_op, in_loop);
                     self.scevexp_pool
                         .make_scev_mul_rec_expr(result, Some(*inst), in_loop)
@@ -263,20 +255,31 @@ impl SCEVAnalyzer {
             let mut parse = |parsee: ObjPtr<Inst>| -> ObjPtr<SCEVExp> {
                 if parsee.is_int_const() {
                     self.scevexp_pool.make_scev_constant(parsee.get_int_bond())
-                } else if cur_loop.is_in_current_loop(&parsee.get_parent_bb()) {
+                } else if parsee.is_global_var()
+                    || parsee.is_param()
+                    || cur_loop.is_in_current_loop(&parsee.get_parent_bb())
+                {
                     self.scevexp_pool.make_scev_unknown(Some(parsee), in_loop)
                 } else {
                     self.analyze(&parsee)
                 }
             };
+
+            let check_inst_avaliable = |inst: ObjPtr<Inst>| -> bool {
+                inst.is_const()
+                    || inst.is_global_var()
+                    || inst.is_param()
+                    || !cur_loop.is_in_loop(&inst.get_parent_bb())
+            };
+
             match op.get_kind() {
                 InstKind::Binary(BinOp::Add) => {
                     let step = op.get_operand((index + 1) % 2);
-                    if step.is_const() || !cur_loop.is_in_loop(&step.get_parent_bb()) {
+                    if check_inst_avaliable(step) {
                         let start = inst
                             .get_operands()
                             .iter()
-                            .find(|x| !cur_loop.is_in_loop(&x.get_parent_bb()))
+                            .find(|x| check_inst_avaliable(**x))
                             .unwrap();
 
                         let result = vec![parse(*start), parse(step)];
@@ -288,13 +291,11 @@ impl SCEVAnalyzer {
 
                 InstKind::Binary(BinOp::Sub) => {
                     let step = op.get_operand(1);
-                    if index == 0
-                        && (step.is_const() || !cur_loop.is_in_loop(&step.get_parent_bb()))
-                    {
+                    if index == 0 && check_inst_avaliable(step) {
                         let start = inst
                             .get_operands()
                             .iter()
-                            .find(|x| !cur_loop.is_in_loop(&x.get_parent_bb()))
+                            .find(|x| check_inst_avaliable(**x))
                             .unwrap();
                         let result = vec![parse(*start), parse(step)];
                         return self
