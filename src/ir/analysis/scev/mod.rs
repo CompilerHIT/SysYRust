@@ -231,6 +231,20 @@ impl SCEVAnalyzer {
         }
     }
 
+    fn parse(&mut self, parsee: ObjPtr<Inst>, cur_loop: ObjPtr<LoopInfo>) -> ObjPtr<SCEVExp> {
+        if parsee.is_int_const() {
+            self.scevexp_pool.make_scev_constant(parsee.get_int_bond())
+        } else if parsee.is_global_var()
+            || parsee.is_param()
+            || cur_loop.is_in_current_loop(&parsee.get_parent_bb())
+        {
+            self.scevexp_pool
+                .make_scev_unknown(Some(parsee), Some(cur_loop))
+        } else {
+            self.analyze(&parsee)
+        }
+    }
+
     fn analyze_phi(
         &mut self,
         inst: &ObjPtr<Inst>,
@@ -252,18 +266,6 @@ impl SCEVAnalyzer {
             .position(|x| x.get_operands().contains(inst))
         {
             let op = inst.get_operand(index);
-            let mut parse = |parsee: ObjPtr<Inst>| -> ObjPtr<SCEVExp> {
-                if parsee.is_int_const() {
-                    self.scevexp_pool.make_scev_constant(parsee.get_int_bond())
-                } else if parsee.is_global_var()
-                    || parsee.is_param()
-                    || cur_loop.is_in_current_loop(&parsee.get_parent_bb())
-                {
-                    self.scevexp_pool.make_scev_unknown(Some(parsee), in_loop)
-                } else {
-                    self.analyze(&parsee)
-                }
-            };
 
             let check_inst_avaliable = |inst: ObjPtr<Inst>| -> bool {
                 inst.is_const()
@@ -282,10 +284,28 @@ impl SCEVAnalyzer {
                             .find(|x| check_inst_avaliable(**x))
                             .unwrap();
 
-                        let result = vec![parse(*start), parse(step)];
+                        let result = vec![self.parse(*start, cur_loop), self.parse(step, cur_loop)];
                         return self
                             .scevexp_pool
                             .make_scev_rec_expr(result, Some(*inst), in_loop);
+                    } else {
+                        let start = inst
+                            .get_operands()
+                            .iter()
+                            .find(|x| check_inst_avaliable(**x))
+                            .unwrap();
+                        let temp = self.scevexp_pool.make_scev_unknown(Some(*inst), in_loop);
+                        self.map.insert(*inst, temp);
+                        let scev_step = self.analyze(&step);
+                        if scev_step.is_scev_rec() && scev_step.get_in_loop() == in_loop {
+                            let mut result = vec![self.parse(*start, cur_loop)];
+                            result.extend(scev_step.get_operands().clone());
+                            return self.scevexp_pool.make_scev_rec_expr(
+                                result,
+                                Some(*inst),
+                                in_loop,
+                            );
+                        }
                     }
                 }
 
@@ -297,7 +317,7 @@ impl SCEVAnalyzer {
                             .iter()
                             .find(|x| check_inst_avaliable(**x))
                             .unwrap();
-                        let result = vec![parse(*start), parse(step)];
+                        let result = vec![self.parse(*start, cur_loop), self.parse(step, cur_loop)];
                         return self
                             .scevexp_pool
                             .make_scev_rec_expr(result, Some(*inst), in_loop);
