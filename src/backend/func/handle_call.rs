@@ -424,6 +424,7 @@ impl Func {
             bb.as_mut().insts = new_insts;
         }
         // self.print_func();
+        self.rm_unuse_sl_suf_handle_call(callers_used, callees_used, callees_be_saved);
     }
 }
 
@@ -432,7 +433,7 @@ impl Func {
     ///删除两个call指令间无用的因为handle call产生的sl
     fn rm_unuse_sl_suf_handle_call(
         &mut self,
-        caller_used: &HashMap<String, HashSet<Reg>>,
+        callers_used: &HashMap<String, HashSet<Reg>>,
         callees_used: &HashMap<String, HashSet<Reg>>,
         callees_be_saved: &HashMap<String, HashSet<Reg>>,
     ) {
@@ -447,12 +448,12 @@ impl Func {
             Func::analyse_inst_with_live_now_backorder(*bb, &mut |inst, live_now| {
                 if inst.get_type() == InstrsType::Call {
                     //对于这个指令def的寄存器,移除影响
-                    for reg in inst.get_reg_def() {
+                    for reg in inst.get_regs() {
                         store_to_insts.get_mut(&reg).unwrap().clear();
                     }
                     //对于这个call指令used但是没有保存的寄存器,移除store
                     let func_called = inst.get_func_name().unwrap();
-                    let mut caller_used = caller_used.get(func_called.as_str()).unwrap().clone();
+                    let mut caller_used = callers_used.get(func_called.as_str()).unwrap().clone();
                     caller_used.extend(callees_used.get(func_called.as_str()).unwrap().iter());
                     let callees_saveds = callees_be_saved.get(func_called.as_str()).unwrap();
                     caller_used.retain(|reg| !callees_saveds.contains(reg));
@@ -460,7 +461,6 @@ impl Func {
                     for reg in used_but_not_saved.iter() {
                         store_to_insts.get_mut(reg).unwrap().clear();
                     }
-
                     return;
                 }
                 match inst.get_type() {
