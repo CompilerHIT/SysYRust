@@ -1,3 +1,5 @@
+use rand::seq::index;
+
 use super::*;
 
 /// handle spill v3实现
@@ -653,5 +655,31 @@ impl Func {
 
         bb.as_mut().insts = new_insts;
         // unimplemented!()
+    }
+}
+
+///处理因为handle spill产生的多余指令
+impl Func {
+    ///都是需要用到的时候才进行寄存器值得归还与存储
+    ///但是在不同块之间的时候可以用寄存器的借还操作代替从内存空间读取值的操作
+    pub fn replace_inst_suf_spill(&mut self) {
+        //进行寄存器之间的移动操作
+        self.calc_live_base();
+        //如果只有一个前继块,则前继块中的spilling优先使用可用的物理寄存器移动到后方
+        // for bb in self.blocks.iter() {
+        //     //统计bb开头的spilling寄存器的恢复操作
+        //     let live_in = bb.live_in.clone();
+        //     let mut availables = RegUsedStat::init_unspecial_regs();
+        //     live_in
+        //         .iter()
+        //         .for_each(|reg| availables.use_reg(reg.get_color()));
+        //     //对于live in中存在的寄存器不能够借用
+        //     //其他寄存器能够用来做中转,记录第一个遇到的时候的指令
+        //     let mut first_load: HashMap<Reg, (ObjPtr<LIRInst>, RegUsedStat)> = HashMap::new();
+        //     let mut regs_used = availables;
+        //     for inst in bb.insts.iter() {
+        //         match
+        //     }
+        // }
     }
 }
