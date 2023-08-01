@@ -34,7 +34,7 @@ fn livo_in_loop(
     let mut rec_set = HashSet::new();
     loop_info.get_current_loop_bb().iter().for_each(|bb| {
         inst_process_in_bb(bb.get_head_inst(), |inst| {
-            if let SCEVExpKind::SCEVMulExpr = scev_analyzer.analyze(&inst).get_kind() {
+            if let SCEVExpKind::SCEVMulRecExpr = scev_analyzer.analyze(&inst).get_kind() {
                 rec_set.insert(inst);
             }
         })
@@ -59,7 +59,7 @@ fn mul_livo(
     scev_analyzer: &mut SCEVAnalyzer,
 ) {
     let scev_exp = scev_analyzer.analyze(&inst);
-    debug_assert!(scev_exp.get_operands().len() > 2);
+    debug_assert!(scev_exp.get_operands().len() >= 2);
 
     let mut tail_inst = loop_info.get_preheader().get_tail_inst();
     let op_vec = scev_exp
@@ -100,10 +100,10 @@ fn parse_step(
     }
 
     let mut header = loop_info.get_header();
-    let mut preheader = loop_info.get_preheader();
+    let preheader = loop_info.get_preheader();
     let mut phi = pools.1.make_phi(start.get_ir_type());
     header.push_front(phi);
-    preheader.push_back(start);
+
     let adder = pools.1.make_add(phi, step);
     inst.insert_after(adder);
 
@@ -123,9 +123,13 @@ fn parse_scev_exp(
     pools: &mut (&mut ObjPool<BasicBlock>, &mut ObjPool<Inst>),
 ) -> Vec<ObjPtr<Inst>> {
     let mut l_d = false;
-    let mut lhs = if exp.is_scev_constant() {
-        vec![pools.1.make_int_const(exp.get_scev_const())]
-    } else if exp.get_operands()[0].is_scev_rec() || exp.get_operands()[0].is_scev_unknown() {
+
+    if exp.is_scev_constant() {
+        return vec![pools.1.make_int_const(exp.get_scev_const())];
+    }
+
+    let mut lhs = if exp.get_operands()[0].is_scev_rec() || exp.get_operands()[0].is_scev_unknown()
+    {
         l_d = true;
         vec![exp.get_operands()[0].get_bond_inst()]
     } else {
@@ -133,9 +137,8 @@ fn parse_scev_exp(
     };
 
     let mut r_d = false;
-    let mut rhs = if exp.is_scev_constant() {
-        vec![pools.1.make_int_const(exp.get_scev_const())]
-    } else if exp.get_operands()[1].is_scev_rec() || exp.get_operands()[1].is_scev_unknown() {
+    let mut rhs = if exp.get_operands()[1].is_scev_rec() || exp.get_operands()[1].is_scev_unknown()
+    {
         r_d = true;
         vec![exp.get_operands()[1].get_bond_inst()]
     } else {
@@ -159,7 +162,9 @@ fn parse_scev_exp(
             debug_assert_eq!(exp.get_operands().len(), 2);
             result = pools.1.make_mul(lhs[l_i], rhs[r_i]);
         }
-        _ => unreachable!(),
+        _ => {
+            unreachable!()
+        }
     }
 
     if l_d {
