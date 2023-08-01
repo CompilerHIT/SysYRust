@@ -236,7 +236,17 @@ impl Debug for SCEVExp {
         let mut s = String::new();
         s += &format!("{:?}: ", self.kind);
         for operand in self.operands.iter() {
-            s += &format!("{:?}, ", operand);
+            match operand.kind {
+                SCEVExpKind::SCEVConstant => {
+                    s += &format!("{}, ", operand.scev_const);
+                }
+                SCEVExpKind::SCEVUnknown => {
+                    s += &format!("{:?}, ", operand.bond_inst);
+                }
+                _ => {
+                    s += &format!("{:?}, ", operand.kind);
+                }
+            }
         }
         write!(f, "{}", s)
     }
