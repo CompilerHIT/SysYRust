@@ -70,7 +70,7 @@ fn mul_livo(
             cur_op_vec.iter().for_each(|op| {
                 tail_inst.insert_before(*op);
             });
-            cur_op_vec[cur_op_vec.len() - 1]
+            cur_op_vec.last().unwrap().clone()
         })
         .collect::<Vec<_>>();
 
@@ -115,7 +115,7 @@ fn parse_step(
         phi.add_operand(start);
     }
 
-    adder
+    phi
 }
 
 fn parse_scev_exp(
