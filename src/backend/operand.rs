@@ -362,6 +362,14 @@ impl Reg {
         }
     }
     #[inline]
+    pub fn get_fs1() -> Reg {
+        Reg {
+            id: 41,
+            r_type: ScalarType::Float,
+        }
+    }
+
+    #[inline]
     pub const fn get_s0() -> Reg {
         Reg {
             id: 8,

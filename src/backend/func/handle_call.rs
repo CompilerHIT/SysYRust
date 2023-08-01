@@ -333,6 +333,7 @@ impl Func {
                 for reg in inst.get_regs() {
                     borrowables.use_reg(reg.get_color());
                 }
+
                 let mut callee_used = callees_used.get(func_called.as_str()).unwrap().clone();
                 callee_used.retain(|reg| {
                     !callees_be_saved
@@ -346,6 +347,9 @@ impl Func {
                 for reg in caller_used {
                     borrowables.use_reg(reg.get_color());
                 }
+
+                //猜测fs1寄存器不能够被借用
+                borrowables.use_reg(Reg::get_fs1().get_color());
 
                 //剩下的borrowables就是能够借用来中转的寄存器
                 let mut tmp_map: HashMap<Reg, TmpHolder> = HashMap::new();

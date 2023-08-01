@@ -31,7 +31,6 @@ use crate::ir::instruction::Inst;
 use crate::ir::ir_type::IrType;
 use crate::utility::{ObjPtr, ScalarType};
 use crate::{config, log_file};
-use biheap::BiHeap;
 pub mod dump;
 pub mod handle_call;
 pub mod p2v;

@@ -13,7 +13,7 @@ impl AsmModule {
         BackendPass::new(obj_module).block_pass_pre_clear(pool);
 
         self.remove_unuse_inst_pre_alloc();
-        self.print_func();
+        // self.print_func();
 
         //检查是否有存在name func里面没有,但是被调用了的函数
 
