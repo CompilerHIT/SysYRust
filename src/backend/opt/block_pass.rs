@@ -22,7 +22,7 @@ impl BackendPass {
         // 对于指令数量较少的那些块，复制上提
         // self.copy_exec();
         // 删除0出入度的块
-        self.clear_unreachable_block();
+        // self.clear_unreachable_block();
         // 清除空块(包括entry块)
         self.clear_empty_block();
         // jump的目标块如果紧邻，则删除jump语句
@@ -61,6 +61,7 @@ impl BackendPass {
             if !func.is_extern {
                 let mut imm_br: Vec<ObjPtr<BB>> = vec![];
                 func.blocks.iter().for_each(|block| {
+                    print_context(block.clone());
                     let afters = block.get_after();
                     let prevs = block.get_prev();
                     if afters.len() == 1 && prevs.len() == 1 && is_jump(prevs[0]) {
@@ -416,8 +417,12 @@ fn replace_first_block(block: ObjPtr<BB>, func: ObjPtr<Func>) {
         index += 1;
     }
     func.as_mut().blocks.remove(index);
-    func.as_mut().blocks.remove(0);
-    func.as_mut().blocks.insert(0, after.clone());
+    func.as_mut().blocks.remove(1);
+    func.as_mut().blocks.insert(1, after.clone());
+    for b in after.get_after().iter() {
+        b.as_mut().in_edge = vec![after.clone()];
+    }
+    func.blocks[0].as_mut().out_edge = vec![after.clone()];
 }
 
 fn exist_br_label(blocks: Vec<ObjPtr<BB>>, label: &String) -> bool {

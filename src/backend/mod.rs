@@ -93,7 +93,7 @@ pub fn generate_asm(
 
     if is_opt {
         // 再次进行指令重排
-        module.re_list_scheduling();
+        // module.re_list_scheduling();
 
         // 额外的块优化处理
         BackendPass::new(ObjPtr::new(module)).run_addition_block_pass();
