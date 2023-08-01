@@ -9,6 +9,8 @@ impl AsmModule {
     /// 5. 针对函数是否为main调整寄存器组成
     pub fn build_v4(&mut self, f: &mut File, _f2: &mut File, pool: &mut BackendPool, is_opt: bool) {
         self.build_lir(pool);
+        //TODO,在这里加上块合并
+
         self.remove_unuse_inst_pre_alloc();
 
         //检查是否有存在name func里面没有,但是被调用了的函数
