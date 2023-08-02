@@ -347,9 +347,9 @@ impl Func {
         }
 
         // self.remove_self_mv();
-        // Func::print_func(ObjPtr::new(&self), "pre_rm_unuse_store.txt");
+        Func::print_func(ObjPtr::new(&self), "./pre_rm_unuse_store.txt");
         self.remove_unuse_store();
-        // Func::print_func(ObjPtr::new(&self), "suf_rm_unuse_store.txt");
+        Func::print_func(ObjPtr::new(&self), "./suf_rm_unuse_store.txt");
         // self.remove_unuse_def();
         // Func::print_func(ObjPtr::new(&self), "after_rm_load.txt");
     }
@@ -366,7 +366,13 @@ impl Func {
                     InstrsType::StoreToStack => {
                         let sst = inst.get_stackslot_with_addr_size();
                         if !livenow.contains(&sst) && sst.get_pos() >= 0 {
-                            println!("{}-{}-{}", bb.label, index, inst.as_ref());
+                            log_file!(
+                                "./rm_for_store.txt",
+                                "{}-{}-{}",
+                                bb.label,
+                                index,
+                                inst.as_ref()
+                            );
                             to_rm.insert(*inst);
                         } else {
                             livenow.remove(&sst);
