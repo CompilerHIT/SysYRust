@@ -87,6 +87,12 @@ impl LoopInfo {
         }
     }
 
+    /// 判断一个循环是否是当前循环的子循环
+    pub fn is_a_sub_loop(&self, loop_tree: ObjPtr<LoopInfo>) -> bool {
+        self.sub_loops.contains(&loop_tree)
+            || self.sub_loops.iter().any(|x| x.is_a_sub_loop(loop_tree))
+    }
+
     /// 判断一个块是否在当前循环中
     pub fn is_in_loop(&self, bb: &ObjPtr<BasicBlock>) -> bool {
         if self.blocks.contains(bb) {

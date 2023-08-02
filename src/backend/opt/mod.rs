@@ -26,14 +26,11 @@ impl BackendPass {
     pub fn run_pass(&mut self, pool: &mut BackendPool) {
         self.block_pass_pre_clear(pool);
         self.clear_pass(pool);
-        self.block_pass();
         self.peephole_pass(pool);
     }
-
+    
     pub fn run_addition_block_pass(&mut self) {
-        // 清除空块(包括entry块)
-        self.clear_empty_block();
-        // jump的目标块如果紧邻，则删除jump语句
-        self.clear_useless_jump();
+        // 块优化
+        self.block_pass();
     }
 }

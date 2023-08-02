@@ -6,40 +6,54 @@ use super::*;
 
 pub struct SCEVExp {
     kind: SCEVExpKind,
-    operands: Vec<ObjPtr<Inst>>,
-    bond_inst: ObjPtr<Inst>,
+    operands: Vec<ObjPtr<SCEVExp>>,
+    scev_const: i32,
+    bond_inst: Option<ObjPtr<Inst>>,
+    in_loop: Option<ObjPtr<LoopInfo>>,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum SCEVExpKind {
     SCEVConstant,
     SCEVUnknown,
-    SCEVGEPExpr,
     SCEVAddExpr,
     SCEVSubExpr,
     SCEVMulExpr,
     SCEVRecExpr,
-    SCEVGEPRecExpr,
     SCEVAddRecExpr,
     SCEVSubRecExpr,
     SCEVMulRecExpr,
 }
 
 impl SCEVExp {
+    pub fn new(
+        kind: SCEVExpKind,
+        operands: Vec<ObjPtr<SCEVExp>>,
+        scev_const: i32,
+        bond_inst: Option<ObjPtr<Inst>>,
+        in_loop: Option<ObjPtr<LoopInfo>>,
+    ) -> Self {
+        SCEVExp {
+            kind,
+            operands,
+            scev_const,
+            bond_inst,
+            in_loop,
+        }
+    }
+
+    pub fn get_scev_const(&self) -> i32 {
+        self.scev_const
+    }
+
+    pub fn get_in_loop(&self) -> Option<ObjPtr<LoopInfo>> {
+        self.in_loop
+    }
     pub fn get_kind(&self) -> SCEVExpKind {
         self.kind
     }
-    pub fn get_operands(&self) -> Vec<ObjPtr<Inst>> {
+    pub fn get_operands(&self) -> Vec<ObjPtr<SCEVExp>> {
         self.operands.clone()
-    }
-    pub fn get_bond_inst(&self) -> ObjPtr<Inst> {
-        self.bond_inst
-    }
-    pub fn get_lhs(&self) -> ObjPtr<Inst> {
-        self.get_operands()[0]
-    }
-    pub fn get_rhs(&self) -> ObjPtr<Inst> {
-        self.get_operands()[1]
     }
     pub fn is_scev_constant(&self) -> bool {
         self.kind == SCEVExpKind::SCEVConstant
@@ -68,131 +82,152 @@ impl SCEVExp {
     pub fn is_scev_rec_expr(&self) -> bool {
         SCEVExpKind::SCEVRecExpr == self.kind
     }
-    pub fn is_scev_gep_rec_expr(&self) -> bool {
-        SCEVExpKind::SCEVGEPRecExpr == self.kind
+    pub fn is_scev_rec(&self) -> bool {
+        match self.kind {
+            SCEVExpKind::SCEVMulRecExpr
+            | SCEVExpKind::SCEVSubRecExpr
+            | SCEVExpKind::SCEVAddRecExpr
+            | SCEVExpKind::SCEVRecExpr => true,
+            _ => false,
+        }
     }
-    pub fn is_scev_gep_expr(&self) -> bool {
-        SCEVExpKind::SCEVGEPExpr == self.kind
-    }
-    pub fn set_operands(&mut self, operands: Vec<ObjPtr<Inst>>) {
+    pub fn set_operands(&mut self, operands: Vec<ObjPtr<SCEVExp>>) {
         self.operands = operands;
     }
-    pub fn get_scev_rec_start(&self) -> ObjPtr<Inst> {
-        debug_assert_eq!(self.kind, SCEVExpKind::SCEVRecExpr);
-        self.get_operands()[0]
-    }
-    pub fn get_scev_rec_step(&self) -> ObjPtr<Inst> {
-        debug_assert_eq!(self.kind, SCEVExpKind::SCEVRecExpr);
-        self.get_operands()[1]
-    }
-    pub fn get_scev_rec_end_cond(&self, mut loop_info: ObjPtr<LoopInfo>) -> Vec<ObjPtr<Inst>> {
-        debug_assert_eq!(self.get_kind(), SCEVExpKind::SCEVRecExpr);
-        loop_info
-            .get_exit_blocks()
-            .iter()
-            .map(|bb| bb.get_tail_inst().get_br_cond())
-            .collect()
+    pub fn get_bond_inst(&self) -> ObjPtr<Inst> {
+        debug_assert!(self.is_scev_rec_expr() || self.is_scev_unknown());
+        self.bond_inst.unwrap()
     }
 }
 
 impl ObjPool<SCEVExp> {
-    pub fn make_scev_constant(&mut self, bond_inst: ObjPtr<Inst>) -> ObjPtr<SCEVExp> {
-        self.put(SCEVExp {
-            kind: SCEVExpKind::SCEVConstant,
-            operands: vec![],
-            bond_inst,
-        })
+    pub fn make_scev_constant(&mut self, scev_const: i32) -> ObjPtr<SCEVExp> {
+        self.put(SCEVExp::new(
+            SCEVExpKind::SCEVConstant,
+            vec![],
+            scev_const,
+            None,
+            None,
+        ))
     }
 
-    pub fn make_scev_unknown(&mut self, bond_inst: ObjPtr<Inst>) -> ObjPtr<SCEVExp> {
-        self.put(SCEVExp {
-            kind: SCEVExpKind::SCEVUnknown,
-            operands: vec![],
+    pub fn make_scev_unknown(
+        &mut self,
+        bond_inst: Option<ObjPtr<Inst>>,
+        in_loop: Option<ObjPtr<LoopInfo>>,
+    ) -> ObjPtr<SCEVExp> {
+        self.put(SCEVExp::new(
+            SCEVExpKind::SCEVUnknown,
+            vec![],
+            0,
             bond_inst,
-        })
+            in_loop,
+        ))
     }
 
-    pub fn make_scev_add_expr(&mut self, bond_inst: ObjPtr<Inst>) -> ObjPtr<SCEVExp> {
-        self.put(SCEVExp {
-            kind: SCEVExpKind::SCEVAddExpr,
-            operands: bond_inst.get_operands().clone(),
-            bond_inst,
-        })
+    pub fn make_scev_add_expr(
+        &mut self,
+        lhs: ObjPtr<SCEVExp>,
+        rhs: ObjPtr<SCEVExp>,
+        in_loop: Option<ObjPtr<LoopInfo>>,
+    ) -> ObjPtr<SCEVExp> {
+        self.put(SCEVExp::new(
+            SCEVExpKind::SCEVAddExpr,
+            vec![lhs, rhs],
+            0,
+            None,
+            in_loop,
+        ))
     }
 
-    pub fn make_scev_sub_expr(&mut self, bond_inst: ObjPtr<Inst>) -> ObjPtr<SCEVExp> {
-        self.put(SCEVExp {
-            kind: SCEVExpKind::SCEVSubExpr,
-            operands: bond_inst.get_operands().clone(),
-            bond_inst,
-        })
+    pub fn make_scev_sub_expr(
+        &mut self,
+        lhs: ObjPtr<SCEVExp>,
+        rhs: ObjPtr<SCEVExp>,
+        in_loop: Option<ObjPtr<LoopInfo>>,
+    ) -> ObjPtr<SCEVExp> {
+        self.put(SCEVExp::new(
+            SCEVExpKind::SCEVSubExpr,
+            vec![lhs, rhs],
+            0,
+            None,
+            in_loop,
+        ))
     }
 
-    pub fn make_scev_mul_expr(&mut self, bond_inst: ObjPtr<Inst>) -> ObjPtr<SCEVExp> {
-        self.put(SCEVExp {
-            kind: SCEVExpKind::SCEVMulExpr,
-            operands: bond_inst.get_operands().clone(),
-            bond_inst,
-        })
+    pub fn make_scev_mul_expr(
+        &mut self,
+        lhs: ObjPtr<SCEVExp>,
+        rhs: ObjPtr<SCEVExp>,
+        in_loop: Option<ObjPtr<LoopInfo>>,
+    ) -> ObjPtr<SCEVExp> {
+        self.put(SCEVExp::new(
+            SCEVExpKind::SCEVMulExpr,
+            vec![lhs, rhs],
+            0,
+            None,
+            in_loop,
+        ))
     }
 
-    pub fn make_scev_mul_rec_expr(&mut self, bond_inst: ObjPtr<Inst>) -> ObjPtr<SCEVExp> {
-        self.put(SCEVExp {
-            kind: SCEVExpKind::SCEVMulRecExpr,
-            operands: bond_inst.get_operands().clone(),
-            bond_inst,
-        })
-    }
-
-    pub fn make_scev_add_rec_expr(&mut self, bond_inst: ObjPtr<Inst>) -> ObjPtr<SCEVExp> {
-        self.put(SCEVExp {
-            kind: SCEVExpKind::SCEVAddRecExpr,
-            operands: bond_inst.get_operands().clone(),
-            bond_inst,
-        })
-    }
-
-    pub fn make_scev_sub_rec_expr(&mut self, bond_inst: ObjPtr<Inst>) -> ObjPtr<SCEVExp> {
-        self.put(SCEVExp {
-            kind: SCEVExpKind::SCEVSubRecExpr,
-            operands: bond_inst.get_operands().clone(),
-            bond_inst,
-        })
-    }
-
-    pub fn make_scev_gep_rec_expr(&mut self, bond_inst: ObjPtr<Inst>) -> ObjPtr<SCEVExp> {
-        let mut operands = bond_inst.get_operands().clone();
-        operands.pop();
-        self.put(SCEVExp {
-            kind: SCEVExpKind::SCEVGEPRecExpr,
+    pub fn make_scev_mul_rec_expr(
+        &mut self,
+        operands: Vec<ObjPtr<SCEVExp>>,
+        bond_inst: Option<ObjPtr<Inst>>,
+        in_loop: Option<ObjPtr<LoopInfo>>,
+    ) -> ObjPtr<SCEVExp> {
+        self.put(SCEVExp::new(
+            SCEVExpKind::SCEVMulRecExpr,
             operands,
+            0,
             bond_inst,
-        })
+            in_loop,
+        ))
     }
 
-    pub fn make_scev_gep_expr(&mut self, bond_inst: ObjPtr<Inst>) -> ObjPtr<SCEVExp> {
-        let mut operands = bond_inst.get_operands().clone();
-        operands.pop();
-        self.put(SCEVExp {
-            kind: SCEVExpKind::SCEVGEPExpr,
+    pub fn make_scev_add_rec_expr(
+        &mut self,
+        operands: Vec<ObjPtr<SCEVExp>>,
+        bond_inst: Option<ObjPtr<Inst>>,
+        in_loop: Option<ObjPtr<LoopInfo>>,
+    ) -> ObjPtr<SCEVExp> {
+        self.put(SCEVExp::new(
+            SCEVExpKind::SCEVAddRecExpr,
             operands,
+            0,
             bond_inst,
-        })
+            in_loop,
+        ))
+    }
+
+    pub fn make_scev_sub_rec_expr(
+        &mut self,
+        operands: Vec<ObjPtr<SCEVExp>>,
+        bond_inst: Option<ObjPtr<Inst>>,
+        in_loop: Option<ObjPtr<LoopInfo>>,
+    ) -> ObjPtr<SCEVExp> {
+        self.put(SCEVExp::new(
+            SCEVExpKind::SCEVSubRecExpr,
+            operands,
+            0,
+            bond_inst,
+            in_loop,
+        ))
     }
 
     pub fn make_scev_rec_expr(
         &mut self,
-        bond_inst: ObjPtr<Inst>,
-        start: ObjPtr<Inst>,
-        step: ObjPtr<Inst>,
+        operands: Vec<ObjPtr<SCEVExp>>,
+        bond_inst: Option<ObjPtr<Inst>>,
+        in_loop: Option<ObjPtr<LoopInfo>>,
     ) -> ObjPtr<SCEVExp> {
-        let mut operands = bond_inst.get_operands().clone();
-        operands.pop();
-        self.put(SCEVExp {
-            kind: SCEVExpKind::SCEVRecExpr,
-            operands: vec![start, step],
+        self.put(SCEVExp::new(
+            SCEVExpKind::SCEVRecExpr,
+            operands,
+            0,
             bond_inst,
-        })
+            in_loop,
+        ))
     }
 }
 
@@ -201,7 +236,17 @@ impl Debug for SCEVExp {
         let mut s = String::new();
         s += &format!("{:?}: ", self.kind);
         for operand in self.operands.iter() {
-            s += &format!("{:?}, ", operand);
+            match operand.kind {
+                SCEVExpKind::SCEVConstant => {
+                    s += &format!("{}, ", operand.scev_const);
+                }
+                SCEVExpKind::SCEVUnknown => {
+                    s += &format!("{:?}, ", operand.bond_inst);
+                }
+                _ => {
+                    s += &format!("{:?}, ", operand.kind);
+                }
+            }
         }
         write!(f, "{}", s)
     }

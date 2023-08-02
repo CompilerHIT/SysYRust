@@ -297,16 +297,23 @@ impl Func {
             Reg(Reg),
             StackOffset(i32),
         }
-        let build_tmp_slot = |func: &mut Func| -> i32 {
-            let back = func.stack_addr.back().unwrap();
-            let pos = back.get_pos() + back.get_size();
-            let new_stack_slot = StackSlot::new(pos, ADDR_SIZE);
-            func.stack_addr.push_back(new_stack_slot);
-            new_stack_slot.get_pos()
-        };
 
         let this_func = ObjPtr::new(&self);
         for bb in self.blocks.iter() {
+            let mut phy_mems_for_handle_call = HashMap::new();
+            //每个固定的中转物理寄存器使用相同的栈空间,以方便后面的无用读写删除优化
+            let mut build_tmp_slot = |func: &mut Func, reg: &Reg| -> i32 {
+                if phy_mems_for_handle_call.contains_key(reg) {
+                    return *phy_mems_for_handle_call.get(reg).unwrap();
+                }
+                let back = func.stack_addr.back().unwrap();
+                let pos = back.get_pos() + back.get_size();
+                let new_stack_slot = StackSlot::new(pos, ADDR_SIZE);
+                func.stack_addr.push_back(new_stack_slot);
+                let new_pos = new_stack_slot.get_pos();
+                phy_mems_for_handle_call.insert(*reg, new_pos);
+                new_pos
+            };
             let mut new_insts = Vec::new();
             Func::analyse_inst_with_live_now_backorder(*bb, &mut |inst, live_now| {
                 match inst.get_type() {
@@ -333,6 +340,7 @@ impl Func {
                 for reg in inst.get_regs() {
                     borrowables.use_reg(reg.get_color());
                 }
+
                 let mut callee_used = callees_used.get(func_called.as_str()).unwrap().clone();
                 callee_used.retain(|reg| {
                     !callees_be_saved
@@ -346,6 +354,8 @@ impl Func {
                 for reg in caller_used {
                     borrowables.use_reg(reg.get_color());
                 }
+                //猜测fs1寄存器不能够被借用
+                borrowables.use_reg(Reg::get_fs1().get_color());
 
                 //剩下的borrowables就是能够借用来中转的寄存器
                 let mut tmp_map: HashMap<Reg, TmpHolder> = HashMap::new();
@@ -373,7 +383,7 @@ impl Func {
                     // }
 
                     //如果异色的都没有那么分配临时栈空间
-                    let tmp_holder = build_tmp_slot(this_func.as_mut());
+                    let tmp_holder = build_tmp_slot(this_func.as_mut(), reg);
                     tmp_map.insert(*reg, TmpHolder::StackOffset(tmp_holder));
                 }
 
@@ -414,5 +424,82 @@ impl Func {
             bb.as_mut().insts = new_insts;
         }
         // self.print_func();
+        self.rm_unuse_sl_suf_handle_call(callers_used, callees_used, callees_be_saved);
+    }
+}
+
+//删除因为handle call进行的重复读写
+impl Func {
+    ///删除两个call指令间无用的因为handle call产生的sl
+    fn rm_unuse_sl_suf_handle_call(
+        &mut self,
+        callers_used: &HashMap<String, HashSet<Reg>>,
+        callees_used: &HashMap<String, HashSet<Reg>>,
+        callees_be_saved: &HashMap<String, HashSet<Reg>>,
+    ) {
+        self.calc_live_base();
+        for bb in self.blocks.iter() {
+            let mut store_to_insts: HashMap<Reg, Vec<ObjPtr<LIRInst>>> = HashMap::new();
+            for reg in Reg::get_all_regs() {
+                store_to_insts.insert(reg, Vec::with_capacity(2));
+            }
+            let mut to_rm_insts: HashSet<ObjPtr<LIRInst>> = HashSet::new();
+            //遇到call指令才开始统计
+            Func::analyse_inst_with_live_now_backorder(*bb, &mut |inst, live_now| {
+                if inst.get_type() == InstrsType::Call {
+                    //对于这个指令def的寄存器,移除影响
+                    for reg in inst.get_regs() {
+                        store_to_insts.get_mut(&reg).unwrap().clear();
+                    }
+                    //对于这个call指令used但是没有保存的寄存器,移除store
+                    let func_called = inst.get_func_name().unwrap();
+                    let mut caller_used = callers_used.get(func_called.as_str()).unwrap().clone();
+                    caller_used.extend(callees_used.get(func_called.as_str()).unwrap().iter());
+                    let callees_saveds = callees_be_saved.get(func_called.as_str()).unwrap();
+                    caller_used.retain(|reg| !callees_saveds.contains(reg));
+                    let used_but_not_saved = caller_used;
+                    for reg in used_but_not_saved.iter() {
+                        store_to_insts.get_mut(reg).unwrap().clear();
+                    }
+                    return;
+                }
+                match inst.get_type() {
+                    InstrsType::LoadFromStack => {
+                        let reg = inst.get_def_reg().unwrap();
+                        //如果已经有了个store,判断指向的地址是否相同,
+                        let pres = store_to_insts.get_mut(reg).unwrap();
+                        if pres.len() == 1 {
+                            let next_offset = pres.get(0).unwrap().get_stack_offset();
+                            let cur_offset = inst.get_stack_offset();
+                            if next_offset == cur_offset {
+                                //对同一个内存位置的无用读写
+                                to_rm_insts.insert(inst);
+                                to_rm_insts.insert(pres.remove(0));
+                            } else {
+                                pres.clear();
+                            }
+                        } else {
+                            debug_assert!(pres.len() == 0);
+                        }
+                    }
+                    InstrsType::StoreToStack => {
+                        let reg = inst.get_dst().drop_reg();
+                        let pres = store_to_insts.get_mut(&reg).unwrap();
+                        if pres.len() == 0 {
+                            pres.push(inst);
+                        } else {
+                            debug_assert!(pres.len() == 1);
+                            *pres.get_mut(0).unwrap() = inst;
+                        }
+                    }
+                    _ => {
+                        for reg in inst.get_regs() {
+                            store_to_insts.get_mut(&reg).unwrap().clear();
+                        }
+                    }
+                }
+            });
+            bb.as_mut().insts.retain(|inst| !to_rm_insts.contains(inst));
+        }
     }
 }

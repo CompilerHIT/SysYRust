@@ -55,6 +55,11 @@ impl Function {
         self.head_block = Some(bb);
     }
 
+    /// 设置第一个BB
+    pub fn set_head(&mut self, bb: ObjPtr<BasicBlock>) {
+        self.head_block = Some(bb);
+    }
+
     /// 获得第一个块，默认为非空块
     pub fn get_head(&self) -> ObjPtr<BasicBlock> {
         debug_assert_ne!(self.head_block.is_none(), true, "函数中没有BB");

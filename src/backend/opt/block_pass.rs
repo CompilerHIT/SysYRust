@@ -20,9 +20,13 @@ impl BackendPass {
         // 处理fuse_imm_br中，中间的基本块有多个前继的情况
         self.fuse_muti2imm_br();
         // 对于指令数量较少的那些块，复制上提
-        self.copy_exec();
+        // self.copy_exec();
         // 删除0出入度的块
-        self.clear_unreachable_block();
+        // self.clear_unreachable_block();
+        // 清除空块(包括entry块)
+        self.clear_empty_block();
+        // jump的目标块如果紧邻，则删除jump语句
+        self.clear_useless_jump();
     }
 
     fn merge_br_jump(&mut self) {
@@ -57,6 +61,7 @@ impl BackendPass {
             if !func.is_extern {
                 let mut imm_br: Vec<ObjPtr<BB>> = vec![];
                 func.blocks.iter().for_each(|block| {
+                    print_context(block.clone());
                     let afters = block.get_after();
                     let prevs = block.get_prev();
                     if afters.len() == 1 && prevs.len() == 1 && is_jump(prevs[0]) {
@@ -110,7 +115,9 @@ impl BackendPass {
             imm_br_pred.iter().for_each(|(block, prevs)| {
                 let prevs = prevs.iter().map(|x| *x).collect::<Vec<_>>();
                 let after = block.get_after()[0];
-                if prevs.len() == block.get_prev().len() && !exist_br_label(prevs.clone(), &block.label) {
+                if prevs.len() == block.get_prev().len()
+                    && !exist_br_label(prevs.clone(), &block.label)
+                {
                     print_context(block.clone());
                     adjust_after_in(after, prevs.clone(), &block.label);
                     block.as_mut().out_edge.clear();
@@ -134,65 +141,64 @@ impl BackendPass {
         })
     }
 
-    fn copy_exec(&mut self) {
-        self.module.name_func.iter().for_each(|(_, func)| {
-            let mut imm_br_pred: Vec<(ObjPtr<BB>, HashSet<ObjPtr<BB>>)> = vec![];
-            func.blocks.iter().for_each(|block| {
-                // 获取那些通过jump跳到该块的前继
-                let prevs: HashSet<_> = block
-                    .get_prev()
-                    .iter()
-                    .filter(|&&prev| {
-                        prev.insts.len() > 0
-                            && prev.get_tail_inst().get_type() == InstrsType::Jump
-                            && (prev.get_tail_inst().get_label().clone()
-                                == Operand::Addr(block.label.clone()))
-                    })
-                    .map(|prev| *prev)
-                    .collect();
+    // fn copy_exec(&mut self) {
+    //     self.module.name_func.iter().for_each(|(_, func)| {
+    //         let mut imm_br_pred: Vec<(ObjPtr<BB>, HashSet<ObjPtr<BB>>)> = vec![];
+    //         func.blocks.iter().for_each(|block| {
+    //             // 获取那些通过jump跳到该块的前继
+    //             let prevs: HashSet<_> = block
+    //                 .get_prev()
+    //                 .iter()
+    //                 .filter(|&&prev| {
+    //                     prev.insts.len() > 0
+    //                         && prev.get_tail_inst().get_type() == InstrsType::Jump
+    //                         && (prev.get_tail_inst().get_label().clone()
+    //                             == Operand::Addr(block.label.clone()))
+    //                 })
+    //                 .map(|prev| *prev)
+    //                 .collect();
 
-                // 如果只有一个后继且满足上述条件的前继块数量大于0
-                if block.insts.len() <= 5 && prevs.len() > 0 {
-                    imm_br_pred.push((block.clone(), prevs.clone()));
-                }
-            });
+    //             // 如果只有一个后继且满足上述条件的前继块数量大于0
+    //             if block.insts.len() <= 5 && prevs.len() > 0 {
+    //                 imm_br_pred.push((block.clone(), prevs.clone()));
+    //             }
+    //         });
 
-            imm_br_pred.iter().for_each(|(block, prevs)| {
-                let prevs = prevs.iter().map(|x| *x).collect::<Vec<_>>();
-                // 前继不经由branch跳到该块
-                if prevs.len() == block.get_prev().len() && !exist_br_label(prevs.clone(), &block.label) {
-                    for after in block.get_after().iter() {
-                        adjust_after_in(after.clone(), prevs.clone(), &block.label);
-                    }
-                    block.as_mut().out_edge.clear();
-                } else {
-                    for after in block.get_after().iter() {
-                        adjust_after_in(after.clone(), prevs.clone(), &String::from(""));
-                    }
-                }
-                for prev in prevs.iter() {
-                    let mut insts = block.insts.clone();
-                    prev.as_mut().insts.pop();
-                    prev.as_mut().push_back_list(&mut insts);
-                    adjust_prev_out(prev.clone(), block.get_after().clone(), &block.label);
-                }
-                block.as_mut().in_edge = block
-                    .as_mut()
-                    .in_edge
-                    .iter()
-                    .filter(|&&b| prevs.iter().all(|&prev| prev != b))
-                    .map(|b| *b)
-                    .collect::<Vec<ObjPtr<BB>>>();
-            })
-        })
-    }
+    //         imm_br_pred.iter().for_each(|(block, prevs)| {
+    //             let prevs = prevs.iter().map(|x| *x).collect::<Vec<_>>();
+    //             // 前继不经由branch跳到该块
+    //             if prevs.len() == block.get_prev().len() && !exist_br_label(prevs.clone(), &block.label) {
+    //                 for after in block.get_after().iter() {
+    //                     adjust_after_in(after.clone(), prevs.clone(), &block.label);
+    //                 }
+    //                 block.as_mut().out_edge.clear();
+    //             } else {
+    //                 for after in block.get_after().iter() {
+    //                     adjust_after_in(after.clone(), prevs.clone(), &String::from(""));
+    //                 }
+    //             }
+    //             for prev in prevs.iter() {
+    //                 let mut insts = block.insts.clone();
+    //                 prev.as_mut().insts.pop();
+    //                 prev.as_mut().push_back_list(&mut insts);
+    //                 adjust_prev_out(prev.clone(), block.get_after().clone(), &block.label);
+    //             }
+    //             block.as_mut().in_edge = block
+    //                 .as_mut()
+    //                 .in_edge
+    //                 .iter()
+    //                 .filter(|&&b| prevs.iter().all(|&prev| prev != b))
+    //                 .map(|b| *b)
+    //                 .collect::<Vec<ObjPtr<BB>>>();
+    //         })
+    //     })
+    // }
 
     fn fuse_basic_block(&mut self) {
         self.module.name_func.iter().for_each(|(_, func)| {
             if !func.is_extern {
                 let mut useless_blocks: Vec<ObjPtr<BB>> = vec![];
                 func.blocks.iter().for_each(|block| {
-                    print_context(block.clone());
                     let prevs = block.get_prev();
                     if prevs.len() == 1 {
                         let prev = prevs[0];
@@ -220,8 +226,8 @@ impl BackendPass {
     fn clear_one_jump(&mut self) {
         self.module.name_func.iter().for_each(|(_, func)| {
             if !func.is_extern {
+                let mut clear_blocks = HashSet::new();
                 func.blocks.iter().for_each(|block| {
-                    // print_context(block.clone());
                     if block.insts.len() == 1 {
                         let tail = block.get_tail_inst();
                         if tail.get_type() == InstrsType::Jump {
@@ -236,29 +242,31 @@ impl BackendPass {
                             prevs.iter().for_each(|prev| {
                                 if prev.insts.len() == 0 {
                                     replace_first_block(block.clone(), func.clone());
-                                    return;
-                                }
-                                let prev_tail = prev.get_tail_inst();
-                                if *prev_tail.get_label() == Operand::Addr(block.label.clone()) {
-                                    prev_tail.as_mut().replace_label(after_label.clone());
                                 } else {
-                                    if prev.insts.len() > 1 {
-                                        let last_two_tail = prev.get_last_not_tail_inst();
-                                        last_two_tail.as_mut().replace_label(after_label.clone());
+                                    let prev_tail = prev.get_tail_inst();
+                                    if *prev_tail.get_label() == Operand::Addr(block.label.clone()) {
+                                        prev_tail.as_mut().replace_label(after_label.clone());
+                                    } else {
+                                        if prev.insts.len() > 1 {
+                                            let last_two_tail = prev.get_last_not_tail_inst();
+                                            last_two_tail.as_mut().replace_label(after_label.clone());
+                                        }
                                     }
+                                    adjust_prev_out(
+                                        prev.clone(),
+                                        block.get_after().clone(),
+                                        &block.label,
+                                    );
+                                    clear_blocks.insert(block);
                                 }
-                                adjust_prev_out(
-                                    prev.clone(),
-                                    block.get_after().clone(),
-                                    &block.label,
-                                );
                             });
-
-                            block.as_mut().in_edge.clear();
-                            block.as_mut().out_edge.clear();
                         }
                     }
-                })
+                });
+                for b in clear_blocks.iter() {
+                    b.as_mut().in_edge.clear();
+                    b.as_mut().out_edge.clear();
+                }
             }
         })
     }
@@ -404,6 +412,7 @@ fn adjust_prev_out(block: ObjPtr<BB>, afters: Vec<ObjPtr<BB>>, clear_label: &Str
 fn replace_first_block(block: ObjPtr<BB>, func: ObjPtr<Func>) {
     assert!(block.get_after().len() == 1);
     let after = block.get_after()[0].clone();
+    let aafter = after.get_after();
     let mut index = 0;
     loop {
         if index >= func.blocks.len() {
@@ -415,8 +424,9 @@ fn replace_first_block(block: ObjPtr<BB>, func: ObjPtr<Func>) {
         index += 1;
     }
     func.as_mut().blocks.remove(index);
-    func.as_mut().blocks.remove(0);
-    func.as_mut().blocks.insert(0, after.clone());
+    func.as_mut().blocks.remove(1);
+    func.as_mut().blocks.insert(1, after);
+    func.blocks[0].as_mut().out_edge = vec![after];
 }
 
 fn exist_br_label(blocks: Vec<ObjPtr<BB>>, label: &String) -> bool {
@@ -442,5 +452,12 @@ fn print_context(block: ObjPtr<BB>) {
     }
     for after in block.get_after().iter() {
         log!("after: {}", after.label);
+    }
+}
+
+fn print_insts(block: ObjPtr<BB>) {
+    log!("block: {}", block.label);
+    for inst in block.insts.iter() {
+        log!("inst: {:?}", inst.as_ref());
     }
 }

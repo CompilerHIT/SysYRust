@@ -1,5 +1,3 @@
-use std::collections::VecDeque;
-
 use crate::{
     backend::{func, opt, regalloc::perfect_alloc},
     ir::CallMap,

@@ -135,7 +135,7 @@ impl AsmModule {
             let mut keys: Vec<(Reg, Reg)> = constraints_times
                 .iter()
                 .map(|(k, _)| *k)
-                .filter(|(v, p)| p.is_caller_save())
+                .filter(|(_, p)| p.is_caller_save())
                 .collect();
             keys.sort_by_key(|key| constraints_times.get(key).unwrap());
             let mut keys: LinkedList<(Reg, Reg)> = keys.iter().cloned().collect();

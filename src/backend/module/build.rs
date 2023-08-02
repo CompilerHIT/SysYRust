@@ -8,16 +8,18 @@ impl AsmModule {
     /// 4. 寄存器重分配:针对call上下文调整函数寄存器组成
     /// 5. 针对函数是否为main调整寄存器组成
     pub fn build_v4(&mut self, f: &mut File, _f2: &mut File, pool: &mut BackendPool, is_opt: bool) {
+        let obj_module = ObjPtr::new(self);
         self.build_lir(pool);
-        //TODO,在这里加上块合并
+        BackendPass::new(obj_module).block_pass_pre_clear(pool);
 
         self.remove_unuse_inst_pre_alloc();
+        // self.print_func();
 
         //检查是否有存在name func里面没有,但是被调用了的函数
 
         if is_opt {
             // // gep偏移计算合并
-            BackendPass::new(ObjPtr::new(self)).opt_gep();
+            BackendPass::new(obj_module).opt_gep();
 
             // 设置一些寄存器为临时变量
             self.cal_tmp_var();

@@ -1,11 +1,9 @@
 use lalrpop_util::lalrpop_mod;
 use sysylib::config;
 use sysylib::frontend::preprocess::preprocess;
-use sysylib::ir::dump_now;
 extern crate biheap;
 // extern crate hexf_parse;
 // extern crate libm;
-use std::env;
 use sysylib::backend::module::AsmModule;
 use sysylib::frontend::irgen::irgen;
 use sysylib::ir::instruction::Inst;
@@ -24,6 +22,7 @@ fn run_main() {
     // ---------------------测试代码---------------------
     #[cfg(debug_assertions)]
     {
+        use std::env;
         env::set_var("RUST_BACKTRACE", "1");
         println!("debug mode");
     }
@@ -44,7 +43,7 @@ fn run_main() {
     crate::config::set_file_path(&String::from(filename)); //把函数名加载到全局
 
     // 生成汇编的标志
-    let s_option = matches.is_present("S");
+    let _s_option = matches.is_present("S");
     // 输出文件名
     let output = matches.value_of("o").unwrap_or("testcase.s");
 

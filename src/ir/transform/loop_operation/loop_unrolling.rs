@@ -18,7 +18,7 @@ pub fn loop_unrolling(
         let loop_list = loop_map.get_mut(&name).unwrap();
         let mut analyzer = SCEVAnalyzer::new();
         let dominator_tree = calculate_dominator(func.get_head());
-        analyzer.set_dominator_tree(ObjPtr::new(&dominator_tree));
+        analyzer.set_loop_list(loop_list.get_loop_list().clone());
         let mut remove_list = None;
         for loop_info in loop_list.get_loop_list().iter() {
             if loop_info.get_sub_loops().len() == 0 && loop_info.get_current_loop_bb().len() == 2 {
@@ -39,71 +39,154 @@ pub fn loop_unrolling(
     });
 }
 
+enum IVC {
+    // 递归表达式且只有两个操作数
+    Introduction,
+    // rhs是常数
+    Const,
+    // 不是递归表达式
+    Nothing,
+}
+
 fn attempt_loop_unrolling(
     analyzer: &mut SCEVAnalyzer,
-    loop_info: ObjPtr<LoopInfo>,
+    mut loop_info: ObjPtr<LoopInfo>,
     pools: &mut (&mut ObjPool<BasicBlock>, &mut ObjPool<Inst>),
 ) -> bool {
-    let mut rec_add = None;
-    let mut inst = loop_info.get_header().get_head_inst();
-    while let InstKind::Phi = inst.get_kind() {
-        if let SCEVExpKind::SCEVRecExpr = analyzer.analyze(&inst).get_kind() {
-            rec_add = Some(inst);
-        }
-        inst = inst.get_next();
+    if loop_info.get_sub_loops().len() != 0 || loop_info.get_current_loop_bb().len() != 2 {
+        return false;
     }
 
-    if let Some(inst) = rec_add {
-        let rec_add = analyzer.analyze(&inst);
-        let start = rec_add.get_scev_rec_start();
-        let step = rec_add.get_scev_rec_step();
-        let end = rec_add.get_scev_rec_end_cond(loop_info);
-        if start.is_const() && step.is_const() && end.len() == 1 {
-            let end = end[0];
-            match end.get_kind() {
-                InstKind::Binary(crate::ir::instruction::BinOp::Lt) => {
-                    if end.get_lhs() == inst {
-                        if end.get_rhs().is_const()
-                            && (end.get_rhs().get_int_bond() - start.get_int_bond())
-                                / step.get_int_bond()
-                                < 2000
-                        {
-                            one_block_loop_full_unrolling(
-                                loop_info,
-                                pools,
-                                start.get_int_bond(),
-                                step.get_int_bond(),
-                                end.get_rhs().get_int_bond(),
-                            );
-                            analyzer.clear();
-                            true
-                        } else {
-                            false
-                        }
-                    } else {
-                        false
-                    }
-                }
-                InstKind::Binary(crate::ir::instruction::BinOp::Le) => false,
-                _ => false,
-            }
+    debug_assert_eq!(loop_info.get_exit_blocks().len(), 1);
+
+    let end_cond = loop_info.get_exit_blocks()[0].get_tail_inst().get_br_cond();
+    let lhs_scev = analyzer.analyze(&end_cond.get_lhs());
+    let rhs_scev = analyzer.analyze(&end_cond.get_rhs());
+    let start;
+    let step;
+    let end;
+    let round;
+
+    match (
+        if lhs_scev.is_scev_constant() {
+            IVC::Const
+        } else if lhs_scev.is_scev_rec()
+            && lhs_scev.get_operands().len() == 2
+            && lhs_scev.get_operands().iter().all(|x| x.is_scev_constant())
+        {
+            IVC::Introduction
         } else {
-            false
+            IVC::Nothing
+        },
+        end_cond.get_kind(),
+        if rhs_scev.is_scev_constant() {
+            IVC::Const
+        } else if rhs_scev.is_scev_rec()
+            && rhs_scev.get_operands().len() == 2
+            && rhs_scev.get_operands().iter().all(|x| x.is_scev_constant())
+        {
+            IVC::Introduction
+        } else {
+            IVC::Nothing
+        },
+    ) {
+        (IVC::Introduction, InstKind::Binary(crate::ir::instruction::BinOp::Le), IVC::Const) => {
+            // i <= 常数
+            start = lhs_scev.get_operands()[0].get_scev_const();
+            step = lhs_scev.get_operands()[1].get_scev_const();
+            end = rhs_scev.get_scev_const();
+            debug_assert!(step > 0);
+            round = (end - start) / step + 1;
         }
-    } else {
-        false
+        (IVC::Introduction, InstKind::Binary(crate::ir::instruction::BinOp::Lt), IVC::Const) => {
+            // i < 常数
+            start = lhs_scev.get_operands()[0].get_scev_const();
+            step = lhs_scev.get_operands()[1].get_scev_const();
+            end = rhs_scev.get_scev_const();
+            debug_assert!(step > 0);
+            if (end - start) % step == 0 {
+                round = (end - start) / step;
+            } else {
+                round = (end - start) / step + 1;
+            }
+        }
+        (IVC::Const, InstKind::Binary(crate::ir::instruction::BinOp::Le), IVC::Introduction) => {
+            // 常数 <= i
+            start = rhs_scev.get_operands()[0].get_scev_const();
+            step = rhs_scev.get_operands()[1].get_scev_const();
+            end = lhs_scev.get_scev_const();
+            debug_assert!(step < 0);
+            round = (end - start) / step + 1;
+        }
+        (IVC::Const, InstKind::Binary(crate::ir::instruction::BinOp::Lt), IVC::Introduction) => {
+            // 常数 < i
+            start = rhs_scev.get_operands()[0].get_scev_const();
+            step = rhs_scev.get_operands()[1].get_scev_const();
+            end = lhs_scev.get_scev_const();
+            debug_assert!(step < 0);
+            if (end - start) % step == 0 {
+                round = (end - start) / step;
+            } else {
+                round = (end - start) / step + 1;
+            }
+        }
+        (IVC::Introduction, InstKind::Binary(crate::ir::instruction::BinOp::Gt), IVC::Const) => {
+            // i > 常数
+            start = lhs_scev.get_operands()[0].get_scev_const();
+            step = lhs_scev.get_operands()[1].get_scev_const();
+            end = rhs_scev.get_scev_const();
+            debug_assert!(step < 0);
+            if (end - start) % step == 0 {
+                round = (end - start) / step;
+            } else {
+                round = (end - start) / step + 1;
+            }
+        }
+        (IVC::Introduction, InstKind::Binary(crate::ir::instruction::BinOp::Ge), IVC::Const) => {
+            // i >= 常数
+            start = lhs_scev.get_operands()[0].get_scev_const();
+            step = lhs_scev.get_operands()[1].get_scev_const();
+            end = rhs_scev.get_scev_const();
+            round = (end - start) / step + 1;
+        }
+        (IVC::Const, InstKind::Binary(crate::ir::instruction::BinOp::Gt), IVC::Introduction) => {
+            // 常数 > i
+            start = rhs_scev.get_operands()[0].get_scev_const();
+            step = rhs_scev.get_operands()[1].get_scev_const();
+            end = lhs_scev.get_scev_const();
+            debug_assert!(step > 0);
+            if (end - start) % step == 0 {
+                round = (end - start) / step;
+            } else {
+                round = (end - start) / step + 1;
+            }
+        }
+        (IVC::Const, InstKind::Binary(crate::ir::instruction::BinOp::Ge), IVC::Introduction) => {
+            // 常数 >= i
+            start = rhs_scev.get_operands()[0].get_scev_const();
+            step = rhs_scev.get_operands()[1].get_scev_const();
+            end = lhs_scev.get_scev_const();
+            debug_assert!(step > 0);
+            round = (end - start) / step + 1;
+        }
+        _ => return false,
     }
+
+    if round > 2000 {
+        return false;
+    }
+
+    one_block_loop_full_unrolling(loop_info, pools, round);
+    analyzer.clear();
+    true
 }
 
 /// 对循环体内只有一个基本块，且循环次数已知的循环进行完全展开
 fn one_block_loop_full_unrolling(
     loop_info: ObjPtr<LoopInfo>,
     pools: &mut (&mut ObjPool<BasicBlock>, &mut ObjPool<Inst>),
-    start: i32,
-    step: i32,
-    end: i32,
+    round: i32,
 ) {
-    let round = (end - start) / step;
     let bodys = loop_info.get_current_loop_bb();
 
     debug_assert_eq!(bodys.len(), 2);

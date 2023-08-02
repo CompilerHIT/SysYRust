@@ -264,6 +264,7 @@ impl Reg {
         }
         callers_saved
     }
+
     ///获取所有callee saved寄存器
     pub fn get_all_callees_saved() -> HashSet<Reg> {
         let mut callees_saved = HashSet::new();
@@ -274,6 +275,15 @@ impl Reg {
             }
         }
         callees_saved
+    }
+    ///获取所有寄存器
+    pub fn get_all_regs() -> HashSet<Reg> {
+        let mut all_regs = HashSet::new();
+        for id in 0..=63 {
+            let reg = Reg::from_color(id);
+            all_regs.insert(reg);
+        }
+        all_regs
     }
 
     ///获取所有能够重分配的寄存器
@@ -361,6 +371,14 @@ impl Reg {
             r_type: ScalarType::Int,
         }
     }
+    #[inline]
+    pub fn get_fs1() -> Reg {
+        Reg {
+            id: 41,
+            r_type: ScalarType::Float,
+        }
+    }
+
     #[inline]
     pub const fn get_s0() -> Reg {
         Reg {
