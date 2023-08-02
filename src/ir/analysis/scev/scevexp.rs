@@ -95,7 +95,7 @@ impl SCEVExp {
         self.operands = operands;
     }
     pub fn get_bond_inst(&self) -> ObjPtr<Inst> {
-        debug_assert!(self.is_scev_rec_expr() || self.is_scev_unknown());
+        debug_assert!(self.is_scev_rec() || self.is_scev_unknown(), "{:?}", self);
         self.bond_inst.unwrap()
     }
 }
