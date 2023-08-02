@@ -176,7 +176,7 @@ impl Func {
             }
         }
 
-        let index = to_index - 1;
+        let mut index = to_index - 1;
         while index > from_index {
             let inst = bb.insts.get(index).unwrap();
             for reg in inst.get_regs() {
@@ -185,6 +185,7 @@ impl Func {
                 }
                 available.use_reg(reg.get_color());
             }
+            index -= 1;
         }
         available
     }

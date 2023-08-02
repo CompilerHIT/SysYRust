@@ -107,6 +107,8 @@ impl Func {
         //块间部分,块间消除load,要找到前继块中所有的对应store,使用mv操作代替store和load操作
         self.calc_live_base();
         loop {
+            self.remove_self_mv();
+            self.calc_live_base();
             let mut finish_flag = true;
             //找到每个块前面的第一个load指令,找到块的前继块的store指令,如果前继块的store指令
             for bb in self.blocks.iter() {
@@ -185,6 +187,7 @@ impl Func {
                     if tmp_reg.is_none() {
                         continue;
                     }
+                    finish_flag = false;
                     let tmp_reg = tmp_reg.unwrap();
                     reg_used_for_replace.use_reg(tmp_reg.get_color());
                     debug_assert!(!bb.live_in.contains(&tmp_reg));
