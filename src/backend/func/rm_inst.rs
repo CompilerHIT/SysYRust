@@ -368,7 +368,14 @@ impl Func {
                     occurs.push_back(def_reg);
                     while !occurs.is_empty() {
                         let front = occurs.front().unwrap();
-
+                        debug_assert!(
+                            program_stat.get_val_from_reg(front).is_some(),
+                            "{}:{},{}-{}",
+                            self.label,
+                            bb.label,
+                            inst.as_ref(),
+                            front
+                        );
                         let pre_val = program_stat.get_val_from_reg(front).unwrap();
                         if pre_val != val {
                             occurs.pop_front();
