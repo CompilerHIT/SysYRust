@@ -4,10 +4,11 @@ use crate::{
     backend::{
         instrs::{BinaryOp, CmpOp, InstrsType, LIRInst, Operand, SingleOp, BB},
         operand::Reg,
+        regalloc::structs::RegUsedStat,
     },
     utility::ObjPtr,
 };
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 ///程序资源状态
 #[derive(Clone)]
@@ -118,7 +119,12 @@ impl ProgramStat {
                 | SingleOp::LoadFImm
                 | SingleOp::Neg
                 | SingleOp::Seqz
-                | SingleOp::Snez => {}
+                | SingleOp::Snez => {
+                    let def_reg = inst.get_def_reg();
+                    if let Some(def_reg) = def_reg {
+                        self.reg_val.insert(*def_reg, Value::Inst(*inst));
+                    }
+                }
                 SingleOp::LoadAddr => {
                     ///把label加载进来
                     let label = inst.get_addr_label().unwrap();
@@ -128,7 +134,7 @@ impl ProgramStat {
                 SingleOp::Li => {
                     //加载一个立即数
                     let dst_reg = inst.get_dst().drop_reg();
-                    let src = inst.get_rhs();
+                    let src = inst.get_lhs();
                     match src {
                         Operand::IImm(iimm) => {
                             let iimm = iimm.get_data();
@@ -146,15 +152,16 @@ impl ProgramStat {
                 SingleOp::Mv => {
                     let dst_reg = inst.get_dst().drop_reg();
                     let src_reg = inst.get_lhs().drop_reg();
-                    let old_val = self.reg_val.get(&dst_reg);
+                    let old_val = self.reg_val.get(&src_reg);
                     match old_val {
                         Some(old_val) => {
-                            self.reg_val.insert(src_reg, old_val.clone());
+                            self.reg_val.insert(dst_reg, old_val.clone());
                         }
-                        None => (),
+                        None => {
+                            self.reg_val.insert(dst_reg, Value::Inst(*inst));
+                        }
                     }
                 }
-                _ => (),
             },
             InstrsType::Load => {
                 //从内存位置加载一个值
@@ -163,11 +170,12 @@ impl ProgramStat {
                 let addr = inst.get_lhs().drop_reg();
                 let addr = self.reg_val.get(&addr);
                 if addr.is_none() {
-                    unreachable!();
+                    // unreachable!();
                     //从未知地址取值,则取值用指令表示
                     self.reg_val.insert(dst_reg, Value::Inst(*inst));
                 } else if addr.unwrap().get_type() != ValueType::Addr {
-                    unreachable!();
+                    self.reg_val.insert(dst_reg, Value::Inst(*inst));
+                    // unreachable!();
                 } else {
                     let offset = inst.get_offset().get_data() as i64;
                     let mut addr = addr.unwrap().get_addr().unwrap().clone();
@@ -192,10 +200,10 @@ impl ProgramStat {
                 let addr = self.reg_val.get(&addr);
                 let val = self.reg_val.get(&dst_reg);
                 if addr.is_none() {
-                    //从未知地址取值,则取值用指令表示
-                    unreachable!();
+                    //往未知地址写值,则清空所有地址记录,让所有记录呈未知
+                    self.mem_val.clear();
                 } else if addr.unwrap().get_type() != ValueType::Addr {
-                    unreachable!();
+                    self.mem_val.clear();
                 } else {
                     let offset = inst.get_offset().get_data() as i64;
                     let mut addr = addr.unwrap().get_addr().unwrap().clone();
@@ -214,17 +222,13 @@ impl ProgramStat {
             InstrsType::StoreToStack => {
                 let src_reg = inst.get_dst().drop_reg();
                 let offset = inst.get_stack_offset().get_data();
-                let mut addr = self
-                    .reg_val
-                    .get(&Reg::get_sp())
-                    .unwrap()
-                    .get_addr()
-                    .unwrap()
-                    .clone();
+                let addr = self.reg_val.get(&Reg::get_sp());
+                let mut addr = addr.unwrap().get_addr().unwrap().clone();
                 addr.1 += offset as i64;
                 let val = self.reg_val.get(&src_reg);
                 if val.is_none() {
-                    self.mem_val.insert(Value::Addr(addr), Value::Inst(*inst));
+                    //如果值未知,清空所有sp对应的值
+                    self.miss_certain_mem(addr.0.as_str());
                 } else {
                     self.mem_val.insert(Value::Addr(addr), val.unwrap().clone());
                 }
@@ -328,15 +332,27 @@ impl ProgramStat {
             }
             InstrsType::Call => {
                 //注意 , call对于 a0 寄存器的影响跟跳转关系有关,需要外部单独处理
-                self.execute_stat = ExecuteStat::Call((inst.get_func_name().unwrap()));
+                self.execute_stat = ExecuteStat::Call(inst.get_func_name().unwrap());
             }
             InstrsType::Ret(..) => {
                 //遇到返回指令(返回返回操作)
                 self.execute_stat = ExecuteStat::Ret;
             }
-            _ => (),
         }
         self.execute_stat.clone()
+    }
+
+    pub fn miss_certain_mem(&mut self, mem_base: &str) {
+        let mut to_rm = HashSet::new();
+        for (addr, _) in self.mem_val.iter() {
+            let base_label = addr.get_addr().unwrap().0.clone();
+            if base_label == mem_base {
+                to_rm.insert(addr.clone());
+            }
+        }
+        for to_rm in to_rm {
+            self.mem_val.remove(&to_rm);
+        }
     }
 
     ///吞入一个块,修改程序状态
@@ -364,5 +380,15 @@ impl ProgramStat {
         let v1 = self.reg_val.get(reg1).unwrap();
         let v2 = self.reg_val.get(reg2).unwrap();
         v1 == v2
+    }
+}
+
+impl ProgramStat {
+    pub fn get_val_from_reg(&self, reg: &Reg) -> Option<Value> {
+        let val = self.reg_val.get(reg);
+        match val {
+            Some(val) => Some(val.clone()),
+            None => None,
+        }
     }
 }

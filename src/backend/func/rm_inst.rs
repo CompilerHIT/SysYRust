@@ -1,6 +1,8 @@
 use rand::seq::index;
 
-use crate::{frontend::irgen::Process, utility::ObjPool};
+use crate::{
+    backend::simulator::program_stat::ProgramStat, frontend::irgen::Process, utility::ObjPool,
+};
 
 use super::*;
 
@@ -17,17 +19,17 @@ impl Func {
 
     ///v2p 后的移除无用指令
     pub fn remove_unuse_inst_suf_v2p(&mut self, pool: &mut BackendPool) {
-        self.remove_self_mv();
-        self.remove_unuse_load_after_v2p(pool);
-        while self.remove_self_mv() {
-            self.remove_unuse_load_after_v2p(pool);
-        }
-        self.short_cut_const_count();
-        self.remove_unuse_def();
-        self.short_cut_mv();
-        self.remove_unuse_def();
-        self.short_cut_complex_expr();
-        self.remove_unuse_def();
+        // self.remove_self_mv();
+        // // self.remove_unuse_load_after_v2p(pool);
+        // // while self.remove_self_mv() {
+        // //     self.remove_unuse_load_after_v2p(pool);
+        // // }
+        // self.short_cut_const_count();
+        // self.remove_unuse_def();
+        // self.short_cut_mv();
+        // self.remove_unuse_def();
+        // self.short_cut_complex_expr();
+        // self.remove_unuse_def();
     }
 
     //移除
@@ -314,11 +316,73 @@ impl Func {
     }
 
     //针对mv的值短路
+    //会把对已经存在的数值的使用,改为从最早寄存器获取
     pub fn short_cut_mv(&mut self) {
         use crate::backend::simulator::structs::Value;
         //维护每个寄存器当前的值
         //维护每个值先后出现的次数
         let mut val_occurs: HashMap<Value, LinkedList<Reg>> = HashMap::new();
+        for bb in self.blocks.iter() {
+            let mut program_stat = ProgramStat::new();
+            for inst in bb.insts.iter() {
+                //获取该指令涉及的寄存器,判断该指令后目的寄存器是否是常数
+                for reg in inst.get_reg_use() {
+                    let val = program_stat.get_val_from_reg(&reg);
+                    if let Some(val) = val {
+                        if val_occurs.contains_key(&val) {
+                            let occurs = val_occurs.get_mut(&val).unwrap();
+                            while !occurs.is_empty() {
+                                let pre = occurs.front().unwrap();
+                                let pre_val = program_stat.get_val_from_reg(pre);
+                                if pre_val.is_none() {
+                                    unreachable!();
+                                }
+                                let pre_val = pre_val.unwrap();
+                                if pre_val != val {
+                                    occurs.pop_front();
+                                    continue;
+                                }
+                                if pre == &reg {
+                                    break;
+                                }
+                                //否则找到了最早使用的寄存器,直接使用该寄存器
+                                inst.as_mut().replace_only_use_reg(&reg, pre);
+                                break;
+                            }
+                        }
+                    }
+                }
+                program_stat.consume_inst(inst);
+                //判断下一条指令是否需要的值在当前就已经存在了,而且存在某个寄存器里面
+                //判断def 是否能够化简
+                if let Some(def_reg) = inst.get_def_reg() {
+                    let def_reg = *def_reg;
+                    //判断当前值是否是常数,如果是常数,修改为li指令
+                    //ps,def之后一定有值
+                    let val = program_stat.get_val_from_reg(&def_reg).unwrap();
+                    //判断当前值是否是之前已经出现过的值,如果是,使用过最早出现的值
+                    if !val_occurs.contains_key(&val) {
+                        val_occurs.insert(val.clone(), LinkedList::new());
+                    }
+                    let occurs = val_occurs.get_mut(&val).unwrap();
+                    occurs.push_back(def_reg);
+                    while !occurs.is_empty() {
+                        let front = occurs.front().unwrap();
+
+                        let pre_val = program_stat.get_val_from_reg(front).unwrap();
+                        if pre_val != val {
+                            occurs.pop_front();
+                            continue;
+                        }
+                        if front == &def_reg {
+                            break;
+                        }
+                        *inst.as_mut() = LIRInst::build_mv(front, &def_reg);
+                        break;
+                    }
+                }
+            }
+        }
     }
 
     //针对常数计算的值短路, (优先改成mv,其次改成直接li)

@@ -78,6 +78,7 @@ impl AsmModule {
         self.update_array_offset(pool);
         self.build_stack_info(f);
 
+        self.rm_inst_suf_p2v(pool);
         // self.print_func();
         //删除无用的函数
     }
