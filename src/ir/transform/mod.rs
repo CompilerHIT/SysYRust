@@ -38,8 +38,8 @@ pub fn optimizer_run(
         functional_optimizer(module, &mut pools, optimize_flag);
 
         // 尾递归优化
-        //tail_call_optimize::tail_call_optimize(module, &mut pools);
-        //functional_optimizer(module, &mut pools, optimize_flag);
+        tail_call_optimize::tail_call_optimize(module, &mut pools);
+        functional_optimizer(module, &mut pools, optimize_flag);
 
         // 函数内联
         func_inline::inline_run(module, &mut pools);
