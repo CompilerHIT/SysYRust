@@ -39,7 +39,7 @@ impl Func {
         for spilling_reg in self.reg_alloc_info.spillings.iter() {
             debug_assert!(
                 regs.contains(&Reg::new(*spilling_reg, ScalarType::Int))
-                    || regs.contains(&Reg::new(*spilling_reg, ScalarType::Int))
+                    || regs.contains(&Reg::new(*spilling_reg, ScalarType::Float))
             );
             let last = self.stack_addr.back().unwrap();
             let new_pos = last.get_pos() + last.get_size();
@@ -701,11 +701,19 @@ impl Func {
                 reg_use_stat.merge(&regs_used);
                 //判断是否是可以用来处理的spilling的寄存器情况
                 let mut if_ok = false;
-                let mut in_cases: HashMap<ObjPtr<BB>, (usize, RegUsedStat)> = HashMap::new();
+                let mut in_cases: HashMap<ObjPtr<BB>, (ObjPtr<LIRInst>, RegUsedStat)> =
+                    HashMap::new();
                 for in_bb in bb.in_edge.iter() {
                     debug_assert!(!in_bb.live_out.contains(reg));
-                    let mut available_reg_for_in_bb = RegUsedStat::new();
-                    for inst in in_bb.insts.iter() {}
+                    let mut available_reg_for_in_bb = RegUsedStat::init_unspecial_regs();
+                    in_bb
+                        .live_out
+                        .iter()
+                        .for_each(|reg| available_reg_for_in_bb.use_reg(reg.get_color()));
+                    for inst in in_bb.insts.iter() {
+                        for reg in inst.get_regs() {}
+                    }
+                    todo!()
                 }
                 if !if_ok {
                     continue;
