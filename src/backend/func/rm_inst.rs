@@ -59,7 +59,7 @@ impl Func {
         //块内部分
         self.calc_live_base();
 
-        //使用n**2算法
+        //块内删除
         for bb in self.blocks.iter() {
             let mut to_process: Vec<(usize, usize)> = Vec::new();
             let mut loads: HashMap<i32, usize> = HashMap::new();
@@ -131,13 +131,13 @@ impl Func {
             }
         }
 
-        // self.remove_unuse_def();
+        self.remove_self_mv();
 
         // //块间部分,块间消除load,要找到前继块中所有的对应store,使用mv操作代替store和load操作
         Func::print_func(ObjPtr::new(&self), "before_rm_load.txt");
         self.calc_live_base();
-        self.calc_live_base();
         self.remove_self_mv();
+        // let mut unchangable
         //找到每个块前面的第一个load指令,找到块的前继块的store指令,如果前继块的store指令
         for bb in self.blocks.iter() {
             let mut loads: Vec<(usize, RegUsedStat)> = Vec::new();
@@ -149,6 +149,7 @@ impl Func {
                 match inst.get_type() {
                     InstrsType::LoadFromStack => {
                         loads.push((index, reg_use_stat));
+                        break;
                     }
                     _ => {}
                 }
@@ -156,15 +157,110 @@ impl Func {
                     reg_use_stat.use_reg(reg.get_color());
                 }
             }
-            // 对于每个例子,往前寻找合适的前继进行插入
-            let mut reg_used_for_rm = RegUsedStat::init_unspecial_regs();
-            for (load_index, mut available) in loads {
-                available.merge(&reg_used_for_rm);
-                let mut stores: Vec<(ObjPtr<BB>, usize, RegUsedStat)> = Vec::new();
 
+            if loads.len() == 0 {
+                continue;
+            }
+            let (load_index, mut available) = loads.get(0).unwrap();
+            let mut stores: Vec<(ObjPtr<BB>, usize, RegUsedStat)> = Vec::new();
+            let pos = bb
+                .insts
+                .get(*load_index)
+                .unwrap()
+                .get_stack_offset()
+                .get_data();
+            //对于stores
+            for in_bb in bb.in_edge.iter() {
+                Func::analyse_inst_with_regused_and_index_backorder_until(
+                    &in_bb,
+                    &mut |inst, index, rus| match inst.get_type() {
+                        InstrsType::StoreToStack => {
+                            let this_pos = inst.get_stack_offset().get_data();
+                            if this_pos == pos {
+                                stores.push((*in_bb, index, *rus));
+                            }
+                        }
+                        _ => (),
+                    },
+                    &|_| -> bool {
+                        return false;
+                    },
+                )
+            }
+
+            // debug_assert!(stores.len() <= bb.in_edge.len());
+            if stores.len() != bb.in_edge.len() {
+                continue;
+            }
+            let load_inst = bb.insts.get(*load_index).unwrap();
+            let to_reg = load_inst.get_def_reg().unwrap();
+            let mid_reg = || -> Option<Reg> {
+                let mut in_available = RegUsedStat::init_unspecial_regs();
+                for (_, _, in_a) in stores.iter() {
+                    in_available.merge(in_a);
+                }
+                if available.is_available_reg(to_reg.get_color())
+                    && in_available.is_available_reg(to_reg.get_color())
+                {
+                    return Some(*to_reg);
+                }
+                available.merge(&in_available);
+                let color = available.get_available_reg(to_reg.get_type());
+                if let Some(color) = color {
+                    return Some(Reg::from_color(color));
+                }
+                None
+            }();
+            if mid_reg.is_none() {
+                //把该指令加入无法使用表
+                continue;
+            }
+            let mid_reg = mid_reg.unwrap();
+            debug_assert!(!bb.live_in.contains(&mid_reg));
+            bb.as_mut().live_in.insert(mid_reg);
+            *load_inst.as_mut() = LIRInst::build_mv(&mid_reg, to_reg);
+            for (in_bb, store_index, _) in stores {
+                debug_assert!(!in_bb.live_out.contains(&mid_reg));
+                in_bb.as_mut().live_out.insert(mid_reg);
+                //删除无用的store指令
+                let store_inst = in_bb.insts.get(store_index).unwrap();
+                let from_reg = store_inst.get_dst().drop_reg();
+                let from_mv_inst = LIRInst::build_mv(&from_reg, &mid_reg);
+                in_bb
+                    .as_mut()
+                    .insts
+                    .insert(store_index, pool.put_inst(from_mv_inst));
+            }
+        }
+
+        let mut rm_each =
+            |bb: &ObjPtr<BB>, unchangable: &mut HashSet<(ObjPtr<BB>, ObjPtr<LIRInst>)>| -> bool {
+                let mut loads: Vec<(usize, RegUsedStat)> = Vec::new();
+                let mut reg_use_stat = RegUsedStat::init_unspecial_regs();
+                bb.live_in
+                    .iter()
+                    .for_each(|reg| reg_use_stat.use_reg(reg.get_color()));
+                for (index, inst) in bb.insts.iter().enumerate() {
+                    match inst.get_type() {
+                        InstrsType::LoadFromStack => {
+                            loads.push((index, reg_use_stat));
+                            break;
+                        }
+                        _ => {}
+                    }
+                    for reg in inst.get_regs() {
+                        reg_use_stat.use_reg(reg.get_color());
+                    }
+                }
+
+                if loads.len() == 0 {
+                    return false;
+                }
+                let (load_index, mut available) = loads.get(0).unwrap();
+                let mut stores: Vec<(ObjPtr<BB>, usize, RegUsedStat)> = Vec::new();
                 let pos = bb
                     .insts
-                    .get(load_index)
+                    .get(*load_index)
                     .unwrap()
                     .get_stack_offset()
                     .get_data();
@@ -187,12 +283,13 @@ impl Func {
                     )
                 }
 
-                debug_assert!(stores.len() <= bb.in_edge.len());
-                if stores.len() != bb.in_edge.len() {
-                    continue;
-                }
-                let load_inst = bb.insts.get(load_index).unwrap();
+                let load_inst = bb.insts.get(*load_index).unwrap();
                 let to_reg = load_inst.get_def_reg().unwrap();
+                // debug_assert!(stores.len() <= bb.in_edge.len());
+                if stores.len() != bb.in_edge.len() {
+                    unchangable.insert((*bb, *load_inst));
+                    return false;
+                }
                 let mid_reg = || -> Option<Reg> {
                     let mut in_available = RegUsedStat::init_unspecial_regs();
                     for (_, _, in_a) in stores.iter() {
@@ -211,12 +308,13 @@ impl Func {
                     None
                 }();
                 if mid_reg.is_none() {
-                    continue;
+                    //把该指令加入无法使用表
+                    unchangable.insert((*bb, *load_inst));
+                    return false;
                 }
                 let mid_reg = mid_reg.unwrap();
                 debug_assert!(!bb.live_in.contains(&mid_reg));
                 bb.as_mut().live_in.insert(mid_reg);
-                reg_used_for_rm.use_reg(mid_reg.get_color());
                 *load_inst.as_mut() = LIRInst::build_mv(&mid_reg, to_reg);
                 for (in_bb, store_index, _) in stores {
                     debug_assert!(!in_bb.live_out.contains(&mid_reg));
@@ -224,19 +322,66 @@ impl Func {
                     //删除无用的store指令
                     let store_inst = in_bb.insts.get(store_index).unwrap();
                     let from_reg = store_inst.get_dst().drop_reg();
-                    let from_mv_inst = LIRInst::build_mv(&from_reg, to_reg);
+                    let from_mv_inst = LIRInst::build_mv(&from_reg, &mid_reg);
                     in_bb
                         .as_mut()
                         .insts
                         .insert(store_index, pool.put_inst(from_mv_inst));
                 }
+                return true;
+            };
+
+        let mut unchangable: HashSet<(ObjPtr<BB>, ObjPtr<LIRInst>)> = HashSet::new();
+        loop {
+            let mut finish_flag = true;
+            for bb in self.blocks.iter() {
+                while rm_each(bb, &mut unchangable) {
+                    finish_flag = false;
+                }
+            }
+            self.remove_unuse_store();
+            self.calc_live_base();
+            if finish_flag {
+                break;
             }
         }
-        Func::print_func(ObjPtr::new(&self), "after_rm_load.txt");
+
+        // self.remove_self_mv();
+        // Func::print_func(ObjPtr::new(&self), "pre_rm_unuse_store.txt");
+        self.remove_unuse_store();
+        // Func::print_func(ObjPtr::new(&self), "suf_rm_unuse_store.txt");
+        // self.remove_unuse_def();
+        // Func::print_func(ObjPtr::new(&self), "after_rm_load.txt");
     }
 
-    //移除无用的store指令
-    pub fn remove_unuse_store(&mut self) {}
+    //移除无用的store指令(有store但无use的指令)
+    pub fn remove_unuse_store(&mut self) {
+        //根据sst图进行无用store指令删除
+        let (_, _, _, live_outs) = Func::calc_stackslot_interval(self);
+        for bb in self.blocks.iter() {
+            let mut livenow: HashSet<StackSlot> = live_outs.get(bb).unwrap().clone();
+            let mut to_rm: HashSet<ObjPtr<LIRInst>> = HashSet::new();
+            for (index, inst) in bb.insts.iter().enumerate().rev() {
+                match inst.get_type() {
+                    InstrsType::StoreToStack => {
+                        let sst = inst.get_stackslot_with_addr_size();
+                        if !livenow.contains(&sst) && sst.get_pos() >= 0 {
+                            println!("{}-{}-{}", bb.label, index, inst.as_ref());
+                            to_rm.insert(*inst);
+                        } else {
+                            livenow.remove(&sst);
+                        }
+                    }
+                    InstrsType::LoadFromStack => {
+                        let sst = inst.get_stackslot_with_addr_size();
+                        livenow.insert(sst);
+                    }
+                    _ => (),
+                }
+            }
+            bb.as_mut().insts.retain(|inst| !to_rm.contains(inst));
+        }
+    }
 
     //针对mv的值短路
     pub fn short_cut_mv(&mut self) {
@@ -287,6 +432,7 @@ impl Func {
             if finish_flag {
                 break;
             }
+            self.remove_unuse_store();
         }
     }
 }
