@@ -6,6 +6,7 @@ mod array_transform;
 mod condition_transform;
 mod constant_folding;
 mod dead_code_eliminate;
+mod delete_empty_block;
 mod delete_redundant_load_store;
 mod func_inline;
 mod global_value_numbering;
@@ -83,4 +84,7 @@ fn functional_optimizer(
     dead_code_eliminate::dead_code_eliminate(module, optimize_flag);
     // 全局死代码删除
     dead_code_eliminate::global_eliminate(module);
+
+    //删除空的块
+    // delete_empty_block::clear_block(module);
 }

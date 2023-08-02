@@ -38,7 +38,7 @@ impl TypeProcess for AddExp {
     ) -> Result<Self::Ret, Error> {
         match self {
             AddExp::MulExp(mulexp) => return mulexp.type_process(input, kit_mut),
-            AddExp::OpExp((addexp, op, mulexp)) => {
+            AddExp::OpExp((addexp, _op, mulexp)) => {
                 let tp_left = addexp.type_process(input, kit_mut).unwrap();
                 let tp_right = mulexp.type_process(input, kit_mut).unwrap();
                 if tp_left > tp_right {
@@ -116,23 +116,17 @@ impl TypeProcess for PrimaryExp {
             PrimaryExp::LVal(lval) => {
                 let sym = kit_mut.get_var_symbol(&lval.id).unwrap();
                 match sym.tp {
-                    Type::ConstFloat | Type::Float => {
-                        Ok(3)
-                    }
+                    Type::ConstFloat | Type::Float => Ok(3),
                     Type::ConstInt | Type::Int => Ok(1),
                     _ => {
                         todo!()
                     }
                 }
             }
-            PrimaryExp::Number(imm) => {
-                match imm {
-                    Number::FloatConst(_) => {
-                        Ok(2)
-                    }
-                    Number::IntConst(_) => Ok(0),
-                }
-            }
+            PrimaryExp::Number(imm) => match imm {
+                Number::FloatConst(_) => Ok(2),
+                Number::IntConst(_) => Ok(0),
+            },
         }
     }
 }
@@ -146,7 +140,7 @@ impl TypeProcess for Exp {
         kit_mut: &mut Kit,
     ) -> Result<Self::Ret, Error> {
         self.add_exp.type_process(input, kit_mut)
-   }
+    }
 }
 
 impl TypeProcess for EqExp {
