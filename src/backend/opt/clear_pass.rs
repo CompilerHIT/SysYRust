@@ -158,14 +158,6 @@ impl BackendPass {
     }
 }
 
-//值短路的实现
-impl Func {
-    ///取值短路
-    ///(通过mv的传递,以及编译时计算的方式对于值的传递进行短路,进而暴露可以删除的代码)
-    /// 比如在中间插入最短计算语句
-    pub fn short_cut_val_trans(&mut self, pool: &BackendPool) {}
-}
-
 impl BackendPass {
     fn get_reg_def_for_remove_repeated_load_store(&self, inst: ObjPtr<LIRInst>) -> Vec<Reg> {
         if inst.get_type() != InstrsType::Call {

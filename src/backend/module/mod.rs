@@ -25,6 +25,7 @@ use super::structs::GenerateAsm;
 pub mod build;
 pub mod handle_call;
 pub mod reduce_caller_save;
+pub mod rm_inst;
 pub mod schedule;
 mod test;
 pub mod utils;

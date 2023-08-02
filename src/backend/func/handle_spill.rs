@@ -82,6 +82,7 @@ impl Func {
                 &phisic_mems,
             );
         }
+        self.replace_inst_suf_spill();
     }
 
     ///在handle spill之后调用
@@ -666,59 +667,9 @@ impl Func {
         //进行寄存器之间的移动操作
         self.calc_live_base();
         //如果只有一个前继块,则前继块中的spilling优先使用可用的物理寄存器移动到后方
-        for bb in self.blocks.iter() {
-            //统计bb开头的spilling寄存器的恢复操作
-            let live_in = bb.live_in.clone();
-            let mut availables = RegUsedStat::init_unspecial_regs();
-            live_in
-                .iter()
-                .for_each(|reg| availables.use_reg(reg.get_color()));
-            //对于live in中存在的寄存器不能够借用
-            //其他寄存器能够用来做中转,记录第一个遇到的时候的指令
-            let mut first_load: HashMap<Reg, (ObjPtr<LIRInst>, RegUsedStat)> = HashMap::new();
-            let mut regs_used = availables;
-            for inst in bb.insts.iter() {
-                match inst.get_type() {
-                    InstrsType::LoadFromStack => {
-                        let dst_reg = inst.get_def_reg().unwrap();
-                        if !first_load.contains_key(dst_reg)
-                            && regs_used.is_available_reg(dst_reg.get_color())
-                        {
-                            first_load.insert(*dst_reg, (*inst, regs_used));
-                        }
-                    }
-                    _ => (),
-                }
-                for reg in inst.get_regs() {
-                    regs_used.use_reg(reg.get_color());
-                }
-            }
-
-            //通过regs_used传递已经使用到的寄存器
-            let mut regs_used = availables;
-            //记录下了所有需要load的情况后,查看前文,寻找前文store的情况,判断是否能替换
-            for (reg, (inst, reg_use_stat)) in first_load.iter_mut() {
-                reg_use_stat.merge(&regs_used);
-                //判断是否是可以用来处理的spilling的寄存器情况
-                let mut if_ok = false;
-                let mut in_cases: HashMap<ObjPtr<BB>, (ObjPtr<LIRInst>, RegUsedStat)> =
-                    HashMap::new();
-                for in_bb in bb.in_edge.iter() {
-                    debug_assert!(!in_bb.live_out.contains(reg));
-                    let mut available_reg_for_in_bb = RegUsedStat::init_unspecial_regs();
-                    in_bb
-                        .live_out
-                        .iter()
-                        .for_each(|reg| available_reg_for_in_bb.use_reg(reg.get_color()));
-                    for inst in in_bb.insts.iter() {
-                        for reg in inst.get_regs() {}
-                    }
-                    todo!()
-                }
-                if !if_ok {
-                    continue;
-                }
-            }
+        self.replace_unuse_load_after_v2p();
+        while self.remove_self_mv() {
+            self.replace_unuse_load_after_v2p();
         }
     }
 }
