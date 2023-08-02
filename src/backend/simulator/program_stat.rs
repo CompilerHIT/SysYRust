@@ -133,18 +133,18 @@ impl ProgramStat {
                 }
                 SingleOp::Li => {
                     //加载一个立即数
-                    let dst_reg = inst.get_dst().drop_reg();
+                    let def_reg = *inst.get_def_reg().unwrap();
                     let src = inst.get_lhs();
                     match src {
                         Operand::IImm(iimm) => {
                             let iimm = iimm.get_data();
                             let iimm: i64 = iimm as i64;
-                            self.reg_val.insert(dst_reg, Value::IImm(iimm));
+                            self.reg_val.insert(def_reg, Value::IImm(iimm));
                         }
                         Operand::FImm(fimm) => {
                             let fimm = fimm.get_data() as f64;
                             self.reg_val
-                                .insert(dst_reg, Value::FImm(format!("{}", fimm).to_string()));
+                                .insert(def_reg, Value::FImm(format!("{}", fimm).to_string()));
                         }
                         _ => unreachable!(),
                     }
@@ -227,8 +227,8 @@ impl ProgramStat {
                 addr.1 += offset as i64;
                 let val = self.reg_val.get(&src_reg);
                 if val.is_none() {
-                    //如果值未知,清空所有sp对应的值
-                    self.miss_certain_mem(addr.0.as_str());
+                    //如果值未知,清除对应位置的值以表示未知
+                    self.mem_val.remove(&Value::Addr(addr));
                 } else {
                     self.mem_val.insert(Value::Addr(addr), val.unwrap().clone());
                 }

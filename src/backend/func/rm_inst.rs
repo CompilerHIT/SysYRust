@@ -19,17 +19,17 @@ impl Func {
 
     ///v2p 后的移除无用指令
     pub fn remove_unuse_inst_suf_v2p(&mut self, pool: &mut BackendPool) {
-        // self.remove_self_mv();
-        // // self.remove_unuse_load_after_v2p(pool);
-        // // while self.remove_self_mv() {
-        // //     self.remove_unuse_load_after_v2p(pool);
-        // // }
-        // self.short_cut_const_count();
-        // self.remove_unuse_def();
-        // self.short_cut_mv();
-        // self.remove_unuse_def();
-        // self.short_cut_complex_expr();
-        // self.remove_unuse_def();
+        self.remove_self_mv();
+        // self.remove_unuse_load_after_v2p(pool);
+        // while self.remove_self_mv() {
+        //     self.remove_unuse_load_after_v2p(pool);
+        // }
+        self.short_cut_const_count();
+        self.remove_unuse_def();
+        self.short_cut_mv();
+        self.remove_unuse_def();
+        self.short_cut_complex_expr();
+        self.remove_unuse_def();
     }
 
     //移除
@@ -319,6 +319,7 @@ impl Func {
     //会把对已经存在的数值的使用,改为从最早寄存器获取
     pub fn short_cut_mv(&mut self) {
         use crate::backend::simulator::structs::Value;
+        Func::print_func(ObjPtr::new(&self), "before_short_cut_mv.txt");
         //维护每个寄存器当前的值
         //维护每个值先后出现的次数
         let mut val_occurs: HashMap<Value, LinkedList<Reg>> = HashMap::new();

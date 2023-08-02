@@ -18,7 +18,7 @@ use crate::{
 ///复杂值类型 (实际实现的时候需要)
 pub struct ComplexValue {
     add: HashMap<ObjPtr<LIRInst>, usize>,
-    minux: HashMap<ObjPtr<LIRInst>, usize>,
+    minus: HashMap<ObjPtr<LIRInst>, usize>,
 }
 
 ///通用值类型
