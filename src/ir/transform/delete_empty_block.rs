@@ -3,62 +3,102 @@ use crate::{
         basicblock::BasicBlock,
         instruction::{Inst, InstKind},
         module::Module,
-        tools::{bfs_bb_proceess, func_process, replace_inst},
+        tools::{bfs_bb_proceess, func_process, replace_inst, inst_process_in_bb},
     },
     utility::{ObjPool, ObjPtr},
 };
 
-// pub fn multiple_branch_opt()
+// 把所有常量移动到头块
+pub fn move_const_to_head(head:ObjPtr<BasicBlock>,pool: &mut ObjPool<Inst>){
+    bfs_bb_proceess(head, |bb| {
+        inst_process_in_bb(bb.get_head_inst(), |inst|{
+            if bb!=head{
+                match inst.get_kind() {
+                    InstKind::ConstFloat(f) =>{
+                        let const_float = pool.make_float_const(f);
+                        head.as_mut().push_front(const_float);
+                        replace_inst(inst, const_float);
+                    }
+                    InstKind::ConstInt(i) =>{
+                        let const_int = pool.make_int_const(i);
+                        head.as_mut().push_front(const_int);
+                        replace_inst(inst, const_int);
+                    }
+                    _=>{}
+                }
+            }
+        })
+    })
+}
 
-pub fn clear_block(
+// 有条件跳转(两个后继为同一块)转化为无条件跳转,清理块间关系
+pub fn multiple_branch_opt(bb: ObjPtr<BasicBlock>,pool: &mut ObjPool<Inst>) ->bool{
+    if !bb.is_empty() {
+        let inst = bb.get_tail_inst();
+        if inst.is_br() {
+            if inst.is_br_cond(){
+                let next = bb.get_next_bb();
+                //多个后继
+                if next[0] == next[1] {
+                    //两个后继相同
+                    let inst_new = pool.make_jmp(); //无条件跳转替换条件跳转
+                    inst.as_mut().insert_before(inst_new);
+                    replace_inst(inst, inst_new);
+                    bb.as_mut().set_next_bb(vec![next[0]]); //设置后继bb
+                    next[0].as_mut().remove_up_bb(bb); //在后继节点中清理第一个符合要求的up_bb
+                    return true;
+                }
+            }
+        }
+    }
+    false
+}
+
+// 删除仅含一条无条件跳转指令的块
+pub fn clear_block(bb: ObjPtr<BasicBlock>){
+    let mut inst = bb.get_head_inst();
+    if let InstKind::Branch = inst.get_kind() {
+        if inst.get_operands().len() == 0 && inst.get_next().is_tail() {
+            delete_block(bb);
+            while !inst.is_tail() {
+                inst = inst.get_next();
+            }
+        }
+    }
+}
+
+pub fn block_opt(
     module: &mut Module,
     pools: &mut (&mut ObjPool<BasicBlock>, &mut ObjPool<Inst>),
 ) {
     let pool = &mut pools.1;
     func_process(module, |_func_name, func| {
-        bfs_bb_proceess(func.get_head(), |bb| {
-            let mut inst = bb.get_head_inst();
-            if let InstKind::Branch = inst.get_kind() {
-                if inst.get_operands().len() == 0 && inst.get_next().is_tail() {
-                    delete_block(bb);
-                    // println!("bb:{:?}", bb.get_name());
-                    while !inst.is_tail() {
-                        // println!("inst:{:?}", inst.get_kind());
-                        inst = inst.get_next();
-                    }
-                }
-            }
-        });
+        move_const_to_head(func.get_head(), pool);
     });
-    func_process(module, |_func_name, func| {
-        bfs_bb_proceess(func.get_head(), |bb| {
-            if !bb.is_empty() {
-                let inst = bb.get_tail_inst();
-                if let InstKind::Branch = inst.get_kind() {
-                    let next = bb.get_next_bb();
-                    if next.len() > 1 {
-                        //多个后继
-                        if next[0] == next[1] {
-                            //两个后继相同
-                            let inst_new = pool.make_jmp(); //无条件跳转替换条件跳转
-                            inst.as_mut().insert_before(inst);
-                            replace_inst(inst, inst_new);
-                            bb.as_mut().set_next_bb(vec![next[0]]); //设置后继bb
-                            next[0].as_mut().remove_up_bb(bb); //在后继节点中清理第一个符合要求的up_bb
-                        }
-                    }
-                }
-            }
+    loop{
+        func_process(module, |_func_name, func| {
+            bfs_bb_proceess(func.get_head(), |bb| {
+                clear_block(bb)
+            });
         });
-    });
+        let mut flag = false;
+        func_process(module, |_func_name, func| {
+            bfs_bb_proceess(func.get_head(), |bb| {
+                flag |= multiple_branch_opt(bb, pool)
+            });
+        });
+        if !flag{
+            break;
+        }
+    }
 }
+
 pub fn delete_block(bb: ObjPtr<BasicBlock>) {
     let up = bb.get_up_bb().clone();
     let next = bb.get_next_bb();
     if up.len() == 0 || !check_delete(next[0], bb, up.clone()) {
         return;
     }
-    // println!("删除空块:{:?}", bb.get_name());
     for i in 0..up.clone().len() {
         up[i].as_mut().replace_next_bb(bb, next[0]);
     }
