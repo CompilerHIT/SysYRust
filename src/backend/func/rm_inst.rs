@@ -31,8 +31,8 @@ impl Func {
         self.remove_self_mv();
         self.short_cut_const();
         self.remove_unuse_def();
-        // self.short_cut_mv();
-        // self.remove_unuse_def();
+        self.short_cut_mv();
+        self.remove_unuse_def();
         // self.short_cut_complex_expr();
         // self.remove_unuse_def();
     }
@@ -88,9 +88,8 @@ impl Func {
     }
 
     //针对mv的值短路
-    //会把对已经存在的数值的使用,改为从最早寄存器获取
+    //会把对已经存在的数值的使用,改为从最早寄存器获取,
     pub fn short_cut_mv(&mut self) {
-        use crate::backend::simulator::structs::Value;
         Func::print_func(ObjPtr::new(&self), "before_short_cut_mv.txt");
         //维护每个寄存器当前的值
         //维护每个值先后出现的次数
@@ -142,15 +141,12 @@ impl Func {
                     occurs.push_back(def_reg);
                     while !occurs.is_empty() {
                         let front = occurs.front().unwrap();
-                        debug_assert!(
-                            program_stat.get_val_from_reg(front).is_some(),
-                            "{}:{},{}-{}",
-                            self.label,
-                            bb.label,
-                            inst.as_ref(),
-                            front
-                        );
-                        let pre_val = program_stat.get_val_from_reg(front).unwrap();
+                        let pre_val = program_stat.get_val_from_reg(front);
+                        if pre_val.is_none() {
+                            occurs.pop_front();
+                            continue;
+                        }
+                        let pre_val = pre_val.unwrap();
                         if pre_val != val {
                             occurs.pop_front();
                             continue;
