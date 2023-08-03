@@ -20,7 +20,7 @@ impl Func {
     }
 
     ///v2p 后的移除无用指令
-    pub fn remove_unuse_inst_suf_v2p(
+    pub fn remove_unuse_inst_suf_handle_call(
         &mut self,
         pool: &mut BackendPool,
         callers_used: &HashMap<String, HashSet<Reg>>,
@@ -33,6 +33,7 @@ impl Func {
         self.remove_unuse_def();
         self.short_cut_mv();
         self.remove_unuse_def();
+        self.remove_unuse_store();
         // self.short_cut_complex_expr();
         // self.remove_unuse_def();
     }

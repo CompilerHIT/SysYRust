@@ -9,7 +9,7 @@ impl AsmModule {
         callees_saved: &HashMap<String, HashSet<Reg>>,
     ) {
         for (_, func) in self.name_func.iter() {
-            func.as_mut().remove_unuse_inst_suf_v2p(
+            func.as_mut().remove_unuse_inst_suf_handle_call(
                 pool,
                 callers_used,
                 callees_used,
