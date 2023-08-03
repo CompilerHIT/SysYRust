@@ -30,10 +30,10 @@ impl Func {
         debug_assert!(self.draw_all_virtual_regs().len() == 0);
         self.remove_self_mv();
         self.short_cut_const();
-        self.remove_unuse_def();
-        self.short_cut_mv();
-        self.remove_unuse_def();
-        self.remove_unuse_store();
+        // self.remove_unuse_def();
+        // self.short_cut_mv();
+        // self.remove_unuse_def();
+        // self.remove_unuse_store();
         // self.short_cut_complex_expr();
         // self.remove_unuse_def();
     }
@@ -247,6 +247,34 @@ impl Func {
                 break;
             }
         }
+    }
+}
+
+//handle call后对于load store指令的消除
+impl Func {
+    pub fn remove_sl_after_handle_call(
+        &mut self,
+        pool: &mut BackendPool,
+        used_but_not_saved: &HashSet<String, HashSet<Reg>>,
+    ) {
+        self.calc_live_base();
+        //块内消除
+
+        //块间消除
+    }
+
+    pub fn remove_sl_after_handle_call_in_block(
+        &mut self,
+        pool: &mut BackendPool,
+        used_but_not_saved: &HashSet<String, HashSet<Reg>>,
+    ) {
+    }
+
+    pub fn remove_sl_after_handle_call_between_blocks(
+        &mut self,
+        pool: &mut BackendPool,
+        used_but_not_saved: &HashSet<String, HashSet<Reg>>,
+    ) {
     }
 }
 

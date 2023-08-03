@@ -663,13 +663,13 @@ impl Func {
     ///都是需要用到的时候才进行寄存器值得归还与存储
     ///但是在不同块之间的时候可以用寄存器的借还操作代替从内存空间读取值的操作
     pub fn remove_inst_suf_spill(&mut self, pool: &mut BackendPool) {
-        //进行寄存器之间的移动操作
-        self.calc_live_base();
-        //如果只有一个前继块,则前继块中的spilling优先使用可用的物理寄存器移动到后方
-        self.remove_unuse_load_after_handle_spill(pool);
-        while self.remove_self_mv() {
-            self.remove_unuse_load_after_handle_spill(pool);
-        }
+        // //进行寄存器之间的移动操作
+        // self.calc_live_base();
+        // //如果只有一个前继块,则前继块中的spilling优先使用可用的物理寄存器移动到后方
+        // self.remove_unuse_load_after_handle_spill(pool);
+        // while self.remove_self_mv() {
+        //     self.remove_unuse_load_after_handle_spill(pool);
+        // }
     }
     //无用的load指令
     //当且仅当v2p后能够使用

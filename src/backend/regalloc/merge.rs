@@ -32,9 +32,11 @@ pub fn alloc_with_merge(func: &mut Func) {
 
         return false;
     };
-    while per_process(func) {}
+    while per_process(func) {
+        //重分配结束后,尝试使用寄存器替换load store
+    }
 
-    //带寄存器合并的分配方式结束后,开始执行
+    //带寄存器合并的分配方式结束后,开始执行减少
 }
 
 //分析虚拟寄存器的合并机会
