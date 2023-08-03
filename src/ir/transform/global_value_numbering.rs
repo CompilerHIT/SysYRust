@@ -192,7 +192,6 @@ pub fn has_val(
                 if flag && index > 0 {
                     //操作数一一同质且有操作数所在节点支配当前节点
                     replace_inst(inst, operands[index - 1]); //用该操作数替换phi节点
-                    println!("删除phi");
                     return true;
                 }
             }
