@@ -7,7 +7,7 @@ impl BackendPass {
     pub fn peephole_pass(&mut self, pool: &mut BackendPool) {
         // 经过两次fuse_imm的块合并后会产生mv tmp, src; mv dst, tmp;的可消去的无用phi指令导致的mv
         // 匹配模式为：两次相邻的mv指令如果满足上述模式则进行融合。
-        // self.rm_useless_mv();
+        self.rm_useless_mv();
 
         self.module.name_func.iter().for_each(|(_, func)| {
             if !func.is_extern {
@@ -47,6 +47,7 @@ impl BackendPass {
                     }
                     index += 1;
                 }
+                self.rm_same_mv(block.clone());
             })
         });
     }
@@ -54,15 +55,17 @@ impl BackendPass {
     fn rm_same_mv(&self, block: ObjPtr<BB>) {
         let mut index = 0;
         loop {
-            if block.insts.len() < 2 || index >= block.insts.len() - 1 {
+            if index >= block.insts.len() {
                 break;
             }
-            let inst1 = block.insts[index];
-            let inst2 = block.insts[index+1];
-            if inst1.get_type() == inst2.get_type() && inst1.operands == inst2.operands {
+            let inst = block.insts[index];
+            if inst.get_type() == InstrsType::OpReg(SingleOp::Mv)
+                && *inst.get_lhs() == *inst.get_dst()
+            {
                 block.as_mut().insts.remove(index);
+            } else {
+                index += 1;
             }
-            index += 1;
         }
     }
 

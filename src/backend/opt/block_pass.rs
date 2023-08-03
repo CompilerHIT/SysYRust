@@ -22,7 +22,7 @@ impl BackendPass {
         // 对于指令数量较少的那些块，复制上提
         // self.copy_exec();
         // 删除0出入度的块
-        // self.clear_unreachable_block();
+        self.clear_unreachable_block();
         // 清除空块(包括entry块)
         self.clear_empty_block();
         // jump的目标块如果紧邻，则删除jump语句
