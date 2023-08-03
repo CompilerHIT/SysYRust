@@ -8,7 +8,10 @@ use crate::{
     utility::{ObjPool, ObjPtr},
 };
 
-// 把所有常量移动到头块
+use super::dead_code_eliminate;
+
+
+/// 把所有常量移动到头块
 pub fn move_const_to_head(head:ObjPtr<BasicBlock>,pool: &mut ObjPool<Inst>){
     bfs_bb_proceess(head, |bb| {
         inst_process_in_bb(bb.get_head_inst(), |inst|{
@@ -31,7 +34,7 @@ pub fn move_const_to_head(head:ObjPtr<BasicBlock>,pool: &mut ObjPool<Inst>){
     })
 }
 
-// 有条件跳转(两个后继为同一块)转化为无条件跳转,清理块间关系
+/// 有条件跳转(两个后继为同一块)转化为无条件跳转,清理块间关系
 pub fn multiple_branch_opt(bb: ObjPtr<BasicBlock>,pool: &mut ObjPool<Inst>) ->bool{
     if !bb.is_empty() {
         let inst = bb.get_tail_inst();
@@ -54,7 +57,7 @@ pub fn multiple_branch_opt(bb: ObjPtr<BasicBlock>,pool: &mut ObjPool<Inst>) ->bo
     false
 }
 
-// 删除仅含一条无条件跳转指令的块
+/// 删除仅含一条无条件跳转指令的块
 pub fn clear_block(bb: ObjPtr<BasicBlock>){
     let mut inst = bb.get_head_inst();
     if let InstKind::Branch = inst.get_kind() {
@@ -67,9 +70,11 @@ pub fn clear_block(bb: ObjPtr<BasicBlock>){
     }
 }
 
+/// 把所有常量移动到头块，删除只含一条无条件跳转指令的块，转换两个后继块相同的情况
 pub fn block_opt(
     module: &mut Module,
     pools: &mut (&mut ObjPool<BasicBlock>, &mut ObjPool<Inst>),
+    optimize_flag:bool,
 ) {
     let pool = &mut pools.1;
     func_process(module, |_func_name, func| {
@@ -91,6 +96,8 @@ pub fn block_opt(
             break;
         }
     }
+    dead_code_eliminate::dead_code_eliminate(module, optimize_flag);
+    dead_code_eliminate::global_eliminate(module);
 }
 
 pub fn delete_block(bb: ObjPtr<BasicBlock>) {
@@ -102,7 +109,6 @@ pub fn delete_block(bb: ObjPtr<BasicBlock>) {
     for i in 0..up.clone().len() {
         up[i].as_mut().replace_next_bb(bb, next[0]);
     }
-
     replace_bb_with_bbs(next[0], bb, up)
 }
 

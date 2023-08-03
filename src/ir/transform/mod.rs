@@ -100,10 +100,5 @@ fn functional_optimizer(
     dead_code_eliminate::global_eliminate(module);
 
     // 块优化
-    delete_empty_block::block_opt(module, pools);
-
-    // 死代码删除
-    dead_code_eliminate::dead_code_eliminate(module, optimize_flag);
-    // 全局死代码删除
-    dead_code_eliminate::global_eliminate(module);
+    delete_empty_block::block_opt(module, pools, optimize_flag);
 }
