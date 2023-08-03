@@ -704,6 +704,15 @@ impl LIRInst {
         ins
     }
 
+    //TOCHECK
+    pub fn build_li_inst(reg: &Reg, imm: i64) -> LIRInst {
+        let ins = LIRInst::new(
+            InstrsType::OpReg(SingleOp::Li),
+            vec![Operand::Reg(*reg), Operand::IImm(IImm::new(imm as i32))],
+        );
+        ins
+    }
+
     ///创建指令,from_reg为值来源,to_reg为值去向
     pub fn build_mv(from_reg: &Reg, to_reg: &Reg) -> LIRInst {
         match from_reg.get_type() {

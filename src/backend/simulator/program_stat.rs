@@ -146,6 +146,10 @@ impl ProgramStat {
                             self.reg_val
                                 .insert(def_reg, Value::FImm(format!("{}", fimm).to_string()));
                         }
+                        //用来做除法优化的情况不考虑
+                        Operand::Addr(_) => {
+                            self.reg_val.insert(def_reg, Value::Inst(*inst));
+                        }
                         _ => unreachable!(),
                     }
                 }

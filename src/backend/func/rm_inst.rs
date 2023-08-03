@@ -1,7 +1,9 @@
 use rand::seq::index;
 
 use crate::{
-    backend::simulator::program_stat::ProgramStat, frontend::irgen::Process, utility::ObjPool,
+    backend::simulator::{execute_stat::ExecuteStat, program_stat::ProgramStat, structs::Value},
+    frontend::irgen::Process,
+    utility::ObjPool,
 };
 
 use super::*;
@@ -19,17 +21,17 @@ impl Func {
 
     ///v2p 后的移除无用指令
     pub fn remove_unuse_inst_suf_v2p(&mut self, pool: &mut BackendPool) {
-        self.remove_self_mv();
+        // self.remove_self_mv();
         // self.remove_unuse_load_after_v2p(pool);
         // while self.remove_self_mv() {
         //     self.remove_unuse_load_after_v2p(pool);
         // }
-        self.short_cut_const_count();
+        self.short_cut_const();
         self.remove_unuse_def();
-        self.short_cut_mv();
-        self.remove_unuse_def();
-        self.short_cut_complex_expr();
-        self.remove_unuse_def();
+        // self.short_cut_mv();
+        // self.remove_unuse_def();
+        // self.short_cut_complex_expr();
+        // self.remove_unuse_def();
     }
 
     //移除
@@ -322,8 +324,10 @@ impl Func {
         Func::print_func(ObjPtr::new(&self), "before_short_cut_mv.txt");
         //维护每个寄存器当前的值
         //维护每个值先后出现的次数
-        let mut val_occurs: HashMap<Value, LinkedList<Reg>> = HashMap::new();
+
+        //只针对块内的局部短路
         for bb in self.blocks.iter() {
+            let mut val_occurs: HashMap<Value, LinkedList<Reg>> = HashMap::new();
             let mut program_stat = ProgramStat::new();
             for inst in bb.insts.iter() {
                 //获取该指令涉及的寄存器,判断该指令后目的寄存器是否是常数
@@ -393,10 +397,53 @@ impl Func {
         }
     }
 
-    //针对常数计算的值短路, (优先改成mv,其次改成直接li)
+    //针对常数赋值的值短路, (对于常量值的加载,优先改为li)
+    pub fn short_cut_const(&mut self) {
+        Func::print_func(ObjPtr::new(&self), "before_short_cut_const.txt");
+        //对于所有常量类型的赋值,如果确定是常量,改为li
+        for bb in self.blocks.iter() {
+            let mut program_stat = ProgramStat::new();
+            for inst in bb.insts.iter() {
+                log!("{:?}", inst);
+                program_stat.consume_inst(inst);
+                let def_reg = inst.get_def_reg();
+                if def_reg.is_none() {
+                    continue;
+                }
+                if program_stat.execute_stat != ExecuteStat::NextInst {
+                    break;
+                }
+                let def_reg = def_reg.unwrap();
+                let val = program_stat.get_val_from_reg(def_reg).unwrap();
+                match val {
+                    Value::IImm(val) => {
+                        //常量替换
+                        let imm_li = LIRInst::build_li_inst(def_reg, val);
+                        *inst.as_mut() = imm_li;
+                    }
+                    _ => (),
+                }
+            }
+        }
+    }
+
+    ///针对计算表达式的值短路,如果要获取一个常数值,则使用最近的比较大的值中获取
     pub fn short_cut_const_count(&mut self) {}
 
-    //针对特殊表达式进行的值短路
+    ///对于单链mv进行值传递,(只考虑两环的情况,因为经过short cut const,const count,mv之后,只剩下两环的mv能优化)
+    pub fn shrink_mv_trans(&mut self) {
+        self.calc_live_base();
+
+        for bb in self.blocks.iter() {
+            //分析blocks 内的def use关系
+            //记录值链以及中间的def use关系
+            let mut defs: HashMap<Reg, ObjPtr<LIRInst>> = HashMap::new();
+            // let mut used_between
+            let mut trans: Vec<(ObjPtr<LIRInst>, ObjPtr<LIRInst>)> = Vec::new();
+        }
+    }
+
+    ///针对特殊表达式进行的值短路
     pub fn short_cut_complex_expr(&mut self) {}
 
     ///移除无用def指令
