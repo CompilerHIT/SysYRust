@@ -26,6 +26,7 @@ impl ProgramStat {
             }
             None => {
                 self.reg_val.insert(dst_reg, Value::Inst(*inst));
+                self.reg_val.insert(src_reg, Value::Inst(*inst));
             }
         }
     }

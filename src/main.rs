@@ -85,7 +85,7 @@ fn run_main() {
     // 后端解析
     let is_opt = o1_option;
     // let is_opt = true;
-    let is_opt = false;
+    // let is_opt = false;
     generate_asm(
         filename,
         output,
