@@ -14,7 +14,7 @@ pub fn meaningless_inst_folding(
 ) {
     func_process(module, |_, func| {
         bfs_inst_process(func.get_head(), |inst| {delete_useless_inst(inst, pools.1);
-            delete_useless_inst2(inst, pools.1)
+            delete_useless_inst2(inst)
         })
     });
 }
@@ -145,7 +145,7 @@ pub fn delete_useless_inst(inst: ObjPtr<Inst>, pool: &mut ObjPool<Inst>) {
 }
 
 //删除乘除相同数的指令
-pub fn delete_useless_inst2(inst: ObjPtr<Inst>, pool: &mut ObjPool<Inst>) {
+pub fn delete_useless_inst2(inst: ObjPtr<Inst>) {
     match inst.get_kind() {
         InstKind::Binary(binop) => match binop {
             BinOp::Mul => {
