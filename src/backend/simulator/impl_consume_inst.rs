@@ -56,8 +56,8 @@ impl ProgramStat {
     pub fn consume_la(&mut self, inst: &ObjPtr<LIRInst>) {
         debug_assert!(inst.get_type() == InstrsType::OpReg(SingleOp::LoadAddr));
         //把label加载进来
-        let label = inst.get_addr_label().unwrap();
-        let l_reg = inst.get_lhs().drop_reg();
+        let label = inst.get_lhs().drop_addr();
+        let l_reg = inst.get_dst().drop_reg();
         self.reg_val.insert(l_reg, Value::Addr((label, 0)));
     }
 }

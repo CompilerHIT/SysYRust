@@ -181,7 +181,7 @@ impl Value {
     pub fn add(one: &Value, another: &Value) -> Option<Value> {
         if one.get_type() == another.get_type() && one.get_type() == ValueType::IImm {
             let v1 = one.get_imm().unwrap();
-            let v2 = one.get_imm().unwrap();
+            let v2 = another.get_imm().unwrap();
             return Some(Value::IImm(v1 + v2));
         } else if let Some(one) = one.get_addr() {
             if let Some(imm) = another.get_imm() {
@@ -201,7 +201,18 @@ impl Value {
 
     ///如果运算成功,返回值,如果失败,返回None
     pub fn minus(one: &Value, another: &Value) -> Option<Value> {
-        todo!()
+        if one.get_type() == another.get_type() && one.get_type() == ValueType::IImm {
+            let v1 = one.get_imm().unwrap();
+            let v2 = another.get_imm().unwrap();
+            return Some(Value::IImm(v1 - v2));
+        } else if let Some(one) = one.get_addr() {
+            if let Some(imm) = another.get_imm() {
+                let mut new_v = one.clone();
+                new_v.1 -= imm;
+                return Some(Value::Addr(new_v));
+            }
+        }
+        None
     }
 }
 
