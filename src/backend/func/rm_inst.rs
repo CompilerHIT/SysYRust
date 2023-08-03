@@ -32,8 +32,9 @@ impl Func {
         self.short_cut_const();
         // self.remove_unuse_def();
         // self.short_cut_mv();
-        // self.remove_unuse_def();
-        // self.remove_unuse_store();
+        self.remove_unuse_def();
+        self.remove_unuse_store();
+        self.remove_unuse_def();
         // self.short_cut_complex_expr();
         // self.remove_unuse_def();
     }
