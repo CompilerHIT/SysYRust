@@ -20,7 +20,13 @@ impl Func {
     }
 
     ///v2p 后的移除无用指令
-    pub fn remove_unuse_inst_suf_v2p(&mut self, pool: &mut BackendPool) {
+    pub fn remove_unuse_inst_suf_v2p(
+        &mut self,
+        pool: &mut BackendPool,
+        callers_used: &HashMap<String, HashSet<Reg>>,
+        callees_used: &HashMap<String, HashSet<Reg>>,
+        callees_saved: &HashMap<String, HashSet<Reg>>,
+    ) {
         debug_assert!(self.draw_all_virtual_regs().len() == 0);
         self.remove_self_mv();
         self.short_cut_const();
@@ -88,7 +94,6 @@ impl Func {
         Func::print_func(ObjPtr::new(&self), "before_short_cut_mv.txt");
         //维护每个寄存器当前的值
         //维护每个值先后出现的次数
-
         //只针对块内的局部短路
         for bb in self.blocks.iter() {
             let mut val_occurs: HashMap<Value, LinkedList<Reg>> = HashMap::new();

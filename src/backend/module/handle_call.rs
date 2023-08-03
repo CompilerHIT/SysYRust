@@ -1,10 +1,14 @@
 use super::*;
 
 impl AsmModule {
-    pub fn handle_call_v4(&mut self, pool: &mut BackendPool) {
-        let callees_used = self.build_callee_used();
-        let callers_used = self.build_caller_used();
-        let callees_be_saved = &self.callee_regs_to_saveds;
+    pub fn handle_call_v4(
+        &mut self,
+        pool: &mut BackendPool,
+        callers_used: &HashMap<String, HashSet<Reg>>,
+        callees_used: &HashMap<String, HashSet<Reg>>,
+        callees_saved: &HashMap<String, HashSet<Reg>>,
+    ) {
+        let callees_be_saved = callees_saved;
         for (_, func) in self.name_func.iter() {
             if func.is_extern {
                 continue;
