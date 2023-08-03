@@ -1,7 +1,11 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::{
-    backend::{instrs::Func, operand::Reg},
+    backend::{
+        instrs::{Func, InstrsType, SingleOp},
+        operand::Reg,
+        regalloc::structs::RegUsedStat,
+    },
     frontend::preprocess,
 };
 
@@ -18,18 +22,47 @@ pub fn alloc_with_merge(func: &mut Func) {
     let regs_to_decolor = Reg::get_all_recolorable_regs();
     let per_process = |func: &mut Func| -> bool {
         func.p2v_pre_handle_call(regs_to_decolor.clone());
-        //分析有合并机会的寄存器对
+        //分析有合并机会的寄存器对,
         let mut mergables: HashSet<(Reg, Reg)>;
+        //分析约束
+
+        //选择可合并寄存器中可分配寄存器数量最多的
+
+        //尝试合并,直到某次合并成功
 
         return false;
     };
     while per_process(func) {}
+
+    //带寄存器合并的分配方式结束后,开始执行
 }
 
 //分析虚拟寄存器的合并机会
 pub fn analyse_mergable(func: &Func) -> HashSet<(Reg, Reg)> {
-    let mut mergables: HashSet<(Reg, Reg)>;
-    todo!()
+    let mut mergables: HashSet<(Reg, Reg)> = HashSet::new();
+    //分析可以合并的虚拟寄存器
+    func.calc_live_base();
+    for bb in func.blocks.iter() {
+        Func::analyse_inst_with_live_now_backorder(
+            *bb,
+            &mut |inst, live_now| match inst.get_type() {
+                InstrsType::OpReg(SingleOp::Mv) => {
+                    let reg_use = inst.get_lhs().drop_reg();
+                    let reg_def = inst.get_def_reg().unwrap();
+                    if live_now.contains(&reg_use) {
+                        return;
+                    }
+                    if reg_use.is_physic() || reg_use.is_physic() {
+                        return;
+                    }
+                    mergables.insert((reg_use, *reg_def));
+                    mergables.insert((*reg_def, reg_use));
+                }
+                _ => (),
+            },
+        );
+    }
+    return mergables;
 }
 
 #[cfg(test)]

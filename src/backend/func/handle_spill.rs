@@ -66,6 +66,7 @@ impl Func {
             phisic_mems.insert(reg, new_stack_slot);
         }
 
+        Func::print_func(ObjPtr::new(&self), "before_handle_spill.txt");
         for bb in self.blocks.iter() {
             // Func::handle_spill_of_block_tmp(
             //     bb,
@@ -472,12 +473,10 @@ impl Func {
                     to_relase.push((*holder, *p_reg));
                     continue;
                 }
-                debug_assert!(
-                    next_occur.front().unwrap().1 == false,
-                    "{}{}",
-                    p_reg,
-                    holder
-                );
+                if next_occur.front().unwrap().1 == true {
+                    to_relase.push((*holder, *p_reg));
+                    continue;
+                }
             }
             for (rentor, borrowed) in to_relase.iter() {
                 holders.remove(borrowed);
