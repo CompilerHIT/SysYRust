@@ -21,7 +21,7 @@ impl AsmModule {
 
         if is_opt {
             // // gep偏移计算合并
-            BackendPass::new(obj_module).opt_gep();
+            // BackendPass::new(obj_module).opt_gep();
 
             // 设置一些寄存器为临时变量
             self.cal_tmp_var();

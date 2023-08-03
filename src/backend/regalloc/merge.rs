@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use crate::{
     backend::{instrs::Func, operand::Reg},
@@ -13,6 +13,8 @@ pub fn alloc_with_merge(func: &mut Func) {
     //然后统计合并机会
     //然后重新分配,从小度开始合并
     //直到合无可合则结束合并
+    //availables 为能够使用的寄存器
+    let availables: HashSet<Reg> = { todo!() };
     let regs_to_decolor = Reg::get_all_recolorable_regs();
     let per_process = |func: &mut Func| -> bool {
         func.p2v_pre_handle_call(regs_to_decolor.clone());
