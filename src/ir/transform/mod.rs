@@ -100,5 +100,5 @@ fn functional_optimizer(
     dead_code_eliminate::global_eliminate(module);
 
     //删除空的块
-    // delete_empty_block::clear_block(module);
+    // delete_empty_block::clear_block(module, pools);
 }

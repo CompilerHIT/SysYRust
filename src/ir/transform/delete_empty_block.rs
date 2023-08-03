@@ -1,14 +1,20 @@
 use crate::{
     ir::{
         basicblock::BasicBlock,
-        instruction::InstKind,
+        instruction::{Inst, InstKind},
         module::Module,
-        tools::{bfs_bb_proceess, func_process},
+        tools::{bfs_bb_proceess, func_process, replace_inst},
     },
-    utility::ObjPtr,
+    utility::{ObjPool, ObjPtr},
 };
 
-pub fn clear_block(module: &mut Module) {
+// pub fn multiple_branch_opt()
+
+pub fn clear_block(
+    module: &mut Module,
+    pools: &mut (&mut ObjPool<BasicBlock>, &mut ObjPool<Inst>),
+) {
+    let pool = &mut pools.1;
     func_process(module, |_func_name, func| {
         bfs_bb_proceess(func.get_head(), |bb| {
             let mut inst = bb.get_head_inst();
@@ -24,6 +30,27 @@ pub fn clear_block(module: &mut Module) {
             }
         });
     });
+    func_process(module, |_func_name, func| {
+        bfs_bb_proceess(func.get_head(), |bb| {
+            if !bb.is_empty() {
+                let inst = bb.get_tail_inst();
+                if let InstKind::Branch = inst.get_kind() {
+                    let next = bb.get_next_bb();
+                    if next.len() > 1 {
+                        //多个后继
+                        if next[0] == next[1] {
+                            //两个后继相同
+                            let inst_new = pool.make_jmp(); //无条件跳转替换条件跳转
+                            inst.as_mut().insert_before(inst);
+                            replace_inst(inst, inst_new);
+                            bb.as_mut().set_next_bb(vec![next[0]]); //设置后继bb
+                            next[0].as_mut().remove_up_bb(bb); //在后继节点中清理第一个符合要求的up_bb
+                        }
+                    }
+                }
+            }
+        });
+    });
 }
 pub fn delete_block(bb: ObjPtr<BasicBlock>) {
     let up = bb.get_up_bb().clone();
@@ -31,7 +58,7 @@ pub fn delete_block(bb: ObjPtr<BasicBlock>) {
     if up.len() == 0 || !check_delete(next[0], bb, up.clone()) {
         return;
     }
-    println!("删除空块:{:?}", bb.get_name());
+    // println!("删除空块:{:?}", bb.get_name());
     for i in 0..up.clone().len() {
         up[i].as_mut().replace_next_bb(bb, next[0]);
     }
