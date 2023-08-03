@@ -64,6 +64,7 @@ impl AsmModule {
         // // self.anaylyse_for_handle_call_v3_pre_split();
         self.anaylyse_for_handle_call_v4();
 
+        let is_opt = true;
         if is_opt {
             self.split_func(pool);
             self.build_own_call_map();
@@ -77,12 +78,18 @@ impl AsmModule {
         let callers_used = self.build_caller_used();
         let callees_used = self.build_callee_used();
         let callees_be_saved = &self.callee_regs_to_saveds.clone();
+        let used_but_not_saved =
+            AsmModule::count_used_but_not_saveds(&callers_used, &callees_used, callees_be_saved);
         self.handle_call_v4(pool, &callers_used, &callees_used, callees_be_saved);
         self.remove_external_func(); //在handle call之前调用,删掉前面往name func中加入的external func
 
-        self.rm_inst_suf_handle_call(pool, &callers_used, &callees_used, callees_be_saved);
+        self.rm_inst_suf_handle_call(pool, &used_but_not_saved);
         self.rearrange_stack_slot();
         self.update_array_offset(pool);
+
+        //
+        self.rm_inst_suf_update_array_offset(pool, &used_but_not_saved);
+
         self.build_stack_info(f);
         // self.print_func();
         //删除无用的函数

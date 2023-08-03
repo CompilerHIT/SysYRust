@@ -23,20 +23,28 @@ impl Func {
     pub fn remove_unuse_inst_suf_handle_call(
         &mut self,
         pool: &mut BackendPool,
-        callers_used: &HashMap<String, HashSet<Reg>>,
-        callees_used: &HashMap<String, HashSet<Reg>>,
-        callees_saved: &HashMap<String, HashSet<Reg>>,
+        regs_used_but_not_saved: &HashMap<String, HashSet<Reg>>,
     ) {
         debug_assert!(self.draw_all_virtual_regs().len() == 0);
         self.remove_self_mv();
+        while self.remove_unuse_store() {
+            self.remove_unuse_def();
+        }
+    }
+    pub fn rm_inst_suf_update_array_offset(
+        &mut self,
+        pool: &mut BackendPool,
+        regs_used_but_not_saved: &HashMap<String, HashSet<Reg>>,
+    ) {
+        self.short_cut_mv();
+        self.remove_unuse_def();
+        self.remove_meaningless_def(regs_used_but_not_saved);
+        self.remove_unuse_def();
         self.short_cut_const();
-        // self.remove_unuse_def();
-        // self.short_cut_mv();
-        // self.remove_unuse_def();
-        while self.remove_unuse_store() {}
-        // Func::print_func(ObjPtr::new(&self), "after_rm_suf_handle_call.txt");
-        // self.short_cut_complex_expr();
-        // self.remove_unuse_def();
+        self.remove_unuse_def();
+        while self.remove_unuse_store() {
+            self.remove_unuse_def();
+        }
     }
 
     //移除
@@ -58,6 +66,13 @@ impl Func {
             })
         }
         if_rm
+    }
+
+    //移除无意义的mv
+    pub fn remove_meaningless_def(
+        &mut self,
+        regs_used_but_not_saved: &HashMap<String, HashSet<Reg>>,
+    ) {
     }
 
     //移除无用的store指令(有store但无use的指令)
@@ -167,6 +182,8 @@ impl Func {
                 }
             }
         }
+
+        Func::print_func(ObjPtr::new(&self), "after_short_cut_mv.txt");
     }
 
     //针对常数赋值的值短路, (对于常量值的加载,优先改为li)

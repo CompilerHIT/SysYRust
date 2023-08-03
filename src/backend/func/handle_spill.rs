@@ -83,7 +83,7 @@ impl Func {
                 &phisic_mems,
             );
         }
-        // self.remove_inst_suf_spill(pool);
+        self.remove_inst_suf_spill(pool);
     }
 
     ///在handle spill之后调用

@@ -286,6 +286,7 @@ impl Func {
         let base_size = slot.get_pos() + slot.get_size();
 
         for (i, inst) in self.array_inst.iter().enumerate() {
+            //如果类型已经被修改,不是array_inst了,则修改
             let mut offset = match inst.get_rhs() {
                 Operand::IImm(imm) => imm.get_data() + base_size,
                 _ => unreachable!("array offset must be imm"),
