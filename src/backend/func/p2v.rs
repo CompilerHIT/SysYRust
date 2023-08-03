@@ -12,6 +12,8 @@ impl Func {
 
         debug_assert!(!regs_to_decolor.contains(&Reg::get_sp()));
         debug_assert!(!regs_to_decolor.contains(&Reg::get_ra()));
+        debug_assert!(!regs_to_decolor.contains(&Reg::get_tp()));
+        debug_assert!(!regs_to_decolor.contains(&Reg::get_gp()));
 
         let mut new_v_regs = HashSet::new(); //用来记录新产生的虚拟寄存器
                                              // self.print_func();

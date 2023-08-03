@@ -433,7 +433,8 @@ impl Func {
     ///对于单链mv进行值传递,(只考虑两环的情况,因为经过short cut const,const count,mv之后,只剩下两环的mv能优化)
     pub fn shrink_mv_trans(&mut self) {
         self.calc_live_base();
-
+        //
+        unimplemented!("也许不需要计算这个,可以通过考虑全局的short cut mv解决");
         for bb in self.blocks.iter() {
             //分析blocks 内的def use关系
             //记录值链以及中间的def use关系
