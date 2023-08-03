@@ -4,6 +4,7 @@ use crate::{
         operand::Reg,
     },
     ir::instruction::Inst,
+    utility::ScalarType,
 };
 
 use super::{
@@ -32,7 +33,7 @@ impl ProgramStat {
     pub fn consume_li(&mut self, inst: &ObjPtr<LIRInst>) {
         debug_assert!(inst.get_type() == InstrsType::OpReg(crate::backend::instrs::SingleOp::Li));
         //加载一个立即数
-        let def_reg = *inst.get_def_reg().unwrap();
+        let def_reg = inst.get_def_reg().unwrap();
         let src = inst.get_lhs();
         match src {
             Operand::IImm(iimm) => {
@@ -172,9 +173,16 @@ impl ProgramStat {
     pub fn consume_call(&mut self, inst: &ObjPtr<LIRInst>) {
         //注意 , call对于 a0 寄存器的影响跟跳转关系有关,需要外部单独处理
         //TODO,暂时无条件认为call指令会清空已有值关系和内存关系
+
+        debug_assert!(inst.get_type() == InstrsType::Call);
+        //交给外部考虑调用call时造成的寄存器原值变化
         for reg in Reg::get_all_not_specials() {
             self.reg_val.remove(&reg);
         }
+        if let Some(def_reg) = inst.get_def_reg() {
+            self.reg_val.insert(def_reg, Value::Inst(*inst));
+        }
+        //不去分析函数调用对于内存空间的影响,认为调用前后所有内存空间原值都失效
         self.mem_val.clear();
         self.execute_stat = ExecuteStat::Call(inst.get_func_name().unwrap());
     }
@@ -261,7 +269,7 @@ impl ProgramStat {
 impl ProgramStat {
     pub fn consume_add(&mut self, inst: &ObjPtr<LIRInst>) {
         debug_assert!(inst.get_type() == InstrsType::Binary(crate::backend::instrs::BinaryOp::Add));
-        let def_reg = *inst.get_def_reg().unwrap();
+        let def_reg = inst.get_def_reg().unwrap();
         let lhs = inst.get_lhs().drop_reg();
         let rhs = inst.get_rhs();
         let lhs = self.reg_val.get(&lhs);

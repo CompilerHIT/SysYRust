@@ -115,7 +115,7 @@ impl ProgramStat {
                 | SingleOp::Snez => {
                     let def_reg = inst.get_def_reg();
                     if let Some(def_reg) = def_reg {
-                        self.reg_val.insert(*def_reg, Value::Inst(*inst));
+                        self.reg_val.insert(def_reg, Value::Inst(*inst));
                     }
                 }
                 SingleOp::LoadAddr => {

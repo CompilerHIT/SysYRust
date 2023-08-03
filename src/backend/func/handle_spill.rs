@@ -842,7 +842,7 @@ impl Func {
                     if available.is_available_reg(to_reg.get_color())
                         && in_available.is_available_reg(to_reg.get_color())
                     {
-                        return Some(*to_reg);
+                        return Some(to_reg);
                     }
                     available.merge(&in_available);
                     let color = available.get_available_reg(to_reg.get_type());
@@ -859,7 +859,7 @@ impl Func {
                 let mid_reg = mid_reg.unwrap();
                 debug_assert!(!bb.live_in.contains(&mid_reg));
                 bb.as_mut().live_in.insert(mid_reg);
-                *load_inst.as_mut() = LIRInst::build_mv(&mid_reg, to_reg);
+                *load_inst.as_mut() = LIRInst::build_mv(&mid_reg, &to_reg);
                 for (in_bb, store_index, _) in stores {
                     debug_assert!(!in_bb.live_out.contains(&mid_reg));
                     in_bb.as_mut().live_out.insert(mid_reg);

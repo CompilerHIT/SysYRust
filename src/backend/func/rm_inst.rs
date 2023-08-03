@@ -31,14 +31,15 @@ impl Func {
             self.remove_unuse_def();
         }
     }
+
     pub fn rm_inst_suf_update_array_offset(
         &mut self,
         pool: &mut BackendPool,
         regs_used_but_not_saved: &HashMap<String, HashSet<Reg>>,
     ) {
-        self.short_cut_mv();
-        self.remove_unuse_def();
         self.remove_meaningless_def(regs_used_but_not_saved);
+        self.short_cut_mv(regs_used_but_not_saved);
+        self.remove_unuse_def();
         self.remove_unuse_def();
         self.short_cut_const();
         self.remove_unuse_def();
@@ -73,6 +74,31 @@ impl Func {
         &mut self,
         regs_used_but_not_saved: &HashMap<String, HashSet<Reg>>,
     ) {
+        //遇到program stat前后值不改变的情况,则删除无用的def指令,除非这条def指令是call指令
+        for bb in self.blocks.iter() {
+            let mut pgs = ProgramStat::new();
+            let mut to_rm = HashSet::new();
+            for inst in bb.insts.iter() {
+                let reg_def = inst.get_def_reg();
+                if reg_def.is_none() {
+                    pgs.consume_inst(inst);
+                    continue;
+                }
+                let reg_def = reg_def.as_ref().unwrap();
+                let old_val = pgs.reg_val.get(reg_def);
+                if old_val.is_none() {
+                    pgs.consume_inst(inst);
+                    continue;
+                }
+                let old_val = old_val.unwrap().clone();
+                pgs.consume_inst(inst);
+                let new_val = pgs.reg_val.get(reg_def).unwrap();
+                if new_val == &old_val {
+                    to_rm.insert(*inst);
+                }
+            }
+            bb.as_mut().insts.retain(|inst| !to_rm.contains(inst));
+        }
     }
 
     //移除无用的store指令(有store但无use的指令)
@@ -111,7 +137,7 @@ impl Func {
 
     //针对mv的值短路
     //会把对已经存在的数值的使用,改为从最早寄存器获取,
-    pub fn short_cut_mv(&mut self) {
+    pub fn short_cut_mv(&mut self, regs_used_but_not_saved: &HashMap<String, HashSet<Reg>>) {
         Func::print_func(ObjPtr::new(&self), "before_short_cut_mv.txt");
         //维护每个寄存器当前的值
         //维护每个值先后出现的次数
@@ -130,7 +156,8 @@ impl Func {
                                 let pre = occurs.front().unwrap();
                                 let pre_val = program_stat.get_val_from_reg(pre);
                                 if pre_val.is_none() {
-                                    unreachable!();
+                                    occurs.pop_front();
+                                    continue;
                                 }
                                 let pre_val = pre_val.unwrap();
                                 if pre_val != val {
@@ -147,11 +174,27 @@ impl Func {
                         }
                     }
                 }
+                let mut to_saveds = HashMap::new();
+                if inst.get_type() == InstrsType::Call {
+                    let func = inst.get_func_name().unwrap();
+                    let func = func.as_str();
+                    let reg_used_but_not_saved = regs_used_but_not_saved.get(func).unwrap();
+                    for (reg, val) in program_stat.reg_val.iter() {
+                        if reg_used_but_not_saved.contains(reg) {
+                            continue;
+                        }
+                        to_saveds.insert(*reg, val.clone());
+                    }
+                }
                 program_stat.consume_inst(inst);
+                for (reg, val) in to_saveds {
+                    program_stat.reg_val.insert(reg, val);
+                }
+
                 //判断下一条指令是否需要的值在当前就已经存在了,而且存在某个寄存器里面
                 //判断def 是否能够化简
                 if let Some(def_reg) = inst.get_def_reg() {
-                    let def_reg = *def_reg;
+                    let def_reg = def_reg;
                     //判断当前值是否是常数,如果是常数,修改为li指令
                     //ps,def之后一定有值
                     let val = program_stat.get_val_from_reg(&def_reg).unwrap();
@@ -198,8 +241,8 @@ impl Func {
                 if def_reg.is_none() {
                     continue;
                 }
-
                 let def_reg = def_reg.unwrap();
+                let def_reg = &def_reg;
                 let val = program_stat.get_val_from_reg(def_reg).unwrap();
                 match val {
                     Value::IImm(val) => {
@@ -258,6 +301,7 @@ impl Func {
                         return;
                     }
                     let def_reg = def_reg.unwrap();
+                    let def_reg = &def_reg;
                     if !live_now.contains(def_reg) {
                         finish_flag = false;
                         return;

@@ -19,7 +19,7 @@ impl AsmModule {
     ) {
         for (_, func) in self.name_func.iter() {
             func.as_mut()
-                .remove_unuse_inst_suf_handle_call(pool, &used_but_not_saveds);
+                .rm_inst_suf_update_array_offset(pool, &used_but_not_saveds);
         }
     }
 

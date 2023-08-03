@@ -57,8 +57,8 @@ pub fn analyse_mergable(func: &Func) -> HashSet<(Reg, Reg)> {
                     if reg_use.is_physic() || reg_use.is_physic() {
                         return;
                     }
-                    mergables.insert((reg_use, *reg_def));
-                    mergables.insert((*reg_def, reg_use));
+                    mergables.insert((reg_use, reg_def));
+                    mergables.insert((reg_def, reg_use));
                 }
                 _ => (),
             },
