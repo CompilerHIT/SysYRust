@@ -667,9 +667,225 @@ impl Func {
         //进行寄存器之间的移动操作
         self.calc_live_base();
         //如果只有一个前继块,则前继块中的spilling优先使用可用的物理寄存器移动到后方
-        self.remove_unuse_load_after_v2p(pool);
-        // while self.remove_self_mv() {
-        //     self.replace_unuse_load_after_v2p();
-        // }
+        self.remove_unuse_load_after_handle_spill(pool);
+        while self.remove_self_mv() {
+            self.remove_unuse_load_after_handle_spill(pool);
+        }
+    }
+    //无用的load指令
+    //当且仅当v2p后能够使用
+    fn remove_unuse_load_after_handle_spill(&mut self, pool: &mut BackendPool) {
+        // return;
+        //找到一个load指令,先往前寻找,判断是否能够块内找到中间有能够使用的物理寄存器以及store指令
+        //如果找到的话,就替换该指令
+        //块内部分
+        self.remove_unuse_load_in_block_after_handle_spill(pool);
+        // // // //块间部分,块间消除load,要找到前继块中所有的对应store,使用mv操作代替store和load操作
+        self.remove_unuse_load_between_blocks_after_handle_spill(pool);
+        self.remove_self_mv();
+        // Func::print_func(ObjPtr::new(&self), "./pre_rm_unuse_store.txt");
+        self.remove_unuse_store();
+        // Func::print_func(ObjPtr::new(&self), "./suf_rm_unuse_store.txt");
+        // self.remove_unuse_def();
+        // Func::print_func(ObjPtr::new(&self), "after_rm_load.txt");
+    }
+
+    fn remove_unuse_load_in_block_after_handle_spill(&mut self, pool: &mut BackendPool) {
+        // self.calc_live_base();
+        // Func::print_func(ObjPtr::new(&self), "pre_rm_load_in_block.txt");
+        //块内删除
+        for bb in self.blocks.iter() {
+            let mut to_process: Vec<(usize, usize)> = Vec::new();
+            let mut loads: HashMap<i32, usize> = HashMap::new();
+            bb.insts
+                .iter()
+                .enumerate()
+                .rev()
+                .for_each(|(index, inst)| match inst.get_type() {
+                    InstrsType::StoreToStack => {
+                        let store_to = inst.get_stack_offset().get_data();
+                        if loads.contains_key(&store_to) {
+                            let store_index = index;
+                            let load_inex = loads.get(&store_to).unwrap();
+                            to_process.push((store_index, *load_inex));
+                            loads.remove(&store_to);
+                        }
+                    }
+                    InstrsType::LoadFromStack => {
+                        let pos = inst.get_stack_offset().get_data();
+                        loads.insert(pos, index);
+                    }
+                    _ => (),
+                });
+            // 对于to_process,按照开头下标进行排序,每次进行一轮替换之后进行更新
+            to_process.sort_by_key(|item| item.0);
+            let mut index = 0;
+            while index < to_process.len() {
+                let (store_index, load_index) = to_process.get(index).unwrap().clone();
+                let available: RegUsedStat =
+                    Func::draw_available_of_certain_area(bb.as_ref(), store_index, load_index);
+                let from_inst = bb.insts.get(store_index).unwrap();
+                let to_inst = bb.insts.get(load_index).unwrap();
+                let from_reg = from_inst.get_dst().drop_reg();
+                let to_reg = to_inst.get_dst().drop_reg();
+                debug_assert!(to_reg.get_type() == from_reg.get_type());
+                let tmp_reg = || -> Option<Reg> {
+                    if available.is_available_reg(to_reg.get_color()) {
+                        return Some(to_reg);
+                    } else if available.is_available_reg(from_reg.get_color()) {
+                        return Some(from_reg);
+                    } else if let Some(available) = available.get_available_reg(to_reg.get_type()) {
+                        let tmp_reg = Reg::from_color(available);
+                        return Some(tmp_reg);
+                    }
+                    return None;
+                }();
+                if tmp_reg.is_none() {
+                    index += 1;
+                    continue;
+                }
+                let tmp_reg = tmp_reg.unwrap();
+                let new_from_mv = LIRInst::build_mv(&from_reg, &tmp_reg);
+                let new_to_mv = LIRInst::build_mv(&tmp_reg, &to_reg);
+                bb.as_mut()
+                    .insts
+                    .insert(store_index, pool.put_inst(new_from_mv));
+                *bb.insts.get(load_index + 1).unwrap().as_mut() = new_to_mv;
+                //更新完后更新下标
+                //首先对于所有原本下标大于等于store_index的,下标+1
+                //然后对于所有原本下标大于等于load_index的,下标+2
+                let mut i = index + 1;
+                while i < to_process.len() {
+                    let (next_store_index, next_load_index) = to_process.get_mut(i).unwrap();
+                    *next_store_index += 1;
+                    *next_load_index += 1;
+                    i += 1;
+                }
+                index += 1;
+            }
+        }
+
+        self.remove_self_mv();
+    }
+
+    fn remove_unuse_load_between_blocks_after_handle_spill(&mut self, pool: &mut BackendPool) {
+        // Func::print_func(ObjPtr::new(&self), "before_rm_load.txt");
+        self.calc_live_base();
+        self.remove_self_mv();
+
+        let mut rm_each =
+            |bb: &ObjPtr<BB>, unchangable: &mut HashSet<(ObjPtr<BB>, ObjPtr<LIRInst>)>| -> bool {
+                let mut loads: Vec<(usize, RegUsedStat)> = Vec::new();
+                let mut reg_use_stat = RegUsedStat::init_unspecial_regs();
+                bb.live_in
+                    .iter()
+                    .for_each(|reg| reg_use_stat.use_reg(reg.get_color()));
+                for (index, inst) in bb.insts.iter().enumerate() {
+                    match inst.get_type() {
+                        InstrsType::LoadFromStack => {
+                            if !unchangable.contains(&(*bb, *inst)) {
+                                loads.push((index, reg_use_stat));
+                                break;
+                            }
+                        }
+                        _ => {}
+                    }
+                    for reg in inst.get_regs() {
+                        reg_use_stat.use_reg(reg.get_color());
+                    }
+                }
+
+                if loads.len() == 0 {
+                    return false;
+                }
+                let (load_index, mut available) = loads.get(0).unwrap();
+                let mut stores: Vec<(ObjPtr<BB>, usize, RegUsedStat)> = Vec::new();
+                let pos = bb
+                    .insts
+                    .get(*load_index)
+                    .unwrap()
+                    .get_stack_offset()
+                    .get_data();
+                //对于stores
+                for in_bb in bb.in_edge.iter() {
+                    Func::analyse_inst_with_regused_and_index_backorder_until(
+                        &in_bb,
+                        &mut |inst, index, rus| match inst.get_type() {
+                            InstrsType::StoreToStack => {
+                                let this_pos = inst.get_stack_offset().get_data();
+                                if this_pos == pos {
+                                    stores.push((*in_bb, index, *rus));
+                                }
+                            }
+                            _ => (),
+                        },
+                        &|_| -> bool {
+                            return false;
+                        },
+                    )
+                }
+
+                let load_inst = bb.insts.get(*load_index).unwrap();
+                let to_reg = load_inst.get_def_reg().unwrap();
+                // debug_assert!(stores.len() <= bb.in_edge.len());
+                if stores.len() != bb.in_edge.len() {
+                    unchangable.insert((*bb, *load_inst));
+                    return false;
+                }
+                let mid_reg = || -> Option<Reg> {
+                    let mut in_available = RegUsedStat::init_unspecial_regs();
+                    for (_, _, in_a) in stores.iter() {
+                        in_available.merge(in_a);
+                    }
+                    if available.is_available_reg(to_reg.get_color())
+                        && in_available.is_available_reg(to_reg.get_color())
+                    {
+                        return Some(*to_reg);
+                    }
+                    available.merge(&in_available);
+                    let color = available.get_available_reg(to_reg.get_type());
+                    if let Some(color) = color {
+                        return Some(Reg::from_color(color));
+                    }
+                    None
+                }();
+                if mid_reg.is_none() {
+                    //把该指令加入无法使用表
+                    unchangable.insert((*bb, *load_inst));
+                    return false;
+                }
+                let mid_reg = mid_reg.unwrap();
+                debug_assert!(!bb.live_in.contains(&mid_reg));
+                bb.as_mut().live_in.insert(mid_reg);
+                *load_inst.as_mut() = LIRInst::build_mv(&mid_reg, to_reg);
+                for (in_bb, store_index, _) in stores {
+                    debug_assert!(!in_bb.live_out.contains(&mid_reg));
+                    in_bb.as_mut().live_out.insert(mid_reg);
+                    //删除无用的store指令
+                    let store_inst = in_bb.insts.get(store_index).unwrap();
+                    let from_reg = store_inst.get_dst().drop_reg();
+                    let from_mv_inst = LIRInst::build_mv(&from_reg, &mid_reg);
+                    in_bb
+                        .as_mut()
+                        .insts
+                        .insert(store_index, pool.put_inst(from_mv_inst));
+                }
+                return true;
+            };
+
+        let mut unchangable: HashSet<(ObjPtr<BB>, ObjPtr<LIRInst>)> = HashSet::new();
+        loop {
+            let mut finish_flag = true;
+            for bb in self.blocks.iter() {
+                while rm_each(bb, &mut unchangable) {
+                    finish_flag = false;
+                }
+            }
+            // self.remove_unuse_store();
+            self.calc_live_base();
+            if finish_flag {
+                break;
+            }
+        }
     }
 }

@@ -32,6 +32,10 @@ impl ProgramStat {
         program_stat
             .reg_val
             .insert(Reg::get_sp(), Value::Addr(("sp_init".to_string(), 80000)));
+
+        //给zero寄存器一个0值
+        program_stat.reg_val.insert(Reg::get_zero(), Value::IImm(0));
+
         program_stat
     }
 
@@ -88,34 +92,23 @@ impl ProgramStat {
                     _ => false,
                 };
                 let mut is_double = inst.is_double();
-                let dst_reg = inst.get_dst().drop_reg();
+                let def_reg = inst.get_dst().drop_reg();
                 match op {
-                    // BinaryOp::Add => {
-                    //     let lhs = inst.get_lhs().drop_reg();
-                    //     let lhs = self.reg_val.get(&lhs);
-                    //     if lhs.is_none() {
-                    //         self.reg_val.insert(dst_reg, Value::Inst(*inst));
-                    //     } else {
-                    //         let rhs = inst.get_rhs();
-                    //         match rhs {
-                    //             _ => unreachable!(),
-                    //         }
-                    //         todo!()
-                    //     }
-                    // }
+                    BinaryOp::Add => {
+                        self.consume_add(inst);
+                    }
                     // BinaryOp::Sub => {
                     //     //对减法的计算
                     //     todo!()
                     // }
                     _ => {
-                        self.reg_val.insert(dst_reg, Value::Inst(*inst));
+                        self.reg_val.insert(def_reg, Value::Inst(*inst));
                     }
                 }
             }
             InstrsType::OpReg(op) => match op {
                 SingleOp::F2I
                 | SingleOp::I2F
-                | SingleOp::LoadAddr
                 | SingleOp::LoadFImm
                 | SingleOp::Neg
                 | SingleOp::Seqz
@@ -126,221 +119,47 @@ impl ProgramStat {
                     }
                 }
                 SingleOp::LoadAddr => {
-                    ///把label加载进来
-                    let label = inst.get_addr_label().unwrap();
-                    let l_reg = inst.get_lhs().drop_reg();
-                    self.reg_val.insert(l_reg, Value::Addr((label, 0)));
+                    self.consume_la(inst);
                 }
                 SingleOp::Li => {
-                    //加载一个立即数
-                    let def_reg = *inst.get_def_reg().unwrap();
-                    let src = inst.get_lhs();
-                    match src {
-                        Operand::IImm(iimm) => {
-                            let iimm = iimm.get_data();
-                            let iimm: i64 = iimm as i64;
-                            self.reg_val.insert(def_reg, Value::IImm(iimm));
-                        }
-                        Operand::FImm(fimm) => {
-                            let fimm = fimm.get_data() as f64;
-                            self.reg_val
-                                .insert(def_reg, Value::FImm(format!("{}", fimm).to_string()));
-                        }
-                        //用来做除法优化的情况不考虑
-                        Operand::Addr(_) => {
-                            self.reg_val.insert(def_reg, Value::Inst(*inst));
-                        }
-                        _ => unreachable!(),
-                    }
+                    self.consume_li(inst);
                 }
                 SingleOp::Mv => {
-                    let dst_reg = inst.get_dst().drop_reg();
-                    let src_reg = inst.get_lhs().drop_reg();
-                    let old_val = self.reg_val.get(&src_reg);
-                    match old_val {
-                        Some(old_val) => {
-                            self.reg_val.insert(dst_reg, old_val.clone());
-                        }
-                        None => {
-                            self.reg_val.insert(dst_reg, Value::Inst(*inst));
-                        }
-                    }
+                    self.consume_mv(inst);
                 }
             },
             InstrsType::Load => {
-                //从内存位置加载一个值
-                //首先要判断该位置有没有值(以及是否是从一个未知地址加载值)
-                let dst_reg = inst.get_dst().drop_reg();
-                let addr = inst.get_lhs().drop_reg();
-                let addr = self.reg_val.get(&addr);
-                if addr.is_none() {
-                    // unreachable!();
-                    //从未知地址取值,则取值用指令表示
-                    self.reg_val.insert(dst_reg, Value::Inst(*inst));
-                } else if addr.unwrap().get_type() != ValueType::Addr {
-                    self.reg_val.insert(dst_reg, Value::Inst(*inst));
-                    // unreachable!();
-                } else {
-                    let offset = inst.get_offset().get_data() as i64;
-                    let mut addr = addr.unwrap().get_addr().unwrap().clone();
-                    addr.1 += offset;
-                    let addr = Value::Addr(addr);
-                    let val = self.mem_val.get(&addr);
-                    if val.is_none() {
-                        self.reg_val.insert(dst_reg, Value::Inst(*inst));
-                    } else if let Some(val) = val {
-                        self.reg_val.insert(dst_reg, val.clone());
-                    } else {
-                        unreachable!();
-                    }
-                }
+                self.consume_load(inst);
             }
             InstrsType::Store => {
-                //把值写入内存某区域
-                //从内存位置加载一个值
-                //首先要判断该位置有没有值(以及是否是从一个未知地址加载值)
-                let dst_reg = inst.get_dst().drop_reg();
-                let addr = inst.get_lhs().drop_reg();
-                let addr = self.reg_val.get(&addr);
-                let val = self.reg_val.get(&dst_reg);
-                if addr.is_none() {
-                    //往未知地址写值,则清空所有地址记录,让所有记录呈未知
-                    self.mem_val.clear();
-                } else if addr.unwrap().get_type() != ValueType::Addr {
-                    self.mem_val.clear();
-                } else {
-                    let offset = inst.get_offset().get_data() as i64;
-                    let mut addr = addr.unwrap().get_addr().unwrap().clone();
-                    addr.1 += offset;
-                    let addr = Value::Addr(addr);
-                    match val {
-                        Some(val) => {
-                            self.mem_val.insert(addr, val.clone());
-                        }
-                        None => {
-                            self.mem_val.insert(addr, Value::Inst(*inst));
-                        }
-                    }
-                }
+                self.consume_store(inst);
             }
             InstrsType::StoreToStack => {
-                let src_reg = inst.get_dst().drop_reg();
-                let offset = inst.get_stack_offset().get_data();
-                let addr = self.reg_val.get(&Reg::get_sp());
-                let mut addr = addr.unwrap().get_addr().unwrap().clone();
-                addr.1 += offset as i64;
-                let val = self.reg_val.get(&src_reg);
-                if val.is_none() {
-                    //如果值未知,清除对应位置的值以表示未知
-                    self.mem_val.remove(&Value::Addr(addr));
-                } else {
-                    self.mem_val.insert(Value::Addr(addr), val.unwrap().clone());
-                }
+                self.consume_store_to_stack(inst);
             }
             InstrsType::LoadFromStack => {
-                let dst_reg = inst.get_dst().drop_reg();
-                let offset = inst.get_stack_offset().get_data();
-                let mut addr = self
-                    .reg_val
-                    .get(&Reg::get_sp())
-                    .unwrap()
-                    .get_addr()
-                    .unwrap()
-                    .clone();
-                addr.1 += offset as i64;
-                let val = self.mem_val.get(&Value::Addr(addr));
-                if val.is_none() {
-                    self.reg_val.insert(dst_reg, Value::Inst(*inst));
-                } else {
-                    self.reg_val.insert(dst_reg, val.unwrap().clone());
-                }
+                self.consume_load_from_stack(inst);
             }
-
             InstrsType::LoadParamFromStack => {
-                let dst_reg = inst.get_dst().drop_reg();
-                self.reg_val.insert(dst_reg, Value::Inst(*inst));
+                self.consume_load_param_from_stack(inst);
             }
             InstrsType::StoreParamToStack => {
                 //该指令的偏移的介绍并不确定,所以不能够确定会store到栈上的什么区域
                 // 但是作为传递参数使用的情况(不会影响到sp中非传参部分区域的值)
                 //所以当前可以忽略该指令的影响
+                self.consume_store_param_to_stack(inst);
             }
             // 判断！是否需要多插入一条j，间接跳转到
-            InstrsType::Branch(cond) => {
-                let lhs = inst.get_lhs().drop_reg();
-                let lhs = self.reg_val.get(&lhs);
-                let bb_label = inst.get_bb_label().unwrap();
-                if lhs.is_none() {
-                    self.execute_stat = ExecuteStat::MayJump(vec![bb_label]);
-                } else {
-                    let lhs = lhs.unwrap();
-                    let mut if_jump = false;
-                    match cond {
-                        CmpOp::Eqz => {
-                            if let Value::IImm(val) = lhs {
-                                if val == &0 {
-                                    if_jump = true
-                                }
-                            }
-                        }
-                        _ => {
-                            let rhs = inst.get_rhs().drop_reg();
-                            let rhs = self.reg_val.get(&rhs);
-                            if let Some(rhs) = rhs {
-                                match cond {
-                                    CmpOp::Eq => {
-                                        if lhs == rhs {
-                                            if_jump = true
-                                        }
-                                    }
-                                    CmpOp::Ne => {
-                                        if lhs != rhs {
-                                            if_jump = true
-                                        }
-                                    }
-                                    CmpOp::Lt => {
-                                        if lhs < rhs {
-                                            if_jump = true
-                                        }
-                                    }
-                                    CmpOp::Le => {
-                                        if lhs <= rhs {
-                                            if_jump = true
-                                        }
-                                    }
-                                    CmpOp::Gt => {
-                                        if lhs > rhs {
-                                            if_jump = true
-                                        }
-                                    }
-                                    CmpOp::Ge => {
-                                        if lhs >= rhs {
-                                            if_jump = true
-                                        }
-                                    }
-                                    _ => unreachable!(),
-                                }
-                            }
-                        }
-                    };
-                    if if_jump {
-                        self.execute_stat = ExecuteStat::Jump(bb_label);
-                    } else {
-                        self.execute_stat = ExecuteStat::MayJump(vec![bb_label]);
-                    }
-                }
-            }
+            InstrsType::Branch(_) => self.consume_branch(inst),
             InstrsType::Jump => {
-                let label = inst.get_bb_label().unwrap();
-                self.execute_stat = ExecuteStat::Jump(label);
+                self.consume_jump(inst);
             }
             InstrsType::Call => {
-                //注意 , call对于 a0 寄存器的影响跟跳转关系有关,需要外部单独处理
-                self.execute_stat = ExecuteStat::Call(inst.get_func_name().unwrap());
+                self.consume_call(inst);
             }
             InstrsType::Ret(..) => {
                 //遇到返回指令(返回返回操作)
-                self.execute_stat = ExecuteStat::Ret;
+                self.consume_ret(inst);
             }
         }
         self.execute_stat.clone()
