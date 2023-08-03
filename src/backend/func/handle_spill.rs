@@ -83,7 +83,7 @@ impl Func {
                 &phisic_mems,
             );
         }
-        self.remove_inst_suf_spill(pool);
+        // self.remove_inst_suf_spill(pool);
     }
 
     ///在handle spill之后调用
@@ -473,7 +473,10 @@ impl Func {
                     to_relase.push((*holder, *p_reg));
                     continue;
                 }
+
                 if next_occur.front().unwrap().1 == true {
+                    // debug_assert!(false, "{}-{}-{}-{}", bb.label, index, inst.as_ref(), holder);
+                    // unreachable!();
                     to_relase.push((*holder, *p_reg));
                     continue;
                 }

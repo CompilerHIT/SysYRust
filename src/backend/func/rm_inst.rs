@@ -32,9 +32,9 @@ impl Func {
         self.short_cut_const();
         // self.remove_unuse_def();
         // self.short_cut_mv();
-        self.remove_unuse_def();
-        self.remove_unuse_store();
-        self.remove_unuse_def();
+        // self.remove_unuse_def();
+        while self.remove_unuse_store() {}
+        // Func::print_func(ObjPtr::new(&self), "after_rm_suf_handle_call.txt");
         // self.short_cut_complex_expr();
         // self.remove_unuse_def();
     }
@@ -61,7 +61,8 @@ impl Func {
     }
 
     //移除无用的store指令(有store但无use的指令)
-    pub fn remove_unuse_store(&mut self) {
+    pub fn remove_unuse_store(&mut self) -> bool {
+        let mut out = false;
         //根据sst图进行无用store指令删除
         let (_, _, _, live_outs) = Func::calc_stackslot_interval(self);
         for bb in self.blocks.iter() {
@@ -85,8 +86,12 @@ impl Func {
                     _ => (),
                 }
             }
+            if to_rm.len() != 0 {
+                out = true;
+            }
             bb.as_mut().insts.retain(|inst| !to_rm.contains(inst));
         }
+        out
     }
 
     //针对mv的值短路
@@ -213,9 +218,10 @@ impl Func {
     pub fn short_cut_complex_expr(&mut self) {}
 
     ///移除无用def指令
-    pub fn remove_unuse_def(&mut self) {
+    pub fn remove_unuse_def(&mut self) -> bool {
         //TODO,等待前端修改main的ret指令的类型为ScarlarType::Int
         // 循环删除无用def
+        let mut out = false;
         loop {
             self.calc_live_base();
             let mut finish_flag = true;
@@ -247,7 +253,9 @@ impl Func {
             if finish_flag {
                 break;
             }
+            out = true;
         }
+        out
     }
 }
 

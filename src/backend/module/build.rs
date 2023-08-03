@@ -79,10 +79,11 @@ impl AsmModule {
         let callees_be_saved = &self.callee_regs_to_saveds.clone();
         self.handle_call_v4(pool, &callers_used, &callees_used, callees_be_saved);
         self.remove_external_func(); //在handle call之前调用,删掉前面往name func中加入的external func
+
+        self.rm_inst_suf_handle_call(pool, &callers_used, &callees_used, callees_be_saved);
         self.rearrange_stack_slot();
         self.update_array_offset(pool);
         self.build_stack_info(f);
-        self.rm_inst_suf_p2v(pool, &callers_used, &callees_used, callees_be_saved);
         // self.print_func();
         //删除无用的函数
     }

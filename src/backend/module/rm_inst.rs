@@ -1,7 +1,7 @@
 use super::*;
 
 impl AsmModule {
-    pub fn rm_inst_suf_p2v(
+    pub fn rm_inst_suf_handle_call(
         &mut self,
         pool: &mut BackendPool,
         callers_used: &HashMap<String, HashSet<Reg>>,
