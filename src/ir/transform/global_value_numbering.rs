@@ -127,7 +127,7 @@ impl Congruence {
     }
 }
 
-pub fn easy_gvn(module: &mut Module) -> bool {
+pub fn easy_gvn(module: &mut Module) -> (bool,CongruenceClass) {
     let mut congruence_class = CongruenceClass::new();
     let mut changed = false;
     let set = call_optimize(module);
@@ -137,20 +137,22 @@ pub fn easy_gvn(module: &mut Module) -> bool {
             changed |= has_val(&mut congruence_class, inst, &dominator_tree, &set)
         });
     });
-    changed
+    (changed,congruence_class)
 }
 
-pub fn gvn(module: &mut Module, opt_option: bool) {
+pub fn gvn(module: &mut Module, opt_option: bool) ->Option<CongruenceClass>{
     if opt_option {
         loop {
             let mut changed = false;
-            changed |= easy_gvn(module);
+            let (gvn_changed,congruence_class) = easy_gvn(module);
+            changed |= gvn_changed;
             changed |= load_store_opt(module);
             if !changed {
-                break;
+                return Some(congruence_class);
             }
         }
     }
+    None
 }
 
 pub fn has_val(
