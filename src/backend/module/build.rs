@@ -14,6 +14,7 @@ impl AsmModule {
             BackendPass::new(obj_module).block_pass_pre_clear(pool);
         }
 
+        // self.print_func();
         self.remove_unuse_inst_pre_alloc();
         // self.print_func();
 
@@ -42,8 +43,9 @@ impl AsmModule {
             self.map_v_to_p();
         }
 
-        // self.print_func();
+        self.print_func();
         self.remove_unuse_inst_suf_alloc();
+        self.print_func();
 
         //加入外部函数
         self.add_external_func(pool);
@@ -51,6 +53,8 @@ impl AsmModule {
         // //建立调用表
         self.build_own_call_map();
         // //寄存器重分配,重分析
+
+        // self.print_func();
 
         self.realloc_reg_with_priority();
 

@@ -61,7 +61,7 @@ impl Func {
                         if_rm = true;
                         return false;
                     }
-                    true
+                    return true;
                 }
                 _ => true,
             })
@@ -76,24 +76,48 @@ impl Func {
     ) {
         //遇到program stat前后值不改变的情况,则删除无用的def指令,除非这条def指令是call指令
         for bb in self.blocks.iter() {
-            let mut pgs = ProgramStat::new();
+            let mut program_stat = ProgramStat::new();
             let mut to_rm = HashSet::new();
             for inst in bb.insts.iter() {
                 let reg_def = inst.get_def_reg();
                 if reg_def.is_none() {
-                    pgs.consume_inst(inst);
+                    program_stat.consume_inst(inst);
                     continue;
                 }
+
                 let reg_def = reg_def.as_ref().unwrap();
-                let old_val = pgs.reg_val.get(reg_def);
+                let old_val = program_stat.reg_val.get(reg_def);
                 if old_val.is_none() {
-                    pgs.consume_inst(inst);
+                    program_stat.consume_inst(inst);
                     continue;
                 }
                 let old_val = old_val.unwrap().clone();
-                pgs.consume_inst(inst);
-                let new_val = pgs.reg_val.get(reg_def).unwrap();
+
+                //记录需要保存的值
+
+                if inst.get_type() == InstrsType::Call {
+                    let mut to_saveds = HashMap::new();
+                    let func = inst.get_func_name().unwrap();
+                    let func = func.as_str();
+                    let reg_used_but_not_saved = regs_used_but_not_saved.get(func).unwrap();
+                    for (reg, val) in program_stat.reg_val.iter() {
+                        if reg_used_but_not_saved.contains(reg) {
+                            continue;
+                        }
+                        to_saveds.insert(*reg, val.clone());
+                    }
+                    program_stat.consume_inst(inst);
+                    for (reg, val) in to_saveds {
+                        program_stat.reg_val.insert(reg, val);
+                    }
+                    continue;
+                }
+
+                program_stat.consume_inst(inst);
+
+                let new_val = program_stat.reg_val.get(reg_def).unwrap();
                 if new_val == &old_val {
+                    // println!("{}", inst.as_ref());
                     to_rm.insert(*inst);
                 }
             }
@@ -281,20 +305,27 @@ impl Func {
     pub fn remove_unuse_def(&mut self) -> bool {
         //TODO,等待前端修改main的ret指令的类型为ScarlarType::Int
         // 循环删除无用def
+        println!("1");
         let mut out = false;
         loop {
             self.calc_live_base();
             let mut finish_flag = true;
             for bb in self.blocks.iter() {
-                let mut new_insts = Vec::new();
+                let mut new_insts: Vec<ObjPtr<LIRInst>> = Vec::new();
                 Func::analyse_inst_with_live_now_backorder(*bb, &mut |inst, live_now| {
+                    println!("{},{}", bb.label, inst.as_ref());
+                    println!("{:?}", live_now);
                     match inst.get_type() {
-                        InstrsType::Call | InstrsType::Ret(_) => {
+                        InstrsType::Call => {
+                            new_insts.push(inst);
+                            return;
+                        }
+                        InstrsType::Ret(_) => {
                             new_insts.push(inst);
                             return;
                         }
                         _ => (),
-                    }
+                    };
                     let def_reg = inst.get_def_reg();
                     if def_reg.is_none() {
                         new_insts.push(inst);
@@ -302,13 +333,17 @@ impl Func {
                     }
                     let def_reg = def_reg.unwrap();
                     let def_reg = &def_reg;
+                    // println!("{def_reg}");
                     if !live_now.contains(def_reg) {
-                        finish_flag = false;
                         return;
                     }
+                    // println!("keep");
                     new_insts.push(inst);
                 });
                 new_insts.reverse();
+                if new_insts.len() != bb.insts.len() {
+                    finish_flag = false;
+                }
                 bb.as_mut().insts = new_insts;
             }
             if finish_flag {

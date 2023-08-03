@@ -279,8 +279,11 @@ impl AsmModule {
         }
         let call_map = &self.call_map;
         //对每个函数进行试图减少指定寄存器的使用
-        for (_, func) in self.name_func.iter() {
+        for (name, func) in self.name_func.iter() {
             if func.is_extern {
+                continue;
+            }
+            if name == "main" {
                 continue;
             }
             let func = *func;

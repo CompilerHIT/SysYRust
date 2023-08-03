@@ -166,7 +166,6 @@ impl Func {
                 if use_reg.is_empty() {
                     continue;
                 }
-                debug_assert!(use_reg.len() == 1);
                 let use_reg = use_reg.get(0).unwrap();
                 unchanged_use.insert((*last_inst, *use_reg));
                 // 往前直到遇到第一个def为止
@@ -174,6 +173,9 @@ impl Func {
                     Func::print_func(ObjPtr::new(self), "p2v.txt");
                     bb.label.as_str()
                 });
+                if bb.insts.len() < 2 {
+                    continue;
+                }
                 let mut index = bb.insts.len() - 2;
                 loop {
                     let inst = bb.insts.get(index).unwrap();
