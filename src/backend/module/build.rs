@@ -43,9 +43,9 @@ impl AsmModule {
             self.map_v_to_p();
         }
 
-        self.print_func();
+        // self.print_func();
         self.remove_unuse_inst_suf_alloc();
-        self.print_func();
+        // self.print_func();
 
         //加入外部函数
         self.add_external_func(pool);

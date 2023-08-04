@@ -305,46 +305,35 @@ impl Func {
     pub fn remove_unuse_def(&mut self) -> bool {
         //TODO,等待前端修改main的ret指令的类型为ScarlarType::Int
         // 循环删除无用def
-        println!("1");
         let mut out = false;
         loop {
             self.calc_live_base();
             let mut finish_flag = true;
             for bb in self.blocks.iter() {
-                let mut new_insts: Vec<ObjPtr<LIRInst>> = Vec::new();
+                let mut to_rm: HashSet<ObjPtr<LIRInst>> = HashSet::new();
                 Func::analyse_inst_with_live_now_backorder(*bb, &mut |inst, live_now| {
-                    println!("{},{}", bb.label, inst.as_ref());
-                    println!("{:?}", live_now);
                     match inst.get_type() {
                         InstrsType::Call => {
-                            new_insts.push(inst);
-                            return;
-                        }
-                        InstrsType::Ret(_) => {
-                            new_insts.push(inst);
                             return;
                         }
                         _ => (),
                     };
                     let def_reg = inst.get_def_reg();
                     if def_reg.is_none() {
-                        new_insts.push(inst);
                         return;
                     }
                     let def_reg = def_reg.unwrap();
                     let def_reg = &def_reg;
                     // println!("{def_reg}");
                     if !live_now.contains(def_reg) {
+                        to_rm.insert(inst);
                         return;
                     }
-                    // println!("keep");
-                    new_insts.push(inst);
                 });
-                new_insts.reverse();
-                if new_insts.len() != bb.insts.len() {
+                bb.as_mut().insts.retain(|inst| !to_rm.contains(inst));
+                if to_rm.len() != 0 {
                     finish_flag = false;
                 }
-                bb.as_mut().insts = new_insts;
             }
             if finish_flag {
                 break;

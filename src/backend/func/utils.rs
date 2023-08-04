@@ -95,9 +95,6 @@ impl Func {
             live_now.insert(*reg);
         });
         for inst in bb.insts.iter().rev() {
-            // for reg in inst.get_reg_def() {
-            //     live_now.remove(&reg);
-            // }
             analyser(*inst, &live_now);
             for reg in inst.get_reg_def() {
                 live_now.remove(&reg);
