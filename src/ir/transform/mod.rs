@@ -11,9 +11,11 @@ mod delete_redundant_load_store;
 mod func_inline;
 mod global_value_numbering;
 mod global_var_transform;
+mod hoist;
 mod loop_operation;
 mod meaningless_insts_folding;
 mod phi_optimizer;
+mod partial_redundancy_elimination;
 mod return_unused;
 mod simplify_cfg;
 mod tail_call_optimize;
@@ -32,6 +34,9 @@ pub fn optimizer_run(
         simplify_cfg::simplify_cfg_run(module, &mut pools);
         functional_optimizer(module, &mut pools, optimize_flag);
 
+        // gvn hoist
+        // hoist::hoist(module, optimize_flag, &mut pools);
+
         // 循环优化
         loop_operation::loop_optimize(module, &mut pools);
         simplify_cfg::simplify_cfg_run(module, &mut pools);
@@ -48,6 +53,9 @@ pub fn optimizer_run(
         // 简化cfg
         simplify_cfg::simplify_cfg_run(module, &mut pools);
         functional_optimizer(module, &mut pools, optimize_flag);
+
+        // gvn hoist
+        // hoist::hoist(module, optimize_flag, &mut pools);
 
         // 循环优化
         loop_operation::loop_optimize(module, &mut pools);

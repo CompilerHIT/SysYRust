@@ -111,6 +111,38 @@ impl CongruenceClass {
             _ => None,
         }
     }
+
+    pub fn remove_inst(&mut self,inst: ObjPtr<Inst>){
+        let congruence = self.get_congruence_mut(inst).unwrap();
+        let index = congruence.map.get(&inst).unwrap();
+        congruence.vec_class.remove(*index);
+        congruence.map.remove(&inst);
+    }
+
+    pub fn add_inst(&mut self,inst: ObjPtr<Inst>){
+        let congruence = self.get_congruence_immut(inst).unwrap();
+        if let Some(_index) = congruence.map.get(&inst) {
+            return ;
+        }
+        let mut index_final = 0;
+        for vec_congruent in &congruence.vec_class {
+            if compare_two_inst(inst, vec_congruent[0], &self) {
+                if let Some(index) = congruence.map.get(&vec_congruent[0]) {
+                    index_final = index + 1;
+                }
+                if index_final != 0 {
+                    let congruence_mut = self.get_congruence_mut(inst).unwrap();
+                    congruence_mut.vec_class[index_final - 1].push(inst);
+                    congruence_mut.map.insert(inst, index_final - 1);
+                }
+                return ;
+            }
+        }
+        let congruence = self.get_congruence_mut(inst).unwrap();
+        let index = congruence.vec_class.len();
+        congruence.vec_class.push(vec![inst]); //加入新的congruent class
+        congruence.map.insert(inst, index); //增加索引映射
+    }
 }
 
 pub struct Congruence {
@@ -127,19 +159,6 @@ impl Congruence {
     }
 }
 
-pub fn easy_gvn(module: &mut Module) -> (bool,CongruenceClass) {
-    let mut congruence_class = CongruenceClass::new();
-    let mut changed = false;
-    let set = call_optimize(module);
-    func_process(module, |_, func| {
-        let dominator_tree = calculate_dominator(func.get_head());
-        bfs_inst_process(func.get_head(), |inst| {
-            changed |= has_val(&mut congruence_class, inst, &dominator_tree, &set)
-        });
-    });
-    (changed,congruence_class)
-}
-
 pub fn gvn(module: &mut Module, opt_option: bool) ->Option<CongruenceClass>{
     if opt_option {
         loop {
@@ -154,6 +173,20 @@ pub fn gvn(module: &mut Module, opt_option: bool) ->Option<CongruenceClass>{
     }
     None
 }
+
+pub fn easy_gvn(module: &mut Module) -> (bool,CongruenceClass) {
+    let mut congruence_class = CongruenceClass::new();
+    let mut changed = false;
+    let set = call_optimize(module);
+    func_process(module, |_, func| {
+        let dominator_tree = calculate_dominator(func.get_head());
+        bfs_inst_process(func.get_head(), |inst| {
+            changed |= has_val(&mut congruence_class, inst, &dominator_tree, &set)
+        });
+    });
+    (changed,congruence_class)
+}
+
 
 pub fn has_val(
     congruence_class: &mut CongruenceClass,

@@ -6,6 +6,7 @@ extern crate biheap;
 // extern crate libm;
 use sysylib::backend::module::AsmModule;
 use sysylib::frontend::irgen::irgen;
+use sysylib::ir::dump_now;
 use sysylib::ir::instruction::Inst;
 use sysylib::{self, backend::generate_asm, ir::module::Module, utility::ObjPool};
 lalrpop_mod! {
@@ -79,8 +80,10 @@ fn run_main() {
     drop(compunit);
 
     // ir优化
-    sysylib::ir::optimizer_run(&mut module, (&mut pool_bb, &mut pool_inst), o1_option);
+    sysylib::ir::optimizer_run(&mut module, (&mut pool_bb, &mut pool_inst), true);
     let output2 = "row_asm.log";
+
+    // dump_now(&module, "dump.ll");
 
     // 后端解析
     let is_opt = o1_option;
