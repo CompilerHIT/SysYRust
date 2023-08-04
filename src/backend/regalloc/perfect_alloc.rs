@@ -90,19 +90,22 @@ pub fn alloc(func: &Func, constraints: &HashMap<Reg, HashSet<Reg>>) -> Option<Fu
 }
 
 pub fn alloc_with_v_interference_graph_and_base_available(
-    live_interference_graph: &HashMap<Reg, HashSet<Reg>>,
+    interference_graph: &HashMap<Reg, HashSet<Reg>>,
     availables: &HashMap<Reg, RegUsedStat>,
     constraints: &HashMap<Reg, HashSet<Reg>>,
 ) -> Option<FuncAllocStat> {
-    let all_neighbors = live_interference_graph;
+    let all_neighbors = interference_graph;
     let mut availables = availables.clone();
     for (reg, constraints) in constraints.iter() {
         debug_assert!(!reg.is_physic());
+        // if !availables.contains_key(reg) {
+        //     availables.insert(*reg, RegUsedStat::init_unspecial_regs());
+        // }
         for p_reg in constraints.iter() {
             availables.get_mut(reg).unwrap().use_reg(p_reg.get_color());
         }
     }
-    let mut live_neighbors = live_interference_graph.clone();
+    let mut live_neighbors = interference_graph.clone();
     let mut to_colors: Vec<Reg> = live_neighbors.iter().map(|(key, _)| *key).collect();
     let mut ordered_color_lst: LinkedList<Reg> = LinkedList::new();
     let availables = availables;

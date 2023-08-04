@@ -1,8 +1,23 @@
+use std::ptr::addr_of_mut;
+
 use super::*;
 
 /// 从函数中提取信息
 impl Func {
     // 实现一些关于函数信息的估计和获取的方法
+    pub fn draw_phisic_regs(&self) -> RegUsedStat {
+        let mut used = RegUsedStat::new();
+        for bb in self.blocks.iter() {
+            for inst in bb.insts.iter() {
+                for reg in inst.get_regs() {
+                    if reg.is_physic() {
+                        used.use_reg(reg.get_color());
+                    }
+                }
+            }
+        }
+        used
+    }
 
     // 估计寄存器数量
     pub fn estimate_num_regs(&self) -> usize {
@@ -81,6 +96,27 @@ impl Func {
         for bb in self.blocks.iter() {
             bb.as_mut().build_reg_intervals();
         }
+    }
+}
+
+//找到函数的最后一个块
+impl Func {
+    pub fn get_final_bb(&self) -> ObjPtr<BB> {
+        let mut rets: Vec<ObjPtr<BB>> = Vec::new();
+        for bb in self.blocks.iter() {
+            if bb.insts.len() <= 0 {
+                continue;
+            }
+            let last_inst = bb.insts.last().unwrap();
+            match last_inst.get_type() {
+                InstrsType::Ret(_) => {
+                    rets.push(*bb);
+                }
+                _ => (),
+            }
+        }
+        debug_assert!(rets.len() == 1);
+        *rets.get(0).unwrap()
     }
 }
 

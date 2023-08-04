@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::collections::HashSet;
+use std::fmt::format;
 use std::fmt::Display;
 use std::vec;
 
@@ -8,7 +9,7 @@ use crate::backend::operand::Reg;
 use crate::utility::ObjPtr;
 use crate::utility::ScalarType;
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, PartialEq, Hash, Eq, PartialOrd, Ord)]
 pub struct RegUsedStat {
     iregs_used: u32,
     fregs_used: u32,
@@ -311,6 +312,26 @@ impl RegUsedStat {
             iregs_used: 0b_1111_1111_1111_1111_1111_1111_1111_1111,
             fregs_used: 0b_1111_1111_1111_1111_1111_1111_1111_1111,
         }
+    }
+}
+
+impl RegUsedStat {
+    ///绘制当前使用情况的编码标签
+    pub fn draw_code_mark(&self) -> String {
+        format!("{}_{}", self.iregs_used, self.fregs_used).to_string()
+    }
+    ///绘制表示当前寄存器使用情况的唯一对应符号标签
+    pub fn draw_symbol_mark(&self) -> String {
+        let mut out = "".to_string();
+        for reg in 0..=63 {
+            if self.is_available_reg(reg) {
+                continue;
+            }
+            let reg = Reg::from_color(reg);
+            let symbol = reg.to_string(false);
+            out.push_str(&symbol);
+        }
+        out
     }
 }
 

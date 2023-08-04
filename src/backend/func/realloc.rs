@@ -1,12 +1,45 @@
+use crate::backend::{module::constraints, regalloc::perfect_alloc};
+
 use super::*;
 
 // realloc 实现 ,用于支持build v4
 impl Func {
-    // //进行贪心的寄存器分配
-    // pub fn alloc_reg_with_priority(&mut self, ordered_regs: Vec<Reg>) {
-    //     // 按照顺序使用ordered regs中的寄存器进行分配
-    //     todo!()
-    // }
+    // //进行贪心的寄存器重分配
+    pub fn alloc_reg_with_priority(&mut self, ordered_regs: Vec<Reg>) {
+        // 按照顺序使用ordered regs中的寄存器进行分配
+        self.calc_live_for_handle_call();
+        let mut to_decolor = Reg::get_all_recolorable_regs();
+        to_decolor.remove(&Reg::get_s0());
+
+        self.p2v_pre_handle_call(to_decolor);
+        Func::print_func(
+            ObjPtr::new(&self),
+            "before_realloc_with_priority_after_p2v.txt",
+        );
+        //不能上二分，为了最好效果,使用最少的寄存器
+        //所以直接地,
+        let all_v_regs = self.draw_all_virtual_regs();
+        let mut constraints = HashMap::new();
+        let mut availables: HashSet<Reg> = HashSet::new();
+        let all_regs = Reg::get_all_regs();
+        for reg in ordered_regs.iter() {
+            availables.insert(*reg);
+            let mut unavailables = all_regs.clone();
+            unavailables.retain(|reg| !availables.contains(reg));
+            for v_reg in all_v_regs.iter() {
+                constraints.insert(*v_reg, unavailables.clone());
+            }
+            let alloc_stat = perfect_alloc::alloc(&self, &constraints);
+            if alloc_stat.is_some() {
+                let alloc_stat = alloc_stat.unwrap();
+                debug_assert!(alloc_stat.spillings.len() == 0);
+                self.v2p(&alloc_stat.dstr);
+                return;
+            }
+        }
+        debug_assert!(false);
+    }
+
     ///移除对特定的寄存器的使用,转为使用其他已经使用过的寄存器
     /// 如果移除成功返回true,移除失败返回false
     ///该函数只应该main以外的函数调用

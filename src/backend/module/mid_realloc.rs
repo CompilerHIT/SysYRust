@@ -39,93 +39,88 @@ impl AsmModule {
         callee_saved_times
     }
 
-    ///使用进行函数分析后的结果先进行寄存器组成重构
-    pub fn realloc_reg_with_priority(&mut self) {
-        //记录除了main函数外每个函数使用到的 callee saved和caller saved 需要的恢复次数
-        let callee_saved_times: HashMap<String, HashMap<Reg, usize>> =
-            self.count_callee_saveds_times();
-        let call_map = &self.call_map;
-        //对每个函数进行试图减少指定寄存器的使用
-        for (func, func_ptr) in self.name_func.iter() {
-            if func_ptr.is_extern {
-                continue;
-            }
-            if func == "main" {
-                continue;
-            }
-            let func_ptr = *func_ptr;
-            //按照每个函数使用被调用时需要保存的自身使用到的callee saved寄存器的数量
-            let callee_saved_time = callee_saved_times.get(func.as_str());
-            if callee_saved_time.is_none() {
-                break;
-            }
-            let callee_saved_time = callee_saved_time.unwrap();
-            let mut callees: Vec<Reg> = callee_saved_time
-                .iter()
-                .map(|(reg, _)| *reg)
-                .filter(|reg| reg != &Reg::get_sp())
-                .collect();
-            callees.sort_by_cached_key(|reg| callee_saved_time.get(reg));
-            let caller_used = self.build_caller_used();
-            let callee_used = self.build_callee_used();
-            let self_used = func_ptr.draw_used_callees();
-            //自身调用的函数使用到的callee saved寄存器
-            let mut callee_func_used: HashSet<Reg> = HashSet::new();
-            for func_called in call_map.get(func_ptr.label.as_str()).unwrap() {
-                if func_called == func_ptr.label.as_str() {
-                    continue;
-                }
-                let callee_used_of_func_called = callee_used.get(func_called).unwrap();
-                callee_func_used.extend(callee_used_of_func_called.iter());
-            }
-            //对于自身使用到的callee_used的寄存器
-            // let mut self_callee_used
-            //从该函数需要保存次数最多的寄存器开始ban
-            let mut baned = HashSet::new();
-            for reg in callees.iter().rev() {
-                if !self_used.contains(reg) {
-                    continue;
-                }
-                if callee_func_used.contains(reg) {
-                    continue;
-                }
-                let ok = func_ptr
-                    .as_mut()
-                    .try_ban_certain_reg(reg, &caller_used, &callee_used);
-                if ok {
-                    log_file!("ban_reg.txt", "{}", reg);
-                    baned.insert(*reg);
-                } else {
-                    break;
-                }
-            }
-        }
-        // // return;
-        //对于main函数单独处理
-        //节省callee,能够节省多少节省多少 (然后试图节省caller)
+    pub fn realloc_pre_split_func(&mut self) {
+        // self.realloc_not_main_with_priority();
         // self.realloc_main_with_priority_pre_split();
     }
 
+    ///使用进行函数分析后的结果先进行寄存器组成重构
+    // fn realloc_not_main_with_priority(&mut self) {
+    //     //记录除了main函数外每个函数使用到的 callee saved和caller saved 需要的恢复次数
+    //     let callee_saved_times: HashMap<String, HashMap<Reg, usize>> =
+    //         self.count_callee_saveds_times();
+    //     let call_map = &self.call_map;
+    //     //对每个函数进行试图减少指定寄存器的使用
+    //     for (func, func_ptr) in self.name_func.iter() {
+    //         if func_ptr.is_extern {
+    //             continue;
+    //         }
+    //         if func == "main" {
+    //             continue;
+    //         }
+    //         let func_ptr = *func_ptr;
+    //         //按照每个函数使用被调用时需要保存的自身使用到的callee saved寄存器的数量
+    //         let callee_saved_time = callee_saved_times.get(func.as_str());
+    //         if callee_saved_time.is_none() {
+    //             break;
+    //         }
+    //         let callee_saved_time = callee_saved_time.unwrap();
+    //         let mut callees: Vec<Reg> = callee_saved_time
+    //             .iter()
+    //             .map(|(reg, _)| *reg)
+    //             .filter(|reg| reg != &Reg::get_sp())
+    //             .collect();
+    //         callees.sort_by_cached_key(|reg| callee_saved_time.get(reg));
+    //         let caller_used = self.build_caller_used();
+    //         let callee_used = self.build_callee_used();
+    //         let self_used = func_ptr.draw_used_callees();
+    //         //自身调用的函数使用到的callee saved寄存器
+    //         let mut callee_func_used: HashSet<Reg> = HashSet::new();
+    //         for func_called in call_map.get(func_ptr.label.as_str()).unwrap() {
+    //             if func_called == func_ptr.label.as_str() {
+    //                 continue;
+    //             }
+    //             let callee_used_of_func_called = callee_used.get(func_called).unwrap();
+    //             callee_func_used.extend(callee_used_of_func_called.iter());
+    //         }
+    //         //对于自身使用到的callee_used的寄存器
+    //         // let mut self_callee_used
+    //         //从该函数需要保存次数最多的寄存器开始ban
+    //         let mut baned = HashSet::new();
+    //         for reg in callees.iter().rev() {
+    //             if !self_used.contains(reg) {
+    //                 continue;
+    //             }
+    //             if callee_func_used.contains(reg) {
+    //                 continue;
+    //             }
+    //             let ok = func_ptr
+    //                 .as_mut()
+    //                 .try_ban_certain_reg(reg, &caller_used, &callee_used);
+    //             if ok {
+    //                 log_file!("ban_reg.txt", "{}", reg);
+    //                 baned.insert(*reg);
+    //             } else {
+    //                 break;
+    //             }
+    //         }
+    //     }
+    //     // // return;
+    //     //对于main函数单独处理
+    //     //节省callee,能够节省多少节省多少 (然后试图节省caller)
+    //     // self.realloc_main_with_priority_pre_split();
+    // }
+
     ///重新调整main函数的寄存器分布以减少被调用函数需要保存的寄存器
-    pub fn realloc_main_with_priority_pre_split(&mut self) {
-        let callee_used = self.build_callee_used();
-        let main_func = self.name_func.get("main").unwrap();
+    fn realloc_main_with_priority_pre_split(&mut self) {
+        let main_func = *self.name_func.get("main").unwrap();
         let mut rs = Reg::get_all_recolorable_regs();
         rs.remove(&Reg::get_s0());
-        debug_assert!(!main_func.draw_all_regs().contains(&Reg::get_s0()));
         main_func.as_mut().p2v_pre_handle_call(rs);
-        main_func.as_mut().reg_alloc_info = FuncAllocStat::new();
-        debug_assert!(main_func.label == "main");
         main_func.as_mut().allocate_reg();
-        let mut callee_constraints: HashMap<Reg, HashSet<Reg>> = HashMap::new();
-        //然后分析需要加入限制的虚拟寄存器
-        //首先尝试进行一波完全寄存器分配
-        main_func.calc_live_for_handle_call();
-
-        //TODO
-
-        //分析原本约束
-
+        let callees_used = self.build_callee_used();
+        let callee_constraints: HashMap<Reg, HashSet<Reg>> =
+            self.build_constraints_with_callee_used(&callees_used);
         //约束建立好之后尝试寄存器分配 (如果实在分配后存在spill,就只好存在spill了)
         let alloc_stat = || -> FuncAllocStat {
             //首先尝试获取一个基础的分配结果

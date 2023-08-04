@@ -93,7 +93,7 @@ impl Func {
     ///函数分裂用到的函数的真实深度克隆
     pub fn real_deep_clone(&self, pool: &mut BackendPool) -> ObjPtr<Func> {
         let context = pool.put_context(Context::new());
-        let mut new_func = Func::new("default", context);
+        let mut new_func = Func::new(&self.label.clone(), context);
         new_func.blocks = Vec::new();
         let mut old_to_new_bbs: HashMap<ObjPtr<BB>, ObjPtr<BB>> = HashMap::new();
         let mut old_to_new_insts: HashMap<ObjPtr<LIRInst>, ObjPtr<LIRInst>> = HashMap::new();

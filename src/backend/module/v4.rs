@@ -125,120 +125,6 @@ impl AsmModule {
         }
     }
 
-    pub fn split_func_v4(&mut self, pool: &mut BackendPool) {
-        self.callee_regs_to_saveds
-            .insert("main".to_string(), HashSet::new());
-
-        let regs_set_to_string = |regs: &HashSet<Reg>| -> String {
-            let mut symbol = "".to_string();
-            for id in 0..=63 {
-                let reg = Reg::from_color(id);
-                if !regs.contains(&reg) {
-                    continue;
-                }
-                symbol.push_str(reg.to_string(false).as_str());
-            }
-            symbol
-        };
-        let regs_to_bitmap = |regs: &HashSet<Reg>| -> Bitmap {
-            let mut map = Bitmap::new();
-            for reg in regs {
-                map.insert(reg.get_color() as usize);
-            }
-            map
-        };
-        let main_func = *self.name_func.get("main").unwrap();
-        let mut func_to_process = Vec::new();
-        func_to_process.push(main_func);
-
-        let mut new_name_func: HashMap<String, ObjPtr<Func>> = HashMap::new();
-        new_name_func.insert("main".to_string(), main_func);
-
-        //call info加入非main函数
-        for (name, _) in self.name_func.iter() {
-            if name == "main" {
-                continue;
-            }
-            self.call_info.insert(name.clone(), HashMap::new());
-        }
-
-        //然后分析callee save的使用情况,进行裂变,同时产生新的name func
-        loop {
-            let mut if_finish = true;
-            let mut new_funcs: Vec<ObjPtr<Func>> = Vec::new();
-            //分析调用的上下文
-            for func in func_to_process.iter() {
-                let call_insts = func.analyse_for_handle_call(&self.callee_regs_to_saveds);
-                //通过对func 的上下文分析 (返回某个call指令附近需要保存的callee saved寄存器)
-                //如果遇到新函数,加入callee saved
-                for (call_inst, callee_regs) in call_insts.iter() {
-                    let func_label = call_inst.get_func_name().unwrap();
-                    let func_label_callee_maps = self.call_info.get(&func_label).unwrap();
-                    let callee_func = self.name_func.get(&func_label).unwrap();
-                    if callee_func.is_extern {
-                        continue;
-                    }
-                    let map = regs_to_bitmap(callee_regs);
-                    //如果该类型 callee 函数已经存在,直接变名
-                    if func_label_callee_maps.contains_key(&map) {
-                        let real_func_name = func_label_callee_maps.get(&map).unwrap().clone();
-                        call_inst.as_mut().replace_label(real_func_name);
-                        continue;
-                    }
-                    //否则产生一个新的函数
-
-                    let new_callee_func = callee_func.real_deep_clone(pool);
-                    let suffix = regs_set_to_string(callee_regs);
-                    let mut new_name = suffix.clone();
-                    new_name.push_str(&format!("_{}", func_label).to_string());
-                    new_callee_func.as_mut().set_name(&new_name);
-                    let suffix = format!("_{func_label}_{suffix}");
-                    new_callee_func.as_mut().suffix_bb(&suffix);
-                    if func_label_callee_maps.len() >= 1 {
-                        new_callee_func.as_mut().is_header = false;
-                    }
-
-                    new_funcs.push(new_callee_func);
-                    call_inst.as_mut().replace_label(new_name.clone());
-
-                    self.call_info
-                        .get_mut(&func_label)
-                        .unwrap()
-                        .insert(map, new_name.clone());
-
-                    // 更新新函数的callees map
-                    self.callee_regs_to_saveds
-                        .insert(new_name.clone(), callee_regs.iter().cloned().collect());
-                    // 继承旧函数的callers map
-                    let old_callers_saved = self
-                        .caller_regs_to_saveds
-                        .get_mut(&callee_func.label)
-                        .unwrap();
-                    let new_callers_saved: HashSet<Reg> =
-                        old_callers_saved.iter().cloned().collect();
-                    self.caller_regs_to_saveds
-                        .insert(new_name.clone(), new_callers_saved);
-                    // 把新函数加入到名称表
-                    new_name_func.insert(new_name.clone(), new_callee_func);
-                    if_finish = false; //设置修改符号为错
-                }
-            }
-            func_to_process = new_funcs;
-            if if_finish {
-                break;
-            }
-        }
-
-        //保留原name_func中的外部函数
-        for (name, func) in self.name_func.iter() {
-            if func.is_extern {
-                new_name_func.insert(name.clone(), *func);
-            }
-        }
-        self.name_func = new_name_func; //修改完成后只有名称表内的函数才是有用的函数
-                                        // debug_assert!(false, "{}", self.name_func.len())
-    }
-
     ///最后得到的表中不会包含sp
     pub fn build_callee_used(&self) -> HashMap<String, HashSet<Reg>> {
         let mut calleed_useds = HashMap::new();
@@ -316,6 +202,7 @@ impl AsmModule {
         if func.is_extern {
             return Reg::get_all_callers_saved();
         }
+
         for func in self.call_map.get(func.label.as_str()).unwrap() {
             let func = self.name_func.get(func).unwrap();
             callee_funcs.insert(*func);

@@ -160,52 +160,47 @@ impl Func {
 
         // 考虑ret
         // 一个block中只可能出现一条return最多
-        for bb in self.blocks.iter() {
-            if let Some(last_inst) = bb.insts.last() {
-                let use_reg = last_inst.get_reg_use();
-                if use_reg.is_empty() {
+        let final_bb = self.get_final_bb();
+        let last_inst = final_bb.insts.last().unwrap();
+        let use_reg = last_inst.get_reg_use();
+        debug_assert!(use_reg.len() == 1 || self.label != "main");
+        if let Some(use_reg) = use_reg.get(0) {
+            unchanged_use.insert((*last_inst, *use_reg));
+            let mut back_bbs: LinkedList<ObjPtr<BB>> = LinkedList::new();
+            back_bbs.push_back(final_bb);
+            let mut passed = HashSet::new();
+            while back_bbs.len() != 0 {
+                let bb = back_bbs.pop_front().unwrap();
+                if passed.contains(&bb) {
                     continue;
                 }
-                match last_inst.get_type() {
-                    InstrsType::Ret(kind) => {}
-                    _ => continue,
-                };
-                let use_reg = use_reg.get(0).unwrap();
-                unchanged_use.insert((*last_inst, *use_reg));
-                let mut back_bbs: LinkedList<ObjPtr<BB>> = LinkedList::new();
-                back_bbs.push_back(*bb);
-                let mut passed = HashSet::new();
-                while back_bbs.len() != 0 {
-                    let bb = back_bbs.pop_front().unwrap();
-                    if passed.contains(&bb) {
-                        continue;
+                passed.insert(bb);
+                let mut index = bb.insts.len() - 1;
+                let mut if_finish = false;
+                loop {
+                    let inst = bb.insts.get(index).unwrap();
+                    if inst.get_reg_def().contains(use_reg) {
+                        unchanged_def.insert((*inst, *use_reg));
+                        if_finish = true;
+                        break;
                     }
-                    passed.insert(bb);
-                    let mut index = bb.insts.len() - 1;
-                    let mut if_finish = false;
-                    loop {
-                        let inst = bb.insts.get(index).unwrap();
-                        if inst.get_reg_def().contains(use_reg) {
-                            unchanged_def.insert((*inst, *use_reg));
-                            if_finish = true;
-                            break;
-                        }
-                        if inst.get_reg_use().contains(use_reg) {
-                            unchanged_use.insert((*inst, *use_reg));
-                        }
-                        if index == 0 {
-                            break;
-                        }
-                        index -= 1;
+                    if inst.get_reg_use().contains(use_reg) {
+                        unchanged_use.insert((*inst, *use_reg));
                     }
+                    if index == 0 {
+                        break;
+                    }
+                    index -= 1;
+                }
 
-                    if !if_finish {
-                        for in_bb in bb.in_edge.iter() {
-                            back_bbs.push_back(*in_bb);
-                        }
+                if !if_finish {
+                    for in_bb in bb.in_edge.iter() {
+                        debug_assert!(in_bb.live_out.contains(use_reg));
+                        back_bbs.push_back(*in_bb);
                     }
                 }
             }
+            // break;
         }
 
         //考虑使用参数寄存器传参的情况,该情况只会发生在函数的第一个块
