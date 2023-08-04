@@ -71,6 +71,13 @@ impl AsmModule {
                 if inst.get_type() != InstrsType::Call {
                     return;
                 }
+                //对于call指令来说,不需要保存和恢复在call指令的时候定义的寄存器
+                let mut live_now = live_now.clone();
+                if let Some(def_reg) = inst.get_def_reg() {
+                    live_now.remove(&def_reg);
+                }
+                let live_now = live_now;
+
                 let callee_func_name = &inst.get_func_name().unwrap();
                 let mut to_saved = live_now.clone();
                 to_saved.retain(|reg| caller_used.get(callee_func_name).unwrap().contains(reg));
@@ -96,6 +103,13 @@ impl AsmModule {
                 if inst.get_type() != InstrsType::Call {
                     return;
                 }
+                //对于call指令来说,不需要保存和恢复在call指令的时候定义的寄存器
+                let mut live_now = live_now.clone();
+                if let Some(def_reg) = inst.get_def_reg() {
+                    live_now.remove(&def_reg);
+                }
+                let live_now = live_now;
+
                 let callee_func_name = &inst.get_func_name().unwrap();
                 //刷新callee svaed
                 if self.name_func.get(callee_func_name).unwrap().is_extern {
@@ -345,10 +359,10 @@ impl AsmModule {
                 }
             }
         }
-        // return;
+        // // return;
         //对于main函数单独处理
         //节省callee,能够节省多少节省多少 (然后试图节省caller)
-        self.realloc_main_with_priority_pre_split();
+        // self.realloc_main_with_priority_pre_split();
     }
 
     fn realloc_main_with_priority_pre_split(&mut self) {
@@ -357,9 +371,9 @@ impl AsmModule {
 
         let mut rs = Reg::get_all_recolorable_regs();
         rs.remove(&Reg::get_s0());
+        debug_assert!(!main_func.draw_all_regs().contains(&Reg::get_s0()));
         main_func.as_mut().p2v_pre_handle_call(rs);
         debug_assert!(main_func.label == "main");
-
         main_func.as_mut().allocate_reg();
         let mut callee_constraints: HashMap<Reg, HashSet<Reg>> = HashMap::new();
         //然后分析需要加入限制的虚拟寄存器
@@ -369,6 +383,13 @@ impl AsmModule {
             if inst.get_type() != InstrsType::Call {
                 return;
             }
+            //对于call指令来说,不需要保存和恢复在call指令的时候定义的寄存器
+            let mut live_now = live_now.clone();
+            if let Some(def_reg) = inst.get_def_reg() {
+                live_now.remove(&def_reg);
+            }
+            let live_now = live_now;
+
             //对于 call指令,分析上下文造成的依赖关系
             let func_name = inst.get_func_name().unwrap();
             let func = self.name_func.get(func_name.as_str()).unwrap();

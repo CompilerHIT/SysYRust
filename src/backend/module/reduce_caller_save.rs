@@ -86,6 +86,13 @@ impl AsmModule {
             if inst.get_type() != InstrsType::Call {
                 return;
             }
+            //对于call指令来说,不需要保存和恢复在call指令的时候定义的寄存器
+            let mut live_now = live_now.clone();
+            if let Some(def_reg) = inst.get_def_reg() {
+                live_now.remove(&def_reg);
+            }
+            let live_now = live_now;
+
             let callee_func_name = inst.get_func_name().unwrap();
             debug_assert!(
                 self.name_func.contains_key(callee_func_name.as_str()),

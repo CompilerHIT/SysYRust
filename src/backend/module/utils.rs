@@ -12,11 +12,10 @@ impl AsmModule {
                 livenow.insert(*reg);
             });
             for inst in bb.insts.iter().rev() {
+                inst_analyser(*inst, &livenow);
                 for reg in inst.get_reg_def() {
                     livenow.remove(&reg);
                 }
-                //
-                inst_analyser(*inst, &livenow);
                 for reg in inst.get_reg_use() {
                     livenow.insert(reg);
                 }

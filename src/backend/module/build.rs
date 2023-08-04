@@ -58,8 +58,10 @@ impl AsmModule {
 
         self.realloc_reg_with_priority();
 
+        // self.print_func();
         self.remove_unuse_inst_suf_alloc();
         // self.print_func();
+
         self.handle_spill_v3(pool);
         // self.print_func();
 
@@ -91,10 +93,7 @@ impl AsmModule {
         self.rearrange_stack_slot();
         self.update_array_offset(pool);
 
-        //
-        if is_opt {
-            self.rm_inst_suf_update_array_offset(pool, &used_but_not_saved);
-        }
+        self.rm_inst_suf_update_array_offset(pool, &used_but_not_saved);
 
         self.build_stack_info(f);
         // self.print_func();
