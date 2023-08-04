@@ -239,70 +239,59 @@ impl AsmModule {
                                         // debug_assert!(false, "{}", self.name_func.len())
     }
 
+    pub fn count_callee_saveds_times(&mut self) -> HashMap<String, HashMap<Reg, usize>> {
+        let mut callee_saved_times: HashMap<String, HashMap<Reg, usize>> = HashMap::new();
+        let callee_used = self.build_callee_used();
+        for (func, func_ptr) in self.name_func.iter() {
+            if func_ptr.is_extern {
+                continue;
+            }
+            func_ptr.calc_live_for_handle_call();
+            debug_assert!(!func_ptr.draw_all_regs().contains(&Reg::get_s0()));
+            AsmModule::analyse_inst_with_live_now(func_ptr.as_ref(), &mut |inst, live_now| {
+                if inst.get_type() != InstrsType::Call {
+                    return;
+                }
+                let mut live_now = live_now.clone();
+                if let Some(def_reg) = inst.get_def_reg() {
+                    live_now.remove(&def_reg);
+                }
+                //对于要保存的寄存器
+                let func_called = inst.get_func_name();
+                let func_called = func_called.as_ref().unwrap();
+                let callee_used = callee_used.get(func_called).unwrap();
+                live_now.retain(|reg| callee_used.contains(reg));
+                if !callee_saved_times.contains_key(func_called) {
+                    callee_saved_times.insert(func_called.clone(), HashMap::new());
+                }
+                let callee_saved_times = callee_saved_times.get_mut(func_called).unwrap();
+                //统计次数
+                for to_save in live_now.iter() {
+                    let new_times = callee_saved_times.get(to_save).unwrap_or(&0) + 1;
+                    callee_saved_times.insert(*to_save, new_times);
+                }
+            });
+        }
+        callee_saved_times
+    }
+
     ///使用进行函数分析后的结果先进行寄存器组成重构
     pub fn realloc_reg_with_priority(&mut self) {
         //记录除了main函数外每个函数使用到的 callee saved和caller saved 需要的恢复次数
-        let mut callee_saved_times: HashMap<ObjPtr<Func>, HashMap<Reg, usize>> = HashMap::new();
-
-        let callee_used = self.build_callee_used();
-
-        for (_, func) in self.name_func.iter() {
-            if func.is_extern {
-                continue;
-            }
-            func.calc_live_for_handle_call();
-            for bb in func.blocks.iter() {
-                let mut livenow: HashSet<Reg> = HashSet::new();
-                bb.live_out.iter().for_each(|reg| {
-                    livenow.insert(*reg);
-                });
-                for inst in bb.insts.iter().rev() {
-                    for reg in inst.get_reg_def() {
-                        livenow.remove(&reg);
-                    }
-                    if inst.get_type() == InstrsType::Call {
-                        let func_called = inst.get_func_name().unwrap();
-                        let callee_used = callee_used.get(func_called.as_str()).unwrap();
-                        let func_called = self.name_func.get(func_called.as_str()).unwrap();
-                        let callees_to_saved: HashSet<Reg> = livenow
-                            .iter()
-                            .filter(|reg| callee_used.contains(&reg))
-                            .cloned()
-                            .collect();
-                        if !callee_saved_times.contains_key(func_called) {
-                            callee_saved_times.insert(*func_called, HashMap::new());
-                        }
-                        for callee_to_saved in callees_to_saved.iter() {
-                            let new_times = callee_saved_times
-                                .get(func_called)
-                                .unwrap()
-                                .get(callee_to_saved)
-                                .unwrap_or(&0)
-                                + 1;
-                            callee_saved_times
-                                .get_mut(func_called)
-                                .unwrap()
-                                .insert(*callee_to_saved, new_times);
-                        }
-                    }
-                    for reg in inst.get_reg_use() {
-                        livenow.insert(reg);
-                    }
-                }
-            }
-        }
+        let callee_saved_times: HashMap<String, HashMap<Reg, usize>> =
+            self.count_callee_saveds_times();
         let call_map = &self.call_map;
         //对每个函数进行试图减少指定寄存器的使用
-        for (name, func) in self.name_func.iter() {
-            if func.is_extern {
+        for (func, func_ptr) in self.name_func.iter() {
+            if func_ptr.is_extern {
                 continue;
             }
-            if name == "main" {
+            if func == "main" {
                 continue;
             }
-            let func = *func;
+            let func_ptr = *func_ptr;
             //按照每个函数使用被调用时需要保存的自身使用到的callee saved寄存器的数量
-            let callee_saved_time = callee_saved_times.get(&func);
+            let callee_saved_time = callee_saved_times.get(func.as_str());
             if callee_saved_time.is_none() {
                 break;
             }
@@ -315,11 +304,11 @@ impl AsmModule {
             callees.sort_by_cached_key(|reg| callee_saved_time.get(reg));
             let caller_used = self.build_caller_used();
             let callee_used = self.build_callee_used();
-            let self_used = func.draw_used_callees();
+            let self_used = func_ptr.draw_used_callees();
             //自身调用的函数使用到的callee saved寄存器
             let mut callee_func_used: HashSet<Reg> = HashSet::new();
-            for func_called in call_map.get(func.label.as_str()).unwrap() {
-                if func_called == func.label.as_str() {
+            for func_called in call_map.get(func_ptr.label.as_str()).unwrap() {
+                if func_called == func_ptr.label.as_str() {
                     continue;
                 }
                 let callee_used_of_func_called = callee_used.get(func_called).unwrap();
@@ -336,33 +325,21 @@ impl AsmModule {
                 if callee_func_used.contains(reg) {
                     continue;
                 }
-                let ok = func
+                let ok = func_ptr
                     .as_mut()
                     .try_ban_certain_reg(reg, &caller_used, &callee_used);
                 if ok {
                     log_file!("ban_reg.txt", "{}", reg);
                     baned.insert(*reg);
-                }
-            }
-            for reg in callees.iter().rev() {
-                if !self_used.contains(reg) {
-                    continue;
-                }
-                if baned.contains(reg) {
-                    continue;
-                }
-                let ok = func
-                    .as_mut()
-                    .try_ban_certain_reg(reg, &caller_used, &callee_used);
-                if ok {
-                    log_file!("ban_reg.txt", "{}", reg);
+                } else {
+                    break;
                 }
             }
         }
         // // return;
         //对于main函数单独处理
         //节省callee,能够节省多少节省多少 (然后试图节省caller)
-        // self.realloc_main_with_priority_pre_split();
+        self.realloc_main_with_priority_pre_split();
     }
 
     fn realloc_main_with_priority_pre_split(&mut self) {
@@ -422,32 +399,25 @@ impl AsmModule {
              -> Option<FuncAllocStat> {
                 let mut callee_constraints = callee_constraints;
                 loop {
-                    let mut allocator = easy_gc_alloc::Allocator::new();
-                    let alloc_stat =
-                        allocator.alloc_with_constraints(&main_func, &callee_constraints);
+                    let alloc_stat = perfect_alloc::alloc(&main_func, &callee_constraints);
                     //每次减半直到分配成功
-                    if alloc_stat.spillings.len() <= spill_limit_num {
-                        return Some(alloc_stat);
+                    if alloc_stat.is_some() {
+                        debug_assert!(alloc_stat.as_ref().unwrap().spillings.len() == 0);
+                        return alloc_stat;
                     }
                     //否则分配失败,减少约束再分配
-                    //首先减半
-                    let ord: Vec<Reg> = callee_constraints.iter().map(|(reg, _)| *reg).collect();
+                    //首先减少约束最多的寄存器的约束
+                    let ord: HashSet<Reg> =
+                        callee_constraints.iter().map(|(reg, _)| *reg).collect();
                     for reg in ord.iter() {
-                        let mut new_baned: HashSet<Reg> = HashSet::new();
-                        let old_baneds = callee_constraints.get(reg).unwrap();
-                        for old_ban in old_baneds {
-                            if new_baned.len() >= old_baneds.len() / 2 {
-                                break;
-                            }
-                            new_baned.insert(*old_ban);
-                        }
-                        if new_baned.len() == 0 {
+                        let mut if_b = true;
+                        callee_constraints.get_mut(reg).unwrap().retain(|reg| {
+                            if_b = !if_b;
+                            if_b
+                        });
+                        if callee_constraints.get(reg).unwrap().len() == 0 {
                             callee_constraints.remove(reg);
-                        } else {
-                            callee_constraints
-                                .get_mut(reg)
-                                .unwrap()
-                                .retain(|reg| new_baned.contains(reg));
+                            break;
                         }
                     }
                     //如果约束消失,则退出
