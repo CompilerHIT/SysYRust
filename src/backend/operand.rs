@@ -371,10 +371,35 @@ impl Reg {
             r_type: ScalarType::Int,
         }
     }
+
+    #[inline]
+    pub const fn get_zero() -> Reg {
+        Reg {
+            id: 0,
+            r_type: ScalarType::Int,
+        }
+    }
+
     #[inline]
     pub fn get_fs1() -> Reg {
         Reg {
             id: 41,
+            r_type: ScalarType::Float,
+        }
+    }
+
+    #[inline]
+    pub fn get_a0() -> Reg {
+        Reg {
+            id: 10,
+            r_type: ScalarType::Int,
+        }
+    }
+
+    #[inline]
+    pub fn get_fa0() -> Reg {
+        Reg {
+            id: 42,
             r_type: ScalarType::Float,
         }
     }

@@ -279,8 +279,11 @@ impl AsmModule {
         }
         let call_map = &self.call_map;
         //对每个函数进行试图减少指定寄存器的使用
-        for (_, func) in self.name_func.iter() {
+        for (name, func) in self.name_func.iter() {
             if func.is_extern {
+                continue;
+            }
+            if name == "main" {
                 continue;
             }
             let func = *func;
@@ -351,9 +354,10 @@ impl AsmModule {
     fn realloc_main_with_priority_pre_split(&mut self) {
         let callee_used = self.build_callee_used();
         let main_func = self.name_func.get("main").unwrap();
-        main_func
-            .as_mut()
-            .p2v_pre_handle_call(Reg::get_all_recolorable_regs());
+
+        let mut rs = Reg::get_all_recolorable_regs();
+        rs.remove(&Reg::get_s0());
+        main_func.as_mut().p2v_pre_handle_call(rs);
         debug_assert!(main_func.label == "main");
 
         main_func.as_mut().allocate_reg();

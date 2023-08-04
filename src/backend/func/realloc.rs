@@ -210,3 +210,15 @@ impl Func {
         }
     }
 }
+
+//对 final realloc的支持
+impl Func {
+    pub fn replace_v_reg(&mut self, old_reg: &Reg, new_reg: &Reg) {
+        debug_assert!(!old_reg.is_physic() && !new_reg.is_physic());
+        self.blocks.iter().for_each(|bb| {
+            bb.insts.iter().for_each(|inst| {
+                inst.as_mut().replace_reg(old_reg, new_reg);
+            })
+        })
+    }
+}

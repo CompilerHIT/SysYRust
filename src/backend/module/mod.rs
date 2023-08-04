@@ -23,8 +23,10 @@ use super::regalloc::easy_gc_alloc;
 use super::regalloc::structs::FuncAllocStat;
 use super::structs::GenerateAsm;
 pub mod build;
+pub mod final_realloc;
 pub mod handle_call;
 pub mod reduce_caller_save;
+pub mod rm_inst;
 pub mod schedule;
 mod test;
 pub mod utils;
@@ -130,7 +132,7 @@ impl AsmModule {
 
     /// 第一次运行v2p时不映射临时寄存器，第二次运行前清空tmp_vars set
     fn map_v_to_p(&mut self) {
-        self.name_func.iter_mut().for_each(|(_, func)| {
+        self.name_func.iter().for_each(|(_, func)| {
             debug_assert!(!func.is_extern);
             func.blocks.iter().for_each(|block| {
                 block.insts.iter().for_each(|inst| {

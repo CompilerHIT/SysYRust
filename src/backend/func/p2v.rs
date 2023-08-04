@@ -12,10 +12,12 @@ impl Func {
 
         debug_assert!(!regs_to_decolor.contains(&Reg::get_sp()));
         debug_assert!(!regs_to_decolor.contains(&Reg::get_ra()));
+        debug_assert!(!regs_to_decolor.contains(&Reg::get_tp()));
+        debug_assert!(!regs_to_decolor.contains(&Reg::get_gp()));
 
         let mut new_v_regs = HashSet::new(); //用来记录新产生的虚拟寄存器
                                              // self.print_func();
-        self.calc_live_for_handle_spill();
+        self.calc_live_for_handle_call();
         //首先根据call上下文初始化 unchanged use 和 unchanged def.这些告诉我们哪些寄存器不能够p2v
         let mut unchanged_use: HashSet<(ObjPtr<LIRInst>, Reg)> = HashSet::new();
         let mut unchanged_def: HashSet<(ObjPtr<LIRInst>, Reg)> = HashSet::new();
@@ -164,25 +166,44 @@ impl Func {
                 if use_reg.is_empty() {
                     continue;
                 }
-                debug_assert!(use_reg.len() == 1);
+                match last_inst.get_type() {
+                    InstrsType::Ret(kind) => {}
+                    _ => continue,
+                };
                 let use_reg = use_reg.get(0).unwrap();
                 unchanged_use.insert((*last_inst, *use_reg));
-                // 往前直到遇到第一个def为止
-                debug_assert!(bb.insts.len() >= 2, "{}", {
-                    Func::print_func(ObjPtr::new(self), "p2v.txt");
-                    bb.label.as_str()
-                });
-                let mut index = bb.insts.len() - 2;
-                loop {
-                    let inst = bb.insts.get(index).unwrap();
-                    if inst.get_reg_def().contains(use_reg) {
-                        unchanged_def.insert((*inst, *use_reg));
-                        break;
+                let mut back_bbs: LinkedList<ObjPtr<BB>> = LinkedList::new();
+                back_bbs.push_back(*bb);
+                let mut passed = HashSet::new();
+                while back_bbs.len() != 0 {
+                    let bb = back_bbs.pop_front().unwrap();
+                    if passed.contains(&bb) {
+                        continue;
                     }
-                    if inst.get_reg_use().contains(use_reg) {
-                        unchanged_use.insert((*inst, *use_reg));
+                    passed.insert(bb);
+                    let mut index = bb.insts.len() - 1;
+                    let mut if_finish = false;
+                    loop {
+                        let inst = bb.insts.get(index).unwrap();
+                        if inst.get_reg_def().contains(use_reg) {
+                            unchanged_def.insert((*inst, *use_reg));
+                            if_finish = true;
+                            break;
+                        }
+                        if inst.get_reg_use().contains(use_reg) {
+                            unchanged_use.insert((*inst, *use_reg));
+                        }
+                        if index == 0 {
+                            break;
+                        }
+                        index -= 1;
                     }
-                    index -= 1;
+
+                    if !if_finish {
+                        for in_bb in bb.in_edge.iter() {
+                            back_bbs.push_back(*in_bb);
+                        }
+                    }
                 }
             }
         }

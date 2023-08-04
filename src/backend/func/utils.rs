@@ -95,9 +95,6 @@ impl Func {
             live_now.insert(*reg);
         });
         for inst in bb.insts.iter().rev() {
-            // for reg in inst.get_reg_def() {
-            //     live_now.remove(&reg);
-            // }
             analyser(*inst, &live_now);
             for reg in inst.get_reg_def() {
                 live_now.remove(&reg);
@@ -107,4 +104,93 @@ impl Func {
             }
         }
     }
+
+    //反序分析指令直到
+    pub fn analyse_inst_with_regused_and_index_backorder_until(
+        bb: &BB,
+        analyser: &mut dyn FnMut(ObjPtr<LIRInst>, usize, &RegUsedStat),
+        until: &dyn Fn(ObjPtr<LIRInst>) -> bool,
+    ) {
+        let mut reg_use_stat = RegUsedStat::init_unspecial_regs();
+        bb.live_out
+            .iter()
+            .for_each(|reg| reg_use_stat.use_reg(reg.get_color()));
+        for (index, inst) in bb.insts.iter().enumerate().rev() {
+            analyser(*inst, index, &reg_use_stat);
+            if until(*inst) {
+                return;
+            }
+            for reg in inst.get_regs() {
+                reg_use_stat.use_reg(reg.get_color());
+            }
+        }
+    }
+
+    pub fn analyse_inst_with_live_now_and_index_backorder(
+        bb: ObjPtr<BB>,
+        analyser: &mut dyn FnMut(ObjPtr<LIRInst>, usize, &HashSet<Reg>),
+    ) {
+        let mut live_now = HashSet::new();
+        bb.live_out.iter().for_each(|reg| {
+            live_now.insert(*reg);
+        });
+        for (index, inst) in bb.insts.iter().enumerate().rev() {
+            // for reg in inst.get_reg_def() {
+            //     live_now.remove(&reg);
+            // }
+            analyser(*inst, index, &live_now);
+            for reg in inst.get_reg_def() {
+                live_now.remove(&reg);
+            }
+            for reg in inst.get_reg_use() {
+                live_now.insert(reg);
+            }
+        }
+    }
+
+    //获取bb的某个区间内的自由可用(可def,可use)物理寄存器 (或者说在(from index,to index)范围内的可用寄存器)
+    pub fn draw_available_of_certain_area(
+        bb: &BB,
+        from_index: usize,
+        to_index: usize,
+    ) -> RegUsedStat {
+        debug_assert!(from_index < to_index);
+        let mut available = RegUsedStat::init_unspecial_regs();
+
+        bb.live_out.iter().for_each(|reg| {
+            if reg.is_physic() {
+                available.use_reg(reg.get_color())
+            }
+        });
+        for (index, inst) in bb.insts.iter().enumerate().rev() {
+            for reg in inst.get_reg_def() {
+                if reg.is_physic() {
+                    available.release_reg(reg.get_color())
+                }
+            }
+            for reg in inst.get_reg_use() {
+                if reg.is_physic() {
+                    available.use_reg(reg.get_color())
+                }
+            }
+            if index == to_index {
+                break;
+            }
+        }
+
+        let mut index = to_index - 1;
+        while index > from_index {
+            let inst = bb.insts.get(index).unwrap();
+            for reg in inst.get_regs() {
+                if !reg.is_physic() {
+                    continue;
+                }
+                available.use_reg(reg.get_color());
+            }
+            index -= 1;
+        }
+        available
+    }
 }
+
+// #[cfg(predicate)]

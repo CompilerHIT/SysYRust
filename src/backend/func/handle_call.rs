@@ -466,6 +466,7 @@ impl Func {
                 match inst.get_type() {
                     InstrsType::LoadFromStack => {
                         let reg = inst.get_def_reg().unwrap();
+                        let reg = &reg;
                         //如果已经有了个store,判断指向的地址是否相同,
                         let pres = store_to_insts.get_mut(reg).unwrap();
                         if pres.len() == 1 {
