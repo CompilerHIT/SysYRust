@@ -114,8 +114,10 @@ impl CongruenceClass {
 
     pub fn remove_inst(&mut self,inst: ObjPtr<Inst>){
         let congruence = self.get_congruence_mut(inst).unwrap();
-        let index = congruence.map.get(&inst).unwrap();
-        congruence.vec_class.remove(*index);
+        let index1 = congruence.map.get(&inst).unwrap();
+        if let Some(index2) = congruence.vec_class[*index1].iter().position(|&x| x == inst) {
+            congruence.vec_class[*index1].remove(index2);
+        }
         congruence.map.remove(&inst);
     }
 
