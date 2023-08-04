@@ -59,6 +59,13 @@ impl Func {
                     let from_reg = inst.get_lhs().drop_reg();
                     if to_reg == from_reg {
                         if_rm = true;
+                        log_file!(
+                            "remove_self_mv.txt",
+                            "{}:{},{:?}",
+                            bb.label,
+                            inst.as_ref(),
+                            inst.as_ref()
+                        );
                         return false;
                     }
                     return true;
@@ -309,8 +316,10 @@ impl Func {
         loop {
             self.calc_live_base();
             let mut finish_flag = true;
+
             for bb in self.blocks.iter() {
                 let mut to_rm: HashSet<ObjPtr<LIRInst>> = HashSet::new();
+
                 Func::analyse_inst_with_live_now_backorder(*bb, &mut |inst, live_now| {
                     match inst.get_type() {
                         InstrsType::Call => {
@@ -332,6 +341,10 @@ impl Func {
                 });
                 bb.as_mut().insts.retain(|inst| !to_rm.contains(inst));
                 if to_rm.len() != 0 {
+                    log_file!("rm_unuse_def.txt", "bb{}", bb.label);
+                    for rm in to_rm {
+                        log_file!("rm_unuse_def.txt", "inst:{},{:?}", rm.as_ref(), rm.as_ref());
+                    }
                     finish_flag = false;
                 }
             }

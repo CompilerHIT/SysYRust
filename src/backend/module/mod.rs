@@ -19,13 +19,13 @@ use crate::utility::ObjPtr;
 
 use super::instrs::{Context, InstrsType, LIRInst, BB};
 use super::operand::Reg;
-use super::regalloc::easy_gc_alloc;
 use super::regalloc::structs::FuncAllocStat;
 use super::structs::GenerateAsm;
 pub mod build;
+pub mod constraints;
 pub mod final_realloc;
 pub mod handle_call;
-pub mod reduce_caller_save;
+pub mod mid_realloc;
 pub mod rm_inst;
 pub mod schedule;
 mod test;

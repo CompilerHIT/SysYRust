@@ -55,10 +55,9 @@ impl AsmModule {
         // //寄存器重分配,重分析
 
         // self.print_func();
-
         self.realloc_reg_with_priority();
+        self.print_func();
 
-        // self.print_func();
         self.remove_unuse_inst_suf_alloc();
         // self.print_func();
 
@@ -93,6 +92,7 @@ impl AsmModule {
         self.rearrange_stack_slot();
         self.update_array_offset(pool);
 
+        // self.print_func();
         self.rm_inst_suf_update_array_offset(pool, &used_but_not_saved);
 
         self.build_stack_info(f);

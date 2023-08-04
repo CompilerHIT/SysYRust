@@ -175,7 +175,7 @@ impl AsmModule {
             if func.is_extern {
                 continue;
             }
-            Func::print_func(*func, "print_all_funcs.txt");
+            Func::print_func(*func, "./print_all_funcs.txt");
         }
     }
 }
