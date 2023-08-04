@@ -1,3 +1,6 @@
+use biheap::bivec::order;
+use rand::seq::index;
+
 use crate::backend::{module::constraints, regalloc::perfect_alloc};
 
 use super::*;
@@ -16,12 +19,14 @@ impl Func {
             ObjPtr::new(&self),
             "before_realloc_with_priority_after_p2v.txt",
         );
+        self.calc_live_for_handle_call();
         //不能上二分，为了最好效果,使用最少的寄存器
         //所以直接地,
         let all_v_regs = self.draw_all_virtual_regs();
         let mut constraints = HashMap::new();
         let mut availables: HashSet<Reg> = HashSet::new();
         let all_regs = Reg::get_all_regs();
+        let mut last_alloc_stat: Option<FuncAllocStat> = None;
         for reg in ordered_regs.iter() {
             availables.insert(*reg);
             let mut unavailables = all_regs.clone();
@@ -31,13 +36,18 @@ impl Func {
             }
             let alloc_stat = perfect_alloc::alloc(&self, &constraints);
             if alloc_stat.is_some() {
-                let alloc_stat = alloc_stat.unwrap();
-                debug_assert!(alloc_stat.spillings.len() == 0);
-                self.v2p(&alloc_stat.dstr);
-                return;
+                last_alloc_stat = alloc_stat;
+                continue;
             }
+            if last_alloc_stat.is_none() {
+                continue;
+            }
+            break;
         }
-        debug_assert!(false);
+
+        let alloc_stat = last_alloc_stat.unwrap();
+        debug_assert!(alloc_stat.spillings.len() == 0);
+        self.v2p(&alloc_stat.dstr);
     }
 
     ///移除对特定的寄存器的使用,转为使用其他已经使用过的寄存器

@@ -19,7 +19,7 @@ use crate::utility::ObjPtr;
 
 use super::instrs::{Context, InstrsType, LIRInst, BB};
 use super::operand::Reg;
-use super::regalloc::structs::FuncAllocStat;
+use super::regalloc::structs::{FuncAllocStat, RegUsedStat};
 use super::structs::GenerateAsm;
 pub mod build;
 pub mod constraints;
@@ -42,7 +42,7 @@ pub struct AsmModule {
     callee_regs_to_saveds: HashMap<String, HashSet<Reg>>,
     ///记录调用该函数的函数应该保存的寄存器
     caller_regs_to_saveds: HashMap<String, HashSet<Reg>>,
-
+    base_splits: HashMap<String, HashMap<RegUsedStat, String>>,
     pub name_func: HashMap<String, ObjPtr<Func>>, //记录实际函数名和实际函数
     pub upper_module: Module,
 }
@@ -59,6 +59,7 @@ impl AsmModule {
             upper_module: ir_module,
             name_func: HashMap::new(),
             call_map: HashMap::new(),
+            base_splits: HashMap::new(),
             callee_regs_to_saveds: HashMap::new(),
             caller_regs_to_saveds: HashMap::new(),
         }
@@ -254,12 +255,28 @@ impl AsmModule {
     pub fn generate_asm(&mut self, f: &mut File, pool: &mut BackendPool) {
         // 生成全局变量与数组
         self.generate_global_var(f);
-        let mut asm_order: Vec<ObjPtr<Func>> =
-            self.name_func.iter().map(|(_, func)| *func).collect();
-        asm_order.iter_mut().for_each(|func| {
-            debug_assert!(!func.is_extern);
-            func.as_mut().generate(pool.put_context(Context::new()), f);
-        })
+        if self.base_splits.len() == 0 {
+            for (_, func) in self.func_map.iter() {
+                if !func.is_extern {
+                    func.as_mut().generate(pool.put_context(Context::new()), f);
+                }
+            }
+        } else {
+            for (_, func) in self.func_map.iter() {
+                if func.label == "main" {
+                    func.as_mut().generate(pool.put_context(Context::new()), f);
+                    continue;
+                }
+                if !func.is_extern {
+                    let splits = self.base_splits.get(&func.label).unwrap();
+                    let to_print: HashSet<String> = splits.iter().map(|(_, s)| s.clone()).collect();
+                    for func in to_print.iter() {
+                        let func = self.name_func.get(func).unwrap();
+                        func.as_mut().generate(pool.put_context(Context::new()), f);
+                    }
+                }
+            }
+        }
     }
 
     pub fn generate_row_asm(&mut self, f: &mut File) {

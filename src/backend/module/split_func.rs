@@ -74,8 +74,8 @@ impl AsmModule {
                 let mut ord_regs: Vec<Reg> = Vec::new();
                 ord_regs.extend(good_callees.iter());
                 ord_regs.extend(good_callers.iter());
-                ord_regs.extend(bad_callees.iter());
                 ord_regs.extend(bad_callers.iter());
+                ord_regs.extend(bad_callees.iter());
                 //按照顺序进行分配,分配确定之后,再之后不会再改变函数内的寄存器组成
 
                 //因为分配在handle spill之后,所以只能够求一个完美分配,
@@ -83,11 +83,19 @@ impl AsmModule {
                 let new_func = func.real_deep_clone(pool);
 
                 new_func.as_mut().alloc_reg_with_priority(ord_regs);
+                let new_constraint = new_func.draw_phisic_regs();
+
+                if let Some(new_func_name) = splits.get(&new_constraint) {
+                    inst.as_mut().replace_label(new_func_name.clone());
+                    return;
+                }
+
                 //分析分配后的寄存器使用结果,根据它自身used的 caller saved寄存器和callee 寄存器给它建模
                 let used = new_func.draw_phisic_regs();
                 let sufix_mark = used.draw_code_mark();
                 let bb_sufix = format!("_hitsz_{}_{}", func_name.clone(), sufix_mark.clone());
                 let new_func_name = format!("{}_hitsz_{}", func_name.clone(), sufix_mark.clone());
+
                 new_func.as_mut().set_name(&new_func_name);
                 new_func.as_mut().suffix_bb(&bb_sufix);
                 new_name_func.insert(new_func_name.clone(), new_func);
@@ -96,7 +104,6 @@ impl AsmModule {
                     .unwrap()
                     .insert(constraint, new_func_name.clone());
                 //new func name 同时还可以存在它自己刚好存在的constraint中,
-                let new_constraint = new_func.draw_phisic_regs();
                 base_splits
                     .get_mut(func_name)
                     .unwrap()
@@ -106,5 +113,7 @@ impl AsmModule {
             });
         }
         self.name_func = new_name_func;
+
+        self.base_splits = base_splits;
     }
 }

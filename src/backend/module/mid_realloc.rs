@@ -6,7 +6,7 @@ impl AsmModule {
     pub fn count_callee_saveds_times(&mut self) -> HashMap<String, HashMap<Reg, usize>> {
         let mut callee_saved_times: HashMap<String, HashMap<Reg, usize>> = HashMap::new();
         let callee_used = self.build_callee_used();
-        for (func, func_ptr) in self.name_func.iter() {
+        for (_, func_ptr) in self.name_func.iter() {
             if func_ptr.is_extern {
                 continue;
             }
@@ -40,76 +40,92 @@ impl AsmModule {
     }
 
     pub fn realloc_pre_split_func(&mut self) {
-        // self.realloc_not_main_with_priority();
-        // self.realloc_main_with_priority_pre_split();
+        self.realloc_main_with_priority_pre_split();
+        self.realloc_not_main_with_priority();
     }
 
     ///使用进行函数分析后的结果先进行寄存器组成重构
-    // fn realloc_not_main_with_priority(&mut self) {
-    //     //记录除了main函数外每个函数使用到的 callee saved和caller saved 需要的恢复次数
-    //     let callee_saved_times: HashMap<String, HashMap<Reg, usize>> =
-    //         self.count_callee_saveds_times();
-    //     let call_map = &self.call_map;
-    //     //对每个函数进行试图减少指定寄存器的使用
-    //     for (func, func_ptr) in self.name_func.iter() {
-    //         if func_ptr.is_extern {
-    //             continue;
-    //         }
-    //         if func == "main" {
-    //             continue;
-    //         }
-    //         let func_ptr = *func_ptr;
-    //         //按照每个函数使用被调用时需要保存的自身使用到的callee saved寄存器的数量
-    //         let callee_saved_time = callee_saved_times.get(func.as_str());
-    //         if callee_saved_time.is_none() {
-    //             break;
-    //         }
-    //         let callee_saved_time = callee_saved_time.unwrap();
-    //         let mut callees: Vec<Reg> = callee_saved_time
-    //             .iter()
-    //             .map(|(reg, _)| *reg)
-    //             .filter(|reg| reg != &Reg::get_sp())
-    //             .collect();
-    //         callees.sort_by_cached_key(|reg| callee_saved_time.get(reg));
-    //         let caller_used = self.build_caller_used();
-    //         let callee_used = self.build_callee_used();
-    //         let self_used = func_ptr.draw_used_callees();
-    //         //自身调用的函数使用到的callee saved寄存器
-    //         let mut callee_func_used: HashSet<Reg> = HashSet::new();
-    //         for func_called in call_map.get(func_ptr.label.as_str()).unwrap() {
-    //             if func_called == func_ptr.label.as_str() {
-    //                 continue;
-    //             }
-    //             let callee_used_of_func_called = callee_used.get(func_called).unwrap();
-    //             callee_func_used.extend(callee_used_of_func_called.iter());
-    //         }
-    //         //对于自身使用到的callee_used的寄存器
-    //         // let mut self_callee_used
-    //         //从该函数需要保存次数最多的寄存器开始ban
-    //         let mut baned = HashSet::new();
-    //         for reg in callees.iter().rev() {
-    //             if !self_used.contains(reg) {
-    //                 continue;
-    //             }
-    //             if callee_func_used.contains(reg) {
-    //                 continue;
-    //             }
-    //             let ok = func_ptr
-    //                 .as_mut()
-    //                 .try_ban_certain_reg(reg, &caller_used, &callee_used);
-    //             if ok {
-    //                 log_file!("ban_reg.txt", "{}", reg);
-    //                 baned.insert(*reg);
-    //             } else {
-    //                 break;
-    //             }
-    //         }
-    //     }
-    //     // // return;
-    //     //对于main函数单独处理
-    //     //节省callee,能够节省多少节省多少 (然后试图节省caller)
-    //     // self.realloc_main_with_priority_pre_split();
-    // }
+    fn realloc_not_main_with_priority(&mut self) {
+        //记录除了main函数外每个函数使用到的 callee saved和caller saved 需要的恢复次数
+        let callee_saved_times: HashMap<String, HashMap<Reg, usize>> =
+            self.count_callee_saveds_times();
+        let call_map = &self.call_map;
+        //对每个函数进行试图减少指定寄存器的使用
+        for (func, func_ptr) in self.name_func.iter() {
+            if func_ptr.is_extern {
+                continue;
+            }
+            if func == "main" {
+                continue;
+            }
+            let func_ptr = *func_ptr;
+            //按照每个函数使用被调用时需要保存的自身使用到的callee saved寄存器的数量
+            let callee_saved_time = callee_saved_times.get(func.as_str());
+            if callee_saved_time.is_none() {
+                break;
+            }
+            let callee_saved_time = callee_saved_time.unwrap();
+            let mut callees: Vec<Reg> = callee_saved_time
+                .iter()
+                .map(|(reg, _)| *reg)
+                .filter(|reg| reg != &Reg::get_sp())
+                .collect();
+            callees.sort_by_cached_key(|reg| callee_saved_time.get(reg));
+            let caller_used = self.build_caller_used();
+            let callee_used = self.build_callee_used();
+            let self_used = func_ptr.draw_used_callees();
+            //自身调用的函数使用到的callee saved寄存器
+            let mut callee_func_used: HashSet<Reg> = HashSet::new();
+            for func_called in call_map.get(func_ptr.label.as_str()).unwrap() {
+                if func_called == func_ptr.label.as_str() {
+                    continue;
+                }
+                let callee_used_of_func_called = callee_used.get(func_called).unwrap();
+                callee_func_used.extend(callee_used_of_func_called.iter());
+            }
+            //对于自身使用到的callee_used的寄存器
+            // let mut self_callee_used
+            //从该函数需要保存次数最多的寄存器开始ban
+            let mut baned = HashSet::new();
+            for reg in callees.iter().rev() {
+                if !self_used.contains(reg) {
+                    continue;
+                }
+                if callee_func_used.contains(reg) {
+                    continue;
+                }
+                let ok = func_ptr
+                    .as_mut()
+                    .try_ban_certain_reg(reg, &caller_used, &callee_used);
+                if ok {
+                    log_file!("ban_reg.txt", "{}", reg);
+                    baned.insert(*reg);
+                } else {
+                    // break;
+                }
+            }
+            for reg in callees.iter().rev() {
+                if !self_used.contains(reg) {
+                    continue;
+                }
+                if callee_func_used.contains(reg) {
+                    continue;
+                }
+                let ok = func_ptr
+                    .as_mut()
+                    .try_ban_certain_reg(reg, &caller_used, &callee_used);
+                if ok {
+                    log_file!("ban_reg.txt", "{}", reg);
+                    baned.insert(*reg);
+                } else {
+                    // break;
+                }
+            }
+        }
+        // // return;
+    }
+
+    //统计每个虚拟寄存器收到不同的物理寄存器的约束个数,根据个数从多到少进行减少
 
     ///重新调整main函数的寄存器分布以减少被调用函数需要保存的寄存器
     fn realloc_main_with_priority_pre_split(&mut self) {
@@ -143,16 +159,23 @@ impl AsmModule {
                     let ord: HashSet<Reg> =
                         callee_constraints.iter().map(|(reg, _)| *reg).collect();
                     for reg in ord.iter() {
-                        let mut if_b = true;
-                        callee_constraints.get_mut(reg).unwrap().retain(|reg| {
-                            if_b = !if_b;
-                            if_b
-                        });
+                        let to_rms: Vec<Reg> = callee_constraints
+                            .get(reg)
+                            .unwrap()
+                            .iter()
+                            .cloned()
+                            .collect();
+                        for to_rm in to_rms {
+                            callee_constraints.get_mut(reg).unwrap().remove(&to_rm);
+                            break;
+                        }
                         if callee_constraints.get(reg).unwrap().len() == 0 {
                             callee_constraints.remove(reg);
                             break;
                         }
+                        break;
                     }
+
                     //如果约束消失,则退出
                     if callee_constraints.len() == 0 {
                         break;

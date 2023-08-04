@@ -55,9 +55,8 @@ impl AsmModule {
         // //寄存器重分配,重分析
 
         // self.print_func();
-        self.realloc_pre_split_func();
+        // self.realloc_pre_split_func();
         self.print_func();
-
         self.remove_unuse_inst_suf_alloc();
         // self.print_func();
 
