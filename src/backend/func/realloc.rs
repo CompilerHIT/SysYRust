@@ -35,14 +35,12 @@ impl Func {
 
         let all_regs = Reg::get_all_regs();
         let mut last_alloc_stat: Option<FuncAllocStat> = None;
-        let mut availables: HashSet<Reg> = HashSet::new();
+        let mut availables: HashSet<Reg> = ordered_regs.iter().cloned().collect();
         for reg in ordered_regs.iter() {
-            availables.insert(*reg);
+            availables.remove(reg);
             let mut unavailables = all_regs.clone();
             unavailables.retain(|reg| !availables.contains(reg));
-
             let mut constraints = HashMap::new();
-
             for v_reg in all_v_regs.iter() {
                 constraints.insert(*v_reg, unavailables.clone());
             }
@@ -50,11 +48,9 @@ impl Func {
             if alloc_stat.is_some() {
                 last_alloc_stat = alloc_stat;
                 continue;
+            } else {
+                break;
             }
-            if last_alloc_stat.is_none() {
-                continue;
-            }
-            break;
         }
 
         if last_alloc_stat.is_none() {

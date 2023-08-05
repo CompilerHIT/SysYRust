@@ -46,6 +46,7 @@ impl Func {
         while self.remove_unuse_store() {
             self.remove_unuse_def();
         }
+        Func::print_func(ObjPtr::new(&self), "after_rm_suf_update_array_offset.txt");
     }
 
     //移除

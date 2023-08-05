@@ -42,7 +42,22 @@ pub fn merge_reg_with_constraints(
         if !constraints.contains_key(r1) || !constraints.contains_key(r2) {
             return false;
         }
-        debug_assert!(availables.contains_key(r1) && availables.contains_key(r2));
+        Func::print_func(ObjPtr::new(func), "rm_inst.txt");
+
+        log_file!("final_merge.txt", "try merge:{},{}", r1, r2);
+        debug_assert!(
+            availables.contains_key(r1) && availables.contains_key(r2),
+            "{},{},{},{},{}",
+            {
+                // Func::print_func(ObjPtr::new(func), "rm_inst.txt");
+                let ok = func.remove_self_mv();
+                ok
+            },
+            r1,
+            r2,
+            availables.contains_key(r1),
+            availables.contains_key(r2)
+        );
         //尝试合并,
         let old_r1_constraints = constraints.remove(r1).unwrap();
         let old_r2_constraints = constraints.remove(r2).unwrap();
@@ -85,6 +100,7 @@ pub fn merge_reg_with_constraints(
             //把func中所有寄存器通通替换
             func.replace_v_reg(r1, &new_v);
             func.replace_v_reg(r2, &new_v);
+            assert!(func.remove_self_mv());
             func.remove_self_mv();
             return true;
         } else {
@@ -143,13 +159,18 @@ pub fn merge_reg_with_constraints(
         ct1.extend(constraints.get(r2).unwrap().iter());
         ct1.len()
     });
+
+    /*
+    建立活寄存器图和可用寄存器表
+     */
     // func.calc_live_base();
     let mut interef_graph = regalloc::build_interference(func);
     //在总图上建立可用表
     let mut availables = regalloc::build_availables_with_interef_graph(&interef_graph);
     //把冲突图转化为活图,去掉图中的物理寄存器
     interef_graph.retain(|reg, _| !reg.is_physic());
-    for (_, inter) in interef_graph.iter_mut() {
+    for (r, inter) in interef_graph.iter_mut() {
+        debug_assert!(availables.contains_key(r));
         inter.retain(|reg| !reg.is_physic());
     }
 
@@ -157,7 +178,6 @@ pub fn merge_reg_with_constraints(
     //统计所有的可着色对,然后按照约束和从小到大的顺序开始着色,如果失败,从表中移出
     for (r1, r2) in mergables.iter() {
         debug_assert!(!r1.is_physic() && !r2.is_physic());
-        // debug_assert!(availables.contains_key(r1) && availables.contains_key(r2));
         if_merge |= per_process(
             func,
             r1,
@@ -198,13 +218,13 @@ fn build_constraints(
                 return;
             }
             let func = inst.get_func_name().unwrap();
-            let mut constraint: HashSet<Reg> =
+            let constraint: HashSet<Reg> =
                 regs_used_but_not_saved.get(func.as_str()).unwrap().clone();
             let mut live_now = live_now.clone();
             if let Some(def_reg) = inst.get_def_reg() {
                 live_now.remove(&def_reg);
             }
-            constraint.retain(|reg| live_now.contains(reg));
+
             for r in live_now.iter().filter(|reg| !reg.is_physic()) {
                 if !constraints.contains_key(r) {
                     constraints.insert(*r, constraint.clone());

@@ -173,25 +173,23 @@ impl Func {
                     continue;
                 }
                 passed.insert(bb);
-                let mut index = bb.insts.len() - 1;
+                let mut index = bb.insts.len();
                 let mut if_finish = false;
-                loop {
+                while index > 0 {
+                    index -= 1;
                     let inst = bb.insts.get(index).unwrap();
                     if inst.get_reg_def().contains(use_reg) {
                         unchanged_def.insert((*inst, *use_reg));
                         if_finish = true;
                         break;
                     }
-                    if index == 0 {
-                        break;
-                    }
-                    index -= 1;
                 }
-
                 if !if_finish {
                     for in_bb in bb.in_edge.iter() {
                         debug_assert!(in_bb.live_out.contains(use_reg));
-                        back_bbs.push_back(*in_bb);
+                        if in_bb.live_out.contains(use_reg) {
+                            back_bbs.push_back(*in_bb);
+                        }
                     }
                 }
             }
@@ -355,9 +353,10 @@ impl Func {
                     continue;
                 }
                 passed.insert(bb);
-                let mut index = bb.insts.len() - 1;
+                let mut index = bb.insts.len();
                 let mut if_finish = false;
-                loop {
+                while index > 0 {
+                    index -= 1;
                     let inst = bb.insts.get(index).unwrap();
                     if inst.get_reg_def().contains(use_reg) {
                         if_finish = true;
@@ -366,16 +365,13 @@ impl Func {
                     if inst.get_reg_use().contains(use_reg) {
                         unchanged_use.insert((*inst, *use_reg));
                     }
-                    if index == 0 {
-                        break;
-                    }
-                    index -= 1;
                 }
 
                 if !if_finish {
                     for in_bb in bb.in_edge.iter() {
-                        debug_assert!(in_bb.live_out.contains(use_reg));
-                        back_bbs.push_back(*in_bb);
+                        if in_bb.live_out.contains(use_reg) {
+                            back_bbs.push_back(*in_bb);
+                        }
                     }
                 }
             }
@@ -447,14 +443,27 @@ impl Func {
             }
         }
 
-        if first_block.label == "params_mix" {
-            //161
-            let inst = first_block.insts.get(161).unwrap();
-            let reg_use = inst.get_reg_use();
-            debug_assert!(reg_use.contains(&Reg::get_a0()));
-            debug_assert!(unchanged_use.contains(&(*inst, Reg::get_a0())));
-        }
         unchanged_use
+    }
+
+    ///search_forward_backward,前向搜索直到遇到def(不包含),反向搜索直到遇见def(包含)
+    /// 返回 (前向搜索得到的相关指令, 反向搜索得到的相关指令)
+    pub fn search_forward_and_backward_until_def(
+        reg: &Reg,
+        to_forward: &mut LinkedList<ObjPtr<BB>>,
+        to_backward: &mut LinkedList<ObjPtr<BB>>,
+        backward_passed: &mut HashSet<ObjPtr<BB>>,
+        forward_passed: &mut HashSet<ObjPtr<BB>>,
+    ) -> Vec<(ObjPtr<LIRInst>, bool)> {
+        let mut find = Vec::new();
+        loop {
+            while !to_forward.is_empty() {}
+            while !to_backward.is_empty() {}
+            if to_forward.is_empty() && to_backward.is_empty() {
+                break;
+            }
+        }
+        find
     }
 
     //返回p2v产生的新虚拟寄存器,以及该过程的动作序列
@@ -522,6 +531,7 @@ impl Func {
                             }
                         }
                     }
+
                     while !to_backward.is_empty() {
                         let item = to_backward.pop_front().unwrap();
                         let key = (item.0, item.1);
@@ -570,6 +580,7 @@ impl Func {
                     }
                 }
             };
+        //先解决块间问题
         for bb in self.blocks.iter() {
             for reg in bb.live_out.iter() {
                 if !regs_to_decolor.contains(reg) {

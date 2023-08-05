@@ -92,7 +92,7 @@ pub fn generate_asm(
     module.handle_overflow(&mut pool);
 
     //最后进行一次寄存器分配与合并
-    // module.final_realloc(&mut pool);
+    module.final_realloc(&mut pool);
 
     if is_opt {
         // 再次进行指令重排
