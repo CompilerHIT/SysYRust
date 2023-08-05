@@ -457,8 +457,96 @@ impl Func {
     ) -> Vec<(ObjPtr<LIRInst>, bool)> {
         let mut find = Vec::new();
         loop {
-            while !to_forward.is_empty() {}
-            while !to_backward.is_empty() {}
+            let mut new_to_forward = HashSet::new();
+            let mut new_to_backward = HashSet::new();
+            while !to_forward.is_empty() {
+                let bb = to_forward.pop_front().unwrap();
+                if forward_passed.contains(&bb) {
+                    continue;
+                }
+                forward_passed.insert(bb);
+                let mut index = 0;
+                while index < bb.insts.len() {
+                    let inst = bb.insts.get(index).unwrap();
+                    if inst.get_reg_use().contains(reg) {
+                        find.push((*inst, false));
+                    }
+                    if inst.get_reg_def().contains(reg) {
+                        break;
+                    }
+                    index += 1;
+                }
+                if index != bb.insts.len() {
+                    continue;
+                }
+                //读到尽头
+                for out_bb in bb.out_edge.iter() {
+                    if out_bb.live_in.contains(reg) {
+                        new_to_forward.insert(*out_bb);
+                    }
+                }
+            }
+            while !to_backward.is_empty() {
+                let bb = to_backward.pop_front().unwrap();
+                if backward_passed.contains(&bb) {
+                    continue;
+                }
+                backward_passed.insert(bb);
+                let mut index = bb.insts.len();
+                let mut if_continue = true;
+                while index > 0 {
+                    index -= 1;
+                    let inst = bb.insts.get(index).unwrap();
+                    if inst.get_reg_def().contains(reg) {
+                        find.push((*inst, true));
+                        if_continue = false;
+                        break;
+                    }
+                    if inst.get_reg_use().contains(reg) {
+                        find.push((*inst, false));
+                    }
+                }
+                if !if_continue {
+                    continue;
+                }
+                debug_assert!(index == 0);
+                for in_bb in bb.in_edge.iter() {
+                    if in_bb.live_out.contains(reg) {
+                        new_to_backward.insert(*in_bb);
+                    }
+                }
+            }
+
+            //计算新的 to forward和tobackward
+            new_to_forward.retain(|bb| !forward_passed.contains(bb));
+            new_to_backward.retain(|bb| !backward_passed.contains(bb));
+
+            loop {
+                let old_to_forward_len = new_to_forward.len();
+                let old_to_backward_len = new_to_backward.len();
+                for nf in new_to_forward.iter() {
+                    for in_bb in nf.in_edge.iter() {
+                        if in_bb.live_out.contains(reg) && !backward_passed.contains(in_bb) {
+                            new_to_backward.insert(*in_bb);
+                        }
+                    }
+                }
+                for nb in new_to_backward.iter() {
+                    for out_bb in nb.out_edge.iter() {
+                        if out_bb.live_in.contains(reg) && !forward_passed.contains(out_bb) {
+                            new_to_forward.insert(*out_bb);
+                        }
+                    }
+                }
+
+                if old_to_backward_len == new_to_backward.len()
+                    && (old_to_forward_len == new_to_forward.len())
+                {
+                    break;
+                }
+            }
+            to_forward.extend(new_to_forward.iter());
+            to_backward.extend(new_to_backward.iter());
             if to_forward.is_empty() && to_backward.is_empty() {
                 break;
             }
@@ -481,128 +569,100 @@ impl Func {
         //以bb,inst,reg为遍历的基本单位
         //首先处理块间的物理寄存器
         //使用栈的方式, 先入后出,后入先出的原则
-        let mut to_forward: LinkedList<(ObjPtr<BB>, Reg, Reg)> = LinkedList::new();
-        let mut to_backward: LinkedList<(ObjPtr<BB>, Reg, Reg)> = LinkedList::new();
         let mut forward_passed: HashSet<(ObjPtr<BB>, Reg)> = HashSet::new();
         let mut backward_passed: HashSet<(ObjPtr<BB>, Reg)> = HashSet::new();
         //进行流处理 (以front作为栈顶)
-        let mut process =
-            |to_forward: &mut LinkedList<(ObjPtr<BB>, Reg, Reg)>,
-             to_backward: &mut LinkedList<(ObjPtr<BB>, Reg, Reg)>,
-             backward_passed: &mut HashSet<(ObjPtr<BB>, Reg)>,
-             forward_passed: &mut HashSet<(ObjPtr<BB>, Reg)>| {
-                loop {
-                    while !to_forward.is_empty() {
-                        let item = to_forward.pop_front().unwrap();
-                        let key = (item.0, item.1);
-                        if forward_passed.contains(&key) {
-                            continue;
-                        }
-                        forward_passed.insert(key);
-                        let (bb, p_reg, v_reg) = item;
-                        //加入入口
-                        for in_bb in bb.in_edge.iter() {
-                            if in_bb.live_out.contains(&p_reg) {
-                                to_backward.push_front((*in_bb, p_reg, v_reg));
-                            }
-                        }
-
-                        let mut index = 0;
-                        while index < bb.insts.len() {
-                            let inst = bb.insts.get(index).unwrap();
-                            if unchanged_use.contains(&(*inst, p_reg)) {
-                                break;
-                            }
-
-                            if inst.get_reg_use().contains(&p_reg) {
-                                p2v_actions.push((*inst, p_reg, v_reg, false));
-                                inst.as_mut().replace_only_use_reg(&p_reg, &v_reg);
-                            }
-                            if inst.get_reg_def().contains(&p_reg) {
-                                break;
-                            }
-                            index += 1;
-                        }
-                        if index == bb.insts.len() && bb.live_out.contains(&p_reg) {
-                            for out_bb in bb.out_edge.iter() {
-                                if out_bb.live_in.contains(&p_reg) {
-                                    to_forward.push_front((*out_bb, p_reg, v_reg));
-                                }
-                            }
-                        }
-                    }
-
-                    while !to_backward.is_empty() {
-                        let item = to_backward.pop_front().unwrap();
-                        let key = (item.0, item.1);
-                        if backward_passed.contains(&key) {
-                            continue;
-                        }
-                        backward_passed.insert(key);
-                        let (bb, p_reg, v_reg) = item;
-                        for out_bb in bb.out_edge.iter() {
-                            if out_bb.live_in.contains(&p_reg) {
-                                to_forward.push_front((*out_bb, p_reg, v_reg));
-                            }
-                        }
-
-                        let mut index = bb.insts.len();
-                        let mut if_finish = false;
-                        while index > 0 {
-                            index -= 1;
-                            let inst = bb.insts.get(index).unwrap();
-                            if unchanged_def.contains(&(*inst, p_reg)) {
-                                if_finish = true;
-                                break;
-                            }
-                            if inst.get_reg_def().contains(&p_reg) {
-                                p2v_actions.push((*inst, p_reg, v_reg, true));
-                                inst.as_mut().replace_only_def_reg(&p_reg, &v_reg);
-                                if_finish = true;
-                                break;
-                            }
-                            if inst.get_reg_use().contains(&p_reg) {
-                                p2v_actions.push((*inst, p_reg, v_reg, false));
-                                inst.as_mut().replace_only_use_reg(&p_reg, &v_reg);
-                            }
-                        }
-                        if !if_finish {
-                            debug_assert!(bb.live_in.contains(&p_reg));
-                            for in_bb in bb.in_edge.iter() {
-                                if in_bb.live_out.contains(&p_reg) {
-                                    to_backward.push_front((*in_bb, p_reg, v_reg));
-                                }
-                            }
-                        }
-                    }
-                    if to_forward.is_empty() && to_backward.is_empty() {
-                        break;
-                    }
-                }
-            };
         //先解决块间问题
         for bb in self.blocks.iter() {
             for reg in bb.live_out.iter() {
                 if !regs_to_decolor.contains(reg) {
                     continue;
                 }
-                let v_reg = Reg::init(reg.get_type());
-                all_v_regs.insert(v_reg);
-                to_backward.push_front((*bb, *reg, v_reg));
-                for out_bb in bb.out_edge.iter() {
-                    if out_bb.live_in.contains(reg) {
-                        to_forward.push_front((*out_bb, *reg, v_reg));
+                if !reg.is_physic() {
+                    continue;
+                }
+
+                if backward_passed.contains(&(*bb, *reg)) {
+                    continue;
+                }
+                //剩下部分用来着色,不同的块间不同的寄存器的反复着色状态不同
+                //首先判断该reg是否能够p2v
+                let mut to_forward = HashSet::new();
+                let mut to_backward = HashSet::new();
+                to_backward.insert(*bb);
+                //找齐所有出入
+                loop {
+                    let old_backward_len = to_backward.len();
+                    let old_forward_len = to_forward.len();
+                    for back_bb in to_backward.iter() {
+                        for out_bb in back_bb.out_edge.iter() {
+                            if out_bb.live_in.contains(reg) {
+                                to_forward.insert(*out_bb);
+                            }
+                        }
+                    }
+                    for forward_bb in to_forward.iter() {
+                        for in_bb in forward_bb.in_edge.iter() {
+                            if in_bb.live_out.contains(reg) {
+                                to_backward.insert(*in_bb);
+                            }
+                        }
+                    }
+                    if old_backward_len == to_backward.len() && old_forward_len == to_forward.len()
+                    {
+                        break;
                     }
                 }
-                process(
+                let mut to_forward = to_forward.iter().cloned().collect();
+                let mut to_backward = to_backward.iter().cloned().collect();
+                let mut f_passed = HashSet::new();
+                let mut b_passed = HashSet::new();
+                let find = Func::search_forward_and_backward_until_def(
+                    reg,
                     &mut to_forward,
                     &mut to_backward,
-                    &mut backward_passed,
-                    &mut forward_passed,
+                    &mut b_passed,
+                    &mut f_passed,
                 );
+                //把内容加入passed表
+                for bb in f_passed {
+                    forward_passed.insert((bb, *reg));
+                }
+                for bb in b_passed {
+                    backward_passed.insert((bb, *reg));
+                }
+                let mut if_p2v = true;
+                for (inst, if_def) in find.iter() {
+                    if *if_def && unchanged_def.contains(&(*inst, *reg))
+                        || (!*if_def) && unchanged_use.contains(&(*inst, *reg))
+                    {
+                        log_file!(
+                            "unchanged_for_p2v_between_blocks.txt",
+                            "{}{}",
+                            reg,
+                            inst.as_ref()
+                        );
+                        if_p2v = false;
+                        break;
+                    }
+                }
+                if if_p2v {
+                    let v_reg = Reg::init(reg.get_type());
+                    all_v_regs.insert(v_reg);
+                    for (inst, if_def) in find {
+                        p2v_actions.push((inst, *reg, v_reg, if_def));
+                        if if_def {
+                            inst.as_mut().replace_only_def_reg(reg, &v_reg);
+                        } else {
+                            inst.as_mut().replace_only_use_reg(reg, &v_reg);
+                        }
+                    }
+                }
             }
         }
         self.calc_live_base();
+
+        // Func::print_func(ObjPtr::new(&self), "p2v_tmp.txt");
         //然后处理块内的物理寄存器
         //现在对于块内的物理寄存器没有能够超出范围的了
         for bb in self.blocks.iter() {
@@ -641,7 +701,7 @@ impl Func {
 
             //对于最后存活的p2v寄存器
             for (p_reg, _) in p2v {
-                debug_assert!(!bb.live_out.contains(&p_reg));
+                debug_assert!(!bb.live_out.contains(&p_reg), "{},{}", bb.label, p_reg);
             }
         }
         (all_v_regs, p2v_actions)
