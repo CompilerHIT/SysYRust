@@ -1,27 +1,29 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::{
-    backend::{
-        instrs::{Func, InstrsType, SingleOp},
-        operand::Reg,
-        regalloc::structs::RegUsedStat,
-    },
-    frontend::preprocess,
+use crate::backend::{
+    instrs::{Func, InstrsType, SingleOp},
+    module::constraints,
+    operand::Reg,
+    regalloc::structs::RegUsedStat,
 };
 
 use super::{perfect_alloc::alloc_with_v_interference_graph_and_base_available, *};
 
 ///进行了寄存器合并的分配,在最后的最后进行
-pub fn alloc_with_merge(func: &mut Func, reg_used_but_not_saveds: &HashMap<String, HashSet<Reg>>) {
+/// availables为可能各个地方允许使用的寄存器的并集
+pub fn merge__reg_with_constraints(
+    func: &mut Func,
+    availables: &HashSet<Reg>,
+    constraints: &HashMap<Reg, HashSet<Reg>>,
+) {
     //首先对寄存器除了特殊寄存器以外的寄存器使用进行p2v
     //然后统计合并机会
     //然后重新分配,从小度开始合并
     //直到合无可合则结束合并
     //availables 为能够使用的寄存器
-    let availables: HashSet<Reg> = { todo!() };
+    let availables: HashSet<Reg> = availables.clone();
     let mut unavailables = Reg::get_all_regs();
     unavailables.retain(|reg| !availables.contains(reg));
-    let regs_to_decolor = Reg::get_all_recolorable_regs();
     let per_process = |func: &mut Func,
                        r1: &Reg,
                        r2: &Reg,
@@ -82,11 +84,10 @@ pub fn alloc_with_merge(func: &mut Func, reg_used_but_not_saveds: &HashMap<Strin
         }
         return false;
     };
-    func.p2v_pre_handle_call(regs_to_decolor.clone());
     //分析有合并机会的寄存器对,
     let mergables: HashSet<(Reg, Reg)> = analyse_mergable(func);
     //分析约束,统计所有能够进行合并的可能,并按照合并可能进行合并,之后约束只会增加不会减少
-    let mut constraints = build_constraints(&func, reg_used_but_not_saveds);
+    let mut constraints = constraints.clone();
     let all_virtual_regs: HashSet<Reg> = func.draw_all_virtual_regs();
     //对所有寄存器建立除了availables以外的约束
     for v_reg in all_virtual_regs.iter() {
@@ -161,13 +162,6 @@ pub fn analyse_mergable(func: &Func) -> HashSet<(Reg, Reg)> {
         );
     }
     return mergables;
-}
-
-pub fn build_constraints(
-    func: &Func,
-    reg_used_but_not_saveds: &HashMap<String, HashSet<Reg>>,
-) -> HashMap<Reg, HashSet<Reg>> {
-    todo!()
 }
 
 //从冲突图中移除某个节点与其他节点关系
