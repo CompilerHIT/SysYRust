@@ -11,13 +11,15 @@ impl Func {
     pub fn alloc_reg_with_priority(&mut self, ordered_regs: Vec<Reg>) {
         // 按照顺序使用ordered regs中的寄存器进行分配
         self.calc_live_for_handle_call();
+
+        debug_assert!(self.draw_all_virtual_regs().len() == 0);
         let mut to_decolor = Reg::get_all_recolorable_regs();
         to_decolor.remove(&Reg::get_s0());
         Func::print_func(
             ObjPtr::new(&self),
             "before_realloc_with_priority_before_p2v.txt",
         );
-        self.p2v_pre_handle_call(to_decolor);
+        let (all_new_v_regs, p2v_actions) = self.p2v(to_decolor);
         Func::print_func(
             ObjPtr::new(&self),
             "before_realloc_with_priority_after_p2v.txt",
@@ -26,6 +28,7 @@ impl Func {
         //不能上二分，为了最好效果,使用最少的寄存器
         //所以直接地,
         let all_v_regs = self.draw_all_virtual_regs();
+        debug_assert!(all_new_v_regs.len() >= all_v_regs.len());
         debug_assert!(self
             .draw_phisic_regs()
             .is_available_reg(Reg::get_s0().get_color()));
@@ -45,7 +48,6 @@ impl Func {
             }
             let alloc_stat = perfect_alloc::alloc(&self, &constraints);
             if alloc_stat.is_some() {
-                println!("aa:{}", availables.len());
                 last_alloc_stat = alloc_stat;
                 continue;
             }
@@ -55,7 +57,17 @@ impl Func {
             break;
         }
 
-        println!("{}", ordered_regs.len());
+        if last_alloc_stat.is_none() {
+            //如果重分配失败,  恢复原样
+            for (inst, p_reg, v_reg, if_def) in p2v_actions {
+                if if_def {
+                    inst.as_mut().replace_only_def_reg(&v_reg, &p_reg);
+                } else {
+                    inst.as_mut().replace_only_use_reg(&v_reg, &p_reg);
+                }
+            }
+            return;
+        }
         let alloc_stat = last_alloc_stat.unwrap();
         debug_assert!(alloc_stat.spillings.len() == 0);
         self.v2p(&alloc_stat.dstr);
