@@ -55,6 +55,26 @@ impl CongruenceClass {
             call_congruence: Congruence::new(),
         }
     }
+    pub fn get_all_congruence_mut(&mut self) ->Vec<&mut Congruence>{
+        let mut vec = vec![];
+        vec.push(&mut self.add_congruence);
+        vec.push(&mut self.sub_congruence);
+        vec.push(&mut self.mul_congruence);
+        vec.push(&mut self.div_congruence);
+        vec.push(&mut self.rem_congruence);
+        vec.push(&mut self.ne_congruence);
+        vec.push(&mut self.cmp_congruence);
+        vec.push(&mut self.call_congruence);
+        vec.push(&mut self.gep_congruence);
+        vec.push(&mut self.pos_congruence);
+        vec.push(&mut self.neg_congruence);
+        vec.push(&mut self.not_congruence);
+        vec.push(&mut self.int_congruence);
+        vec.push(&mut self.float_congruence);
+        vec.push(&mut self.ftoi_congruence);
+        vec.push(&mut self.itof_congruence);
+        vec
+    }
 
     pub fn get_congruence_immut(&self, inst: ObjPtr<Inst>) -> Option<&Congruence> {
         match inst.get_kind() {
