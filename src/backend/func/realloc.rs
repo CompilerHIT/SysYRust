@@ -45,6 +45,7 @@ impl Func {
             }
             let alloc_stat = perfect_alloc::alloc(&self, &constraints);
             if alloc_stat.is_some() {
+                println!("aa:{}", availables.len());
                 last_alloc_stat = alloc_stat;
                 continue;
             }
@@ -54,6 +55,7 @@ impl Func {
             break;
         }
 
+        println!("{}", ordered_regs.len());
         let alloc_stat = last_alloc_stat.unwrap();
         debug_assert!(alloc_stat.spillings.len() == 0);
         self.v2p(&alloc_stat.dstr);

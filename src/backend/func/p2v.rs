@@ -813,8 +813,9 @@ impl Func {
                 all_v_regs.insert(v_reg);
                 to_backward.push_front((*bb, *reg, v_reg));
                 for out_bb in bb.out_edge.iter() {
-                    debug_assert!(out_bb.live_in.contains(reg));
-                    to_forward.push_front((*out_bb, *reg, v_reg));
+                    if out_bb.live_in.contains(reg) {
+                        to_forward.push_front((*out_bb, *reg, v_reg));
+                    }
                 }
                 process(
                     &mut to_forward,
