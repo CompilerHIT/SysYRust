@@ -112,6 +112,12 @@ pub fn dependency_check(gep: [ObjPtr<Inst>; 2], vector: Vec<(ObjPtr<SCEVExp>, [i
 /// 弱SIV：分为弱-0 SIV和弱-交叉 SIV
 /// 弱-0 SIV：两个矩阵的第一列相反，且第二列的和小于bound
 ///
+/// # Arguments
+/// * 'matrix_1' - 第一个矩阵
+/// * 'matrix_2' - 第二个矩阵
+/// * 'bound' - 对应iv的上下界，第一个参数为下界，第二个参数为上界
+/// # Returns
+/// true表示存在依赖关系，false表示不存在依赖关系
 fn siv_test(matrix_1: &[i32], matrix_2: &[i32], bound: &[[i32; 2]]) -> bool {
     debug_assert_eq!(matrix_1.len(), 2);
     debug_assert_eq!(matrix_2.len(), 2);
@@ -161,8 +167,156 @@ fn siv_test(matrix_1: &[i32], matrix_2: &[i32], bound: &[[i32; 2]]) -> bool {
     }
 }
 
+/// miv_test函数，分为gcd测试，Banerjee测试和I测试
+/// # Arguments
+/// * 'matrix_1' - 第一个矩阵
+/// * 'matrix_2' - 第二个矩阵
+/// * 'bound' - 对应iv的上下界，第一个参数为下界，第二个参数为上界
+/// # Returns
+/// true表示存在依赖关系，false表示不存在依赖关系
 fn miv_test(matrix_1: &[i32], matrix_2: &[i32], bound: &[[i32; 2]]) -> bool {
-    todo!()
+    gcd_test(matrix_1, matrix_2)
+        && banerjee_test(matrix_1, matrix_2, bound)
+        && i_test(matrix_1, matrix_2, bound)
+}
+
+/// 求两个数的最大公约数
+fn gcd(a: i32, b: i32) -> i32 {
+    let mut a = a;
+    let mut b = b;
+    while b != 0 {
+        let temp = b;
+        b = a % b;
+        a = temp;
+    }
+    a
+}
+
+/// 测试Fi + Gj = C的情况，其中F和G为访问矩阵，i和j为IV向量，C为常数，
+/// 方程有一个解当且仅当等式左边系数的最大公约数可以整除等式右边的常数项
+/// 缺陷：没有考虑边界条件
+/// # Arguments
+/// * 'matrix_1' - 第一个矩阵
+/// * 'matrix_2' - 第二个矩阵
+/// # Returns
+/// true表示存在依赖关系，false表示不存在依赖关系
+fn gcd_test(matrix_1: &[i32], matrix_2: &[i32]) -> bool {
+    let matrix = matrix_1[0..(matrix_1.len() - 1)]
+        .iter()
+        .zip(matrix_2[0..(matrix_2.len() - 1)].iter())
+        .map(|(x, y)| *x - *y)
+        .collect::<Vec<_>>();
+
+    let gcd = matrix.iter().fold(
+        matrix.iter().find(|x| **x != 0).cloned().unwrap_or(1),
+        |x, y| {
+            if *y != 0 {
+                gcd(x, *y)
+            } else {
+                x
+            }
+        },
+    );
+
+    (matrix_1[matrix_1.len() - 1] - matrix_2[matrix_2.len() - 1]) % gcd == 0
+}
+
+/// Banerjee测试，构造非常数项的表达式的一个取值区间，然后判断常数项是否在区间内
+/// 缺陷：判断的是有无实数解，没有考虑整数依赖
+/// # Arguments
+/// * 'matrix_1' - 第一个矩阵
+/// * 'matrix_2' - 第二个矩阵
+/// * 'bound' - 对应iv的上下界，第一个参数为下界，第二个参数为上界
+/// # Returns
+/// true表示存在依赖关系，false表示不存在依赖关系
+fn banerjee_test(matrix_1: &[i32], matrix_2: &[i32], bound: &[[i32; 2]]) -> bool {
+    debug_assert!(matrix_1.len() == matrix_2.len());
+    debug_assert!(matrix_1.len() > 1);
+
+    let matrix_1_64 = matrix_1.iter().map(|x| *x as i64).collect::<Vec<_>>();
+
+    let matrix_2_64 = matrix_2.iter().map(|x| *x as i64).collect::<Vec<_>>();
+
+    let bound_64 = bound
+        .iter()
+        .map(|x| [x[0] as i64, x[1] as i64])
+        .collect::<Vec<_>>();
+
+    let c = matrix_2_64[matrix_2_64.len() - 1] - matrix_1_64[matrix_1_64.len() - 1];
+
+    let mut h_k_positve: i64 = 0;
+    let mut h_k_negative: i64 = 0;
+
+    let a_positve = |a: i64| -> i64 {
+        if a > 0 {
+            a
+        } else {
+            0
+        }
+    };
+
+    let a_negative = |a: i64| -> i64 {
+        if a < 0 {
+            -a
+        } else {
+            0
+        }
+    };
+
+    debug_assert_eq!(a_positve(-10) - a_negative(-10), -10);
+    debug_assert_eq!(a_positve(10) - a_negative(10), 10);
+
+    for i in 0..(matrix_1_64.len() - 1) {
+        let a = matrix_1_64[i];
+        let b = matrix_2_64[i];
+        let l = bound_64[i][0];
+        let u = bound_64[i][1];
+
+        debug_assert_eq!(a_positve(a) - a_negative(a), a);
+        debug_assert_eq!(a_positve(b) - a_negative(b), b);
+
+        h_k_positve += a_positve(a - b) * u - a_positve(a - b) * l;
+        h_k_negative += -a_negative(a - b) * u + a_positve(a - b) * l;
+    }
+
+    h_k_negative <= c && c <= h_k_positve
+}
+
+/// I测试，
+fn i_test(matrix_1: &[i32], matrix_2: &[i32], bound: &[[i32; 2]]) -> bool {
+    debug_assert_eq!(matrix_1.len(), matrix_2.len());
+
+    let mut new_matrix_1 = matrix_1.to_vec();
+    let mut new_matrix_2 = matrix_2.to_vec();
+    let mut new_bound = bound.to_vec();
+
+    while new_matrix_1.len() > 2 {
+        let cur_gcd = gcd(
+            new_matrix_1.iter().fold(
+                new_matrix_1.iter().find(|x| **x != 0).cloned().unwrap_or(1),
+                |x, y| if *y != 0 { gcd(x, *y) } else { x },
+            ),
+            new_matrix_2.iter().fold(
+                new_matrix_2.iter().find(|x| **x != 0).cloned().unwrap_or(1),
+                |x, y| if *y != 0 { gcd(x, *y) } else { x },
+            ),
+        );
+
+        if cur_gcd != 1 {
+            new_matrix_1.iter_mut().for_each(|x| *x /= cur_gcd);
+            new_matrix_2.iter_mut().for_each(|x| *x /= cur_gcd);
+        }
+
+        if banerjee_test(&new_matrix_1, &new_matrix_2, &new_bound) {
+            new_matrix_1 = new_matrix_1[1..(new_matrix_1.len() - 1)].to_vec();
+            new_matrix_2 = new_matrix_2[1..(new_matrix_2.len() - 1)].to_vec();
+            new_bound = new_bound[1..(new_bound.len() - 1)].to_vec();
+        } else {
+            return false;
+        }
+    }
+
+    gcd_test(&new_matrix_1, &new_matrix_2)
 }
 
 /// # Arguments
