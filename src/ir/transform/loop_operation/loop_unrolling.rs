@@ -1,11 +1,5 @@
 use super::*;
-use crate::ir::{
-    analysis::{
-        dominator_tree::calculate_dominator,
-        scev::{scevexp::SCEVExpKind, SCEVAnalyzer},
-    },
-    instruction::InstKind,
-};
+use crate::ir::{analysis::scev::SCEVAnalyzer, instruction::InstKind};
 
 /// 尝试对循环进行展开
 pub fn loop_unrolling(
@@ -13,11 +7,10 @@ pub fn loop_unrolling(
     loop_map: &mut HashMap<String, LoopList>,
     pools: &mut (&mut ObjPool<BasicBlock>, &mut ObjPool<Inst>),
 ) {
-    func_process(module, |name, func| loop {
+    func_process(module, |name, _| loop {
         let mut flag = false;
         let loop_list = loop_map.get_mut(&name).unwrap();
         let mut analyzer = SCEVAnalyzer::new();
-        let dominator_tree = calculate_dominator(func.get_head());
         analyzer.set_loop_list(loop_list.get_loop_list().clone());
         let mut remove_list = None;
         for loop_info in loop_list.get_loop_list().iter() {
