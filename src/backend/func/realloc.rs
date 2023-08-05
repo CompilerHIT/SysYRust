@@ -29,14 +29,17 @@ impl Func {
         debug_assert!(self
             .draw_phisic_regs()
             .is_available_reg(Reg::get_s0().get_color()));
-        let mut constraints = HashMap::new();
-        let mut availables: HashSet<Reg> = HashSet::new();
+
         let all_regs = Reg::get_all_regs();
         let mut last_alloc_stat: Option<FuncAllocStat> = None;
+        let mut availables: HashSet<Reg> = HashSet::new();
         for reg in ordered_regs.iter() {
             availables.insert(*reg);
             let mut unavailables = all_regs.clone();
             unavailables.retain(|reg| !availables.contains(reg));
+
+            let mut constraints = HashMap::new();
+
             for v_reg in all_v_regs.iter() {
                 constraints.insert(*v_reg, unavailables.clone());
             }
@@ -49,9 +52,6 @@ impl Func {
                 continue;
             }
             break;
-        }
-        if last_alloc_stat.is_none() {
-            println!("{}\n{:?}\n{:?}", self.label, ordered_regs, availables);
         }
 
         let alloc_stat = last_alloc_stat.unwrap();

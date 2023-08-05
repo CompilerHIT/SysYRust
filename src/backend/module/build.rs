@@ -68,14 +68,14 @@ impl AsmModule {
         // // self.anaylyse_for_handle_call_v3_pre_split();
         self.anaylyse_for_handle_call_v4();
 
-        // let is_opt = true;
-        // if is_opt {
-        //     //TODO
-        //     self.split_func_v4(pool);
-        //     self.build_own_call_map();
-        //     self.analyse_callee_regs_to_saved();
-        //     self.analyse_caller_regs_to_saved();
-        // }
+        let is_opt = true;
+        if is_opt {
+            //TODO
+            self.split_func_v4(pool);
+            self.build_own_call_map();
+            self.analyse_callee_regs_to_saved();
+            self.analyse_caller_regs_to_saved();
+        }
         // self.reduce_caller_to_saved_after_func_split();
         // self.analyse_caller_regs_to_saved();
 

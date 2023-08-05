@@ -45,8 +45,13 @@ impl AsmModule {
                 //然后再分配该处不造成影响的caller saved
                 //然后再分配该处造成影响的callee saved
                 //最后再分配该处会造成影响的caller saved
-                let all_callers = Reg::get_all_callers_saved();
-                let all_callees = Reg::get_all_callees_saved();
+                let mut all_callers = Reg::get_all_callers_saved();
+                let mut all_callees = Reg::get_all_callees_saved();
+                //处理论外寄存器以及专用寄存器
+                all_callers.remove(&Reg::get_ra());
+                all_callees.remove(&&Reg::get_sp());
+                all_callees.remove(&Reg::get_s0());
+
                 let mut bad_callees = all_callees.clone();
                 bad_callees.retain(|reg| live_now.contains(reg));
                 let mut bad_callers = all_callers.clone();
@@ -76,6 +81,8 @@ impl AsmModule {
                 ord_regs.extend(good_callers.iter());
                 ord_regs.extend(bad_callers.iter());
                 ord_regs.extend(bad_callees.iter());
+                debug_assert!(ord_regs.len() == 58, "{}", ord_regs.len());
+
                 //按照顺序进行分配,分配确定之后,再之后不会再改变函数内的寄存器组成
 
                 //因为分配在handle spill之后,所以只能够求一个完美分配,
