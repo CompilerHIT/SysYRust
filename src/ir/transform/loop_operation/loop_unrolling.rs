@@ -172,7 +172,7 @@ fn attempt_loop_unrolling(
         _ => return false,
     }
 
-    if round > 2000 {
+    if round > 1000 {
         return false;
     }
 
