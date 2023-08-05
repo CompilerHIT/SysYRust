@@ -12,8 +12,12 @@ use crate::{
     utility::{ObjPool, ObjPtr},
 };
 
-use self::{licm::licm_run, livo::livo_run, loop_simplify::loop_simplify_run};
+use self::{
+    auto_parallelization::auto_paralellization, licm::licm_run, livo::livo_run,
+    loop_simplify::loop_simplify_run, loop_unrolling::loop_unrolling,
+};
 
+mod auto_parallelization;
 mod licm;
 mod livo;
 mod loop_simplify;
@@ -22,6 +26,7 @@ mod loop_unrolling;
 pub fn loop_optimize(
     module: &mut Module,
     pools: &mut (&mut ObjPool<BasicBlock>, &mut ObjPool<Inst>),
+    para: bool,
 ) {
     let mut loop_map = loop_recognize(module);
     func_process(module, |name, _| {
@@ -35,8 +40,15 @@ pub fn loop_optimize(
         licm_run(loop_map.get_mut(&name).unwrap(), pools);
     });
 
-    loop_unrolling::loop_unrolling(module, &mut loop_map, pools);
+    // 循环展开
+    loop_unrolling(module, &mut loop_map, pools);
     super::functional_optimizer(module, pools, true);
+
+    if para {
+        // 自动并行化
+        auto_paralellization(module, &mut loop_map, pools);
+        super::functional_optimizer(module, pools, true);
+    }
 
     // 归纳变量强度削减
     func_process(module, |name, func| {
