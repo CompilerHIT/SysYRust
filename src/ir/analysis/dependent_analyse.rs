@@ -19,7 +19,11 @@ use super::scev::scevexp::SCEVExp;
 /// # Returns
 /// true表示存在依赖关系，false表示不存在依赖关系
 pub fn dependency_check(gep: [ObjPtr<Inst>; 2], vector: Vec<(ObjPtr<SCEVExp>, [i32; 2])>) -> bool {
-    debug_assert_eq!(gep[0].get_ptr(), gep[1].get_ptr());
+    debug_assert!(if gep[0].get_gep_ptr().get_kind() == InstKind::Load {
+        gep[0].get_gep_ptr().get_ptr() == gep[1].get_gep_ptr().get_ptr()
+    } else {
+        gep[0].get_gep_ptr() == gep[1].get_gep_ptr()
+    });
 
     if gep[0].get_gep_offset() == gep[1].get_gep_offset() {
         return false;
