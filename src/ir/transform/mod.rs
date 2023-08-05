@@ -32,7 +32,7 @@ pub fn optimizer_run(
         functional_optimizer(module, &mut pools, optimize_flag);
 
         // 循环优化
-        loop_operation::loop_optimize(module, &mut pools);
+        loop_operation::loop_optimize(module, &mut pools, true);
         simplify_cfg::simplify_cfg_run(module, &mut pools);
         functional_optimizer(module, &mut pools, optimize_flag);
 
@@ -41,7 +41,6 @@ pub fn optimizer_run(
         //functional_optimizer(module, &mut pools, optimize_flag);
 
         // 函数内联
-        dump_now(module, "dump.ll");
         func_inline::inline_run(module, &mut pools);
         functional_optimizer(module, &mut pools, optimize_flag);
 
@@ -50,10 +49,9 @@ pub fn optimizer_run(
         functional_optimizer(module, &mut pools, optimize_flag);
 
         // 循环优化
-        loop_operation::loop_optimize(module, &mut pools);
+        loop_operation::loop_optimize(module, &mut pools, false);
         simplify_cfg::simplify_cfg_run(module, &mut pools);
         functional_optimizer(module, &mut pools, optimize_flag);
-        dump_now(module, "dump_opt.ll");
 
         // TODO: 性能优化
 
