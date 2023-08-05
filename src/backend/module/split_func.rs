@@ -62,7 +62,7 @@ impl AsmModule {
                 good_callers.retain(|reg| !bad_callers.contains(reg));
 
                 //判断对应函数是否已经存在
-                let mut constraint = RegUsedStat::new();
+                let mut constraint = RegUsedStat::init_unspecial_regs_without_s0();
                 bad_callees
                     .iter()
                     .for_each(|reg| constraint.use_reg(reg.get_color()));

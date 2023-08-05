@@ -307,6 +307,12 @@ impl RegUsedStat {
             fregs_used: 0,
         }
     }
+    pub const fn init_unspecial_regs_without_s0() -> RegUsedStat {
+        RegUsedStat {
+            iregs_used: 0b_0000_0000_0000_0000_0000_0000_0001_1111,
+            fregs_used: 0b_0000_0000_0000_0000_0000_0000_0000_0000,
+        }
+    }
     pub const fn init_unavailable() -> RegUsedStat {
         RegUsedStat {
             iregs_used: 0b_1111_1111_1111_1111_1111_1111_1111_1111,

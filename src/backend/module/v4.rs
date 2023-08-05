@@ -39,16 +39,6 @@ impl AsmModule {
         self.func_groups = func_group;
     }
 
-    pub fn p2v(&mut self) {
-        self.name_func
-            .iter()
-            .filter(|(_, f)| !f.is_extern)
-            .for_each(|(_, f)| {
-                f.as_mut()
-                    .p2v_pre_handle_call(Reg::get_all_recolorable_regs());
-            });
-    }
-
     ///v4的analyse for handle call 依赖于前文调用build call map构建的call map
     pub fn anaylyse_for_handle_call_v4(&mut self) {
         //对于name func里面的东西,根据上下文准备对应内容

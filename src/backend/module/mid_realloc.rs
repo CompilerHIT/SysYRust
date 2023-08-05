@@ -94,6 +94,7 @@ impl AsmModule {
                 if callee_func_used.contains(reg) {
                     continue;
                 }
+                func_ptr.calc_live_for_handle_call();
                 let ok = func_ptr
                     .as_mut()
                     .try_ban_certain_reg(reg, &caller_used, &callee_used);
@@ -132,7 +133,7 @@ impl AsmModule {
         let main_func = *self.name_func.get("main").unwrap();
         let mut rs = Reg::get_all_recolorable_regs();
         rs.remove(&Reg::get_s0());
-        main_func.as_mut().p2v_pre_handle_call(rs);
+        main_func.as_mut().p2v_pre_handle_call(&rs);
         main_func.as_mut().allocate_reg();
         let callees_used = self.build_callee_used();
         let callee_constraints: HashMap<Reg, HashSet<Reg>> =

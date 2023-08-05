@@ -55,7 +55,7 @@ impl AsmModule {
         // //寄存器重分配,重分析
 
         // self.print_func();
-        // self.realloc_pre_split_func();
+        self.realloc_pre_split_func();
         self.print_func();
         self.remove_unuse_inst_suf_alloc();
         // self.print_func();
@@ -84,7 +84,7 @@ impl AsmModule {
         let callees_used = self.build_callee_used();
         let callees_be_saved = &self.callee_regs_to_saveds.clone();
         let used_but_not_saved =
-            AsmModule::count_used_but_not_saveds(&callers_used, &callees_used, callees_be_saved);
+            AsmModule::build_used_but_not_saveds(&callers_used, &callees_used, callees_be_saved);
         self.handle_call_v4(pool, &callers_used, &callees_used, callees_be_saved);
         self.remove_external_func(); //在handle call之前调用,删掉前面往name func中加入的external func
 

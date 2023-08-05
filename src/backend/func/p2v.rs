@@ -7,7 +7,7 @@ impl Func {
     /// 该行为需要在handle call之前执行 (在这个试图看来,一个call前后除了a0的值可能发生改变,其他寄存器的值并不会发生改变)
     ///因为在handle call后有有些寄存器需要通过栈来restore,暂时还没有分析这个行为
     /// 该函数会绝对保留原本程序的结构，并且不会通过构造phi等行为增加指令,不会调整指令顺序,不会合并寄存器等等
-    pub fn p2v_pre_handle_call(&mut self, regs_to_decolor: HashSet<Reg>) -> HashSet<Reg> {
+    pub fn p2v_pre_handle_call(&mut self, regs_to_decolor: &HashSet<Reg>) -> HashSet<Reg> {
         self.p2v(regs_to_decolor).0
     }
 
@@ -461,7 +461,7 @@ impl Func {
     // vregs  ,  (inst,p_reg,v_reg,def_or_use)
     pub fn p2v(
         &mut self,
-        regs_to_decolor: HashSet<Reg>,
+        regs_to_decolor: &HashSet<Reg>,
     ) -> (HashSet<Reg>, Vec<(ObjPtr<LIRInst>, Reg, Reg, bool)>) {
         //一种简单的p2v方式
         self.calc_live_base();
@@ -672,5 +672,15 @@ impl Func {
         }
 
         v_reg
+    }
+
+    pub fn undo_p2v(p2v_actions: &Vec<(ObjPtr<LIRInst>, Reg, Reg, bool)>) {
+        for (inst, p_reg, v_reg, if_def) in p2v_actions {
+            if *if_def {
+                inst.as_mut().replace_only_def_reg(v_reg, p_reg);
+            } else {
+                inst.as_mut().replace_only_use_reg(v_reg, p_reg);
+            }
+        }
     }
 }

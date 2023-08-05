@@ -17,10 +17,10 @@ pub fn alloc(func: &Func, constraints: &HashMap<Reg, HashSet<Reg>>) -> Option<Fu
     // intereference_graph.retain(|reg, _| !reg.is_physic());
     let availables = regalloc::build_availables_with_interef_graph(&intereference_graph);
     //把interef graph转为活interef graph
+    intereference_graph.retain(|reg, _| !reg.is_physic());
     for (_, inter) in intereference_graph.iter_mut() {
         inter.retain(|reg| !reg.is_physic());
     }
-    intereference_graph.retain(|reg, _| !reg.is_physic());
     alloc_with_v_interference_graph_and_base_available(
         &intereference_graph,
         &availables,
@@ -33,14 +33,15 @@ pub fn alloc_with_v_interference_graph_and_base_available(
     availables: &HashMap<Reg, RegUsedStat>,
     constraints: &HashMap<Reg, HashSet<Reg>>,
 ) -> Option<FuncAllocStat> {
-    let all_neighbors = all_live_neighbors;
+    let all_live_neighbors = all_live_neighbors;
     let mut availables = availables.clone();
     for (reg, constraints) in constraints.iter() {
         debug_assert!(!reg.is_physic());
-        // if !availables.contains_key(reg) {
-        //     availables.insert(*reg, RegUsedStat::init_unspecial_regs());
-        // }
+        if !availables.contains_key(reg) {
+            availables.insert(*reg, RegUsedStat::init_unspecial_regs());
+        }
         for p_reg in constraints.iter() {
+            // debug_assert!(availables.contains_key(reg), "availables:{}", reg);
             availables.get_mut(reg).unwrap().use_reg(p_reg.get_color());
         }
     }
@@ -68,6 +69,9 @@ pub fn alloc_with_v_interference_graph_and_base_available(
         let mut finish_flag = true;
         let mut new_to_colors: Vec<Reg> = Vec::new();
         for to_color in to_colors.iter() {
+            debug_assert!(availables.contains_key(to_color), "{}", {
+                to_color.to_string(true)
+            });
             let available = availables
                 .get(to_color)
                 .unwrap()
@@ -99,7 +103,7 @@ pub fn alloc_with_v_interference_graph_and_base_available(
             let color = availables.get(&reg).unwrap();
             let color = color.get_available_reg(reg.get_type()).unwrap();
             colors.insert(reg.get_id(), color);
-            for nb in all_neighbors.get(&reg).unwrap() {
+            for nb in all_live_neighbors.get(&reg).unwrap() {
                 availables.get_mut(nb).unwrap().use_reg(color);
             }
         }

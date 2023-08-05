@@ -23,7 +23,7 @@ impl AsmModule {
         }
     }
 
-    pub fn count_used_but_not_saveds(
+    pub fn build_used_but_not_saveds(
         callers_used: &HashMap<String, HashSet<Reg>>,
         callees_used: &HashMap<String, HashSet<Reg>>,
         callees_saved: &HashMap<String, HashSet<Reg>>,
