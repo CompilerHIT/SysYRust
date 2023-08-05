@@ -13,7 +13,10 @@ impl Func {
         self.calc_live_for_handle_call();
         let mut to_decolor = Reg::get_all_recolorable_regs();
         to_decolor.remove(&Reg::get_s0());
-
+        Func::print_func(
+            ObjPtr::new(&self),
+            "before_realloc_with_priority_before_p2v.txt",
+        );
         self.p2v_pre_handle_call(to_decolor);
         Func::print_func(
             ObjPtr::new(&self),
@@ -23,6 +26,9 @@ impl Func {
         //不能上二分，为了最好效果,使用最少的寄存器
         //所以直接地,
         let all_v_regs = self.draw_all_virtual_regs();
+        debug_assert!(self
+            .draw_phisic_regs()
+            .is_available_reg(Reg::get_s0().get_color()));
         let mut constraints = HashMap::new();
         let mut availables: HashSet<Reg> = HashSet::new();
         let all_regs = Reg::get_all_regs();
@@ -43,6 +49,9 @@ impl Func {
                 continue;
             }
             break;
+        }
+        if last_alloc_stat.is_none() {
+            println!("{}\n{:?}\n{:?}", self.label, ordered_regs, availables);
         }
 
         let alloc_stat = last_alloc_stat.unwrap();

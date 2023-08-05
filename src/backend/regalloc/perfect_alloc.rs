@@ -1,6 +1,9 @@
 use std::collections::{HashMap, HashSet, LinkedList};
 
-use crate::backend::{instrs::Func, operand::Reg};
+use crate::{
+    backend::{instrs::Func, operand::Reg},
+    log_file,
+};
 
 use super::{
     structs::{FuncAllocStat, RegUsedStat},
@@ -107,6 +110,8 @@ pub fn alloc_with_v_interference_graph_and_base_available(
             dstr: colors,
         };
         return Some(fat);
+    } else {
+        log_file!("unbest_alloc_for_pp.txt", "{:?}", to_colors);
     }
     None
 }

@@ -33,14 +33,14 @@ impl Func {
         self.calc_live_for_alloc_reg();
         //ban掉16个物理寄存器以检查紧缩结果
 
-        let alloc_stat = perfect_alloc::alloc(self, &HashMap::new());
-        if alloc_stat.is_some() {
-            let alloc_stat = alloc_stat.unwrap();
-            regalloc::check_alloc_v2(&self, &alloc_stat.dstr, &alloc_stat.spillings);
-            self.reg_alloc_info = alloc_stat;
-            self.context.as_mut().set_reg_map(&self.reg_alloc_info.dstr);
-            return;
-        }
+        // let alloc_stat = perfect_alloc::alloc(self, &HashMap::new());
+        // if alloc_stat.is_some() {
+        //     let alloc_stat = alloc_stat.unwrap();
+        //     regalloc::check_alloc_v2(&self, &alloc_stat.dstr, &alloc_stat.spillings);
+        //     self.reg_alloc_info = alloc_stat;
+        //     self.context.as_mut().set_reg_map(&self.reg_alloc_info.dstr);
+        //     return;
+        // }
         // 保留临时寄存器的分配方式
         self.calc_live_for_alloc_reg();
         let mut allocator = crate::backend::regalloc::easy_gc_alloc::Allocator::new();
