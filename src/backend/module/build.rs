@@ -10,6 +10,7 @@ impl AsmModule {
     pub fn build_v4(&mut self, f: &mut File, _f2: &mut File, pool: &mut BackendPool, is_opt: bool) {
         let obj_module = ObjPtr::new(self);
         self.build_lir(pool);
+        self.print_asm("asm_abastract.txt");
         if is_opt {
             BackendPass::new(obj_module).block_pass_pre_clear(pool);
         }
@@ -54,11 +55,10 @@ impl AsmModule {
         self.build_own_call_map();
         // //寄存器重分配,重分析
 
+        self.print_asm("asm_before_realloc_pre_spilt_func.txt");
         // self.print_func();
         self.realloc_pre_split_func();
-        // self.print_func();
-        self.remove_unuse_inst_suf_alloc();
-        // self.print_func();
+        self.print_asm("asm_after_realloc_pre_spilt_func.txt");
 
         self.handle_spill_v3(pool);
         // self.print_func();
@@ -89,16 +89,19 @@ impl AsmModule {
             AsmModule::build_used_but_not_saveds(&callers_used, &callees_used, callees_be_saved);
         self.handle_call_v4(pool, &callers_used, &callees_used, callees_be_saved);
 
+        self.print_asm("asm_before_rm_inst_suf_handle_call.txt");
         self.rm_inst_suf_handle_call(pool, &used_but_not_saved);
 
+        self.print_asm("asm_before_rearrange_stack_slot.txt");
         self.rearrange_stack_slot();
         self.update_array_offset(pool);
 
-        // self.print_func();
+        self.print_asm("asm_before_rm_suf_update_array_offset.txt");
         self.rm_inst_suf_update_array_offset(pool, &used_but_not_saved);
 
         self.build_stack_info(f);
         // println!("5");
+        self.print_asm("asm_before_final_realloc.txt");
         self.final_realloc(pool);
         // self.print_func();
         //删除无用的函数

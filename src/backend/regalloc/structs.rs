@@ -341,6 +341,14 @@ impl RegUsedStat {
     }
 }
 
+///RegUseStat求交集的实现
+impl RegUsedStat {
+    pub fn inter(&mut self, other: &RegUsedStat) {
+        self.iregs_used &= other.iregs_used;
+        self.fregs_used &= other.fregs_used;
+    }
+}
+
 #[cfg(test)]
 mod test_regusestat {
     use crate::backend::operand::Reg;
@@ -375,6 +383,34 @@ mod test_regusestat {
         assert!(reg.is_available_reg(55));
         reg.merge(&reg2);
         assert!(!reg.is_available_reg(55));
+    }
+
+    #[test]
+    fn test_inter() {
+        let m = RegUsedStat::init_for_i();
+        let n = RegUsedStat::init_for_f();
+
+        let mut gg = RegUsedStat::init_unavailable();
+        gg.inter(&m);
+        assert!(gg == m);
+        let mut gg = RegUsedStat::init_unavailable();
+        gg.inter(&n);
+        assert!(gg == n);
+        let mut k = m;
+        for i in 0..=63 {
+            let add_flag: bool = rand::random();
+            if add_flag {
+                k.use_reg(i);
+            }
+        }
+        k.inter(&m);
+        for i in 0..=63 {
+            if k.is_available_reg(i) {
+                assert!(m.is_available_reg(i))
+            } else {
+                assert!(!m.is_available_reg(i));
+            }
+        }
     }
 
     #[test]
