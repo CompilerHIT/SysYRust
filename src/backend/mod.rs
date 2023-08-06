@@ -10,6 +10,7 @@ pub mod regalloc;
 pub mod simulator;
 pub mod structs;
 
+pub mod parrallel;
 use std::fs::File;
 use std::io::Write;
 
