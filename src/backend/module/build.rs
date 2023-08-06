@@ -32,7 +32,7 @@ impl AsmModule {
             // 将非临时寄存器映射到物理寄存器
             self.map_v_to_p();
             // 代码调度，列表调度法
-            self.list_scheduling_tech();
+            // self.list_scheduling_tech();
 
             // 为临时寄存器分配寄存器
             self.clear_tmp_var();
