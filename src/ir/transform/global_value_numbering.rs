@@ -179,34 +179,52 @@ impl Congruence {
             map: HashMap::new(),
         }
     }
+
+    pub fn remove_inst(&mut self,inst: ObjPtr<Inst>){
+        let index1 = self.map.get(&inst).unwrap();
+        if let Some(index2) = self.vec_class[*index1].iter().position(|&x| x == inst) {
+            self.vec_class[*index1].remove(index2);
+        }
+        self.map.remove(&inst);
+    }
+
+    pub fn add_inst(&mut self,inst: ObjPtr<Inst>,index:usize){
+        if let Some(_index) = self.map.get(&inst) {
+            return ;
+        }
+        self.map.insert(inst, index); //增加索引映射
+        self.vec_class[index].push(inst);
+    }
 }
 
-pub fn gvn(module: &mut Module, opt_option: bool) ->Option<CongruenceClass>{
+pub fn gvn(module: &mut Module, opt_option: bool) ->Option<Vec<CongruenceClass>>{
     if opt_option {
         loop {
             let mut changed = false;
-            let (gvn_changed,congruence_class) = easy_gvn(module);
+            let (gvn_changed,vec_congruence_class) = easy_gvn(module);
             changed |= gvn_changed;
             changed |= load_store_opt(module);
             if !changed {
-                return Some(congruence_class);
+                return Some(vec_congruence_class);
             }
         }
     }
     None
 }
 
-pub fn easy_gvn(module: &mut Module) -> (bool,CongruenceClass) {
-    let mut congruence_class = CongruenceClass::new();
+pub fn easy_gvn(module: &mut Module) -> (bool,Vec<CongruenceClass>) {
+    let mut vec_congruence_class = vec![];
     let mut changed = false;
     let set = call_optimize(module);
     func_process(module, |_, func| {
+        let mut congruence_class = CongruenceClass::new();
         let dominator_tree = calculate_dominator(func.get_head());
         bfs_inst_process(func.get_head(), |inst| {
             changed |= has_val(&mut congruence_class, inst, &dominator_tree, &set)
         });
+        vec_congruence_class.push(congruence_class);
     });
-    (changed,congruence_class)
+    (changed,vec_congruence_class)
 }
 
 
