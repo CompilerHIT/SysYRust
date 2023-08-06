@@ -46,7 +46,7 @@ impl Func {
         while self.remove_unuse_store() {
             self.remove_unuse_def();
         }
-        Func::print_func(ObjPtr::new(&self), "after_rm_suf_update_array_offset.txt");
+        // Func::print_func(ObjPtr::new(&self), "after_rm_suf_update_array_offset.txt");
     }
 
     //移除
@@ -170,7 +170,7 @@ impl Func {
     //针对mv的值短路
     //会把对已经存在的数值的使用,改为从最早寄存器获取,
     pub fn short_cut_mv(&mut self, regs_used_but_not_saved: &HashMap<String, HashSet<Reg>>) {
-        Func::print_func(ObjPtr::new(&self), "before_short_cut_mv.txt");
+        // Func::print_func(ObjPtr::new(&self), "before_short_cut_mv.txt");
         //维护每个寄存器当前的值
         //维护每个值先后出现的次数
         //只针对块内的局部短路
@@ -258,7 +258,7 @@ impl Func {
             }
         }
 
-        Func::print_func(ObjPtr::new(&self), "after_short_cut_mv.txt");
+        // Func::print_func(ObjPtr::new(&self), "after_short_cut_mv.txt");
     }
 
     //针对常数赋值的值短路, (对于常量值的加载,优先改为li)

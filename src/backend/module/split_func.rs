@@ -50,7 +50,6 @@ impl AsmModule {
                 //处理论外寄存器以及专用寄存器
                 all_callers.remove(&Reg::get_ra());
                 all_callees.remove(&&Reg::get_sp());
-                all_callees.remove(&Reg::get_s0());
 
                 let mut bad_callees = all_callees.clone();
                 bad_callees.retain(|reg| live_now.contains(reg));
@@ -69,6 +68,8 @@ impl AsmModule {
                 bad_callers
                     .iter()
                     .for_each(|reg| constraint.use_reg(reg.get_color()));
+
+                debug_assert!(!constraint.is_available_reg(Reg::get_s0().get_color()));
                 let splits = base_splits.get(func_name).unwrap();
                 if let Some(new_func) = splits.get(&constraint) {
                     inst.as_mut().replace_label(new_func.clone());
@@ -105,6 +106,13 @@ impl AsmModule {
 
                 new_func.as_mut().set_name(&new_func_name);
                 new_func.as_mut().suffix_bb(&bb_sufix);
+
+                //判断新函数是否是第一个
+                if splits.len() == 0 {
+                    new_func.as_mut().is_header = true;
+                } else {
+                    new_func.as_mut().is_header = false;
+                }
                 new_name_func.insert(new_func_name.clone(), new_func);
                 base_splits
                     .get_mut(func_name)

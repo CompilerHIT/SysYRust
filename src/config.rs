@@ -113,6 +113,51 @@ pub fn dump() {
     }
 }
 
+///not log ban
+pub fn dump_not_log() {
+    macro_rules! log_file {
+    ($file:expr, $($arg:tt)*) => {{
+        use std::fs::OpenOptions;
+        use std::io::Write;
+
+        let mut file = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open($file)
+        .expect("Failed to open log file");
+
+        writeln!(file, $($arg)*).expect("Failed to write to log file");
+    }};
+    }
+    init();
+    //统计的总属性输出到一个专门的文件中 (粒度到源文件)
+    unsafe {
+        log_file!(
+            "performance_eval.txt",
+            "sy_path:{}",
+            SRC_PATH.as_ref().unwrap().clone()
+        );
+        let order = vec![
+            "spill",
+            "offset_overflow",
+            "branch_overflow",
+            "caller_save",
+            "callee_save",
+            "mem_rearrange",
+        ];
+        for kind in order.iter() {
+            let times = CONFIG_INFO
+                .as_ref()
+                .unwrap()
+                .times
+                .get(&kind.to_string())
+                .unwrap();
+            log_file!("performance_eval.txt", "{}\t:{} times", kind, times);
+        }
+        //打印栈重排效果,
+    }
+}
+
 ///记录在ban列表中的文件就不会被打印
 pub fn ban(path: &str) {
     init();

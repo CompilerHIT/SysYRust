@@ -10,7 +10,7 @@ impl AsmModule {
     pub fn build_v4(&mut self, f: &mut File, _f2: &mut File, pool: &mut BackendPool, is_opt: bool) {
         let obj_module = ObjPtr::new(self);
         self.build_lir(pool);
-        self.print_asm("asm_abastract.txt");
+        // self.print_asm("asm_abastract.txt");
         if is_opt {
             BackendPass::new(obj_module).block_pass_pre_clear(pool);
         }
@@ -71,14 +71,14 @@ impl AsmModule {
 
         self.anaylyse_for_handle_call_v4();
 
-        // let is_opt = true;
-        // if is_opt {
-        //     //TODO
-        //     self.split_func_v4(pool);
-        //     self.build_own_call_map();
-        //     self.analyse_callee_regs_to_saved();
-        //     self.analyse_caller_regs_to_saved();
-        // }
+        let is_opt = true;
+        if is_opt {
+            //TODO
+            self.split_func_v4(pool);
+            self.build_own_call_map();
+            self.analyse_callee_regs_to_saved();
+            self.analyse_caller_regs_to_saved();
+        }
 
         self.reduce_caller_to_saved_after_func_split();
         self.analyse_caller_regs_to_saved();

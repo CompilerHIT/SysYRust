@@ -15,15 +15,15 @@ impl Func {
         debug_assert!(self.draw_all_virtual_regs().len() == 0);
         let mut to_decolor = Reg::get_all_recolorable_regs();
         to_decolor.remove(&Reg::get_s0());
-        Func::print_func(
-            ObjPtr::new(&self),
-            "before_realloc_with_priority_before_p2v.txt",
-        );
+        // Func::print_func(
+        //     ObjPtr::new(&self),
+        //     "before_realloc_with_priority_before_p2v.txt",
+        // );
         let (all_new_v_regs, p2v_actions) = self.p2v(&to_decolor);
-        Func::print_func(
-            ObjPtr::new(&self),
-            "before_realloc_with_priority_after_p2v.txt",
-        );
+        // Func::print_func(
+        //     ObjPtr::new(&self),
+        //     "before_realloc_with_priority_after_p2v.txt",
+        // );
         self.calc_live_for_handle_call();
         //不能上二分，为了最好效果,使用最少的寄存器
         //所以直接地,

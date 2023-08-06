@@ -582,7 +582,7 @@ impl Func {
         let mut all_v_regs: HashSet<Reg> = HashSet::new();
         let mut p2v_actions = Vec::new();
 
-        Func::print_func(ObjPtr::new(&self), "before_rm_between_blocks.txt");
+        // Func::print_func(ObjPtr::new(&self), "before_rm_between_blocks.txt");
         // let to_check = read_number_from_console();
 
         //进行流处理 (以front作为栈顶)
@@ -660,7 +660,7 @@ impl Func {
             }
         }
 
-        Func::print_func(ObjPtr::new(&self), "p2v_tmp.txt");
+        // Func::print_func(ObjPtr::new(&self), "p2v_tmp.txt");
         //然后处理块内的物理寄存器
         //现在对于块内的物理寄存器没有能够超出范围的了
         for bb in self.blocks.iter() {
