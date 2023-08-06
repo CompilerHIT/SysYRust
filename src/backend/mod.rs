@@ -100,6 +100,7 @@ pub fn generate_asm(
 
         // 额外的块优化处理
         BackendPass::new(ObjPtr::new(module)).run_addition_block_pass();
+        
     }
 
     //生成抽象汇编

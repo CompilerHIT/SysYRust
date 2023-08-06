@@ -224,3 +224,10 @@ impl AsmModule {
         func_groups
     }
 }
+
+impl AsmModule {
+    fn print_asm(&mut self, path: &str) {
+        let mut file = File::create(path).unwrap();
+        self.generate_row_asm(&mut file);
+    }
+}

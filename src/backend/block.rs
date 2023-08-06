@@ -2331,6 +2331,7 @@ impl BB {
         }
     }
 }
+
 impl GenerateAsm for BB {
     fn generate(&mut self, context: ObjPtr<Context>, f: &mut File) {
         if self.showed {

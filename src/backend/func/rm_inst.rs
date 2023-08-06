@@ -38,8 +38,8 @@ impl Func {
         regs_used_but_not_saved: &HashMap<String, HashSet<Reg>>,
     ) {
         self.remove_meaningless_def(regs_used_but_not_saved);
-        self.short_cut_mv(regs_used_but_not_saved);
         self.remove_unuse_def();
+        self.short_cut_mv(regs_used_but_not_saved);
         self.remove_unuse_def();
         self.short_cut_const();
         self.remove_unuse_def();
