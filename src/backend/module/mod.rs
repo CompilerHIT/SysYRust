@@ -289,12 +289,12 @@ impl AsmModule {
         })
     }
 
-    pub fn generate_row_asm(&mut self, f: &mut File, pool: &mut BackendPool) {
+    pub fn generate_row_asm(&mut self, f: &mut File) {
         debug_assert!(|| -> bool {
             self.name_func.iter_mut().for_each(|(_, func)| {
                 debug_assert!(!func.is_extern);
                 func.as_mut()
-                    .generate_row(pool.put_context(Context::new()), f);
+                    .generate_row(f);
             });
             // self.func_map.iter_mut().for_each(|(_, func)| {
             //     if !func.is_extern {
