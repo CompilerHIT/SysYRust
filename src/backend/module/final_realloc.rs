@@ -9,6 +9,7 @@ impl AsmModule {
 
         let callers_used = self.build_caller_used();
         let callees_used = self.build_callee_used();
+        self.analyse_callee_regs_to_saved();
         let callees_saved = &self.callee_regs_to_saveds;
         let reg_used_but_not_saved =
             AsmModule::build_used_but_not_saveds(&callers_used, &callees_used, callees_saved);

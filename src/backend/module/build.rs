@@ -55,17 +55,19 @@ impl AsmModule {
         self.build_own_call_map();
         // //寄存器重分配,重分析
 
-        self.print_asm("asm_before_realloc_pre_spilt_func.txt");
+        // self.print_asm("asm_before_realloc_pre_spilt_func.txt");
         // self.print_func();
         self.realloc_pre_split_func();
-        self.print_asm("asm_after_realloc_pre_spilt_func.txt");
+        // self.print_asm("asm_after_realloc_pre_spilt_func.txt");
 
         self.handle_spill_v3(pool);
         // self.print_func();
+        // self.print_asm("asm_after_handle_spill.txt");
 
         self.analyse_callee_regs_to_saved();
 
         self.remove_unuse_inst_suf_alloc();
+        // self.print_asm("asm_after_remove_unuse_inst_suf_handle_spill.txt");
 
         self.anaylyse_for_handle_call_v4();
 
@@ -80,6 +82,7 @@ impl AsmModule {
 
         self.reduce_caller_to_saved_after_func_split();
         self.analyse_caller_regs_to_saved();
+        // self.print_asm("asm_after_realloc_suf_handle_call.txt");
 
         //此后栈空间大小以及 caller saved和callee saved都确定了
         let callers_used = self.build_caller_used();
@@ -88,22 +91,19 @@ impl AsmModule {
         let used_but_not_saved =
             AsmModule::build_used_but_not_saveds(&callers_used, &callees_used, callees_be_saved);
         self.handle_call_v4(pool, &callers_used, &callees_used, callees_be_saved);
+        // self.print_asm("asm_after_handle_call.txt");
 
-        self.print_asm("asm_before_rm_inst_suf_handle_call.txt");
+        // self.print_asm("asm_before_rm_inst_suf_handle_call.txt");
         self.rm_inst_suf_handle_call(pool, &used_but_not_saved);
 
-        self.print_asm("asm_before_rearrange_stack_slot.txt");
+        // self.print_asm("asm_before_rearrange_stack_slot.txt");
         self.rearrange_stack_slot();
         self.update_array_offset(pool);
 
-        self.print_asm("asm_before_rm_suf_update_array_offset.txt");
+        // self.print_asm("asm_before_rm_suf_update_array_offset.txt");
         self.rm_inst_suf_update_array_offset(pool, &used_but_not_saved);
 
         self.build_stack_info(f);
-        // println!("5");
-        self.print_asm("asm_before_final_realloc.txt");
-        self.final_realloc(pool);
-        // self.print_func();
         //删除无用的函数
     }
 }

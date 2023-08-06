@@ -1,4 +1,7 @@
-use std::collections::{HashMap, HashSet, LinkedList};
+use std::{
+    collections::{HashMap, HashSet, LinkedList},
+    fmt::format,
+};
 
 use crate::{
     backend::{instrs::LIRInst, operand::Reg},
@@ -61,6 +64,7 @@ pub fn init() {
             info.times.insert("caller_save".to_string(), 0);
             info.times.insert("callee_save".to_string(), 0);
             info.times.insert("mem_rearrange".to_string(), 0);
+            info.times.insert("reg_merge".to_string(), 0);
         }
         if SRC_PATH.is_none() {
             SRC_PATH = Some(String::from("default.sy"));
@@ -241,6 +245,26 @@ pub fn record_mem_rearrange(func: &str, old_mem: usize, new_mem: usize) {
         .push_back(format!("realloc mem func{}:{}/{}", func, old_mem, new_mem).to_string());
     let time = info.times.get_mut("mem_rearrange").unwrap();
     *time += old_mem as i32 - new_mem as i32;
+}
+
+///记录寄存器合并所在的函数,并记录该次寄存器合并
+pub fn record_merge_reg(func: &str, reg1: &Reg, reg2: &Reg) {
+    init();
+    let path = "reg_merge.txt";
+    let kind = "reg_merge";
+    let info = unsafe { CONFIG_INFO.as_mut().unwrap() };
+    if !info.file_infos.contains_key(&path.to_string()) {
+        info.file_infos.insert(path.to_string(), LinkedList::new());
+    }
+    info.times.insert(
+        kind.to_string(),
+        *info.times.get(&kind.to_string()).unwrap_or(&0) + 1,
+    );
+    let msg = format!("merge {reg1}{reg2} in {func}");
+    info.file_infos
+        .get_mut(&path.to_string())
+        .unwrap()
+        .push_back(msg);
 }
 
 //实现一个全局寄存器表

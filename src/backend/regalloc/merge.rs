@@ -7,6 +7,7 @@ use crate::{
         operand::Reg,
         regalloc::structs::RegUsedStat,
     },
+    config,
     ir::instruction::Inst,
     log, log_file,
     utility::ObjPtr,
@@ -43,7 +44,6 @@ pub fn merge_reg_with_constraints(
             return false;
         }
         Func::print_func(ObjPtr::new(func), "rm_inst.txt");
-
         log_file!("final_merge.txt", "try merge:{},{}", r1, r2);
         debug_assert!(
             availables.contains_key(r1) && availables.contains_key(r2),
@@ -121,7 +121,7 @@ pub fn merge_reg_with_constraints(
     p2v 并记录 去色动作序列
      */
     let to_recolors = Reg::get_all_recolorable_regs();
-    println!("{}", to_recolors.len());
+
     let (_, p2v_actions) = func.p2v(&to_recolors);
 
     /*
@@ -180,7 +180,7 @@ pub fn merge_reg_with_constraints(
     //统计所有的可着色对,然后按照约束和从小到大的顺序开始着色,如果失败,从表中移出
     for (r1, r2) in mergables.iter() {
         debug_assert!(!r1.is_physic() && !r2.is_physic());
-        if_merge |= per_process(
+        let ok = per_process(
             func,
             r1,
             r2,
@@ -188,6 +188,10 @@ pub fn merge_reg_with_constraints(
             &mut availables,
             &mut constraints,
         );
+        if_merge |= ok;
+        if ok {
+            config::record_merge_reg(&func.label, r1, r2);
+        }
     }
     //如果合并成功
     if if_merge {
