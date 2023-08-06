@@ -69,7 +69,8 @@ impl AsmModule {
                     .iter()
                     .for_each(|reg| constraint.use_reg(reg.get_color()));
 
-                debug_assert!(!constraint.is_available_reg(Reg::get_s0().get_color()));
+                assert!(bad_callees.remove(&Reg::get_s0()));
+                assert!(!constraint.is_available_reg(Reg::get_s0().get_color()));
                 let splits = base_splits.get(func_name).unwrap();
                 if let Some(new_func) = splits.get(&constraint) {
                     inst.as_mut().replace_label(new_func.clone());

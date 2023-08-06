@@ -1,3 +1,5 @@
+use core::time;
+
 use crate::backend::regalloc;
 
 use super::*;
@@ -14,24 +16,32 @@ impl AsmModule {
         let reg_used_but_not_saved =
             AsmModule::build_used_but_not_saveds(&callers_used, &callees_used, callees_saved);
 
-        for (name, func) in self.name_func.iter() {
-            if func.is_extern {
-                continue;
-            }
-            let callers_used = callers_used.get(name).unwrap();
+        let mut to_realloc: Vec<ObjPtr<Func>> = self.name_func.iter().map(|(_, f)| *f).collect();
+        to_realloc.retain(|f| !f.is_extern);
+        let mut times = 0;
+        for func in to_realloc {
+            let name = &func.label;
+            let callers_used = callers_used.get(name).unwrap().clone();
+            let callees_used = callees_used.get(name).unwrap().clone();
             let mut used = callers_used.clone();
-            used.extend(callees_used.get(name).unwrap().iter());
+            used.extend(callees_used);
             let availables = used;
-
             //before alloc
+            //记录alloc前的改变
+            let path = format!("{}_{}.txt", name, times);
+            self.print_asm(&path);
+            times += 1;
 
-            // Func::print_func(*func, "00.txt");
+            // 每次
             while regalloc::merge::merge_reg_with_constraints(
                 func.as_mut(),
                 &availables,
                 &reg_used_but_not_saved,
             ) {
-                // Func::print_func(*func, "00.txt");
+                //记录alloc后的状态
+                let path = format!("{}_{}.txt", name, times);
+                self.print_asm(&path);
+                times += 1;
             }
         }
     }

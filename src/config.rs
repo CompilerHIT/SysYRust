@@ -87,8 +87,9 @@ pub fn dump() {
 
     //统计的总属性输出到一个专门的文件中 (粒度到源文件)
     unsafe {
+        let performance_path = "performance_eval.txt";
         log_file!(
-            "performance_eval.txt",
+            performance_path,
             "sy_path:{}",
             SRC_PATH.as_ref().unwrap().clone()
         );
@@ -107,14 +108,14 @@ pub fn dump() {
                 .times
                 .get(&kind.to_string())
                 .unwrap();
-            log_file!("performance_eval.txt", "{}\t:{} times", kind, times);
+            log_file!(performance_path, "{}\t:{} times", kind, times);
         }
         //打印栈重排效果,
     }
 }
 
 ///not log ban
-pub fn dump_not_log() {
+pub fn dump_not_log(performance_path: &str) {
     macro_rules! log_file {
     ($file:expr, $($arg:tt)*) => {{
         use std::fs::OpenOptions;
@@ -133,7 +134,7 @@ pub fn dump_not_log() {
     //统计的总属性输出到一个专门的文件中 (粒度到源文件)
     unsafe {
         log_file!(
-            "performance_eval.txt",
+            performance_path,
             "sy_path:{}",
             SRC_PATH.as_ref().unwrap().clone()
         );
@@ -152,7 +153,7 @@ pub fn dump_not_log() {
                 .times
                 .get(&kind.to_string())
                 .unwrap();
-            log_file!("performance_eval.txt", "{}\t:{} times", kind, times);
+            log_file!(performance_path, "{}\t:{} times", kind, times);
         }
         //打印栈重排效果,
     }

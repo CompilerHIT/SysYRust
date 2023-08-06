@@ -98,5 +98,5 @@ fn run_main() {
 
     // 编译结束后打印记录的属性
     // config::dump();
-    config::dump_not_log(); //该行未使用debug模式包裹,一般情况下需要注释掉
+    config::dump_not_log("./performance_eval.txt"); //该行未使用debug模式包裹,一般情况下需要注释掉
 }
