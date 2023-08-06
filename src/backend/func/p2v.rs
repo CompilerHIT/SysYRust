@@ -36,6 +36,7 @@ impl Func {
         // self.print_func();
         //只有传参过程存在unchanged def,以及call指令可能存在unchanged def
         let mut unchanged_def: HashSet<(ObjPtr<LIRInst>, Reg)> = HashSet::new();
+        let mut path_build_unchagned_def = "unchanged_def.txt";
         for bb in self.blocks.iter() {
             for (i, inst) in bb.insts.iter().enumerate() {
                 if inst.get_type() != InstrsType::Call {
@@ -60,53 +61,36 @@ impl Func {
                     }
                 }
                 if used.len() != 0 {
-                    //TODO  (暂时不考虑 参数的加入不在同一个块中的情况)
-                    //used 传递到前文的情况
-                    let mut to_backward: LinkedList<(ObjPtr<BB>, Reg)> = LinkedList::new();
-                    let mut backwarded: HashSet<(ObjPtr<BB>, Reg)> = HashSet::new();
-                    for reg_used in used.iter() {
-                        for in_bb in bb.in_edge.iter() {
-                            if !in_bb.live_out.contains(reg_used) {
-                                continue;
-                            }
-                            // unreachable!();
-                            to_backward.push_back((*in_bb, *reg_used));
-                        }
-                    }
-                    while !to_backward.is_empty() {
-                        let item = to_backward.pop_front().unwrap();
-                        if backwarded.contains(&item) {
+                    //对于call指令使用到的寄存器,加入到列表中
+                    for reg in used {
+                        if !bb.live_in.contains(&reg) {
                             continue;
                         }
-                        backwarded.insert(item);
-                        let (bb, reg) = item;
-                        let mut keep_backward = true;
-                        for inst in bb.insts.iter().rev() {
-                            if inst.get_reg_def().contains(&reg) {
-                                unchanged_def.insert((*inst, reg));
-                                keep_backward = false;
-                                break;
+                        let mut to_backward = LinkedList::new();
+                        to_backward.push_back(*bb);
+                        let mut to_forward = LinkedList::new();
+                        let mut forward_passed = HashSet::new();
+                        let mut backward_passed = HashSet::new();
+                        let find = Func::search_forward_and_backward_until_def(
+                            &reg,
+                            &mut to_forward,
+                            &mut to_backward,
+                            &mut backward_passed,
+                            &mut forward_passed,
+                        );
+                        for (inst, if_def) in find {
+                            if if_def {
+                                unchanged_def.insert((inst, reg));
                             }
-                        }
-                        if !keep_backward {
-                            continue;
-                        }
-                        for in_bb in bb.in_edge.iter() {
-                            if !in_bb.live_out.contains(&reg) {
-                                continue;
-                            }
-                            to_backward.push_back((*in_bb, reg));
                         }
                     }
-                    debug_assert!(to_backward.is_empty());
                 }
-
                 let mut defined: HashSet<Reg> = inst.get_reg_def().iter().cloned().collect();
-                for defined in defined.iter() {
-                    unchanged_def.insert((*inst, *defined));
+                for reg in defined.iter().cloned() {
+                    unchanged_def.insert((*inst, reg));
                 }
                 let mut index = i + 1;
-                // 往后继块传递defined
+                // 往后继块传递defined,往后面传递的话可能会发现其他块中存在的unchange def,但是其他块中的也是regdef?
                 while index < bb.insts.len() && defined.len() != 0 {
                     let inst = *bb.insts.get(index).unwrap();
                     for reg in inst.get_reg_def() {
@@ -116,42 +100,39 @@ impl Func {
                     }
                     index += 1;
                 }
-                if defined.len() != 0 {
-                    // 按照目前的代码结构来说不应该存在
-                    // 说明define到了live out中(说明其他块使用了这个块中的计算出的a0)
-                    // 则其他块中计算出的a0也应该使用相同的物理寄存器号(不应该改变)
-                    let mut to_pass: LinkedList<(ObjPtr<BB>, Reg)> = LinkedList::new();
-                    for out_bb in bb.out_edge.iter() {
-                        for reg in defined.iter() {
-                            if !out_bb.live_in.contains(reg) {
-                                continue;
-                            }
-                            to_pass.push_back((*out_bb, *reg));
-                        }
+                if defined.len() == 0 {
+                    continue;
+                }
+                for reg in defined.iter() {
+                    //理论上当前实现对于函数返回值的使用不应该传递到后面的基本块
+                    debug_assert!(!bb.live_out.contains(reg));
+                }
+                for defined in defined.iter() {
+                    if !bb.live_out.contains(defined) {
+                        continue;
                     }
-                    let mut passed: HashSet<(ObjPtr<BB>, Reg)> = HashSet::new();
-                    while !to_pass.is_empty() {
-                        let (bb, reg) = to_pass.pop_front().unwrap();
-                        if passed.contains(&(bb, reg)) {
-                            continue;
-                        }
-                        passed.insert((bb, reg));
-                        let mut index = 0;
-                        while index < bb.insts.len() {
-                            let inst = bb.insts.get(index).unwrap();
-                            if inst.get_reg_def().contains(&reg) {
-                                break;
-                            }
-                            index += 1;
-                        }
-
-                        if index == bb.insts.len() {
-                            //说明可能传到live out中
-                            for out_bb in bb.out_edge.iter() {
-                                if out_bb.live_in.contains(&reg) {
-                                    to_pass.push_back((*out_bb, reg));
+                    //找到相关的指令
+                    let mut to_forward = LinkedList::new();
+                    let mut to_backward = LinkedList::new();
+                    to_backward.push_back(*bb);
+                    let mut backward_passed = HashSet::new();
+                    let mut forward_passed = HashSet::new();
+                    let find = Func::search_forward_and_backward_until_def(
+                        defined,
+                        &mut to_forward,
+                        &mut to_backward,
+                        &mut backward_passed,
+                        &mut forward_passed,
+                    );
+                    for (inst, if_def) in find.iter() {
+                        if *if_def {
+                            debug_assert!(|| -> bool {
+                                match inst.get_type() {
+                                    InstrsType::Call => true,
+                                    _ => false,
                                 }
-                            }
+                            }());
+                            unchanged_def.insert((*inst, *defined));
                         }
                     }
                 }
@@ -164,6 +145,11 @@ impl Func {
         let use_reg = last_inst.get_reg_use();
         debug_assert!(use_reg.len() == 1 || self.label != "main");
         if let Some(use_reg) = use_reg.get(0) {
+            debug_assert!(match last_inst.get_type() {
+                InstrsType::Ret(_) => true,
+                _ => false,
+            });
+            debug_assert!(use_reg.is_physic());
             let mut back_bbs: LinkedList<ObjPtr<BB>> = LinkedList::new();
             back_bbs.push_back(final_bb);
             let mut passed = HashSet::new();
@@ -201,14 +187,15 @@ impl Func {
     pub fn build_unchanged_use(&mut self) -> HashSet<(ObjPtr<LIRInst>, Reg)> {
         //首先根据call上下文初始化 unchanged use 和 unchanged def.这些告诉我们哪些寄存器不能够p2v
         let mut unchanged_use: HashSet<(ObjPtr<LIRInst>, Reg)> = HashSet::new();
+
         for bb in self.blocks.iter() {
             for (i, inst) in bb.insts.iter().enumerate() {
                 if inst.get_type() != InstrsType::Call {
                     continue;
                 }
                 let mut used: HashSet<Reg> = inst.get_reg_use().iter().cloned().collect();
-                for used in used.iter() {
-                    unchanged_use.insert((*inst, *used));
+                for used in used.iter().cloned() {
+                    unchanged_use.insert((*inst, used));
                 }
                 if i != 0 {
                     let mut index: i32 = i as i32 - 1;
@@ -228,48 +215,32 @@ impl Func {
                         index -= 1;
                     }
                 }
+
+                //used向前传递
                 if used.len() != 0 {
-                    //TODO  (暂时不考虑 参数的加入不在同一个块中的情况)
-                    //used 传递到前文的情况
-                    let mut to_backward: LinkedList<(ObjPtr<BB>, Reg)> = LinkedList::new();
-                    let mut backwarded: HashSet<(ObjPtr<BB>, Reg)> = HashSet::new();
-                    for reg_used in used.iter() {
-                        for in_bb in bb.in_edge.iter() {
-                            if !in_bb.live_out.contains(reg_used) {
-                                continue;
-                            }
-                            // unreachable!();
-                            to_backward.push_back((*in_bb, *reg_used));
-                        }
-                    }
-                    while !to_backward.is_empty() {
-                        let item = to_backward.pop_front().unwrap();
-                        if backwarded.contains(&item) {
+                    //对于call指令使用到的寄存器,加入到列表中
+                    for reg in used {
+                        if !bb.live_in.contains(&reg) {
                             continue;
                         }
-                        backwarded.insert(item);
-                        let (bb, reg) = item;
-                        let mut keep_backward = true;
-                        for inst in bb.insts.iter().rev() {
-                            if inst.get_reg_def().contains(&reg) {
-                                keep_backward = false;
-                                break;
+                        let mut to_backward = LinkedList::new();
+                        to_backward.push_back(*bb);
+                        let mut to_forward = LinkedList::new();
+                        let mut forward_passed = HashSet::new();
+                        let mut backward_passed = HashSet::new();
+                        let find = Func::search_forward_and_backward_until_def(
+                            &reg,
+                            &mut to_forward,
+                            &mut to_backward,
+                            &mut backward_passed,
+                            &mut forward_passed,
+                        );
+                        for (inst, if_def) in find {
+                            if !if_def {
+                                unchanged_use.insert((inst, reg));
                             }
-                            if inst.get_reg_use().contains(&reg) {
-                                unchanged_use.insert((*inst, reg));
-                            }
-                        }
-                        if !keep_backward {
-                            continue;
-                        }
-                        for in_bb in bb.in_edge.iter() {
-                            if !in_bb.live_out.contains(&reg) {
-                                continue;
-                            }
-                            to_backward.push_back((*in_bb, reg));
                         }
                     }
-                    debug_assert!(to_backward.is_empty());
                 }
 
                 let mut defined: HashSet<Reg> = inst.get_reg_def().iter().cloned().collect();
@@ -289,47 +260,34 @@ impl Func {
                     }
                     index += 1;
                 }
-                if defined.len() != 0 {
-                    // 按照目前的代码结构来说不应该存在
-                    // 说明define到了live out中(说明其他块使用了这个块中的计算出的a0)
-                    // 则其他块中计算出的a0也应该使用相同的物理寄存器号(不应该改变)
-                    let mut to_pass: LinkedList<(ObjPtr<BB>, Reg)> = LinkedList::new();
-                    for out_bb in bb.out_edge.iter() {
-                        for reg in defined.iter() {
-                            if !out_bb.live_in.contains(reg) {
-                                continue;
-                            }
-                            to_pass.push_back((*out_bb, *reg));
-                        }
-                    }
-                    let mut passed: HashSet<(ObjPtr<BB>, Reg)> = HashSet::new();
-                    while !to_pass.is_empty() {
-                        let (bb, reg) = to_pass.pop_front().unwrap();
-                        if passed.contains(&(bb, reg)) {
-                            continue;
-                        }
-                        passed.insert((bb, reg));
-                        let mut index = 0;
-                        while index < bb.insts.len() {
-                            let inst = bb.insts.get(index).unwrap();
-                            for use_reg in inst.get_reg_use() {
-                                if use_reg == reg {
-                                    unchanged_use.insert((*inst, reg));
-                                }
-                            }
-                            if inst.get_reg_def().contains(&reg) {
-                                break;
-                            }
-                            index += 1;
-                        }
 
-                        if index == bb.insts.len() {
-                            //说明可能传到live out中
-                            for out_bb in bb.out_edge.iter() {
-                                if out_bb.live_in.contains(&reg) {
-                                    to_pass.push_back((*out_bb, reg));
-                                }
-                            }
+                if defined.len() == 0 {
+                    continue;
+                }
+                for reg in defined.iter() {
+                    //理论上当前实现对于函数返回值的使用不应该传递到后面的基本块
+                    debug_assert!(!bb.live_out.contains(reg));
+                }
+                for defined in defined.iter() {
+                    if !bb.live_out.contains(defined) {
+                        continue;
+                    }
+                    //找到相关的指令
+                    let mut to_forward = LinkedList::new();
+                    let mut to_backward = LinkedList::new();
+                    to_backward.push_back(*bb);
+                    let mut backward_passed = HashSet::new();
+                    let mut forward_passed = HashSet::new();
+                    let find = Func::search_forward_and_backward_until_def(
+                        defined,
+                        &mut to_forward,
+                        &mut to_backward,
+                        &mut backward_passed,
+                        &mut forward_passed,
+                    );
+                    for (inst, if_def) in find.iter() {
+                        if !*if_def {
+                            unchanged_use.insert((*inst, *defined));
                         }
                     }
                 }
@@ -386,14 +344,12 @@ impl Func {
             // println!("{}", first_block.label.clone());
             let mut args: HashSet<Reg> = Reg::get_all_args();
             args.retain(|reg| live_in.contains(reg));
-
             // println!("{}{:?}", first_block.label, args);
             //对于参数往后传递
             for (index, inst) in first_block.insts.iter().enumerate() {
                 for reg_use in inst.get_reg_use() {
                     if args.contains(&reg_use) {
                         unchanged_use.insert((*inst, reg_use));
-                        // println!("unchange used:{:?}\t{}\n", inst, reg_use);
                     }
                 }
                 for reg_def in inst.get_reg_def() {
@@ -401,45 +357,31 @@ impl Func {
                 }
             }
             if args.len() != 0 {
-                //可能传递到后面
-                let mut to_pass: LinkedList<(ObjPtr<BB>, Reg)> = LinkedList::new();
+                //从该处往后搜索,搜索到的指令应该都是已经加入到的use，且不可能有def
                 for arg in args.iter() {
-                    for out_bb in first_block.out_edge.iter() {
-                        if !out_bb.live_in.contains(arg) {
-                            continue;
-                        }
-                        to_pass.push_back((*out_bb, *arg));
+                    // if liveou
+                    let mut to_forward: LinkedList<ObjPtr<BB>> = LinkedList::new();
+                    let mut to_backward = LinkedList::new();
+                    let mut forward_passed: HashSet<ObjPtr<BB>> = HashSet::new();
+                    let mut backward_passed: HashSet<ObjPtr<BB>> = HashSet::new();
+                    to_backward.push_back(first_block);
+                    let find = Func::search_forward_and_backward_until_def(
+                        arg,
+                        &mut to_forward,
+                        &mut to_backward,
+                        &mut backward_passed,
+                        &mut forward_passed,
+                    );
+                    for (inst, if_def) in find {
+                        //一定只有use
+                        debug_assert!(!if_def, "{},{:?}", arg, {
+                            Func::print_func(ObjPtr::new(self), "tmp2.txt");
+                            inst
+                        });
+                        //一定在本块中,也就是一定加入过了,
+                        debug_assert!(unchanged_use.contains(&(inst, *arg)));
                     }
                 }
-
-                let mut passed: HashSet<(ObjPtr<BB>, Reg)> = HashSet::new();
-                while !to_pass.is_empty() {
-                    let (bb, reg) = to_pass.pop_front().unwrap();
-                    if passed.contains(&(bb, reg)) {
-                        continue;
-                    }
-                    passed.insert((bb, reg));
-                    let mut if_forward = true;
-                    for inst in bb.insts.iter() {
-                        if inst.get_reg_use().contains(&reg) {
-                            unchanged_use.insert((*inst, reg));
-                        }
-                        if inst.get_reg_def().contains(&reg) {
-                            if_forward = false;
-                            break;
-                        }
-                    }
-                    if !if_forward {
-                        continue;
-                    }
-                    for out_bb in bb.out_edge.iter() {
-                        if !out_bb.live_in.contains(&reg) {
-                            continue;
-                        }
-                        to_pass.push_back((*out_bb, reg));
-                    }
-                }
-                debug_assert!(to_pass.is_empty());
             }
         }
 
@@ -456,9 +398,37 @@ impl Func {
         forward_passed: &mut HashSet<ObjPtr<BB>>,
     ) -> Vec<(ObjPtr<LIRInst>, bool)> {
         let mut find = Vec::new();
+        let mut new_to_forward: HashSet<ObjPtr<BB>> = to_forward.iter().cloned().collect();
+        let mut new_to_backward: HashSet<ObjPtr<BB>> = to_backward.iter().cloned().collect();
         loop {
-            let mut new_to_forward = HashSet::new();
-            let mut new_to_backward = HashSet::new();
+            let old_to_forward_len = new_to_forward.len();
+            let old_to_backward_len = new_to_backward.len();
+            for nf in new_to_forward.iter() {
+                for in_bb in nf.in_edge.iter() {
+                    if in_bb.live_out.contains(reg) && !backward_passed.contains(in_bb) {
+                        new_to_backward.insert(*in_bb);
+                    }
+                }
+            }
+            for nb in new_to_backward.iter() {
+                for out_bb in nb.out_edge.iter() {
+                    if out_bb.live_in.contains(reg) && !forward_passed.contains(out_bb) {
+                        new_to_forward.insert(*out_bb);
+                    }
+                }
+            }
+
+            if old_to_backward_len == new_to_backward.len()
+                && (old_to_forward_len == new_to_forward.len())
+            {
+                break;
+            }
+        }
+        to_forward.extend(new_to_forward.iter());
+        to_backward.extend(new_to_backward.iter());
+        loop {
+            new_to_forward.clear();
+            new_to_backward.clear();
             while !to_forward.is_empty() {
                 let bb = to_forward.pop_front().unwrap();
                 if forward_passed.contains(&bb) {
@@ -476,7 +446,7 @@ impl Func {
                     }
                     index += 1;
                 }
-                if index != bb.insts.len() {
+                if index < bb.insts.len() {
                     continue;
                 }
                 //读到尽头
@@ -571,50 +541,32 @@ impl Func {
         //使用栈的方式, 先入后出,后入先出的原则
         let mut forward_passed: HashSet<(ObjPtr<BB>, Reg)> = HashSet::new();
         let mut backward_passed: HashSet<(ObjPtr<BB>, Reg)> = HashSet::new();
+
+        Func::print_func(ObjPtr::new(&self), "before_rm_between_blocks.txt");
+        // let to_check = read_number_from_console();
+
         //进行流处理 (以front作为栈顶)
         //先解决块间问题
         for bb in self.blocks.iter() {
             for reg in bb.live_out.iter() {
+                // if reg.get_id() == to_check {
+                //     let a = 2;
+                // }
+
                 if !regs_to_decolor.contains(reg) {
                     continue;
                 }
                 if !reg.is_physic() {
                     continue;
                 }
-
                 if backward_passed.contains(&(*bb, *reg)) {
                     continue;
                 }
                 //剩下部分用来着色,不同的块间不同的寄存器的反复着色状态不同
                 //首先判断该reg是否能够p2v
-                let mut to_forward = HashSet::new();
-                let mut to_backward = HashSet::new();
-                to_backward.insert(*bb);
-                //找齐所有出入
-                loop {
-                    let old_backward_len = to_backward.len();
-                    let old_forward_len = to_forward.len();
-                    for back_bb in to_backward.iter() {
-                        for out_bb in back_bb.out_edge.iter() {
-                            if out_bb.live_in.contains(reg) {
-                                to_forward.insert(*out_bb);
-                            }
-                        }
-                    }
-                    for forward_bb in to_forward.iter() {
-                        for in_bb in forward_bb.in_edge.iter() {
-                            if in_bb.live_out.contains(reg) {
-                                to_backward.insert(*in_bb);
-                            }
-                        }
-                    }
-                    if old_backward_len == to_backward.len() && old_forward_len == to_forward.len()
-                    {
-                        break;
-                    }
-                }
-                let mut to_forward = to_forward.iter().cloned().collect();
-                let mut to_backward = to_backward.iter().cloned().collect();
+                let mut to_forward = LinkedList::new();
+                let mut to_backward = LinkedList::new();
+                to_backward.push_back(*bb);
                 let mut f_passed = HashSet::new();
                 let mut b_passed = HashSet::new();
                 let find = Func::search_forward_and_backward_until_def(
@@ -627,18 +579,21 @@ impl Func {
                 //把内容加入passed表
                 for bb in f_passed {
                     forward_passed.insert((bb, *reg));
+                    log_file!("btpassed.txt", "{}{}{}", self.label, bb.label, reg);
                 }
                 for bb in b_passed {
                     backward_passed.insert((bb, *reg));
+                    log_file!("fwpassed.txt", "{}{}{}", self.label, bb.label, reg);
                 }
                 let mut if_p2v = true;
                 for (inst, if_def) in find.iter() {
-                    if *if_def && unchanged_def.contains(&(*inst, *reg))
-                        || (!*if_def) && unchanged_use.contains(&(*inst, *reg))
+                    if (*if_def && unchanged_def.contains(&(*inst, *reg)))
+                        || ((!*if_def) && unchanged_use.contains(&(*inst, *reg)))
                     {
                         log_file!(
                             "unchanged_for_p2v_between_blocks.txt",
-                            "{}{}",
+                            "{}:{}{}",
+                            bb.label,
                             reg,
                             inst.as_ref()
                         );
@@ -646,23 +601,24 @@ impl Func {
                         break;
                     }
                 }
-                if if_p2v {
-                    let v_reg = Reg::init(reg.get_type());
-                    all_v_regs.insert(v_reg);
-                    for (inst, if_def) in find {
-                        p2v_actions.push((inst, *reg, v_reg, if_def));
-                        if if_def {
-                            inst.as_mut().replace_only_def_reg(reg, &v_reg);
-                        } else {
-                            inst.as_mut().replace_only_use_reg(reg, &v_reg);
-                        }
+                if !if_p2v {
+                    continue;
+                }
+                let v_reg = Reg::init(reg.get_type());
+                all_v_regs.insert(v_reg);
+                for (inst, if_def) in find {
+                    p2v_actions.push((inst, *reg, v_reg, if_def));
+                    if if_def {
+                        inst.as_mut().replace_only_def_reg(reg, &v_reg);
+                    } else {
+                        inst.as_mut().replace_only_use_reg(reg, &v_reg);
                     }
                 }
+                self.calc_live_base();
             }
         }
-        self.calc_live_base();
 
-        // Func::print_func(ObjPtr::new(&self), "p2v_tmp.txt");
+        Func::print_func(ObjPtr::new(&self), "p2v_tmp.txt");
         //然后处理块内的物理寄存器
         //现在对于块内的物理寄存器没有能够超出范围的了
         for bb in self.blocks.iter() {
@@ -698,10 +654,15 @@ impl Func {
                         .replace_only_def_reg(&reg_def, p2v.get(&reg_def).unwrap());
                 }
             }
-
             //对于最后存活的p2v寄存器
             for (p_reg, _) in p2v {
-                debug_assert!(!bb.live_out.contains(&p_reg), "{},{}", bb.label, p_reg);
+                debug_assert!(
+                    !bb.live_out.contains(&p_reg),
+                    "{},{},{}",
+                    self.label,
+                    bb.label,
+                    p_reg
+                );
             }
         }
         (all_v_regs, p2v_actions)
@@ -751,6 +712,29 @@ impl Func {
                 inst.as_mut().replace_only_def_reg(v_reg, p_reg);
             } else {
                 inst.as_mut().replace_only_use_reg(v_reg, p_reg);
+            }
+        }
+    }
+}
+
+use std::io::{self, BufRead};
+
+fn read_number_from_console() -> i32 {
+    let stdin = io::stdin();
+    let mut handle = stdin.lock();
+
+    loop {
+        let mut input = String::new();
+        println!("请输入一个整数：");
+
+        match handle.read_line(&mut input) {
+            Ok(_) => match input.trim().parse::<i32>() {
+                Ok(number) => return number,
+                Err(_) => println!("输入不是一个有效的整数，请重新输入。"),
+            },
+            Err(error) => {
+                eprintln!("读取输入失败：{}", error);
+                std::process::exit(1);
             }
         }
     }

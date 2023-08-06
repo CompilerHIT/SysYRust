@@ -120,7 +120,9 @@ pub fn merge_reg_with_constraints(
     /*
     p2v 并记录 去色动作序列
      */
-    let (_, p2v_actions) = func.p2v(&Reg::get_all_recolorable_regs());
+    let to_recolors = Reg::get_all_recolorable_regs();
+    println!("{}", to_recolors.len());
+    let (_, p2v_actions) = func.p2v(&to_recolors);
 
     /*
     准备待合并列表
@@ -220,11 +222,7 @@ fn build_constraints(
             let func = inst.get_func_name().unwrap();
             let constraint: HashSet<Reg> =
                 regs_used_but_not_saved.get(func.as_str()).unwrap().clone();
-            let mut live_now = live_now.clone();
-            if let Some(def_reg) = inst.get_def_reg() {
-                live_now.remove(&def_reg);
-            }
-
+            let live_now = live_now.clone();
             for r in live_now.iter().filter(|reg| !reg.is_physic()) {
                 if !constraints.contains_key(r) {
                     constraints.insert(*r, constraint.clone());

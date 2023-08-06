@@ -56,12 +56,14 @@ impl AsmModule {
 
         // self.print_func();
         self.realloc_pre_split_func();
-        self.print_func();
+        // self.print_func();
         self.remove_unuse_inst_suf_alloc();
         // self.print_func();
 
         self.handle_spill_v3(pool);
         // self.print_func();
+
+        self.analyse_callee_regs_to_saved();
 
         self.remove_unuse_inst_suf_alloc();
 
@@ -86,9 +88,9 @@ impl AsmModule {
         let used_but_not_saved =
             AsmModule::build_used_but_not_saveds(&callers_used, &callees_used, callees_be_saved);
         self.handle_call_v4(pool, &callers_used, &callees_used, callees_be_saved);
-        self.remove_external_func(); //在handle call之前调用,删掉前面往name func中加入的external func
 
         self.rm_inst_suf_handle_call(pool, &used_but_not_saved);
+
         self.rearrange_stack_slot();
         self.update_array_offset(pool);
 
@@ -96,6 +98,8 @@ impl AsmModule {
         self.rm_inst_suf_update_array_offset(pool, &used_but_not_saved);
 
         self.build_stack_info(f);
+        // println!("5");
+        self.final_realloc(pool);
         // self.print_func();
         //删除无用的函数
     }

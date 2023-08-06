@@ -20,6 +20,7 @@ impl AsmModule {
     pub fn rearrange_stack_slot(&mut self) {
         self.name_func
             .iter()
+            .filter(|(_, f)| !f.is_extern)
             .for_each(|(_, func)| func.as_mut().rearrange_stack_slot());
     }
 
@@ -76,7 +77,9 @@ impl AsmModule {
     /// 计算栈空间,进行ra,sp,callee 的保存和恢复
     pub fn build_stack_info(&mut self, f: &mut File) {
         for (name, func) in self.name_func.iter() {
-            debug_assert!(!func.is_extern);
+            if func.is_extern {
+                continue;
+            }
             if func.label == "main" {
                 func.as_mut().callee_saved.clear(); // main函数不需要保存任何callee saved
             } else {
@@ -95,7 +98,9 @@ impl AsmModule {
 
     pub fn update_array_offset(&mut self, pool: &mut BackendPool) {
         for (_, func) in self.name_func.iter() {
-            debug_assert!(!func.is_extern);
+            if func.is_extern {
+                continue;
+            }
             func.as_mut().update_array_offset(pool);
         }
     }

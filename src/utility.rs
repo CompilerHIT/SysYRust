@@ -33,6 +33,23 @@ macro_rules! log_file {
     }}};
 }
 
+///使用新建方式写入文件
+#[macro_export]
+macro_rules! log_file_new {
+    () => {
+        ($file:expr, $($arg:tt)*) => {{ #[cfg(debug_assertions)] {
+            use std::fs::OpenOptions;
+            use std::io::Write;
+
+            let mut file = OpenOptions::new()
+            .create(true)
+            .open($file)
+            .expect("Failed to open log file");
+            writeln!(file, $($arg)*).expect("Failed to write to log file");
+        }}};
+    };
+}
+
 // 该宏用来进行不换行的文件log
 #[macro_export]
 macro_rules! log_file_uln {
