@@ -144,7 +144,7 @@ pub fn alloc_with_v_interference_graph_and_base_available(
         return Some(fat);
     }
 
-    // return None;
+    return None;
     //发现一阶段方案不足以完美分配,对于剩下的活寄存器,进一步搜索试探完美分配
     log_file!("unbest_alloc_for_pp.txt", "{:?}", to_colors);
     let mut pre_colors: HashMap<i32, i32> = HashMap::new();
@@ -162,8 +162,11 @@ pub fn alloc_with_v_interference_graph_and_base_available(
             }
 
             //从中去掉特殊颜色
-            let special = RegUsedStat::init_unspecial_regs_without_s0();
+            let special = RegUsedStat::init_unspecial_regs();
             nb_availables.inter(&special);
+
+            //
+            todo!();
 
             //然后在nb中找一个可用的颜色来着色
             if !nb_availables.is_available(to_color.get_type()) {
