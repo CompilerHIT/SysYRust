@@ -22,38 +22,89 @@ pub fn auto_paralellization(
         let loop_list = loop_map.get(&name).unwrap();
         let mut op = HashSet::new();
         let mut unop = HashSet::new();
+        let mut parallelized = HashSet::new();
         let mut analyzer = SCEVAnalyzer::new();
         analyzer.set_loop_list(loop_list.get_loop_list().clone());
 
-        for loop_info in loop_list.get_loop_list().iter() {
-            if !op.contains(loop_info) && !unop.contains(loop_info) {
-                continue;
-            }
+        loop {
+            let mut unvisited = false;
+            for loop_info in loop_list.get_loop_list().iter() {
+                if op.contains(loop_info) || unop.contains(loop_info) {
+                    continue;
+                }
 
-            // 从当前循环向外层遍历，找到最外层未检测过的循环
-            let mut current_loop = *loop_info;
-            while let Some(x) = current_loop.get_parent_loop() {
-                if !op.contains(&current_loop) && !unop.contains(&current_loop) {
-                    current_loop = x;
-                } else {
-                    break;
+                unvisited = true;
+                // 从当前循环向外层遍历，找到最外层未检测过的循环
+                let mut current_loop = *loop_info;
+                while let Some(x) = current_loop.get_parent_loop() {
+                    if !op.contains(&x) && !unop.contains(&x) {
+                        current_loop = x;
+                    } else {
+                        break;
+                    }
+                }
+
+                // 从最外层循环开始检测是否可并行化
+                if check_parallelization(
+                    current_loop,
+                    &call_op,
+                    &mut op,
+                    &mut unop,
+                    Vec::new(),
+                    Vec::new(),
+                    &mut analyzer,
+                ) {
+                    parallelized_insert(current_loop, &mut parallelized);
+                    parallelize(current_loop, pools);
                 }
             }
 
-            // 从最外层循环开始检测是否可并行化
-            if check_parallelization(
-                current_loop,
-                &call_op,
-                &mut op,
-                &mut unop,
-                Vec::new(),
-                Vec::new(),
-                &mut analyzer,
-            ) {
-                parallelize(current_loop, &mut op, &mut unop, pools);
+            if !unvisited {
+                break;
             }
         }
+        debug_assert!(op.is_disjoint(&unop));
+
+        debug_assert!(
+            loop_list
+                .get_loop_list()
+                .iter()
+                .all(|x| op.contains(x) || unop.contains(x)),
+            "loop not in op or unop: {:?}",
+            loop_list
+                .get_loop_list()
+                .iter()
+                .find(|x| !op.contains(x) && !unop.contains(x))
+                .unwrap()
+        );
+
+        // 将能够并行但还未加入到并行化列表的循环加入到并行化列表
+        op.iter().for_each(|x| {
+            if !parallelized.contains(x) {
+                let mut current_loop = *x;
+                while let Some(x) = current_loop.get_parent_loop() {
+                    if op.contains(&x) && !parallelized.contains(&x) {
+                        current_loop = x;
+                    } else {
+                        break;
+                    }
+                }
+                parallelized_insert(current_loop, &mut parallelized);
+                parallelize(current_loop, pools);
+            }
+        });
+
+        debug_assert_eq!(op, parallelized);
     });
+}
+
+fn parallelized_insert(loop_info: ObjPtr<LoopInfo>, parallelized: &mut HashSet<ObjPtr<LoopInfo>>) {
+    let flag = parallelized.insert(loop_info);
+    debug_assert!(flag);
+    loop_info
+        .get_sub_loops()
+        .iter()
+        .for_each(|x| parallelized_insert(*x, parallelized));
 }
 
 fn check_parallelization(
@@ -85,7 +136,10 @@ fn check_parallelization(
                 if inst.get_ptr().get_kind() == InstKind::Gep {
                     let gep = inst.get_ptr();
                     let array = get_gep_ptr(gep);
-                    debug_assert_eq!(array.get_kind(), InstKind::Alloca(0));
+                    debug_assert!(
+                        array.get_kind() == InstKind::Alloca(0)
+                            || array.is_param() && array.get_ir_type().is_pointer()
+                    );
                     if let Some(x) = read_map.get_mut(&array) {
                         x.insert(gep);
                     } else {
@@ -102,7 +156,10 @@ fn check_parallelization(
 
                 let gep = inst.get_dest();
                 let array = get_gep_ptr(gep);
-                debug_assert_eq!(array.get_kind(), InstKind::Alloca(0));
+                debug_assert!(
+                    array.get_kind() == InstKind::Alloca(0)
+                        || array.is_param() && array.get_ir_type().is_pointer()
+                );
                 if let Some(x) = write_map.get_mut(&array) {
                     x.insert(gep);
                 } else {
@@ -110,7 +167,7 @@ fn check_parallelization(
                 }
             }
             InstKind::Call(callee) => {
-                if call_op.contains(&callee) {
+                if !call_op.contains(&callee) {
                     flag = false;
                     return;
                 }
@@ -136,7 +193,7 @@ fn check_parallelization(
         iv_set.insert(inst);
         inst = inst.get_next();
     }
-    if iv_set.len() > 1 {
+    if iv_set.len() != 1 {
         unop.insert(current_loop);
         return false;
     }
@@ -227,6 +284,7 @@ fn check_parallelization(
                             .map(|(i, x)| (x.clone(), bound[i]))
                             .collect(),
                     ) {
+                        unop.insert(current_loop);
                         return false;
                     }
                 }
@@ -248,6 +306,7 @@ fn check_parallelization(
                             .collect(),
                     )
                 {
+                    unop.insert(current_loop);
                     return false;
                 }
             }
@@ -276,9 +335,7 @@ fn check_parallelization(
 
 fn parallelize(
     current_loop: ObjPtr<LoopInfo>,
-    op: &mut HashSet<ObjPtr<LoopInfo>>,
-    unop: &mut HashSet<ObjPtr<LoopInfo>>,
     pools: &mut (&mut ObjPool<BasicBlock>, &mut ObjPool<Inst>),
 ) {
-    println!("parallelize loop: {:?}", current_loop);
+    todo!()
 }
