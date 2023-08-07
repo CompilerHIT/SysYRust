@@ -72,7 +72,7 @@ impl AsmModule {
 
         self.anaylyse_for_handle_call_v4();
 
-        let is_opt = true;
+        let is_opt = false;
         if is_opt {
             //TODO
             self.split_func(pool);
