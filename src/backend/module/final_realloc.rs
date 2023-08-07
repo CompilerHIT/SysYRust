@@ -31,6 +31,7 @@ impl AsmModule {
             let callees_used = callees_used.get(name).unwrap().clone();
             let mut used = callers_used.clone();
             used.extend(callees_used);
+            used.insert(Reg::get_s0());
             let availables = used;
             //before alloc
             //记录alloc前的改变
@@ -44,10 +45,12 @@ impl AsmModule {
                 &availables,
                 &reg_used_but_not_saved,
             ) {
+                //暂时只进行一次realloc
                 //记录alloc后的状态
-                let path = format!("{}_{}.txt", name, times);
+                let path = format!("{}_{}_after.txt", name, times);
                 self.print_asm(&path);
                 times += 1;
+                break;
             }
         }
     }

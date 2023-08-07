@@ -190,18 +190,14 @@ impl Func {
 
         let this_func = ObjPtr::new(&self);
         for bb in self.blocks.iter() {
-            let mut phy_mems_for_handle_call = HashMap::new();
             //每个固定的中转物理寄存器使用相同的栈空间,以方便后面的无用读写删除优化
-            let mut build_tmp_slot = |func: &mut Func, reg: &Reg| -> i32 {
-                if phy_mems_for_handle_call.contains_key(reg) {
-                    return *phy_mems_for_handle_call.get(reg).unwrap();
-                }
+            //每次中转的时候使用新建的虚拟空间(以减少虚拟空间之间的冲突,以方便后面的栈重排)
+            let build_tmp_slot = |func: &mut Func, reg: &Reg| -> i32 {
                 let back = func.stack_addr.back().unwrap();
                 let pos = back.get_pos() + back.get_size();
                 let new_stack_slot = StackSlot::new(pos, ADDR_SIZE);
                 func.stack_addr.push_back(new_stack_slot);
                 let new_pos = new_stack_slot.get_pos();
-                phy_mems_for_handle_call.insert(*reg, new_pos);
                 new_pos
             };
             let mut new_insts = Vec::new();
