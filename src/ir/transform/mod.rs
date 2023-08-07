@@ -1,3 +1,4 @@
+use super::function::Function;
 use super::{basicblock::BasicBlock, instruction::Inst, module::Module};
 use super::{dump_now, tools::*};
 use crate::utility::ObjPool;
@@ -58,15 +59,45 @@ pub fn optimizer_run(
         hoist::hoist(module, optimize_flag, &mut pools);
 
         // 循环优化
-        loop_operation::loop_optimize(module, &mut pools, false);
-        simplify_cfg::simplify_cfg_run(module, &mut pools);
-        functional_optimizer(module, &mut pools, optimize_flag);
+        //loop_operation::loop_optimize(module, &mut pools, false);
+        //simplify_cfg::simplify_cfg_run(module, &mut pools);
+        //functional_optimizer(module, &mut pools, optimize_flag);
 
         // TODO: 性能优化
 
         // 再做一次
         functional_optimizer(module, &mut pools, optimize_flag);
     }
+}
+
+/// 增加一些调用后端函数的接口
+pub fn add_interface(module: &mut Module, func_pool: &mut ObjPool<Function>, optimize_flag: bool) {
+    if !optimize_flag {
+        return;
+    }
+
+    // 增加自动并行化接口
+
+    // void hitsz_thread_init();
+    // 初始化线程池，在main函数中调用一次即可
+    let thread_init = func_pool.new_function();
+    module.push_function("hitsz_thread_init".to_string(), thread_init);
+
+    // int hitsz_thread_create();
+    // 创建一个新的线程，返回线程id
+    let mut thread_create = func_pool.new_function();
+    thread_create.set_return_type(super::ir_type::IrType::Int);
+    module.push_function("hitsz_thread_create".to_string(), thread_create);
+
+    // void hitsz_thread_join();
+    // 等待线程结束，只有0号线程调用
+    let thread_join = func_pool.new_function();
+    module.push_function("hitsz_thread_join".to_string(), thread_join);
+
+    // void hitsz_thread_exit();
+    // 线程退出，非0号线程调用
+    let thread_exit = func_pool.new_function();
+    module.push_function("hitsz_thread_exit".to_string(), thread_exit);
 }
 
 fn functional_optimizer(
