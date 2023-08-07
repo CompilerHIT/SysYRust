@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::{ir::{module::Module, basicblock::BasicBlock, analysis::{downstream_tree::{ DownStreamTree, self}, dominator_tree::{calculate_dominator, self, DominatorTree}}, tools::{func_process, replace_inst}, instruction::{Inst, InstKind}, transform::{phi_optimizer::{self, phi_run}, gvn_hoist::hoist}, dump_now}, utility::{ObjPtr, ObjPool}};
+use crate::{ir::{module::Module, basicblock::BasicBlock, analysis::{downstream_tree::{ DownStreamTree, self}, dominator_tree::{calculate_dominator, self, DominatorTree}}, tools::{func_process, replace_inst}, instruction::{Inst, InstKind}, transform::{phi_optimizer::{self, phi_run}, gvn_hoist::hoist, sink::sink}, dump_now}, utility::{ObjPtr, ObjPool}};
 
 use super::{global_value_numbering::{self, Congruence}, gvn_hoist::{make_same_inst, hoist_group}, delete_empty_block::{replace_bb_with_bbs, block_opt}};
 
@@ -32,6 +32,8 @@ pub fn pre(module: &mut Module, opt_option: bool,pools: &mut (&mut ObjPool<Basic
     dump_now(&module, "pre.ll");
     hoist(module, opt_option, pools);
     dump_now(&module, "hoist.ll");
+    sink(module, pools);
+    dump_now(&module, "sink.ll");
     println!("pre finished");
 }
 
