@@ -25,7 +25,7 @@ impl BackendPass {
 
     pub fn run_pass(&mut self, pool: &mut BackendPool) {
         self.block_pass_pre_clear(pool);
-        self.clear_pass(pool);
+        // self.clear_pass(pool);
         self.peephole_pass(pool);
     }
 

@@ -1,5 +1,5 @@
 use super::*;
-
+use crate::log;
 ///一些进行分析需要用到的工具
 impl AsmModule {
     pub fn analyse_inst_with_live_now(
@@ -217,5 +217,18 @@ impl AsmModule {
     pub fn print_asm(&mut self, path: &str) {
         let mut file = File::create(path).unwrap();
         self.generate_row_asm(&mut file);
+    }
+}
+
+impl AsmModule {
+    pub fn log_insts(&self) {
+        self.name_func.iter().for_each(|(_, func)| {
+            func.blocks.iter().for_each(|b| {
+                log!("block: {}", b.label);
+                b.insts.iter().for_each(|inst| {
+                    log!("inst: {:?}", inst.as_ref());
+                })
+            })
+        });
     }
 }

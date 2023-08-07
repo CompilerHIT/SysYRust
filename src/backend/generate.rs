@@ -1,5 +1,5 @@
 use super::{instrs::*, operand::is_imm_12bs};
-use crate::backend::operand::ToString;
+use crate::{backend::operand::ToString, log};
 use std::fs::File;
 impl GenerateAsm for LIRInst {
     fn generate(&mut self, context: ObjPtr<Context>, f: &mut File) {
@@ -84,7 +84,10 @@ impl GenerateAsm for LIRInst {
                 let mut is_float = false;
                 let dst = match self.get_dst() {
                     Operand::Reg(reg) => reg.to_string(row),
-                    _ => panic!("dst of single op must be reg, to improve"),
+                    _ => {
+                        log!("{:?}", self);
+                        panic!("dst of single op must be reg, to improve")
+                    },
                 };
                 let src = match self.get_lhs() {
                     Operand::Reg(reg) => {
