@@ -301,15 +301,18 @@ impl BlockAllocStat {
 }
 
 impl RegUsedStat {
+    /// 获取除了 x0-x5以外的寄存器集合
+    /// x0-x5: zero,ra,sp,gp,tp
     pub const fn init_unspecial_regs() -> RegUsedStat {
         RegUsedStat {
-            iregs_used: 0b_0000_0000_0000_0000_0000_0001_0001_1111,
+            iregs_used: 0b_0000_0000_0000_0000_0000_0000_0001_1111,
             fregs_used: 0,
         }
     }
+    //获取除了x0-x5以及s0以及外的寄存器的集合
     pub const fn init_unspecial_regs_without_s0() -> RegUsedStat {
         RegUsedStat {
-            iregs_used: 0b_0000_0000_0000_0000_0000_0000_0001_1111,
+            iregs_used: 0b_0000_0000_0000_0000_0000_0001_0001_1111,
             fregs_used: 0b_0000_0000_0000_0000_0000_0000_0000_0000,
         }
     }
@@ -365,8 +368,8 @@ mod test_regusestat {
 
     #[test]
     fn test_unspecial() {
-        let mut reg_use_stat = RegUsedStat::init_unspecial_regs();
-        for reg in Reg::get_all_specials() {
+        let reg_use_stat = RegUsedStat::init_unspecial_regs();
+        for reg in Reg::get_all_specials_with_s0() {
             assert!(!reg_use_stat.is_available_reg(reg.get_color()));
         }
         for reg in Reg::get_all_not_specials() {

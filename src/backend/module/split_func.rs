@@ -5,7 +5,7 @@ use crate::backend::regalloc::structs::RegUsedStat;
 use super::*;
 
 impl AsmModule {
-    pub fn split_func_v4(&mut self, pool: &mut BackendPool) {
+    pub fn split_func(&mut self, pool: &mut BackendPool) {
         //建立寄存器使用情况表,使用一个reg_use_stat的序列化方法得到
         let main_func = self.name_func.get("main").unwrap();
         let mut new_name_func = HashMap::new();
@@ -25,6 +25,7 @@ impl AsmModule {
         to_process.push_back(*main_func);
         while !to_process.is_empty() {
             let caller = to_process.pop_front().unwrap();
+            caller.calc_live_base();
             AsmModule::analyse_inst_with_live_now(&caller, &mut |inst, live_now| {
                 if inst.get_type() != InstrsType::Call {
                     return;
@@ -50,6 +51,7 @@ impl AsmModule {
                 //处理论外寄存器以及专用寄存器
                 all_callers.remove(&Reg::get_ra());
                 all_callees.remove(&&Reg::get_sp());
+                all_callees.remove(&Reg::get_s0());
 
                 let mut bad_callees = all_callees.clone();
                 bad_callees.retain(|reg| live_now.contains(reg));

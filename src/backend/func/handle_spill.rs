@@ -180,7 +180,7 @@ impl Func {
          -> Reg {
             debug_assert!(!rentors.contains_key(rentor));
             //获取所有非特殊寄存器
-            let mut regs = RegUsedStat::init_unspecial_regs();
+            let mut regs = RegUsedStat::init_unspecial_regs_without_s0();
             //然后禁止当前指令使用到的物理寄存器,以及当前指令涉及的虚拟寄存器使用到的寄存器
             for reg in inst.get_regs() {
                 if reg.is_physic() {

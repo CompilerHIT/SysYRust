@@ -176,7 +176,7 @@ impl Func {
                 available_tmp_regs.release_reg(reg.get_color());
             }
         }
-        for reg in Reg::get_all_specials() {
+        for reg in Reg::get_all_specials_with_s0() {
             available_tmp_regs.use_reg(reg.get_color());
         }
 

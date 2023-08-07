@@ -72,10 +72,10 @@ impl AsmModule {
 
         self.anaylyse_for_handle_call_v4();
 
-        let is_opt = true;
+        // let is_opt = true;
         if is_opt {
             //TODO
-            self.split_func_v4(pool);
+            self.split_func(pool);
             self.build_own_call_map();
             self.analyse_callee_regs_to_saved();
             self.analyse_caller_regs_to_saved();

@@ -339,14 +339,23 @@ impl Reg {
         out
     }
 
-    ///获取所有的特殊寄存器
-    pub fn get_all_specials() -> HashSet<Reg> {
+    ///获取所有的特殊寄存器 以及 s0
+    pub fn get_all_specials_with_s0() -> HashSet<Reg> {
         let mut out = HashSet::new();
         for reg in 0..=4 {
             let reg = Reg::from_color(reg);
             out.insert(reg);
         }
         out.insert(Reg::get_s0());
+        out
+    }
+    ///获取所有的特殊寄存器,包括x0-x5,不包括s0
+    pub fn get_all_specials() -> HashSet<Reg> {
+        let mut out = HashSet::new();
+        for reg in 0..=4 {
+            let reg = Reg::from_color(reg);
+            out.insert(reg);
+        }
         out
     }
 }
