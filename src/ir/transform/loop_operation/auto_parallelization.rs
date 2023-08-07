@@ -1,7 +1,11 @@
 use std::collections::HashSet;
 
 use crate::ir::{
-    analysis::scev::{scevexp::SCEVExp, SCEVAnalyzer},
+    analysis::{
+        call_optimize::call_optimize,
+        dependent_analyse::dependency_check,
+        scev::{scevexp::SCEVExp, SCEVAnalyzer},
+    },
     instruction::InstKind,
 };
 
@@ -12,6 +16,7 @@ pub fn auto_paralellization(
     loop_map: &mut HashMap<String, LoopList>,
     pools: &mut (&mut ObjPool<BasicBlock>, &mut ObjPool<Inst>),
 ) {
+    let call_op = call_optimize(module);
     func_process(module, |name, _| {
         // 遍历所有的循环，从循环外层向内层遍历
         let loop_list = loop_map.get(&name).unwrap();
@@ -38,6 +43,7 @@ pub fn auto_paralellization(
             // 从最外层循环开始检测是否可并行化
             if check_parallelization(
                 current_loop,
+                &call_op,
                 &mut op,
                 &mut unop,
                 Vec::new(),
@@ -52,6 +58,7 @@ pub fn auto_paralellization(
 
 fn check_parallelization(
     mut current_loop: ObjPtr<LoopInfo>,
+    call_op: &HashSet<String>,
     op: &mut HashSet<ObjPtr<LoopInfo>>,
     unop: &mut HashSet<ObjPtr<LoopInfo>>,
     iv: Vec<ObjPtr<SCEVExp>>,
@@ -100,6 +107,12 @@ fn check_parallelization(
                     x.insert(gep);
                 } else {
                     write_map.insert(array, HashSet::new());
+                }
+            }
+            InstKind::Call(callee) => {
+                if call_op.contains(&callee) {
+                    flag = false;
+                    return;
                 }
             }
             _ => {}
@@ -207,13 +220,58 @@ fn check_parallelization(
         if let Some(write_set) = write_map.get(array) {
             for re in read_set.iter() {
                 for wr in write_set.iter() {
-                    todo!()
+                    if dependency_check(
+                        [*re, *wr],
+                        iv.iter()
+                            .enumerate()
+                            .map(|(i, x)| (x.clone(), bound[i]))
+                            .collect(),
+                    ) {
+                        return false;
+                    }
                 }
             }
         }
     }
 
-    todo!()
+    // 2. 写写冲突
+    for (array, write_set) in write_map.iter() {
+        let write_set2 = write_map.get(array).unwrap();
+        for wr in write_set.iter() {
+            for wr2 in write_set2.iter() {
+                if wr != wr2
+                    && dependency_check(
+                        [*wr, *wr2],
+                        iv.iter()
+                            .enumerate()
+                            .map(|(i, x)| (x.clone(), bound[i]))
+                            .collect(),
+                    )
+                {
+                    return false;
+                }
+            }
+        }
+    }
+
+    // 检查子循环是否可并行化
+    for child in current_loop.get_sub_loops().iter() {
+        if !check_parallelization(
+            *child,
+            call_op,
+            op,
+            unop,
+            iv.clone(),
+            bound.clone(),
+            analyzer,
+        ) {
+            unop.insert(current_loop);
+            return false;
+        }
+    }
+
+    op.insert(current_loop);
+    true
 }
 
 fn parallelize(
@@ -222,5 +280,5 @@ fn parallelize(
     unop: &mut HashSet<ObjPtr<LoopInfo>>,
     pools: &mut (&mut ObjPool<BasicBlock>, &mut ObjPool<Inst>),
 ) {
-    unimplemented!()
+    println!("parallelize loop: {:?}", current_loop);
 }
