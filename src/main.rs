@@ -79,6 +79,7 @@ fn run_main() {
     drop(compunit);
 
     // ir优化
+    sysylib::ir::add_interface(&mut module, &mut pool_func, o1_option);
     sysylib::ir::optimizer_run(&mut module, (&mut pool_bb, &mut pool_inst), o1_option);
     let output2 = "row_asm.log";
 
