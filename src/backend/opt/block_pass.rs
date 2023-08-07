@@ -12,15 +12,15 @@ impl BackendPass {
         // 在直接跳转到另一个块, 并且跳转目标块没有其它前继的情况下, 可以直接把两个块合成为一个大块
         self.fuse_basic_block();
         // 部分上提：前一个块没有b型指令，不会破坏块结构则上提，fuse_muti2imm_br的特殊处理
-        // self.part_fuse();
+        self.part_fuse(pool);
     }
-    pub fn block_pass(&mut self) {
+    pub fn block_pass(&mut self, pool: &mut BackendPool) {
         // 若branch的下一条jump指令的目标块，只有一个前驱，则将该jump指令删除，并将其合并到这个块中
         self.merge_br_jump();
         // 如果branch和其紧邻的jump语句的目标块相同，则将jump语句删除
         self.resolve_merge_br();
         // 处理fuse_imm_br中，中间的基本块有多个前继的情况
-        self.fuse_muti2imm_br();
+        self.fuse_muti2imm_br(pool);
         // 对于指令数量较少的那些块，复制上提
         // self.copy_exec();
         // 清除空块(包括entry块)
@@ -87,7 +87,7 @@ impl BackendPass {
         });
     }
 
-    fn fuse_muti2imm_br(&mut self) {
+    fn fuse_muti2imm_br(&mut self, pool: &mut BackendPool) {
         self.module.name_func.iter().for_each(|(_, func)| {
             let mut imm_br_pred: Vec<(ObjPtr<BB>, HashSet<ObjPtr<BB>>)> = vec![];
             func.blocks.iter().for_each(|block| {
@@ -123,7 +123,11 @@ impl BackendPass {
                     adjust_after_in(after, prevs.clone(), &String::from(""));
                 }
                 for prev in prevs.iter() {
-                    let mut insts = block.insts.clone();
+                    let mut insts = block
+                        .insts
+                        .iter()
+                        .map(|&x| pool.put_inst(x.as_ref().clone()))
+                        .collect();
                     prev.as_mut().insts.pop();
                     prev.as_mut().push_back_list(&mut insts);
                     adjust_prev_out(prev.clone(), vec![after.clone()], &block.label);
@@ -139,7 +143,7 @@ impl BackendPass {
         })
     }
 
-    fn part_fuse(&mut self) {
+    fn part_fuse(&mut self, pool: &mut BackendPool) {
         self.module.name_func.iter().for_each(|(_, func)| {
             let mut imm_br_pred: Vec<(ObjPtr<BB>, HashSet<ObjPtr<BB>>)> = vec![];
             func.blocks.iter().for_each(|block| {
@@ -167,15 +171,18 @@ impl BackendPass {
             imm_br_pred.iter().for_each(|(block, prevs)| {
                 let prevs = prevs.iter().map(|x| *x).collect::<Vec<_>>();
                 let after = block.get_after()[0];
-                if prevs.len() == block.get_prev().len()
-                {
+                if prevs.len() == block.get_prev().len() {
                     adjust_after_in(after, prevs.clone(), &block.label);
                     block.as_mut().out_edge.clear();
                 } else {
                     adjust_after_in(after, prevs.clone(), &String::from(""));
                 }
                 for prev in prevs.iter() {
-                    let mut insts = block.insts.clone();
+                    let mut insts = block
+                        .insts
+                        .iter()
+                        .map(|&x| pool.put_inst(x.as_ref().clone()))
+                        .collect();
                     prev.as_mut().insts.pop();
                     prev.as_mut().push_back_list(&mut insts);
                     adjust_prev_out(prev.clone(), vec![after.clone()], &block.label);
@@ -467,7 +474,6 @@ fn adjust_prev_out(block: ObjPtr<BB>, afters: Vec<ObjPtr<BB>>, clear_label: &Str
 fn replace_first_block(block: ObjPtr<BB>, func: ObjPtr<Func>) {
     assert!(block.get_after().len() == 1);
     let after = block.get_after()[0].clone();
-    let aafter = after.get_after();
     let mut index = 0;
     loop {
         if index >= func.blocks.len() {
