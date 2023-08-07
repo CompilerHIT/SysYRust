@@ -3,61 +3,140 @@ use super::*;
 impl AsmModule {
     ///build constraints with caller_used
     pub fn build_constraints_with_caller_used(
+        &mut self,
         callers_used: &HashMap<String, HashSet<Reg>>,
     ) -> HashMap<Reg, HashSet<Reg>> {
-        // AsmModule::analyse_inst_with_live_now(&main_func, &mut |inst, live_now| {
-        //     if inst.get_type() != InstrsType::Call {
-        //         return;
-        //     }
-        //     //对于call指令来说,不需要保存和恢复在call指令的时候定义的寄存器
-        //     let mut live_now = live_now.clone();
-        //     if let Some(def_reg) = inst.get_def_reg() {
-        //         live_now.remove(&def_reg);
-        //     }
-        //     let live_now = live_now;
-
-        //     //对于 call指令,分析上下文造成的依赖关系
-        //     let func_name = inst.get_func_name().unwrap();
-        //     let func = self.name_func.get(func_name.as_str()).unwrap();
-        //     if func.is_extern {
-        //         //遇到 is_extern的情况,不能节省,也不应节省
-        //         return;
-        //     } else {
-        //         let callee_used = callee_used.get(func.label.as_str()).unwrap();
-        //         for reg in live_now.iter() {
-        //             if reg.is_physic() {
-        //                 continue;
-        //             }
-
-        //             if !callee_constraints.contains_key(reg) {
-        //                 callee_constraints.insert(*reg, callee_used.clone());
-        //             } else {
-        //                 callee_constraints.get_mut(reg).unwrap().extend(callee_used);
-        //             }
-        //         }
-        //     }
-        // });
-        todo!()
+        //统计所有寄存器相关的冲突情况(包括物理寄存器)
+        let mut constraints = HashMap::new();
+        for (_, func) in self.name_func.iter() {
+            if func.is_extern {
+                continue;
+            }
+            AsmModule::analyse_inst_with_live_now(func.as_ref(), &mut |inst, live_now| {
+                if inst.get_type() != InstrsType::Call {
+                    return;
+                }
+                let func_name = inst.get_func_name().unwrap();
+                let func_name = &func_name;
+                let mut live_now = live_now.clone();
+                if let Some(def_reg) = inst.get_def_reg() {
+                    live_now.remove(&def_reg);
+                }
+                let callers_used = callers_used.get(func_name).unwrap();
+                let mut callers_need_to_saved = live_now.clone();
+                callers_need_to_saved.retain(|reg| callers_used.contains(reg));
+                for live_reg in live_now {
+                    if live_reg.is_physic() {
+                        continue;
+                    }
+                    if !constraints.contains_key(&live_reg) {
+                        constraints.insert(live_reg, HashSet::new());
+                    }
+                    constraints
+                        .get_mut(&live_reg)
+                        .unwrap()
+                        .extend(callers_need_to_saved.iter());
+                }
+            });
+        }
+        constraints
     }
 
     ///build constraints with callee_used
     pub fn build_constraints_with_callee_used(
+        &mut self,
         callees_used: &HashMap<String, HashSet<Reg>>,
     ) -> HashMap<Reg, HashSet<Reg>> {
-        todo!()
+        let mut constraints = HashMap::new();
+        for (_, func) in self.name_func.iter() {
+            if func.is_extern {
+                continue;
+            }
+            AsmModule::analyse_inst_with_live_now(func.as_ref(), &mut |inst, live_now| {
+                if inst.get_type() != InstrsType::Call {
+                    return;
+                }
+                let func_name = inst.get_func_name().unwrap();
+                let func_name = &func_name;
+                let mut live_now = live_now.clone();
+                if let Some(def_reg) = inst.get_def_reg() {
+                    live_now.remove(&def_reg);
+                }
+                let callees_used = callees_used.get(func_name).unwrap();
+                let mut callees_need_to_saved = live_now.clone();
+                callees_need_to_saved.retain(|reg| callees_used.contains(reg));
+                for live_reg in live_now {
+                    if live_reg.is_physic() {
+                        continue;
+                    }
+                    if !constraints.contains_key(&live_reg) {
+                        constraints.insert(live_reg, HashSet::new());
+                    }
+                    constraints
+                        .get_mut(&live_reg)
+                        .unwrap()
+                        .extend(callees_need_to_saved.iter());
+                }
+            });
+        }
+        constraints
     }
     ///build constraints with all used
     pub fn build_constraints(
+        &mut self,
         callers_used: &HashMap<String, HashSet<Reg>>,
         callees_used: &HashMap<String, HashSet<Reg>>,
     ) -> HashMap<Reg, HashSet<Reg>> {
-        todo!()
+        let callees_constraints = self.build_constraints_with_callee_used(callees_used);
+        let callers_constraints = self.build_constraints_with_caller_used(callers_used);
+        let mut constraints = callees_constraints;
+        for (reg, constraint) in callers_constraints {
+            if !constraints.contains_key(&reg) {
+                constraints.insert(reg, constraint);
+            } else {
+                constraints.get_mut(&reg).unwrap().extend(constraint.iter());
+            }
+        }
+        constraints
     }
 
     ///build contraints with used_but_not_saved
     pub fn build_constraints_with_used_but_not_saved(
+        &mut self,
         used_but_not_saved: &HashMap<String, HashSet<Reg>>,
     ) -> HashMap<Reg, HashSet<Reg>> {
-        todo!()
+        let mut constraints = HashMap::new();
+        for (_, func) in self.name_func.iter() {
+            if func.is_extern {
+                continue;
+            }
+            AsmModule::analyse_inst_with_live_now(func.as_ref(), &mut |inst, live_now| {
+                if inst.get_type() != InstrsType::Call {
+                    return;
+                }
+                let func_name = inst.get_func_name().unwrap();
+                let func_name = &func_name;
+                let mut live_now = live_now.clone();
+                if let Some(def_reg) = inst.get_def_reg() {
+                    live_now.remove(&def_reg);
+                }
+                let mut regs_need_saved = used_but_not_saved.get(func_name).unwrap().clone();
+                regs_need_saved.retain(|reg| live_now.contains(reg));
+                let live_regs_need_saved = regs_need_saved;
+                for live_reg in live_now {
+                    if live_reg.is_physic() {
+                        continue;
+                    }
+                    if !constraints.contains_key(&live_reg) {
+                        constraints.insert(live_reg, HashSet::new());
+                    }
+                    constraints
+                        .get_mut(&live_reg)
+                        .unwrap()
+                        .extend(live_regs_need_saved.iter());
+                }
+            });
+        }
+        constraints
     }
 }

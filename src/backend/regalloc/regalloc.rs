@@ -193,7 +193,8 @@ pub fn build_availables_with_interef_graph(
 ) -> HashMap<Reg, RegUsedStat> {
     let mut availables: HashMap<Reg, RegUsedStat> = HashMap::new();
     for (reg, neighbors) in intereference_graph.iter() {
-        let mut available = RegUsedStat::new();
+        let mut available = RegUsedStat::init_unspecial_regs();
+        available.release_reg(Reg::get_s0().get_color());
         for neighbor in neighbors {
             if neighbor.is_physic() {
                 available.use_reg(neighbor.get_color());

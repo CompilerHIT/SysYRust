@@ -64,7 +64,7 @@ impl Func {
             phisic_mems.insert(reg, new_stack_slot);
         }
 
-        Func::print_func(ObjPtr::new(&self), "before_handle_spill.txt");
+        // Func::print_func(ObjPtr::new(&self), "before_handle_spill.txt");
         for bb in self.blocks.iter() {
             // Func::handle_spill_of_block_tmp(
             //     bb,

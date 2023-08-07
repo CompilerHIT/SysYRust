@@ -10,6 +10,7 @@ impl AsmModule {
     pub fn build_v4(&mut self, f: &mut File, _f2: &mut File, pool: &mut BackendPool, is_opt: bool) {
         let obj_module = ObjPtr::new(self);
         self.build_lir(pool);
+        // self.print_asm("asm_abastract.txt");
         if is_opt {
             BackendPass::new(obj_module).block_pass_pre_clear(pool);
         }
@@ -54,49 +55,55 @@ impl AsmModule {
         self.build_own_call_map();
         // //寄存器重分配,重分析
 
+        // self.print_asm("asm_before_realloc_pre_spilt_func.txt");
         // self.print_func();
-        // self.realloc_reg_with_priority();
-        // self.print_func();
-
-        self.remove_unuse_inst_suf_alloc();
-        // self.print_func();
+        self.realloc_pre_split_func();
+        // self.print_asm("asm_after_realloc_pre_spilt_func.txt");
 
         self.handle_spill_v3(pool);
         // self.print_func();
+        // self.print_asm("asm_after_handle_spill.txt");
+
+        self.analyse_callee_regs_to_saved();
 
         self.remove_unuse_inst_suf_alloc();
+        // self.print_asm("asm_after_remove_unuse_inst_suf_handle_spill.txt");
 
-        // // self.anaylyse_for_handle_call_v3_pre_split();
         self.anaylyse_for_handle_call_v4();
 
-        // let is_opt = true;
-        // if is_opt {
-        //     self.split_func(pool);
-        //     self.build_own_call_map();
-        //     // self.anaylyse_for_handle_call_v4();
-        // }
+        let is_opt = true;
+        if is_opt {
+            //TODO
+            self.split_func_v4(pool);
+            self.build_own_call_map();
+            self.analyse_callee_regs_to_saved();
+            self.analyse_caller_regs_to_saved();
+        }
 
-        // self.reduce_caller_to_saved_after_func_split();
-        // self.analyse_caller_regs_to_saved();
+        self.reduce_caller_to_saved_after_func_split();
+        self.analyse_caller_regs_to_saved();
+        // self.print_asm("asm_after_realloc_suf_handle_call.txt");
 
         //此后栈空间大小以及 caller saved和callee saved都确定了
         let callers_used = self.build_caller_used();
         let callees_used = self.build_callee_used();
         let callees_be_saved = &self.callee_regs_to_saveds.clone();
         let used_but_not_saved =
-            AsmModule::count_used_but_not_saveds(&callers_used, &callees_used, callees_be_saved);
+            AsmModule::build_used_but_not_saveds(&callers_used, &callees_used, callees_be_saved);
         self.handle_call_v4(pool, &callers_used, &callees_used, callees_be_saved);
-        self.remove_external_func(); //在handle call之前调用,删掉前面往name func中加入的external func
+        // self.print_asm("asm_after_handle_call.txt");
 
+        // self.print_asm("asm_before_rm_inst_suf_handle_call.txt");
         self.rm_inst_suf_handle_call(pool, &used_but_not_saved);
+
+        // self.print_asm("asm_before_rearrange_stack_slot.txt");
         self.rearrange_stack_slot();
         self.update_array_offset(pool);
 
-        // self.print_func();
-        // self.rm_inst_suf_update_array_offset(pool, &used_but_not_saved);
+        // self.print_asm("asm_before_rm_suf_update_array_offset.txt");
+        self.rm_inst_suf_update_array_offset(pool, &used_but_not_saved);
 
         self.build_stack_info(f);
-        // self.print_func();
         //删除无用的函数
     }
 }

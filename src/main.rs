@@ -6,7 +6,6 @@ extern crate biheap;
 // extern crate libm;
 use sysylib::backend::module::AsmModule;
 use sysylib::frontend::irgen::irgen;
-use sysylib::ir::dump_now;
 use sysylib::ir::instruction::Inst;
 use sysylib::{self, backend::generate_asm, ir::module::Module, utility::ObjPool};
 lalrpop_mod! {
@@ -98,5 +97,6 @@ fn run_main() {
     );
 
     // 编译结束后打印记录的属性
-    config::dump();
+    // config::dump();
+    config::dump_not_log("./performance_eval.txt"); //该行未使用debug模式包裹,一般情况下需要注释掉
 }

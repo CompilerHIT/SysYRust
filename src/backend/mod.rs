@@ -79,7 +79,6 @@ pub fn generate_asm(
     let mut file2 = File::create(row_path).unwrap();
 
     //构造
-    // module.build_v3(&mut file, &mut file2, &mut pool, is_opt);
     module.build_v4(&mut file, &mut file2, &mut pool, is_opt);
     // module.generate_row_asm(&mut file2, &mut pool);
 
@@ -92,7 +91,7 @@ pub fn generate_asm(
     module.handle_overflow(&mut pool);
 
     //最后进行一次寄存器分配与合并
-    module.final_realloc();
+    // module.final_realloc(&mut pool);
 
     if is_opt {
         // 再次进行指令重排
@@ -100,7 +99,6 @@ pub fn generate_asm(
 
         // 额外的块优化处理
         BackendPass::new(ObjPtr::new(module)).run_addition_block_pass();
-        
     }
 
     //生成抽象汇编

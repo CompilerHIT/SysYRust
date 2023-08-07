@@ -15,8 +15,8 @@ mod gvn_hoist;
 mod sink;
 mod loop_operation;
 mod meaningless_insts_folding;
-mod phi_optimizer;
 mod partial_redundancy_elimination;
+mod phi_optimizer;
 mod return_unused;
 mod simplify_cfg;
 mod tail_call_optimize;
@@ -43,7 +43,7 @@ pub fn optimizer_run(
         simplify_cfg::simplify_cfg_run(module, &mut pools);
         functional_optimizer(module, &mut pools, optimize_flag);
 
-        // 尾递归优化
+        // // 尾递归优化
         tail_call_optimize::tail_call_optimize(module, &mut pools);
         functional_optimizer(module, &mut pools, optimize_flag);
 
@@ -107,5 +107,4 @@ fn functional_optimizer(
     dead_code_eliminate::dead_code_eliminate(module, optimize_flag);
     // 全局死代码删除
     dead_code_eliminate::global_eliminate(module);
-    
 }
