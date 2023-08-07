@@ -101,9 +101,9 @@ impl AsmModule {
         self.rearrange_stack_slot();
         self.update_array_offset(pool);
 
-        // self.print_func();
+        // self.print_asm("asm_before_rm_inst_suf_update_array_offset.txt");
         self.rm_inst_suf_update_array_offset(pool, &used_but_not_saved);
-
+        // self.print_asm("asm_before_rm_inst_suf_update_array_offset.txt");
         self.build_stack_info(f);
     }
 }
