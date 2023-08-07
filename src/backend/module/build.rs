@@ -105,6 +105,5 @@ impl AsmModule {
         self.rm_inst_suf_update_array_offset(pool, &used_but_not_saved);
 
         self.build_stack_info(f);
-        // self.print_func();
     }
 }

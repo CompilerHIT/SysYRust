@@ -2,6 +2,17 @@ use super::*;
 /// 打印函数当前的汇编形式
 impl Func {
     pub fn generate_row(&mut self, f: &mut File) {
+        if self.const_array.len() > 0 || self.float_array.len() > 0 {
+            writeln!(f, "	.data\n   .align  3").unwrap();
+        }
+        if self.is_header {
+            for mut a in self.const_array.clone() {
+                a.generate(self.context, f);
+            }
+            for mut a in self.float_array.clone() {
+                a.generate(self.context, f);
+            }
+        }
         AsmBuilder::new(f).show_func(&self.label);
         let mut _size = 0;
         for block in self.blocks.iter() {

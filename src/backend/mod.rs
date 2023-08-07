@@ -98,7 +98,7 @@ pub fn generate_asm(
         // module.re_list_scheduling();
 
         // 额外的块优化处理
-        BackendPass::new(ObjPtr::new(module)).run_addition_block_pass();
+        BackendPass::new(ObjPtr::new(module)).run_addition_block_pass(&mut pool);
     }
 
     //生成抽象汇编
