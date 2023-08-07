@@ -161,26 +161,39 @@ pub fn alloc_with_v_interference_graph_and_base_available(
                 nb_availables.inter(available);
             }
 
-            //从中去掉特殊颜色
-            let special = RegUsedStat::init_unspecial_regs();
-            nb_availables.inter(&special);
-
+            //现在nb_availables里面记录了邻居的unavailable 列表中都存在的寄存器
             //
-            todo!();
+            // todo!();
+            let mut self_avialable = availables.get(to_color).unwrap().to_owned();
+            //自身可以用的颜色,且不是特殊的颜色
+            let mut available_color: Option<i32> = None;
+            loop {
+                let color = self_avialable.get_available_reg(to_color.get_type());
+                if color.is_none() {
+                    break;
+                }
+                let color = color.unwrap();
+                if nb_availables.is_available_reg(color) {
+                    self_avialable.use_reg(color);
+                    continue;
+                }
+                available_color = Some(color);
+                break;
+            }
 
-            //然后在nb中找一个可用的颜色来着色
-            if !nb_availables.is_available(to_color.get_type()) {
-                new_to_colors.push(*to_color);
+            if available_color.is_none() {
                 continue;
             }
             //着色,加入表中
             finish_flag = false;
-            let available_color = nb_availables
-                .get_available_reg(to_color.get_type())
-                .unwrap();
+            let available_color = available_color.unwrap();
             pre_colors.insert(to_color.get_id(), available_color);
             let nbs = live_neighbors.remove(to_color).unwrap();
             for nb in nbs.iter() {
+                debug_assert!(!availables
+                    .get(nb)
+                    .unwrap()
+                    .is_available_reg(available_color));
                 availables.get_mut(nb).unwrap().use_reg(available_color);
             }
         }
