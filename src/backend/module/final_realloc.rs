@@ -35,9 +35,9 @@ impl AsmModule {
             let availables = used;
             //before alloc
             //记录alloc前的改变
-            let path = format!("{}_{}.txt", name, times);
-            self.print_asm(&path);
-            times += 1;
+            // let path = format!("{}_{}.txt", name, times);
+            // self.print_asm(&path);
+            // times += 1;
 
             // 每次
             while regalloc::merge::merge_reg_with_constraints(
@@ -45,12 +45,12 @@ impl AsmModule {
                 &availables,
                 &reg_used_but_not_saved,
             ) {
-                //暂时只进行一次realloc
-                //记录alloc后的状态
-                let path = format!("{}_{}_after.txt", name, times);
-                self.print_asm(&path);
-                times += 1;
-                break;
+                // //暂时只进行一次realloc
+                // //记录alloc后的状态
+                // let path = format!("{}_{}_after.txt", name, times);
+                // self.print_asm(&path);
+                // times += 1;
+                // break;
             }
         }
     }
