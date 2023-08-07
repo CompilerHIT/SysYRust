@@ -100,6 +100,7 @@ pub fn dump() {
             "caller_save",
             "callee_save",
             "mem_rearrange",
+            "reg_merge",
         ];
         for kind in order.iter() {
             let times = CONFIG_INFO
@@ -145,6 +146,7 @@ pub fn dump_not_log(performance_path: &str) {
             "caller_save",
             "callee_save",
             "mem_rearrange",
+            "reg_merge",
         ];
         for kind in order.iter() {
             let times = CONFIG_INFO

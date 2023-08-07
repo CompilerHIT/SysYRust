@@ -1,5 +1,7 @@
 use std::collections::{HashMap, HashSet, LinkedList};
 
+use biheap::bivec::order;
+
 use crate::{
     backend::{instrs::Func, operand::Reg},
     log_file,
@@ -67,11 +69,11 @@ pub fn alloc_with_v_interference_graph_and_base_available(
      */
     let final_color = |all_neighbors: &HashMap<Reg, HashSet<Reg>>,
                        availables: HashMap<Reg, RegUsedStat>,
-                       tocolors: LinkedList<Reg>|
+                       orderd_tocolors: LinkedList<Reg>|
      -> HashMap<i32, i32> {
         let mut colors: HashMap<i32, i32> = HashMap::new();
         let all_live_neighbors = all_neighbors;
-        let mut ordered_color_lst = tocolors;
+        let mut ordered_color_lst = orderd_tocolors;
         let mut availables = availables;
         while !ordered_color_lst.is_empty() {
             let reg = ordered_color_lst.pop_front().unwrap();
@@ -120,17 +122,19 @@ pub fn alloc_with_v_interference_graph_and_base_available(
     }
 
     if to_colors.len() == 0 {
-        let mut colors: HashMap<i32, i32> = HashMap::new();
-        let mut availables = availables;
-        while !ordered_color_lst.is_empty() {
-            let reg = ordered_color_lst.pop_front().unwrap();
-            let color = availables.get(&reg).unwrap();
-            let color = color.get_available_reg(reg.get_type()).unwrap();
-            colors.insert(reg.get_id(), color);
-            for nb in all_live_neighbors.get(&reg).unwrap() {
-                availables.get_mut(nb).unwrap().use_reg(color);
-            }
-        }
+        let colors = final_color(all_live_neighbors, availables, ordered_color_lst);
+        // let mut colors: HashMap<i32, i32> = HashMap::new();
+        // let mut availables = availables;
+        // while !ordered_color_lst.is_empty() {
+        //     let reg = ordered_color_lst.pop_front().unwrap();
+        //     let color = availables.get(&reg).unwrap();
+        //     let color = color.get_available_reg(reg.get_type()).unwrap();
+        //     colors.insert(reg.get_id(), color);
+        //     for nb in all_live_neighbors.get(&reg).unwrap() {
+        //         availables.get_mut(nb).unwrap().use_reg(color);
+        //     }
+        // }
+
         let fat = FuncAllocStat {
             stack_size: 0,
             bb_stack_sizes: HashMap::new(),
@@ -140,10 +144,11 @@ pub fn alloc_with_v_interference_graph_and_base_available(
         return Some(fat);
     }
 
-    return None;
+    // return None;
     //发现一阶段方案不足以完美分配,对于剩下的活寄存器,进一步搜索试探完美分配
     log_file!("unbest_alloc_for_pp.txt", "{:?}", to_colors);
     let mut pre_colors: HashMap<i32, i32> = HashMap::new();
+    let mut availables = availables;
     loop {
         let mut finish_flag = true;
         let mut new_to_colors: Vec<Reg> = Vec::new();
@@ -210,16 +215,16 @@ pub fn alloc_with_v_interference_graph_and_base_available(
     if to_colors.len() == 0 {
         let mut colors: HashMap<i32, i32> =
             final_color(all_live_neighbors, availables, ordered_color_lst);
+        colors.extend(pre_colors);
         let fat = FuncAllocStat {
             stack_size: 0,
             bb_stack_sizes: HashMap::new(),
             spillings: HashSet::new(),
             dstr: colors,
         };
-        //pre_color
-        colors.extend(pre_colors);
         return Some(fat);
     }
+
     //如果二阶段方案不足以完美分配,试探三阶段完美分配  (建立数学模型+多线程发射)
 
     None
