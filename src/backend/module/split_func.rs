@@ -71,20 +71,41 @@ impl AsmModule {
                     .iter()
                     .for_each(|reg| constraint.use_reg(reg.get_color()));
 
-                assert!(bad_callees.remove(&Reg::get_s0()));
-                assert!(!constraint.is_available_reg(Reg::get_s0().get_color()));
                 let splits = base_splits.get(func_name).unwrap();
-                if let Some(new_func) = splits.get(&constraint) {
-                    inst.as_mut().replace_label(new_func.clone());
-                    return;
+                // if let Some(new_func) = splits.get(&constraint) {
+                //     inst.as_mut().replace_label(new_func.clone());
+                //     return;
+                // }
+                //在可用列表中寻找一个使用寄存器数量最多的用例
+                let mut satisfyer: Option<(RegUsedStat, String)> = None;
+                for (split_used, split_name) in splits.iter() {
+                    let mut base = constraint;
+                    base.merge(split_used);
+                    //如果base中使用的内容包含了 split_used中使用的内容,则其在可选列表中
+                    if base != constraint {
+                        continue;
+                    }
+                    if satisfyer.is_none() {
+                        satisfyer = Some((split_used.clone(), split_name.clone()));
+                        continue;
+                    }
+                    let (ob, on) = satisfyer.as_ref().unwrap().clone();
+                    if ob.num_unavailable_regs() < split_used.num_unavailable_regs() {
+                        satisfyer = Some((ob, on));
+                    }
                 }
 
+                if let Some((rus, name)) = satisfyer {
+                    inst.as_mut().replace_label(name);
+                    return;
+                }
                 //
                 let mut ord_regs: Vec<Reg> = Vec::new();
                 ord_regs.extend(good_callees.iter());
                 ord_regs.extend(good_callers.iter());
                 ord_regs.extend(bad_callers.iter());
                 ord_regs.extend(bad_callees.iter());
+                assert!(ord_regs.len() == 58);
                 debug_assert!(ord_regs.len() == 58, "{}", ord_regs.len());
 
                 //按照顺序进行分配,分配确定之后,再之后不会再改变函数内的寄存器组成
@@ -102,7 +123,7 @@ impl AsmModule {
                 }
 
                 //分析分配后的寄存器使用结果,根据它自身used的 caller saved寄存器和callee 寄存器给它建模
-                let used = new_func.draw_phisic_regs();
+                let used = new_constraint;
                 let sufix_mark = used.draw_code_mark();
                 let bb_sufix = format!("_hitsz_{}_{}", func_name.clone(), sufix_mark.clone());
                 let new_func_name = format!("{}_hitsz_{}", func_name.clone(), sufix_mark.clone());

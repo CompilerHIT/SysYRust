@@ -309,7 +309,7 @@ impl RegUsedStat {
             fregs_used: 0,
         }
     }
-    //获取除了x0-x5以及s0以及外的寄存器的集合
+    ///获取除了x0-x5这五个特殊寄存器以及s0寄存器以外的寄存器的集合
     pub const fn init_unspecial_regs_without_s0() -> RegUsedStat {
         RegUsedStat {
             iregs_used: 0b_0000_0000_0000_0000_0000_0001_0001_1111,
@@ -341,6 +341,18 @@ impl RegUsedStat {
             out.push_str(&symbol);
         }
         out
+    }
+}
+
+impl RegUsedStat {
+    pub fn num_unavailable_regs(&self) -> usize {
+        let mut count = 0;
+        for i in 0..=63 {
+            if !self.is_available_reg(i) {
+                count += 1;
+            }
+        }
+        return count;
     }
 }
 

@@ -72,7 +72,7 @@ impl AsmModule {
 
         self.anaylyse_for_handle_call_v4();
 
-        // let is_opt = true;
+        let is_opt = true;
         if is_opt {
             //TODO
             self.split_func(pool);
@@ -81,8 +81,8 @@ impl AsmModule {
             self.analyse_caller_regs_to_saved();
         }
 
-        self.reduce_caller_to_saved_after_func_split();
-        self.analyse_caller_regs_to_saved();
+        // self.reduce_caller_to_saved_after_func_split();
+        // self.analyse_caller_regs_to_saved();
         // self.print_asm("asm_after_realloc_suf_handle_call.txt");
 
         //此后栈空间大小以及 caller saved和callee saved都确定了
