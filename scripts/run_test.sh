@@ -26,7 +26,7 @@ for file in ${source_files}; do
 
 	# 使用gcc将其与./lib/libsysy.a链接
 	test_file="${file%.*}exe.out"
-	gcc "${source_folder}/${file}" -L./lib -lsysy -o "${test_file}"
+	gcc "${source_folder}/${file}" -L./lib -lsysy -static -o "${test_file}"
 
 	# 查看./performance文件夹下是否有对应的.in文件作为输入
 	out_file="${file%.*}.out"

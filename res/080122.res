@@ -1,3 +1,6 @@
+/*
+    回退版本到7月27日
+*/
 Testing 00_bitset1.s...
 Timer@0056-0064: 0H-0M-0S-896236us
 TOTAL: 0H-0M-0S-896236us
@@ -271,9 +274,6 @@ Passed sl3.s!
 Testing stencil0.s...
 Timer@0023-0059: 0H-0M-0S-145788us
 TOTAL: 0H-0M-0S-145788us
-/*
-    回退版本到7月27日
-*/
 Passed stencil0.s!
 ---------------
 Testing stencil1.s...

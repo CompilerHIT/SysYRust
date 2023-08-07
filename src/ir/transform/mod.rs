@@ -6,12 +6,15 @@ mod array_transform;
 mod condition_transform;
 mod constant_folding;
 mod dead_code_eliminate;
+mod delete_empty_block;
 mod delete_redundant_load_store;
 mod func_inline;
 mod global_value_numbering;
 mod global_var_transform;
+mod hoist;
 mod loop_operation;
 mod meaningless_insts_folding;
+mod partial_redundancy_elimination;
 mod phi_optimizer;
 mod return_unused;
 mod simplify_cfg;
@@ -31,14 +34,17 @@ pub fn optimizer_run(
         simplify_cfg::simplify_cfg_run(module, &mut pools);
         functional_optimizer(module, &mut pools, optimize_flag);
 
+        // gvn hoist
+        hoist::hoist(module, optimize_flag, &mut pools);
+
         // 循环优化
         loop_operation::loop_optimize(module, &mut pools, true);
         simplify_cfg::simplify_cfg_run(module, &mut pools);
         functional_optimizer(module, &mut pools, optimize_flag);
 
-        // 尾递归优化
-        //tail_call_optimize::tail_call_optimize(module, &mut pools);
-        //functional_optimizer(module, &mut pools, optimize_flag);
+        // // 尾递归优化
+        tail_call_optimize::tail_call_optimize(module, &mut pools);
+        functional_optimizer(module, &mut pools, optimize_flag);
 
         // 函数内联
         func_inline::inline_run(module, &mut pools);
@@ -47,6 +53,9 @@ pub fn optimizer_run(
         // 简化cfg
         simplify_cfg::simplify_cfg_run(module, &mut pools);
         functional_optimizer(module, &mut pools, optimize_flag);
+
+        // gvn hoist
+        hoist::hoist(module, optimize_flag, &mut pools);
 
         // 循环优化
         loop_operation::loop_optimize(module, &mut pools, false);

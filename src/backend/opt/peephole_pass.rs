@@ -47,6 +47,7 @@ impl BackendPass {
                     }
                     index += 1;
                 }
+                self.rm_same_mv(block.clone());
             })
         });
     }
@@ -54,15 +55,17 @@ impl BackendPass {
     fn rm_same_mv(&self, block: ObjPtr<BB>) {
         let mut index = 0;
         loop {
-            if block.insts.len() < 2 || index >= block.insts.len() - 1 {
+            if index >= block.insts.len() {
                 break;
             }
-            let inst1 = block.insts[index];
-            let inst2 = block.insts[index+1];
-            if inst1.get_type() == inst2.get_type() && inst1.operands == inst2.operands {
+            let inst = block.insts[index];
+            if inst.get_type() == InstrsType::OpReg(SingleOp::Mv)
+                && *inst.get_lhs() == *inst.get_dst()
+            {
                 block.as_mut().insts.remove(index);
+            } else {
+                index += 1;
             }
-            index += 1;
         }
     }
 

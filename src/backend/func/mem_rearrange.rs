@@ -150,6 +150,7 @@ impl Func {
             }
             _ => (),
         });
+        log_file!("to_rerrange.txt", "{:?}", all_rearrangable_stackslot);
         //判断这两个集合是否相等
         // debug_assert!(all_live_stackslots == all_rearrangable_stackslot);
         //只保留活着的栈空间
@@ -186,7 +187,7 @@ impl Func {
             //记录所有已经用过的冲突的空间
             let mut unavailables_ssts: HashSet<StackSlot> = HashSet::new();
             debug_assert!(interef.contains_key(sst), "{}", {
-                // Func::print_func(ObjPtr::new(self), "an_mem_re.txt");
+                Func::print_func(ObjPtr::new(self), "an_mem_re.txt");
                 sst.get_pos()
             });
             for inter_sst in interef.get(sst).unwrap() {

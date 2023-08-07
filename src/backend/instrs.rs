@@ -119,6 +119,13 @@ pub struct LIRInst {
     func_type: ScalarType,
 }
 
+impl LIRInst {
+    pub fn get_func_type(&self) -> ScalarType {
+        debug_assert!(self.get_type() == InstrsType::Call);
+        self.func_type
+    }
+}
+
 // 实现个fmt display trait
 impl fmt::Display for LIRInst {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -271,18 +278,15 @@ impl LIRInst {
             }
         }
     }
-    pub fn get_def_reg(&self) -> Option<&Reg> {
-        if self.operands.len() > 0 {
-            match self.get_type() {
-                InstrsType::Store | InstrsType::StoreParamToStack | InstrsType::StoreToStack => {}
-                _ => {
-                    return match self.get_dst() {
-                        Operand::Reg(reg) => Some(reg),
-                        _ => None,
-                    }
-                }
-            }
+    pub fn get_def_reg(&self) -> Option<Reg> {
+        let def_regs = self.get_reg_def();
+        if def_regs.len() == 1 {
+            let def_reg = def_regs.get(0).unwrap().clone();
+            return Some(def_reg);
+        } else {
+            debug_assert!(def_regs.len() == 0);
         }
+
         None
     }
     pub fn get_mut_def_reg(&mut self) -> Option<&mut Reg> {
@@ -701,6 +705,15 @@ impl LIRInst {
             ],
         );
         ins.set_double();
+        ins
+    }
+
+    //TOCHECK
+    pub fn build_li_inst(reg: &Reg, imm: i64) -> LIRInst {
+        let ins = LIRInst::new(
+            InstrsType::OpReg(SingleOp::Li),
+            vec![Operand::Reg(*reg), Operand::IImm(IImm::new(imm as i32))],
+        );
         ins
     }
 

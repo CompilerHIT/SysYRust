@@ -11,8 +11,8 @@ pub use crate::utility::ObjPtr;
 
 mod block_pass;
 mod clear_pass;
-mod peephole_pass;
 mod particular_opt;
+mod peephole_pass;
 
 pub struct BackendPass {
     pub module: ObjPtr<AsmModule>,
@@ -28,7 +28,7 @@ impl BackendPass {
         self.clear_pass(pool);
         self.peephole_pass(pool);
     }
-    
+
     pub fn run_addition_block_pass(&mut self) {
         // 块优化
         self.block_pass();

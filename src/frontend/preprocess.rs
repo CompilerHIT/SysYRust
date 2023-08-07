@@ -11,7 +11,13 @@ pub fn preprocess(input: &str) -> String {
                     result.push_str(&format!("_sysy_starttime({});", line_number));
                 } else if pparts[i].contains("stoptime()") {
                     result.push_str(&format!("_sysy_stoptime({});", line_number));
-                } else {
+                } 
+                // else if pparts[i].contains("stoptime(") {//here
+                //     result.push_str(&format!("_sysy_stoptime({};", line_number));
+                // } else if pparts[i].contains("starttime("){//here
+                //     result.push_str(&format!("_sysy_starttime({};", line_number));
+                // } 
+                else {
                     result.push_str((" ".to_string() + pparts[i] + ";").as_str());
                 }
             }
@@ -20,7 +26,13 @@ pub fn preprocess(input: &str) -> String {
                     result.push_str(&format!("_sysy_starttime({})", line_number));
                 } else if pparts[pparts.len() - 1].contains("stoptime()") {
                     result.push_str(&format!("_sysy_stoptime({})", line_number));
-                } else {
+                } 
+                // else if pparts[pparts.len() - 1].contains("starttime(") {//here
+                //     result.push_str(&format!("_sysy_starttime({}", line_number));
+                // } else if pparts[pparts.len() - 1].contains("stoptime(") {//here
+                //     result.push_str(&format!("_sysy_stoptime({}", line_number));
+                // } 
+                else {
                     result.push_str((" ".to_string() + pparts[pparts.len() - 1]).as_str());
                 }
             }

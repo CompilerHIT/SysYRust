@@ -19,13 +19,16 @@ use crate::utility::ObjPtr;
 
 use super::instrs::{Context, InstrsType, LIRInst, BB};
 use super::operand::Reg;
-use super::regalloc::easy_gc_alloc;
-use super::regalloc::structs::FuncAllocStat;
+use super::regalloc::structs::{FuncAllocStat, RegUsedStat};
 use super::structs::GenerateAsm;
 pub mod build;
+pub mod constraints;
+pub mod final_realloc;
 pub mod handle_call;
-pub mod reduce_caller_save;
+pub mod mid_realloc;
+pub mod rm_inst;
 pub mod schedule;
+pub mod split_func;
 mod test;
 pub mod utils;
 pub mod v3;
@@ -39,8 +42,8 @@ pub struct AsmModule {
     callee_regs_to_saveds: HashMap<String, HashSet<Reg>>,
     ///记录调用该函数的函数应该保存的寄存器
     caller_regs_to_saveds: HashMap<String, HashSet<Reg>>,
-    call_info: HashMap<String, HashMap<Bitmap, String>>, //每个base func name 对应调用的 不同callee need save函数
-    pub name_func: HashMap<String, ObjPtr<Func>>,        //记录实际函数名和实际函数
+    base_splits: HashMap<String, HashMap<RegUsedStat, String>>,
+    pub name_func: HashMap<String, ObjPtr<Func>>, //记录实际函数名和实际函数
     pub upper_module: Module,
 }
 
@@ -54,9 +57,9 @@ impl AsmModule {
             func_map: Vec::new(),
             func_groups: HashMap::new(),
             upper_module: ir_module,
-            call_info: HashMap::new(),
             name_func: HashMap::new(),
             call_map: HashMap::new(),
+            base_splits: HashMap::new(),
             callee_regs_to_saveds: HashMap::new(),
             caller_regs_to_saveds: HashMap::new(),
         }
@@ -130,8 +133,10 @@ impl AsmModule {
 
     /// 第一次运行v2p时不映射临时寄存器，第二次运行前清空tmp_vars set
     fn map_v_to_p(&mut self) {
-        self.name_func.iter_mut().for_each(|(_, func)| {
-            debug_assert!(!func.is_extern);
+        self.name_func.iter().for_each(|(_, func)| {
+            if func.is_extern {
+                return;
+            }
             func.blocks.iter().for_each(|block| {
                 block.insts.iter().for_each(|inst| {
                     inst.as_mut()
@@ -252,54 +257,39 @@ impl AsmModule {
     pub fn generate_asm(&mut self, f: &mut File, pool: &mut BackendPool) {
         // 生成全局变量与数组
         self.generate_global_var(f);
-        let mut asm_order: Vec<ObjPtr<Func>> = Vec::new();
-        // println!("{}", self.call_info.len());
-        if self.call_info.len() != 0 {
+        if self.base_splits.len() == 0 {
             for (_, func) in self.func_map.iter() {
-                if func.is_extern {
-                    continue;
-                }
-                if func.label == "main" {
-                    asm_order.push(*self.name_func.get("main").unwrap());
-                    continue;
-                }
-                let name = func.label.clone();
-                for name in self.call_info.get(name.as_str()).unwrap() {
-                    let name = name.1;
-                    // println!("name{}", name.clone());
-                    let func = self.name_func.get(name).unwrap();
-                    asm_order.push(*func);
+                if !func.is_extern {
+                    func.as_mut().generate(pool.put_context(Context::new()), f);
                 }
             }
         } else {
             for (_, func) in self.func_map.iter() {
-                // println!("{}", func.label);
-                if func.is_extern {
+                if func.label == "main" {
+                    func.as_mut().generate(pool.put_context(Context::new()), f);
                     continue;
                 }
-                asm_order.push(*func);
+                if !func.is_extern {
+                    let splits = self.base_splits.get(&func.label).unwrap();
+                    let to_print: HashSet<String> = splits.iter().map(|(_, s)| s.clone()).collect();
+                    for func in to_print.iter() {
+                        let func = self.name_func.get(func).unwrap();
+                        func.as_mut().generate(pool.put_context(Context::new()), f);
+                    }
+                }
             }
         }
-
-        asm_order.iter_mut().for_each(|func| {
-            debug_assert!(!func.is_extern);
-            func.as_mut().generate(pool.put_context(Context::new()), f);
-        })
     }
 
-    pub fn generate_row_asm(&mut self, f: &mut File, pool: &mut BackendPool) {
+    pub fn generate_row_asm(&mut self, f: &mut File) {
         debug_assert!(|| -> bool {
             self.name_func.iter_mut().for_each(|(_, func)| {
-                debug_assert!(!func.is_extern);
-                func.as_mut()
-                    .generate_row(pool.put_context(Context::new()), f);
+                if func.is_extern {
+                    return;
+                }
+                func.as_mut().generate_row(f);
             });
-            // self.func_map.iter_mut().for_each(|(_, func)| {
-            //     if !func.is_extern {
-            //         func.as_mut()
-            //             .generate_row(pool.put_context(Context::new()), f);
-            //     }
-            // });
+
             true
         }());
     }

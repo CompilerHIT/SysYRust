@@ -11,14 +11,14 @@ use crate::{
         operand::Reg,
         BackendPool,
     },
-    ir::CallMap,
+    ir::{instruction::Inst, CallMap},
     utility::{ObjPool, ObjPtr, ScalarType},
 };
 
 ///复杂值类型 (实际实现的时候需要)
 pub struct ComplexValue {
     add: HashMap<ObjPtr<LIRInst>, usize>,
-    minux: HashMap<ObjPtr<LIRInst>, usize>,
+    minus: HashMap<ObjPtr<LIRInst>, usize>,
 }
 
 ///通用值类型
@@ -173,13 +173,46 @@ impl PartialOrd for Value {
 
 ///实现一些对value的运算
 impl Value {
+    //只有同类型的值才可以进行加减运算
     pub fn add_another(&mut self, another: &Value) {}
     pub fn minus_another(&mut self, another: &Value) {}
-    pub fn add(one: &Value, another: &Value) -> Value {
-        todo!()
+
+    ///如果运算成功,返回值,如果失败,返回None
+    pub fn add(one: &Value, another: &Value) -> Option<Value> {
+        if one.get_type() == another.get_type() && one.get_type() == ValueType::IImm {
+            let v1 = one.get_imm().unwrap();
+            let v2 = another.get_imm().unwrap();
+            return Some(Value::IImm(v1 + v2));
+        } else if let Some(one) = one.get_addr() {
+            if let Some(imm) = another.get_imm() {
+                let mut new_v = one.clone();
+                new_v.1 += imm;
+                return Some(Value::Addr(new_v));
+            }
+        } else if let Some(another) = another.get_addr() {
+            if let Some(imm) = one.get_imm() {
+                let mut new_v = another.clone();
+                new_v.1 += imm;
+                return Some(Value::Addr(new_v));
+            }
+        }
+        None
     }
-    pub fn minus(one: &Value, another: &Value) -> Value {
-        todo!()
+
+    ///如果运算成功,返回值,如果失败,返回None
+    pub fn minus(one: &Value, another: &Value) -> Option<Value> {
+        if one.get_type() == another.get_type() && one.get_type() == ValueType::IImm {
+            let v1 = one.get_imm().unwrap();
+            let v2 = another.get_imm().unwrap();
+            return Some(Value::IImm(v1 - v2));
+        } else if let Some(one) = one.get_addr() {
+            if let Some(imm) = another.get_imm() {
+                let mut new_v = one.clone();
+                new_v.1 -= imm;
+                return Some(Value::Addr(new_v));
+            }
+        }
+        None
     }
 }
 

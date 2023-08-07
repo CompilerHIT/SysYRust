@@ -82,9 +82,12 @@ fn run_main() {
     sysylib::ir::optimizer_run(&mut module, (&mut pool_bb, &mut pool_inst), o1_option);
     let output2 = "row_asm.log";
 
+    // dump_now(&module, "dump.ll");
+
     // 后端解析
     let is_opt = o1_option;
     // let is_opt = true;
+    // let is_opt = false;
     generate_asm(
         filename,
         output,
@@ -94,5 +97,6 @@ fn run_main() {
     );
 
     // 编译结束后打印记录的属性
-    config::dump();
+    // config::dump();
+    config::dump_not_log("./performance_eval.txt"); //该行未使用debug模式包裹,一般情况下需要注释掉
 }

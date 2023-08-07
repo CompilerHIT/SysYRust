@@ -13,13 +13,13 @@ use crate::{
 pub fn load_store_opt(module: &mut Module) -> bool {
     let mut func_map = get_store_map(module);
     let mut changed = false;
-    func_process(module, |func_name, func| {
+    func_process(module, |_func_name, func| {
         bfs_bb_proceess(func.get_head(), |bb| {
             let mut map = HashMap::new();
             let mut inst = bb.get_head_inst();
             while !inst.is_tail() {
                 let next = inst.get_next();
-                changed |= delete_inst(&mut func_map, &mut map, inst, func_name.clone());
+                changed |= delete_inst(&mut func_map, &mut map, inst);
                 inst = next;
             }
         });
@@ -80,7 +80,6 @@ pub fn delete_inst(
     func_map: &mut HashMap<String, HashSet<ObjPtr<Inst>>>,
     map: &mut HashMap<ObjPtr<Inst>, ObjPtr<Inst>>,
     inst: ObjPtr<Inst>,
-    func_now: String,
 ) -> bool {
     match inst.get_kind() {
         InstKind::Load => {

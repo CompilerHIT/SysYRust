@@ -12,11 +12,10 @@ impl AsmModule {
                 livenow.insert(*reg);
             });
             for inst in bb.insts.iter().rev() {
+                inst_analyser(*inst, &livenow);
                 for reg in inst.get_reg_def() {
                     livenow.remove(&reg);
                 }
-                //
-                inst_analyser(*inst, &livenow);
                 for reg in inst.get_reg_use() {
                     livenow.insert(reg);
                 }
@@ -170,18 +169,6 @@ impl AsmModule {
 }
 
 impl AsmModule {
-    pub fn print_func(&self) {
-        // // debug_assert!(false, "{}", self.name_func.len());
-        for (_, func) in self.name_func.iter() {
-            if func.is_extern {
-                continue;
-            }
-            Func::print_func(*func, "print_all_funcs.txt");
-        }
-    }
-}
-
-impl AsmModule {
     ///创建一个函数调用族群(包括族长以及族长调用和简接调用的所有函数)
     ///调用该函数前应该先调用call map建立直接调用关系表
     pub fn build_func_groups(
@@ -223,5 +210,12 @@ impl AsmModule {
             }
         }
         func_groups
+    }
+}
+
+impl AsmModule {
+    pub fn print_asm(&mut self, path: &str) {
+        let mut file = File::create(path).unwrap();
+        self.generate_row_asm(&mut file);
     }
 }

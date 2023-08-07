@@ -1,0 +1,59 @@
+use crate::{ir::{module::Module, tools::{func_process, inst_process_in_bb, dfs_pre_order_bb_process, replace_inst}, basicblock::BasicBlock, instruction::{Inst, InstKind, BinOp, UnOp}, ir_type::IrType, analysis::dominator_tree::{self, calculate_dominator, DominatorTree}}, utility::{ObjPtr, ObjPool}};
+
+use super::global_value_numbering::{self, CongruenceClass, compare_two_inst};
+
+pub fn hoist(module: &mut Module, opt_option: bool,pools: &mut (&mut ObjPool<BasicBlock>, &mut ObjPool<Inst>)){
+    if opt_option{
+        let mut congruence_class = global_value_numbering::gvn(module,opt_option).unwrap();
+        func_process(module, |_, func| {
+            let dominator_tree = calculate_dominator(func.get_head());
+            loop {
+                let mut changed = false;
+                dfs_pre_order_bb_process(func.get_head(), |bb| {
+                    let next = bb.get_next_bb().clone();
+                    if next.len()>1{
+                        changed |= check_successor(bb,next,&mut congruence_class,pools.1,&dominator_tree);
+                    }
+                });
+                if !changed{
+                    break;
+                }
+            }
+        });
+    }
+}
+
+pub fn check_successor(bb:ObjPtr<BasicBlock>,vec_successors:Vec<ObjPtr<BasicBlock>>,congruence_class:&mut CongruenceClass,pool: &mut ObjPool<Inst>,dominator_tree:& DominatorTree)->bool{
+    let bb1 = vec_successors[0];
+    let bb2 = vec_successors[1];
+    let mut flag = false;
+    inst_process_in_bb(bb1.get_head_inst(), |inst1|{
+        inst_process_in_bb(bb2.get_head_inst(), |inst2|{
+            if dominator_tree.is_dominate(&bb, &bb1)&&dominator_tree.is_dominate(&bb, &bb2) {
+                if compare_two_inst(inst1, inst2, congruence_class){
+                    let tail = bb.get_tail_inst();
+                    let inst_new =make_same_inst(inst1, pool);
+                    congruence_class.add_inst(inst_new);
+                    congruence_class.remove_inst(inst1);
+                    congruence_class.remove_inst(inst2);
+                    tail.as_mut().insert_before(inst_new);
+                    replace_inst(inst1, inst_new);
+                    replace_inst(inst2, inst_new);
+                    flag = true;
+                }
+            }
+        })
+    });
+    flag
+}
+
+pub fn make_same_inst(inst_old:ObjPtr<Inst>,pool: &mut ObjPool<Inst>)->ObjPtr<Inst>{
+    let ir_type = inst_old.as_ref().get_ir_type();
+    let kind = inst_old.get_kind().clone();
+    let operands = inst_old.get_operands().clone();
+    let inst_new = pool.put(Inst::new(ir_type, kind, operands));
+    for i in inst_new.get_operands(){
+        i.as_mut().add_user(inst_new.as_ref());
+    }
+    inst_new
+}

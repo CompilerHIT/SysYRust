@@ -244,12 +244,15 @@ impl BackendPass {
                                     replace_first_block(block.clone(), func.clone());
                                 } else {
                                     let prev_tail = prev.get_tail_inst();
-                                    if *prev_tail.get_label() == Operand::Addr(block.label.clone()) {
+                                    if *prev_tail.get_label() == Operand::Addr(block.label.clone())
+                                    {
                                         prev_tail.as_mut().replace_label(after_label.clone());
                                     } else {
                                         if prev.insts.len() > 1 {
                                             let last_two_tail = prev.get_last_not_tail_inst();
-                                            last_two_tail.as_mut().replace_label(after_label.clone());
+                                            last_two_tail
+                                                .as_mut()
+                                                .replace_label(after_label.clone());
                                         }
                                     }
                                     adjust_prev_out(
@@ -452,12 +455,5 @@ fn print_context(block: ObjPtr<BB>) {
     }
     for after in block.get_after().iter() {
         log!("after: {}", after.label);
-    }
-}
-
-fn print_insts(block: ObjPtr<BB>) {
-    log!("block: {}", block.label);
-    for inst in block.insts.iter() {
-        log!("inst: {:?}", inst.as_ref());
     }
 }

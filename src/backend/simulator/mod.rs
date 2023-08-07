@@ -9,6 +9,7 @@ use super::instrs::{Func, BB};
 // 对程序进行建模
 //以为 死代码消除 ,编译时计算等提供接口
 pub mod execute_stat;
+mod impl_consume_inst;
 pub mod program_stat;
 pub mod structs;
 
