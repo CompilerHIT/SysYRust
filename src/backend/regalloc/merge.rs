@@ -43,6 +43,12 @@ pub fn merge_reg_with_constraints(
         if !constraints.contains_key(r1) || !constraints.contains_key(r2) {
             return false;
         }
+        if interef_graph.get(r1).unwrap().contains(r2) {
+            debug_assert!(interef_graph.get(r2).unwrap().contains(r1));
+            return false;
+        }
+        debug_assert!(!interef_graph.get(r1).unwrap().contains(r2));
+        debug_assert!(!interef_graph.get(r2).unwrap().contains(r1));
         Func::print_func(ObjPtr::new(func), "rm_inst.txt");
         log_file!("final_merge.txt", "try merge:{},{}", r1, r2);
         debug_assert!(
