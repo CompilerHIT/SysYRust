@@ -75,6 +75,13 @@ impl Func {
                 continue;
             }
             self.handle_spill_for_block(bb, pool);
+            // Func::handle_spill_of_block_tmp(
+            //     bb,
+            //     pool,
+            //     &self.reg_alloc_info.spillings,
+            //     &self.spill_stack_map,
+            //     &phisic_mems,
+            // );
         }
         // self.remove_inst_suf_spill(pool);
         Func::print_func(ObjPtr::new(&self), "after_handle_spill.txt");
@@ -127,7 +134,6 @@ impl Func {
         //直接保存恢复保存恢复 (使用t0-t2三个寄存器)
         let mut new_insts = Vec::new();
         let mut tmp_available = RegUsedStat::init_unavailable();
-
         for i in 5..=7 {
             tmp_available.release_reg(i);
         }
@@ -158,6 +164,11 @@ impl Func {
                 let ld_inst = LIRInst::build_loadstack_inst(&tmp_reg, pos);
                 new_insts.push(pool.put_inst(ld_inst));
                 inst.as_mut().replace_reg(&reg, &tmp_reg);
+                config::record_spill(
+                    "",
+                    "",
+                    format!("从栈{}把{}值取入{}", pos, reg, tmp_reg).as_str(),
+                );
                 borrows.insert(reg, tmp_reg);
             }
             new_insts.push(*inst);
@@ -167,6 +178,11 @@ impl Func {
                     let borrowed = borrows.get(&reg).unwrap();
                     let sd_inst = LIRInst::build_storetostack_inst(&borrowed, pos);
                     new_insts.push(pool.put_inst(sd_inst));
+                    config::record_spill(
+                        "",
+                        "",
+                        format!("把{}值从{}存入栈{}", reg, borrowed, pos).as_str(),
+                    );
                 }
             }
         }
