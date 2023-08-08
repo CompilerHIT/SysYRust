@@ -34,7 +34,8 @@ impl Func {
         //先分配空间
         //对于spillings用到的空间直接一人一个
         let regs = self.draw_all_virtual_regs();
-        for spilling_reg in self.reg_alloc_info.spillings.iter() {
+        for spilling_reg in regs.iter() {
+            let spilling_reg = &spilling_reg.get_id();
             debug_assert!(
                 regs.contains(&Reg::new(*spilling_reg, ScalarType::Int))
                     || regs.contains(&Reg::new(*spilling_reg, ScalarType::Float))
@@ -64,6 +65,8 @@ impl Func {
             phisic_mems.insert(reg, new_stack_slot);
         }
 
+        // debug_assert!();
+
         // Func::print_func(ObjPtr::new(&self), "before_handle_spill.txt");
         for bb in self.blocks.iter() {
             // Func::handle_spill_of_block_tmp(
@@ -73,15 +76,24 @@ impl Func {
             //     &self.spill_stack_map,
             //     &phisic_mems,
             // );
-            Func::handle_spill_of_block(
+            // Func::handle_spill_of_block(
+            //     bb,
+            //     pool,
+            //     &self.reg_alloc_info.spillings,
+            //     &self.spill_stack_map,
+            //     &phisic_mems,
+            // );
+            Func::handle_spill_of_block_tmp(
                 bb,
                 pool,
                 &self.reg_alloc_info.spillings,
                 &self.spill_stack_map,
                 &phisic_mems,
             );
+
+            // Func::handle_spill_of_block(bb, pool, spillings, spill_stack_map, phisic_mem);
         }
-        self.remove_inst_suf_spill(pool);
+        // self.remove_inst_suf_spill(pool);
     }
 
     ///在handle spill之后调用
@@ -118,8 +130,66 @@ impl Func {
 }
 
 impl Func {
-    ///考虑有临时寄存器可以用
-    /// 该操作应该在p2v之后进行,认为遇到的虚拟寄存器都是临时寄存器
+    /// 认为有三个临时寄存器可以使用
+    fn handle_spill_of_block_tmp(
+        bb: &ObjPtr<BB>,
+        pool: &mut BackendPool,
+        spillings: &HashSet<i32>,
+        spill_stack_map: &HashMap<Reg, StackSlot>,
+        phisic_mem: &HashMap<Reg, StackSlot>,
+    ) {
+        //直接保存恢复保存恢复 (使用t0-t2三个寄存器)
+        let mut new_insts = Vec::new();
+        let mut tmp_available = RegUsedStat::init_unavailable();
+
+        for i in 5..=7 {
+            tmp_available.release_reg(i);
+        }
+        for i in 18..=20 {
+            tmp_available.release_reg(i + FLOAT_BASE);
+        }
+        let tmp_available = tmp_available;
+        for inst in bb.insts.iter() {
+            let mut tmp_use_stat = tmp_available;
+            let defed = inst.get_reg_def();
+            let regs = inst.get_regs();
+            for r in inst.get_regs() {
+                if r.is_physic() {
+                    assert!(!tmp_available.is_available_reg(r.get_color()), "{r}");
+                }
+            }
+            let mut borrows = HashMap::new();
+            for reg in regs.iter() {
+                if reg.is_physic() {
+                    continue;
+                }
+                let tmp_reg = tmp_use_stat.get_available_reg(reg.get_type()).unwrap();
+                tmp_use_stat.use_reg(tmp_reg);
+                let tmp_reg = Reg::from_color(tmp_reg);
+                //把值存到物理寄存器
+                //从栈上加载值
+                let pos = spill_stack_map.get(&reg).unwrap().get_pos();
+                let ld_inst = LIRInst::build_loadstack_inst(&tmp_reg, pos);
+                new_insts.push(pool.put_inst(ld_inst));
+                inst.as_mut().replace_reg(&reg, &tmp_reg);
+                borrows.insert(reg, tmp_reg);
+            }
+            new_insts.push(*inst);
+            for reg in defed.iter() {
+                if !reg.is_physic() {
+                    let pos = spill_stack_map.get(&reg).unwrap().get_pos();
+                    let borrowed = borrows.get(&reg).unwrap();
+                    let sd_inst = LIRInst::build_storetostack_inst(&borrowed, pos);
+                    new_insts.push(pool.put_inst(sd_inst));
+                }
+            }
+        }
+        bb.as_mut().insts = new_insts;
+    }
+}
+
+impl Func {
+    /// 该操作应该在p2v之后进行,认为遇到的虚拟寄存器都是spill
     fn handle_spill_of_block(
         bb: &ObjPtr<BB>,
         pool: &mut BackendPool,
@@ -300,8 +370,7 @@ impl Func {
             debug_assert!(spillings.contains(&rentor.get_id()));
             debug_assert!(rentors.get(rentor).unwrap() == borrowed);
             debug_assert!(holders.get(borrowed).unwrap() == rentor);
-            //虽然但是一个块中不应该出现虚拟寄存器的两次写,so
-            debug_assert!(next_occurs.get(rentor).unwrap().front().unwrap().1 != true);
+            //可能出现虚拟寄存器的先读后写
             let pos = spill_stack_map.get(rentor).unwrap().get_pos();
             //把spilling寄存器的值还回栈上
             config::record_spill(
@@ -392,6 +461,11 @@ impl Func {
                     let pos = phisic_mem.get(&reg).unwrap().get_pos();
                     let load_inst = LIRInst::build_loadstack_inst(&reg, pos);
                     new_insts.push(pool.put_inst(load_inst));
+                    config::record_spill(
+                        "",
+                        &bb.label.as_str(),
+                        format!("从栈{}取回物理寄存器{}原值", pos, reg).as_str(),
+                    );
                     holders.insert(reg, reg);
                 }
             }
@@ -532,7 +606,7 @@ impl Func {
                 }
             }
 
-            //然后归还
+            //先归还
             for reg in inst.get_reg_use() {
                 //判断是否有需要归还的寄存器 (把值取回物理寄存器,此处需要一个物理寄存器相关的空间)
                 if reg.is_physic() && holders.contains_key(&reg) {

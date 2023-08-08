@@ -36,12 +36,12 @@ impl AsmModule {
             // 代码调度，列表调度法
             self.list_scheduling_tech();
 
-            let func = *self.name_func.get("loop3").unwrap();
-            func.print_live_interval("tmp_before.txt");
+            // let func = *self.name_func.get("loop3").unwrap();
+            // func.print_live_interval("tmp_before.txt");
             // // 为临时寄存器分配寄存器
             self.clear_tmp_var();
             self.allocate_reg();
-            func.print_live_interval("tmp_after.txt");
+            // func.print_live_interval("tmp_after.txt");
             // self.print_asm("after_alloc_tmp.txt");
             self.map_v_to_p();
         } else {
