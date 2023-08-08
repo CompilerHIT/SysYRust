@@ -98,6 +98,12 @@ pub fn add_interface(module: &mut Module, func_pool: &mut ObjPool<Function>, opt
     // 线程退出，非0号线程调用
     let thread_exit = func_pool.new_function();
     module.push_function("hitsz_thread_exit".to_string(), thread_exit);
+
+    // int hitsz_get_thread_num();
+    // 获取当前线程id
+    let mut get_thread_num = func_pool.new_function();
+    get_thread_num.set_return_type(super::ir_type::IrType::Int);
+    module.push_function("hitsz_get_thread_num".to_string(), get_thread_num);
 }
 
 fn functional_optimizer(

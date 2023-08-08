@@ -152,6 +152,13 @@ fn dump_external_func() -> String {
     ext_fun.push("declare void @_sysy_starttime()\n");
     ext_fun.push("declare void @_sysy_stoptime()\n");
 
+    // functions interface
+    ext_fun.push("declare void @hitsz_thread_init()\n");
+    ext_fun.push("declare void @hitsz_thread_exit()\n");
+    ext_fun.push("declare i32 @hitsz_thread_create()\n");
+    ext_fun.push("declare void @hitsz_thread_join()\n");
+    ext_fun.push("declare void @hitsz_get_thread_num()\n");
+
     let mut text = String::new();
     text += "; External Functions\n";
     for fun in ext_fun {
