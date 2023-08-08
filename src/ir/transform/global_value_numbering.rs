@@ -55,7 +55,7 @@ impl CongruenceClass {
             call_congruence: Congruence::new(),
         }
     }
-    pub fn get_all_congruence_mut(&mut self) ->Vec<&mut Congruence>{
+    pub fn get_all_congruence_mut(&mut self) -> Vec<&mut Congruence> {
         let mut vec = vec![];
         vec.push(&mut self.add_congruence);
         vec.push(&mut self.sub_congruence);
@@ -100,7 +100,10 @@ impl CongruenceClass {
             InstKind::FtoI => Some(&self.ftoi_congruence),
             InstKind::ItoF => Some(&self.itof_congruence),
             InstKind::Call(_) => Some(&self.call_congruence),
-            _ => None,
+            _ => {
+                println!("kind:{:?}", inst.get_kind());
+                None
+            }
         }
     }
 
@@ -132,22 +135,62 @@ impl CongruenceClass {
         }
     }
 
-    pub fn remove_inst(&mut self,inst: ObjPtr<Inst>){
+    pub fn remove_inst(&mut self, inst: ObjPtr<Inst>) {
+        match inst.get_kind() {
+            InstKind::Alloca(_)
+            | InstKind::Branch
+            | InstKind::Head
+            | InstKind::Parameter
+            | InstKind::Return
+            | InstKind::Store
+            | InstKind::Load
+            | InstKind::GlobalConstFloat(_)
+            | InstKind::GlobalConstInt(_)
+            | InstKind::GlobalFloat(_)
+            | InstKind::Phi
+            | InstKind::GlobalInt(_) => {
+                return;
+            }
+            _ => {}
+        }
         let congruence = self.get_congruence_mut(inst).unwrap();
         let index1 = congruence.map.get(&inst).unwrap();
-        if let Some(index2) = congruence.vec_class[*index1].iter().position(|&x| x == inst) {
+        if let Some(index2) = congruence.vec_class[*index1]
+            .iter()
+            .position(|&x| x == inst)
+        {
             congruence.vec_class[*index1].remove(index2);
         }
         congruence.map.remove(&inst);
     }
 
-    pub fn add_inst(&mut self,inst: ObjPtr<Inst>){
+    pub fn add_inst(&mut self, inst: ObjPtr<Inst>) {
+        match inst.get_kind() {
+            InstKind::Alloca(_)
+            | InstKind::Branch
+            | InstKind::Head
+            | InstKind::Parameter
+            | InstKind::Return
+            | InstKind::Store
+            | InstKind::Load
+            | InstKind::GlobalConstFloat(_)
+            | InstKind::GlobalConstInt(_)
+            | InstKind::GlobalFloat(_)
+            | InstKind::Phi
+            | InstKind::GlobalInt(_) => {
+                return;
+            }
+            _ => {}
+        }
         let congruence = self.get_congruence_immut(inst).unwrap();
         if let Some(_index) = congruence.map.get(&inst) {
-            return ;
+            return;
         }
         let mut index_final = 0;
         for vec_congruent in &congruence.vec_class {
+            if vec_congruent.len() == 0 {
+                continue;
+            }
             if compare_two_inst(inst, vec_congruent[0], &self) {
                 if let Some(index) = congruence.map.get(&vec_congruent[0]) {
                     index_final = index + 1;
@@ -157,7 +200,7 @@ impl CongruenceClass {
                     congruence_mut.vec_class[index_final - 1].push(inst);
                     congruence_mut.map.insert(inst, index_final - 1);
                 }
-                return ;
+                return;
             }
         }
         let congruence = self.get_congruence_mut(inst).unwrap();
@@ -180,28 +223,29 @@ impl Congruence {
         }
     }
 
-    pub fn remove_inst(&mut self,inst: ObjPtr<Inst>){
-        let index1 = self.map.get(&inst).unwrap();
-        if let Some(index2) = self.vec_class[*index1].iter().position(|&x| x == inst) {
-            self.vec_class[*index1].remove(index2);
+    pub fn remove_inst(&mut self, inst: ObjPtr<Inst>) {
+        if let Some(index1) = self.map.get(&inst) {
+            if let Some(index2) = self.vec_class[*index1].iter().position(|&x| x == inst) {
+                self.vec_class[*index1].remove(index2);
+            }
+            self.map.remove(&inst);
         }
-        self.map.remove(&inst);
     }
 
-    pub fn add_inst(&mut self,inst: ObjPtr<Inst>,index:usize){
+    pub fn add_inst(&mut self, inst: ObjPtr<Inst>, index: usize) {
         if let Some(_index) = self.map.get(&inst) {
-            return ;
+            return;
         }
         self.map.insert(inst, index); //增加索引映射
         self.vec_class[index].push(inst);
     }
 }
 
-pub fn gvn(module: &mut Module, opt_option: bool) ->Option<Vec<CongruenceClass>>{
+pub fn gvn(module: &mut Module, opt_option: bool) -> Option<Vec<CongruenceClass>> {
     if opt_option {
         loop {
             let mut changed = false;
-            let (gvn_changed,vec_congruence_class) = easy_gvn(module);
+            let (gvn_changed, vec_congruence_class) = easy_gvn(module);
             changed |= gvn_changed;
             changed |= load_store_opt(module);
             if !changed {
@@ -212,7 +256,7 @@ pub fn gvn(module: &mut Module, opt_option: bool) ->Option<Vec<CongruenceClass>>
     None
 }
 
-pub fn easy_gvn(module: &mut Module) -> (bool,Vec<CongruenceClass>) {
+pub fn easy_gvn(module: &mut Module) -> (bool, Vec<CongruenceClass>) {
     let mut vec_congruence_class = vec![];
     let mut changed = false;
     let set = call_optimize(module);
@@ -224,9 +268,8 @@ pub fn easy_gvn(module: &mut Module) -> (bool,Vec<CongruenceClass>) {
         });
         vec_congruence_class.push(congruence_class);
     });
-    (changed,vec_congruence_class)
+    (changed, vec_congruence_class)
 }
-
 
 pub fn has_val(
     congruence_class: &mut CongruenceClass,

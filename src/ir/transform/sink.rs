@@ -6,7 +6,7 @@ pub fn sink(module: &mut Module,pools: &mut (&mut ObjPool<BasicBlock>, &mut ObjP
     func_process(module, |_, func| {
         let dominator_tree = calculate_dominator(func.get_head());
         bfs_bb_proceess(func.get_head(), |bb| {
-            inst_process_in_bb_reverse(bb.get_head_inst(), |inst|{
+            inst_process_in_bb_reverse(bb.get_tail_inst(), |inst|{
                 let use_list = inst.get_use_list();
                 let mut flag = false;
                 for user in use_list{
