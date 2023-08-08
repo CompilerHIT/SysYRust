@@ -1,3 +1,4 @@
+pub mod dump;
 pub mod easy_gc_alloc;
 pub mod merge;
 pub mod perfect_alloc;
