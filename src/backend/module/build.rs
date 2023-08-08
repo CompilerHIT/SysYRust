@@ -16,12 +16,10 @@ impl AsmModule {
         if is_opt {
             BackendPass::new(obj_module).block_pass_pre_clear(pool);
         }
-        // self.print_func();
         self.remove_unuse_inst_pre_alloc();
-        // self.print_func();
 
         //检查是否有存在name func里面没有,但是被调用了的函数
-        // let is_opt = true;
+        let is_opt = true;
         if is_opt {
             // // gep偏移计算合并
             // BackendPass::new(obj_module).opt_gep();
@@ -37,6 +35,7 @@ impl AsmModule {
             self.list_scheduling_tech();
 
             let func = *self.name_func.get("loop3").unwrap();
+            func.calc_live_base();
             func.print_live_interval("tmp_before.txt");
             // // 为临时寄存器分配寄存器
             self.clear_tmp_var();
