@@ -30,6 +30,7 @@ pub fn alloc(func: &Func, constraints: &HashMap<Reg, HashSet<Reg>>) -> Option<Fu
     )
 }
 
+///根据干涉图和可用寄存器列表不择手段地尝试获取最佳寄存器分配结果
 pub fn alloc_with_v_interference_graph_and_base_available(
     all_live_neighbors: &HashMap<Reg, HashSet<Reg>>,
     availables: &HashMap<Reg, RegUsedStat>,
@@ -65,7 +66,7 @@ pub fn alloc_with_v_interference_graph_and_base_available(
     }());
 
     /*
-    准备最后根据总图进行寄存器分配的方法
+    准备最后根据总图,对排好序的寄存器进行分配
      */
     let final_color = |all_neighbors: &HashMap<Reg, HashSet<Reg>>,
                        availables: HashMap<Reg, RegUsedStat>,
@@ -87,6 +88,7 @@ pub fn alloc_with_v_interference_graph_and_base_available(
         colors
     };
 
+    //应用kempe定义探索最优寄存器分配
     let mut to_colors: Vec<Reg> = live_neighbors.iter().map(|(key, _)| *key).collect();
     let mut ordered_color_lst: LinkedList<Reg> = LinkedList::new();
     let availables = availables;
@@ -144,9 +146,10 @@ pub fn alloc_with_v_interference_graph_and_base_available(
         return Some(fat);
     }
 
-    return None;
+    // return None;
     //发现一阶段方案不足以完美分配,对于剩下的活寄存器,进一步搜索试探完美分配
     log_file!("unbest_alloc_for_pp.txt", "{:?}", to_colors);
+    // 进一步应用kempe定理
     let mut pre_colors: HashMap<i32, i32> = HashMap::new();
     let mut availables = availables;
     loop {
@@ -182,6 +185,7 @@ pub fn alloc_with_v_interference_graph_and_base_available(
             }
 
             if available_color.is_none() {
+                new_to_colors.push(*to_color);
                 continue;
             }
             //着色,加入表中
@@ -241,7 +245,13 @@ pub fn alloc_with_v_interference_graph_and_base_available(
         return Some(fat);
     }
 
-    //如果二阶段方案不足以完美分配,试探三阶段完美分配  (建立数学模型+多线程发射)
+    //
+
+    // 进行弦图优化,寻找最佳分配着色序列
+
+    // 基于简单贪心(从度数最高的开始着色,直到剩余的寄存器能够被完美着色为止)
+
+    // (建立数学模型+多线程发射)
 
     None
 }
