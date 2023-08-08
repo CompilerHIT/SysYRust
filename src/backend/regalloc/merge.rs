@@ -103,6 +103,7 @@ pub fn merge_reg_with_constraints(
         //     func.replace_v_reg(r2, &new_v);
         //     return true;
         // }
+        //如果该移动边的两个顶点 其中有一个的邻居都是 小度点,则合并成功
 
         //尝试着色
         if let Some(_) = alloc_with_v_interference_graph_and_base_available(
