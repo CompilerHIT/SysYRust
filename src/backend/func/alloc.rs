@@ -31,7 +31,6 @@ impl Func {
         //分类分配
         //不保留临时寄存器的分配方式,这个时候采用完美试探分配,
         self.calc_live_for_alloc_reg();
-        //ban掉16个物理寄存器以检查紧缩结果
 
         let alloc_stat = perfect_alloc::alloc(self, &HashMap::new());
         if alloc_stat.is_some() {

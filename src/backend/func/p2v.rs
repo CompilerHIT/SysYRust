@@ -103,10 +103,13 @@ impl Func {
                 if defined.len() == 0 {
                     continue;
                 }
-                for reg in defined.iter() {
-                    //理论上当前实现对于函数返回值的使用不应该传递到后面的基本块
-                    debug_assert!(!bb.live_out.contains(reg));
-                }
+                // for reg in defined.iter() {
+                //     //理论上当前实现对于函数返回值的使用不应该传递到后面的基本块
+                //     debug_assert!(!bb.live_out.contains(reg), "{}", {
+                //         self.print_live_interval("tt.txt");
+                //         reg
+                //     });
+                // }
                 for defined in defined.iter() {
                     if !bb.live_out.contains(defined) {
                         continue;

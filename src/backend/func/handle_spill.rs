@@ -66,34 +66,18 @@ impl Func {
             phisic_mems.insert(reg, new_stack_slot);
         }
 
+        Func::print_func(ObjPtr::new(&self), "before_handle_spill.txt");
         // debug_assert!();
         let to_process = self.blocks.iter().cloned().collect::<Vec<ObjPtr<BB>>>();
         // Func::print_func(ObjPtr::new(&self), "before_handle_spill.txt");
         for bb in to_process.iter() {
+            if bb.insts.len() == 0 {
+                continue;
+            }
             self.handle_spill_for_block(bb, pool);
-            debug_assert!(
-                bb.insts
-                    .iter()
-                    .filter(|inst| inst
-                        .get_regs()
-                        .iter()
-                        .filter(|reg| !reg.is_physic())
-                        .count()
-                        != 0)
-                    .count()
-                    == 0,
-                "{}",
-                {
-                    for inst in bb.insts.iter() {
-                        println!("{}", inst.as_ref());
-                    }
-
-                    false
-                }
-            );
-            // Func::handle_spill_of_block(bb, pool, spillings, spill_stack_map, phisic_mem);
         }
         // self.remove_inst_suf_spill(pool);
+        Func::print_func(ObjPtr::new(&self), "after_handle_spill.txt");
         debug_assert!(self.draw_all_virtual_regs().len() == 0);
     }
 
@@ -207,7 +191,8 @@ impl Func {
 
         let choose_borrow = Func::choose_borrow;
         let borrow = Func::borrow;
-        let simplify_holders_with_next_occur = Func::simplify_holders_with_next_occur;
+        let refresh_rentors_and_holders_with_next_occur =
+            Func::refresh_rentors_and_holders_with_next_occur;
 
         let mut new_insts = Vec::new();
         let mut rentors: HashMap<Reg, Reg> = HashMap::new();
@@ -239,11 +224,8 @@ impl Func {
                         }
                     }
                     _ => {
-                        for inst in bb.insts.iter() {
-                            println!("{}", inst.as_ref());
-                        }
-                        println!("{}{}{}", bb.label, inst.as_ref(), reg);
-                        unreachable!()
+                        Func::load_back(reg, &phisic_mems, pool, &mut new_insts);
+                        holders.insert(*reg, *reg);
                     }
                 }
             }
@@ -280,8 +262,7 @@ impl Func {
                 if rentors.contains_key(&reg) {
                     continue;
                 }
-                let to_borrow =
-                    choose_borrow(reg, &mut next_occurs, &rentors, &holders, availables);
+                let to_borrow = choose_borrow(reg, &next_occurs, &rentors, &holders, availables);
                 availables.use_reg(to_borrow.get_color());
                 borrow(
                     reg,
@@ -308,7 +289,7 @@ impl Func {
                     == 0
             );
             //根据next occur更新rentor和holder
-            simplify_holders_with_next_occur(&mut holders, &next_occurs);
+            refresh_rentors_and_holders_with_next_occur(&mut rentors, &mut holders, &next_occurs);
             new_insts.push(*inst);
         };
         let mut index = 0;
@@ -328,13 +309,15 @@ impl Func {
         let to_give_back: Vec<Reg> = rentors.iter().map(|(_, r)| *r).collect();
         for reg in to_give_back {
             let rentor = *holders.get(&reg).unwrap();
-            Func::return_reg(&rentor, &reg, spill_stack_map, pool, &mut new_insts);
-            rentors.remove(&rentor);
-            holders.insert(reg, reg);
+            if bb.live_out.contains(&rentor) {
+                Func::return_reg(&rentor, &reg, spill_stack_map, pool, &mut new_insts);
+            }
             //根据物理寄存器是否在live out 中判断是否要加载回来
             if bb.live_out.contains(&reg) {
                 Func::load_back(&reg, &phisic_mems, pool, &mut new_insts);
             }
+            rentors.remove(&rentor);
+            holders.insert(reg, reg);
         }
 
         // println!("{index}");
@@ -379,6 +362,12 @@ impl Func {
                 );
                 inst.as_mut().replace_reg(&reg, &tmp_reg);
             }
+            //borrow结束后rentor中的寄存器应该都是临时寄存器
+            for (r, br) in rentors.iter() {
+                debug_assert!(Reg::get_tmp_for_handle_spill().contains(br));
+            }
+            rentors.clear();
+
             new_insts.push(*inst);
             index += 1;
         }
@@ -392,7 +381,7 @@ impl Func {
     ) {
         let mut to_free = Vec::new();
         for (reg, next_occurs) in next_occurs.iter_mut() {
-            while next_occurs.front().unwrap().0 <= cur_index {
+            while !next_occurs.is_empty() && next_occurs.front().unwrap().0 <= cur_index {
                 next_occurs.pop_front();
             }
             if next_occurs.len() == 0 {
@@ -433,18 +422,8 @@ impl Func {
                 .unwrap()
                 .push_back((bb.insts.len(), false));
         });
-        //对于其他的没有加入到表中的寄存器,也添加列表
-        for reg in Reg::get_all_not_specials() {
-            if next_occurs.contains_key(&reg) {
-                continue;
-            }
-            next_occurs.insert(reg, LinkedList::new());
-        }
-
-        //然后对于不在live out中的但是insts中出现的所有寄存器,直接全部加上一个超长长度,
-        //并且后面设置为true是为了提示不用保存
-        for (_, next_occur) in next_occurs.iter_mut() {
-            next_occur.push_back((bb.insts.len() * 2, true));
+        for (_, b) in next_occurs.iter() {
+            debug_assert!(b.len() >= 1);
         }
         next_occurs
     }
@@ -462,6 +441,11 @@ impl Func {
         let pos = spill_stack_map.get(rentor).unwrap().get_pos();
         let store_inst = LIRInst::build_storetostack_inst(owner, pos);
         new_insts.push(pool.put_inst(store_inst));
+        config::record_spill(
+            "",
+            "",
+            format!("把{}值从{}存回栈{}上", rentor, owner, pos).as_str(),
+        );
     }
 
     ///加载回物理寄存器的原值
@@ -474,8 +458,14 @@ impl Func {
         let pos = phisic_mems.get(p_reg).unwrap().get_pos();
         let load_inst = LIRInst::build_loadstack_inst(p_reg, pos);
         new_insts.push(pool.put_inst(load_inst));
+        config::record_spill(
+            "",
+            "",
+            format!("从栈{}上加载回物理寄存器{}原值", pos, p_reg).as_str(),
+        );
     }
 
+    ///choose last
     fn choose_borrow(
         rentor: &Reg,
         next_occurs: &HashMap<Reg, LinkedList<(usize, bool)>>,
@@ -485,7 +475,18 @@ impl Func {
     ) -> Reg {
         let mut availables = availables;
         availables.merge(&RegUsedStat::init_for_reg(rentor.get_type()));
-        let mut choices: Vec<(Reg, usize)> = Vec::new();
+
+        //获取自己的下次出现,如果自己没有下次出现,则 (use 完就结束了,也就是最短使用了,也就随便选一个能用的寄存器就最好)
+        let self_next_occur = next_occurs.get(rentor);
+        if self_next_occur.is_none() {
+            let to_borrow = availables.get_available_reg(rentor.get_type()).unwrap();
+            let to_borrow = Reg::from_color(to_borrow);
+            return to_borrow;
+        }
+
+        //如果自己有下次出现,记录自己最后一次出现的下标
+        let self_last_occur = self_next_occur.unwrap().back().unwrap().0;
+        let mut choices: Vec<(Reg, usize, bool)> = Vec::new();
         //然后建立可用寄存器列表
         for reg in Reg::get_all_not_specials() {
             if !availables.is_available_reg(reg.get_color()) {
@@ -497,17 +498,59 @@ impl Func {
             } else {
                 &reg
             };
-            let next_occur = next_occurs.get(old_holder).unwrap().front().unwrap();
-            let (index, if_def) = next_occur;
+            let next_occur = next_occurs.get(old_holder);
+            //如果next occur下次没有出现(则可以直接给他一个最大值,也就是自己的出现位置+2)
+            let (index, if_def) = if next_occur.is_none() {
+                (self_last_occur * 2 + 1, true)
+            } else {
+                next_occur.unwrap().front().unwrap().clone()
+            };
             //因为def的情况代价更小更适合选,所以相同前置的情况下先设置为1,
-            let next_occur = index << 1 | (if *if_def { 1 } else { 0 });
-            choices.push((*old_holder, next_occur));
+            choices.push((*old_holder, index, if_def));
         }
 
         //对 order 进行排序
         choices.sort_by_key(|item| item.1);
 
-        //刚好接近自身的最后一次出现的一个
+        //优先选择刚好下一次出现在自己最后一次出现后的一个
+        //首先寻找第一个下标大于自身的下次def自由寄存器,如果有自由寄存器,优先自由寄存器 (代价1)
+        // 然后寻找第一个下标大于自身的下次use自由寄存器,如果有自由寄存器,优先自由寄存器 (代价2)
+        //然后寻找第一个下次出现大于自身的下次use 可抢寄存器,代价3
+        //最后最大下标寄存器
+        let mut first_free_def: Option<Reg> = None;
+        let mut first_free_use: Option<Reg> = None;
+        let mut first_borrowable_use: Option<Reg> = None;
+        for (reg, _, if_def) in choices.iter().filter(|item| item.1 > self_last_occur) {
+            if reg.is_physic() && *if_def && first_free_def.is_none() {
+                first_free_def = Some(*reg);
+                break;
+            }
+        }
+        for (reg, _, if_def) in choices.iter().filter(|item| item.1 > self_last_occur) {
+            if reg.is_physic() && !*if_def && first_free_use.is_none() {
+                first_free_use = Some(*reg);
+                break;
+            }
+        }
+        for (reg, _, if_def) in choices.iter().filter(|item| item.1 > self_last_occur) {
+            if !reg.is_physic() && first_borrowable_use.is_none() {
+                debug_assert!(!*if_def);
+                first_borrowable_use = Some(*reg);
+                break;
+            }
+        }
+
+        if let Some(reg) = first_free_def {
+            log_file!("1.txt", "1");
+            return reg;
+        } else if let Some(reg) = first_free_use {
+            log_file!("2.txt", "2");
+            return reg;
+        } else if let Some(rentor) = first_borrowable_use {
+            log_file!("3.txt", "3");
+            return *rentors.get(&rentor).unwrap();
+        }
+        log_file!("4.txt", "4");
 
         //获取该虚拟寄存器的下一次出现
         debug_assert!(choices.len() != 0);
@@ -521,7 +564,9 @@ impl Func {
         to_borrow
     }
 
-    fn simplify_holders_with_next_occur(
+    ///如果下次rentor是def,则直接丢弃rentor
+    fn refresh_rentors_and_holders_with_next_occur(
+        rentors: &mut HashMap<Reg, Reg>,
         holders: &mut HashMap<Reg, Reg>,
         next_occurs: &HashMap<Reg, LinkedList<(usize, bool)>>,
     ) {
@@ -533,9 +578,31 @@ impl Func {
         }
         for reg in to_process {
             debug_assert!(holders.get(&reg).unwrap() == &reg);
-            let then_def = next_occurs.get(&reg).unwrap().front().unwrap().1;
+            let next_occur = next_occurs.get(&reg);
+            //说明这个物理寄存器之后不再出现了,说明可以抛弃
+            if next_occur.is_none() {
+                holders.remove(&reg);
+                continue;
+            }
+            let then_def = next_occur.unwrap().front().unwrap().1;
             if then_def {
                 holders.remove(&reg);
+            }
+        }
+
+        let to_process: Vec<Reg> = rentors.iter().map(|(r, _)| *r).collect();
+        for rentor in to_process {
+            let reg_rent = *rentors.get(&rentor).unwrap();
+            let next_occur = next_occurs.get(&rentor);
+            if next_occur.is_none() {
+                rentors.remove(&rentor);
+                holders.remove(&reg_rent);
+                continue;
+            }
+            let then_def = next_occur.unwrap().front().unwrap().1;
+            if then_def {
+                rentors.remove(&rentor);
+                holders.remove(&reg_rent);
             }
         }
     }
@@ -558,6 +625,11 @@ impl Func {
             } else {
                 spill_stack_map.get(holder).unwrap().get_pos()
             };
+            config::record_spill(
+                "",
+                "",
+                format!("把{}值暂存到栈{}是上", holder, pos).as_str(),
+            );
             let store_inst = LIRInst::build_storetostack_inst(to_borrow, pos);
             new_insts.push(pool.put_inst(store_inst));
             rentors.remove(holder);
@@ -566,6 +638,11 @@ impl Func {
         let pos = spill_stack_map.get(rentor).unwrap().get_pos();
         let load_inst = LIRInst::build_loadstack_inst(to_borrow, pos);
         new_insts.push(pool.put_inst(load_inst));
+        config::record_spill(
+            "",
+            "",
+            format!("从栈{}加载{}的值到{}上", pos, rentor, to_borrow).as_str(),
+        );
         rentors.insert(*rentor, *to_borrow);
         holders.insert(*to_borrow, *rentor);
     }
