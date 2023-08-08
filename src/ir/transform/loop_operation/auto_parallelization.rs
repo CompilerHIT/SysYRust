@@ -56,6 +56,7 @@ pub fn auto_paralellization(
                 ) {
                     parallelized_insert(current_loop, &mut parallelized);
                     parallelize(current_loop, pools);
+                    analyzer.clear();
                 }
             }
 
@@ -91,6 +92,7 @@ pub fn auto_paralellization(
                 }
                 parallelized_insert(current_loop, &mut parallelized);
                 parallelize(current_loop, pools);
+                analyzer.clear();
             }
         });
 
@@ -333,9 +335,269 @@ fn check_parallelization(
     true
 }
 
+/// 进行自动并行化的ir修改
 fn parallelize(
-    current_loop: ObjPtr<LoopInfo>,
+    mut current_loop: ObjPtr<LoopInfo>,
     pools: &mut (&mut ObjPool<BasicBlock>, &mut ObjPool<Inst>),
 ) {
-    todo!()
+    let mut iv = current_loop.get_header().get_head_inst();
+    debug_assert!(iv.is_phi() && !iv.get_next().is_phi());
+    debug_assert_eq!(iv.get_operands().len(), 2);
+    let index = iv
+        .get_operands()
+        .iter()
+        .position(|x| !current_loop.is_in_current_loop(&x.get_parent_bb()))
+        .unwrap();
+    let start = iv.get_operand(index);
+    let mut update = iv.get_operand(1 - index);
+    let step_index = update.get_operands().iter().position(|x| *x != iv).unwrap();
+    let mut step = update.get_operand(step_index);
+
+    let new_start = thread_create_ir(current_loop, start, step, pools);
+
+    iv.set_operand(new_start, index);
+    let const_4 = pools.1.make_int_const(4);
+    let new_step = pools.1.make_mul(step, const_4);
+    step.insert_after(const_4);
+    step.insert_after(new_step);
+    update.set_operand(new_step, step_index);
+
+    let exiting_blocks = current_loop.get_exit_blocks();
+    for exiting_block in exiting_blocks {
+        let exit_block = exiting_block
+            .get_next_bb()
+            .iter()
+            .find(|x| !current_loop.is_in_loop(x))
+            .unwrap()
+            .clone();
+
+        thread_exit_ir(exiting_block, exit_block, pools);
+    }
+}
+
+/// 申请线程的大致结构
+///                             ┌────────────────────────────────┐
+///                             │ Pre_header                     │
+///                             │                                │
+///                             └────────┬───────────────────────┘
+///                                      │
+///                                      │
+///                                      │
+///                             ┌────────▼───────────────────────┐
+///                             │                                │
+///                     ┌───────► i: phi 0 i_add                 │
+///                     │       │                                │
+///                     │       │ start: phi prestart start_add  │
+///                     │       │                                │
+///                     │       │ br i < 3                       │
+///                     │       ├───────────────┬────────────────┤
+///                     │       │   TRUE        │  FALSE         ├──────────────────►┌───────────────────────────────┐
+///                     │       │               │                │                   │ jmp                           │
+///                     │       └──────┬────────┴────────────────┘       ┌──────────►│                               │
+///                     │              │                                 │           └───────────────┬───────────────┘
+///                     │       ┌──────▼─────────────────────────┐       │                           │
+///                     │       │                                │       │                           │
+///                     │       │ thread_id: call thread_create()│       │                           │
+///                     │       │                                │       │                           │
+///                     │       │ br thread_id != 0              │       │           ┌───────────────▼────────────────┐
+///                     │       │                                │       │           │                                │
+///                     │       │                                │       │           │ Header                         │
+///                     │       ├───────────────┬────────────────┤       │           │                                │
+///                     │       │   TRUE        │  FALSE         ├───────┘           └────────────────────────────────┘
+///                     │       │               │                │
+///                     │       └──────┬────────┴────────────────┘
+///                     │              │
+///                     │              │
+///                     │       ┌──────▼─────────────────────────┐
+///                     │       │                                │
+///                     │       │ start_add: add start step      │
+///                     │       │                                │
+///                     │       │ i_add: add i step              │
+///                     │       │                                │
+///                     │       │ jmp                            │
+///                     └───────┤                                │
+///                             │                                │
+///                             │                                │
+///                             └────────────────────────────────┘
+fn thread_create_ir(
+    current_loop: ObjPtr<LoopInfo>,
+    prestart: ObjPtr<Inst>,
+    step: ObjPtr<Inst>,
+    pools: &mut (&mut ObjPool<BasicBlock>, &mut ObjPool<Inst>),
+) -> ObjPtr<Inst> {
+    let mut preheader = current_loop.get_preheader();
+    let mut header = current_loop.get_header();
+    // 从上往下构造ir
+    // thread_loop_head
+    let mut thread_loop_head = pools
+        .0
+        .new_basic_block(format!("thread_loop_head_{}", header.get_name()));
+    let const_0 = pools.1.make_int_const(0);
+    let const_3 = pools.1.make_int_const(3);
+    preheader.get_tail_inst().insert_before(const_0);
+    preheader.get_tail_inst().insert_before(const_3);
+
+    let mut phi_i = pools.1.make_int_phi();
+    let mut phi_start = pools.1.make_int_phi();
+    let lt = pools.1.make_lt(phi_i, const_3);
+
+    thread_loop_head.push_back(phi_i);
+    thread_loop_head.push_back(phi_start);
+    thread_loop_head.push_back(lt);
+    thread_loop_head.push_back(pools.1.make_br(lt));
+
+    // thread_loop_call
+    let mut thread_loop_call = pools
+        .0
+        .new_basic_block(format!("thread_loop_call_{}", header.get_name()));
+    let call = pools
+        .1
+        .make_int_call("hitsz_thread_creat".to_string(), Vec::new());
+    let ne = pools.1.make_ne(call, const_0);
+
+    thread_loop_call.push_back(call);
+    thread_loop_call.push_back(ne);
+    thread_loop_call.push_back(pools.1.make_br(ne));
+
+    // thread_loop_update
+    let mut thread_loop_update = pools
+        .0
+        .new_basic_block(format!("thread_loop_update_{}", header.get_name()));
+    let start_add = pools.1.make_add(phi_start, step);
+    let i_add = pools.1.make_add(phi_i, step);
+
+    thread_loop_update.push_back(start_add);
+    thread_loop_head.push_back(i_add);
+    thread_loop_update.push_back(pools.1.make_jmp());
+
+    // thread_loop_jmp
+    let mut thread_loop_jmp = pools
+        .0
+        .new_basic_block(format!("thread_loop_jmp_{}", header.get_name()));
+    thread_loop_jmp.push_back(pools.1.make_jmp());
+
+    // 修改phi的参数
+    phi_i.add_operand(const_0);
+    phi_i.add_operand(i_add);
+
+    phi_start.add_operand(prestart);
+    phi_start.add_operand(start_add);
+
+    // 修改cfg结构
+    preheader.replace_next_bb(header, thread_loop_head);
+    header.replace_up_bb(preheader, thread_loop_jmp);
+
+    thread_loop_head.set_next_bb(vec![thread_loop_jmp, thread_loop_call]);
+    thread_loop_head.set_up_bb(vec![preheader, thread_loop_update]);
+
+    thread_loop_call.set_next_bb(vec![thread_loop_jmp, thread_loop_update]);
+    thread_loop_call.set_up_bb(vec![thread_loop_head]);
+
+    thread_loop_update.set_next_bb(vec![thread_loop_head]);
+    thread_loop_update.set_up_bb(vec![thread_loop_call]);
+
+    thread_loop_jmp.set_next_bb(vec![header]);
+    thread_loop_jmp.set_up_bb(vec![thread_loop_head, thread_loop_call]);
+
+    phi_start
+}
+
+/// 线程退出的大致结构
+///           ┌───────────────────────┐
+///           │ exiting_block         │
+///           │                       │
+///           └──────────┬────────────┘
+///                      │
+///           ┌──────────▼────────────┐
+///           │ id: get_thread_num()  │
+///           │ br: id != 0           │
+///           ├──────────┬────────────┤
+///           │ TRUE     │ FALSE      │
+///           │          │            │
+///           └──┬───────┴────────┬───┘
+///              │                │
+/// ┌────────────▼──────┐   ┌─────▼───────────────┐
+/// │ thread_join()     │   │ thread_exit()       │
+/// │                   │   │                     │
+/// │ jmp               │   │ jmp                 │
+/// └────────────┬──────┘   └────┬────────────────┘
+///              │               │
+///            ┌─▼───────────────▼────┐
+///            │                      │
+///            │ jmp                  │
+///            │                      │
+///            └─────────┬────────────┘
+///                      │
+///            ┌─────────▼────────────┐
+///            │ exit_block           │
+///            │                      │
+///            │                      │
+///            └──────────────────────┘
+fn thread_exit_ir(
+    mut exiting_block: ObjPtr<BasicBlock>,
+    mut exit_block: ObjPtr<BasicBlock>,
+    pools: &mut (&mut ObjPool<BasicBlock>, &mut ObjPool<Inst>),
+) {
+    // thread_exit_if
+    let mut thread_exit_if = pools
+        .0
+        .new_basic_block(format!("thread_exit_if_{}", exiting_block.get_name()));
+    let get_thread_num = pools
+        .1
+        .make_int_call("hitsz_get_thread_num".to_string(), Vec::new());
+    let const_0 = pools.1.make_int_const(0);
+    let ne = pools.1.make_ne(get_thread_num, const_0);
+
+    thread_exit_if.push_back(get_thread_num);
+    thread_exit_if.push_back(const_0);
+    thread_exit_if.push_back(ne);
+    thread_exit_if.push_back(pools.1.make_br(ne));
+
+    // thread_exit_join
+    let mut thread_exit_join = pools
+        .0
+        .new_basic_block(format!("thread_exit_join_{}", exiting_block.get_name()));
+    let call = pools
+        .1
+        .make_void_call("hitsz_thread_join".to_string(), Vec::new());
+    let jmp = pools.1.make_jmp();
+
+    thread_exit_join.push_back(call);
+    thread_exit_join.push_front(jmp);
+
+    // thread_exit_exit
+    let mut thread_exit_exit = pools
+        .0
+        .new_basic_block(format!("thread_exit_exit_{}", exiting_block.get_name()));
+    let call = pools
+        .1
+        .make_void_call("hitsz_thread_exit".to_string(), Vec::new());
+    let jmp = pools.1.make_jmp();
+
+    thread_exit_exit.push_back(call);
+    thread_exit_exit.push_front(jmp);
+
+    // thread_exit_jmp
+    let mut thread_exit_jmp = pools
+        .0
+        .new_basic_block(format!("thread_exit_jmp_{}", exiting_block.get_name()));
+    let jmp = pools.1.make_jmp();
+
+    thread_exit_jmp.push_front(jmp);
+
+    // 修改cfg结构
+    exiting_block.replace_next_bb(exit_block, thread_exit_if);
+    exit_block.replace_up_bb(exiting_block, thread_exit_jmp);
+
+    thread_exit_if.set_next_bb(vec![thread_exit_exit, thread_exit_join]);
+    thread_exit_if.set_up_bb(vec![exiting_block]);
+
+    thread_exit_join.set_next_bb(vec![thread_exit_jmp]);
+    thread_exit_join.set_up_bb(vec![thread_exit_if]);
+
+    thread_exit_exit.set_next_bb(vec![thread_exit_jmp]);
+    thread_exit_exit.set_up_bb(vec![thread_exit_if]);
+
+    thread_exit_jmp.set_next_bb(vec![exit_block]);
+    thread_exit_jmp.set_up_bb(vec![thread_exit_if, thread_exit_exit]);
 }
