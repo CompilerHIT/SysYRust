@@ -265,18 +265,14 @@ impl Display for RegUsedStat {
 
 #[derive(Clone)]
 pub struct FuncAllocStat {
-    pub stack_size: usize,
-    pub bb_stack_sizes: HashMap<ObjPtr<BB>, usize>, //统计翻译bb的时候前面已经用过的栈空间
-    pub spillings: HashSet<i32>,                    //spilling regs
-    pub dstr: HashMap<i32, i32>,                    //distribute regs
+    pub spillings: HashSet<i32>, //spilling regs
+    pub dstr: HashMap<i32, i32>, //distribute regs
 }
 
 impl FuncAllocStat {
     pub fn new() -> FuncAllocStat {
         let mut out = FuncAllocStat {
             spillings: HashSet::new(),
-            stack_size: 0,
-            bb_stack_sizes: HashMap::new(),
             dstr: HashMap::new(),
         };
         for i in 0..=63 {

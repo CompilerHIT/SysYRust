@@ -125,21 +125,8 @@ pub fn alloc_with_v_interference_graph_and_base_available(
 
     if to_colors.len() == 0 {
         let colors = final_color(all_live_neighbors, availables, ordered_color_lst);
-        // let mut colors: HashMap<i32, i32> = HashMap::new();
-        // let mut availables = availables;
-        // while !ordered_color_lst.is_empty() {
-        //     let reg = ordered_color_lst.pop_front().unwrap();
-        //     let color = availables.get(&reg).unwrap();
-        //     let color = color.get_available_reg(reg.get_type()).unwrap();
-        //     colors.insert(reg.get_id(), color);
-        //     for nb in all_live_neighbors.get(&reg).unwrap() {
-        //         availables.get_mut(nb).unwrap().use_reg(color);
-        //     }
-        // }
 
         let fat = FuncAllocStat {
-            stack_size: 0,
-            bb_stack_sizes: HashMap::new(),
             spillings: HashSet::new(),
             dstr: colors,
         };
@@ -237,8 +224,6 @@ pub fn alloc_with_v_interference_graph_and_base_available(
             final_color(all_live_neighbors, availables, ordered_color_lst);
         colors.extend(pre_colors);
         let fat = FuncAllocStat {
-            stack_size: 0,
-            bb_stack_sizes: HashMap::new(),
             spillings: HashSet::new(),
             dstr: colors,
         };
