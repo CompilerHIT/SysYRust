@@ -549,7 +549,6 @@ impl Func {
         //然后计算live in 和live out
         while let Some(value) = queue.pop_front() {
             let (block, reg) = value;
-
             for pred in block.as_ref().in_edge.iter() {
                 if pred.as_mut().live_out.insert(reg) {
                     if pred.as_mut().live_def.contains(&reg) {
@@ -561,20 +560,6 @@ impl Func {
                 }
             }
         }
-
-        // //TODO ban掉大量寄存器以查看栈空间压缩效果
-        // for bb in self.blocks.iter() {
-        //     for color in 18..=31 {
-        //         let reg = Reg::from_color(color);
-        //         bb.as_mut().live_in.insert(reg);
-        //         bb.as_mut().live_out.insert(reg);
-        //     }
-        //     for color in 0..=9 {
-        //         let reg = Reg::from_color(FLOAT_BASE + color);
-        //         bb.as_mut().live_in.insert(reg);
-        //         bb.as_mut().live_out.insert(reg);
-        //     }
-        // }
     }
 }
 
