@@ -1,4 +1,4 @@
-use crate::log;
+use crate::{backend::regalloc, log};
 
 use super::*;
 
@@ -16,9 +16,7 @@ impl AsmModule {
         if is_opt {
             BackendPass::new(obj_module).block_pass_pre_clear(pool);
         }
-        // self.print_func();
         self.remove_unuse_inst_pre_alloc();
-        // self.print_func();
 
         //检查是否有存在name func里面没有,但是被调用了的函数
         let is_opt = true;
@@ -40,6 +38,10 @@ impl AsmModule {
             // func.print_live_interval("tmp_before.txt");
             // // 为临时寄存器分配寄存器
             self.clear_tmp_var();
+
+            self.name_func
+                .iter()
+                .for_each(|(_, func)| debug_assert_eq!(func.tmp_vars.len(), 0));
             self.allocate_reg();
             // func.print_live_interval("tmp_after.txt");
             // self.print_asm("after_alloc_tmp.txt");
@@ -49,9 +51,8 @@ impl AsmModule {
             self.map_v_to_p();
         }
 
-        // self.print_func();
+        self.print_asm("after_schedule.txt");
         self.remove_unuse_inst_suf_alloc();
-        // self.print_func();
 
         //加入外部函数
         self.add_external_func(pool);
