@@ -246,7 +246,7 @@ impl Func {
                             config::record_spill(
                                 "",
                                 &bb.label.as_str(),
-                                format!("把虚拟寄存器{}值从{}写回栈{}上", rentor, borrowed, pos,)
+                                format!("把物理寄存器{}中{}的值存回栈{}上", borrowed, rentor, pos,)
                                     .as_str(),
                             );
                         }
@@ -281,7 +281,7 @@ impl Func {
                 config::record_spill(
                     "",
                     &bb.label.as_str(),
-                    format!("从{}取回虚拟寄存器{}原值到{}", pos, rentor, borrowed).as_str(),
+                    format!("从栈{}上取回虚拟寄存器{}原值到{}", pos, rentor, borrowed).as_str(),
                 );
             }
             //修改 rent hold表
@@ -307,7 +307,11 @@ impl Func {
             config::record_spill(
                 "",
                 &bb.label.as_str(),
-                format!("把spilling寄存器{}值从{}写回栈{}处", rentor, borrowed, pos).as_str(),
+                format!(
+                    "把spilling寄存器{}值从物理寄存器{}写回栈{}处",
+                    rentor, borrowed, pos
+                )
+                .as_str(),
             );
             let self_back_inst = LIRInst::build_storetostack_inst(&borrowed, pos);
             new_insts.push(pool.put_inst(self_back_inst));
@@ -320,7 +324,7 @@ impl Func {
                 config::record_spill(
                     "",
                     &bb.label.as_str(),
-                    format!("取回物理寄存器{}原值", borrowed).as_str(),
+                    format!("从栈{}取回物理寄存器{}原值", owner_pos, borrowed).as_str(),
                 );
             }
             //更新rentor 和rentor的状态

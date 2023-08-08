@@ -21,7 +21,7 @@ impl AsmModule {
         // self.print_func();
 
         //检查是否有存在name func里面没有,但是被调用了的函数
-        // let is_opt = true;
+        let is_opt = true;
         if is_opt {
             // // gep偏移计算合并
             // BackendPass::new(obj_module).opt_gep();
@@ -66,6 +66,7 @@ impl AsmModule {
         // self.print_asm("asm_after_realloc_pre_spilt_func.txt");
 
         self.handle_spill_v3(pool);
+
         // self.print_func();
         // self.print_asm("asm_after_handle_spill.txt");
 
