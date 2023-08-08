@@ -283,6 +283,7 @@ impl AsmModule {
 
     pub fn generate_row_asm(&mut self, f: &mut File) {
         debug_assert!(|| -> bool {
+            self.generate_global_var(f);
             self.name_func.iter_mut().for_each(|(_, func)| {
                 if func.is_extern {
                     return;

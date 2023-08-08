@@ -43,6 +43,13 @@ pub fn merge_reg_with_constraints(
         if !constraints.contains_key(r1) || !constraints.contains_key(r2) {
             return false;
         }
+        if interef_graph.get(r1).unwrap().contains(r2) {
+            debug_assert!(interef_graph.get(r2).unwrap().contains(r1));
+            return false;
+        }
+        debug_assert!(r1.get_type() == r2.get_type());
+        debug_assert!(!interef_graph.get(r1).unwrap().contains(r2));
+        debug_assert!(!interef_graph.get(r2).unwrap().contains(r1));
         Func::print_func(ObjPtr::new(func), "rm_inst.txt");
         log_file!("final_merge.txt", "try merge:{},{}", r1, r2);
         debug_assert!(
@@ -78,17 +85,29 @@ pub fn merge_reg_with_constraints(
         new_v_links_to.extend(old_r2_inter.iter());
         new_v_links_to.remove(r1);
         new_v_links_to.remove(r2);
-        add_node_to_intereference_graph(interef_graph, &new_v, new_v_links_to);
+        add_node_to_intereference_graph(interef_graph, &new_v, new_v_links_to.clone());
         let mut new_v_constraint: HashSet<Reg> = old_r1_constraints.clone();
         new_v_constraint.extend(old_r2_constraints.iter());
-        constraints.insert(new_v, new_v_constraint);
+        constraints.insert(new_v, new_v_constraint.clone());
         //更新available
         let old_r1_available = availables.remove(r1).unwrap();
         let old_r2_available = availables.remove(r2).unwrap();
 
         let mut new_v_available = old_r1_available.clone();
         new_v_available.merge(&old_r2_available);
+
+        for r in new_v_constraint.iter() {
+            new_v_available.use_reg(r.get_color());
+        }
         availables.insert(new_v, new_v_available);
+
+        //如果新节点可分配 (则合并成功) (判断是否可合并成功)
+        if new_v_available.num_available_regs(r1.get_type()) > new_v_links_to.len() {
+            func.replace_v_reg(r1, &new_v);
+            func.replace_v_reg(r2, &new_v);
+            return true;
+        }
+        //如果该移动边的两个顶点 其中有一个的邻居都是 小度点,则合并成功
 
         //尝试着色
         if let Some(_) = alloc_with_v_interference_graph_and_base_available(
@@ -100,8 +119,6 @@ pub fn merge_reg_with_constraints(
             //把func中所有寄存器通通替换
             func.replace_v_reg(r1, &new_v);
             func.replace_v_reg(r2, &new_v);
-            assert!(func.remove_self_mv());
-            func.remove_self_mv();
             return true;
         } else {
             constraints.remove(&new_v);
@@ -195,6 +212,7 @@ pub fn merge_reg_with_constraints(
     }
     //如果合并成功
     if if_merge {
+        assert!(func.remove_self_mv());
         loop {
             if let Some(alloc_stat) = alloc_with_v_interference_graph_and_base_available(
                 &interef_graph,

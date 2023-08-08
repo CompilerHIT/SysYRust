@@ -1,3 +1,5 @@
+use crate::log;
+
 use super::*;
 
 impl AsmModule {
@@ -14,7 +16,6 @@ impl AsmModule {
         if is_opt {
             BackendPass::new(obj_module).block_pass_pre_clear(pool);
         }
-
         // self.print_func();
         self.remove_unuse_inst_pre_alloc();
         // self.print_func();
@@ -25,18 +26,18 @@ impl AsmModule {
             // // gep偏移计算合并
             // BackendPass::new(obj_module).opt_gep();
 
-            // 设置一些寄存器为临时变量
-            self.cal_tmp_var();
+            // // 设置一些寄存器为临时变量
+            // self.cal_tmp_var();
 
-            // 对非临时寄存器进行分配
-            self.allocate_reg();
-            // 将非临时寄存器映射到物理寄存器
-            self.map_v_to_p();
-            // 代码调度，列表调度法
-            // self.list_scheduling_tech();
+            // // 对非临时寄存器进行分配
+            // self.allocate_reg();
+            // // 将非临时寄存器映射到物理寄存器
+            // self.map_v_to_p();
+            // // 代码调度，列表调度法
+            // // self.list_scheduling_tech();
 
-            // 为临时寄存器分配寄存器
-            self.clear_tmp_var();
+            // // 为临时寄存器分配寄存器
+            // self.clear_tmp_var();
             self.allocate_reg();
             self.map_v_to_p();
         } else {
@@ -71,17 +72,17 @@ impl AsmModule {
 
         self.anaylyse_for_handle_call_v4();
 
-        let is_opt = true;
+        let is_opt = false;
         if is_opt {
             //TODO
-            self.split_func_v4(pool);
+            self.split_func(pool);
             self.build_own_call_map();
             self.analyse_callee_regs_to_saved();
             self.analyse_caller_regs_to_saved();
         }
 
-        self.reduce_caller_to_saved_after_func_split();
-        self.analyse_caller_regs_to_saved();
+        // self.reduce_caller_to_saved_after_func_split();
+        // self.analyse_caller_regs_to_saved();
         // self.print_asm("asm_after_realloc_suf_handle_call.txt");
 
         //此后栈空间大小以及 caller saved和callee saved都确定了
@@ -100,10 +101,9 @@ impl AsmModule {
         self.rearrange_stack_slot();
         self.update_array_offset(pool);
 
-        // self.print_asm("asm_before_rm_suf_update_array_offset.txt");
+        // self.print_asm("asm_before_rm_inst_suf_update_array_offset.txt");
         self.rm_inst_suf_update_array_offset(pool, &used_but_not_saved);
-
+        // self.print_asm("asm_before_rm_inst_suf_update_array_offset.txt");
         self.build_stack_info(f);
-        //删除无用的函数
     }
 }

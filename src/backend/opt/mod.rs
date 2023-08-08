@@ -25,12 +25,12 @@ impl BackendPass {
 
     pub fn run_pass(&mut self, pool: &mut BackendPool) {
         self.block_pass_pre_clear(pool);
-        self.clear_pass(pool);
+        // self.clear_pass(pool);
         self.peephole_pass(pool);
     }
 
-    pub fn run_addition_block_pass(&mut self) {
+    pub fn run_addition_block_pass(&mut self, pool: &mut BackendPool) {
         // 块优化
-        self.block_pass();
+        self.block_pass(pool);
     }
 }

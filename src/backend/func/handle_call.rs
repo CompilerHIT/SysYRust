@@ -147,120 +147,10 @@ impl Func {
         pool.put_func(new_func)
     }
 
-    ///配合v3系列的module.build
-    /// 实现了自适应函数调用
-    /// callers_used 为  (func name, the caller saved reg this func used)
-    pub fn handle_call_v3(
-        &mut self,
-        pool: &mut BackendPool,
-        callers_used: &HashMap<String, HashSet<Reg>>,
-    ) {
-        self.calc_live_for_handle_call();
-        let mut slots_for_caller_saved: Vec<StackSlot> = Vec::new();
-        // self.print_func();
-        // Func::print_func(ObjPtr::new(&self), "test_call.txt");
-        for bb in self.blocks.iter() {
-            let mut new_insts: Vec<ObjPtr<LIRInst>> = Vec::new();
-            let mut live_now: HashSet<Reg> = HashSet::new();
-            bb.live_out.iter().for_each(|reg| {
-                live_now.insert(*reg);
-            });
-            let mut index = bb.insts.len();
-            for inst in bb.insts.iter().rev() {
-                index -= 1;
-                for reg in inst.get_reg_def() {
-                    debug_assert!(
-                        live_now.contains(&reg) || inst.get_type() == InstrsType::Call,
-                        "blocak:{},inst:{:?},reg:{},index:{}",
-                        bb.label,
-                        inst.as_ref(),
-                        reg,
-                        index
-                    );
-                    live_now.remove(&reg);
-                }
-
-                if inst.get_type() == InstrsType::Call {
-                    // 找出 caller saved
-                    let mut to_saved: Vec<Reg> = Vec::new();
-                    for reg in live_now.iter() {
-                        //需要注意ra寄存器虽然是caller saved,但是不需要用栈空间方式进行restore
-                        if reg.is_caller_save() && reg.get_id() != 1 {
-                            to_saved.push(*reg);
-                        }
-                    }
-                    //TODO to_check, 根据指令判断是否使用
-                    let func_name = inst.get_func_name().unwrap();
-                    let callers_used = callers_used.get(&func_name).unwrap();
-                    to_saved = to_saved
-                        .iter()
-                        .cloned()
-                        .filter(|reg| callers_used.contains(reg))
-                        .collect();
-                    //根据调用的函数的情况,判断这个函数使用了哪些caller save寄存器
-                    // 准备栈空间
-                    while slots_for_caller_saved.len() < to_saved.len() {
-                        let last_slot = self.stack_addr.back().unwrap();
-                        let new_pos = last_slot.get_pos() + last_slot.get_size();
-                        let new_slot = StackSlot::new(new_pos, ADDR_SIZE);
-                        self.stack_addr.push_back(new_slot);
-                        slots_for_caller_saved.push(new_slot);
-                    }
-                    //产生一条指令
-                    let build_ls = |reg: Reg, offset: i32, kind: InstrsType| -> LIRInst {
-                        debug_assert!(
-                            (kind == InstrsType::LoadFromStack || kind == InstrsType::StoreToStack)
-                        );
-                        let mut ins = LIRInst::new(
-                            kind,
-                            vec![Operand::Reg(reg), Operand::IImm(IImm::new(offset))],
-                        );
-                        ins.set_double();
-                        ins
-                    };
-                    // 插入恢复指令
-                    for (index, reg) in to_saved.iter().enumerate() {
-                        let pos = slots_for_caller_saved.get(index).unwrap().get_pos();
-                        let load_inst = build_ls(*reg, pos, InstrsType::LoadFromStack);
-                        let load_inst = pool.put_inst(load_inst);
-                        new_insts.push(load_inst);
-                        config::record_caller_save_sl(
-                            &self.label,
-                            &bb.label,
-                            format!("load{reg}").as_str(),
-                        );
-                    }
-                    new_insts.push(*inst); //插入call指令
-                                           //插入保存指令
-                    for (index, reg) in to_saved.iter().enumerate() {
-                        let pos = slots_for_caller_saved.get(index).unwrap().get_pos();
-                        let store_inst = build_ls(*reg, pos, InstrsType::StoreToStack);
-                        let store_inst = pool.put_inst(store_inst);
-                        new_insts.push(store_inst);
-                        config::record_caller_save_sl(
-                            &self.label,
-                            &bb.label,
-                            format!("store{reg}").as_str(),
-                        );
-                    }
-                } else {
-                    new_insts.push(*inst);
-                }
-                for reg in inst.get_reg_use() {
-                    live_now.insert(reg);
-                }
-            }
-            new_insts.reverse();
-            bb.as_mut().insts = new_insts;
-        }
-
-        // self.print_func();
-    }
-
-    ///其中欧冠callers_used为指定函数使用的callers used寄存器
-    /// callee_used_bug unsaved为指定函数使用了但是没有保存的寄存器
-    /// 使用中转寄存器
-    /// 使用临时栈空间
+    /// callers_used为指定函数使用的callers used寄存器<br>
+    /// callee_used_bug unsaved指定函数使用了但是没有保存的寄存器 <br>
+    /// 使用中转寄存器<br>
+    /// 使用临时栈空间 <br>
     pub fn handle_call_v4(
         &mut self,
         pool: &mut BackendPool,
@@ -286,7 +176,7 @@ impl Func {
                 available_tmp_regs.release_reg(reg.get_color());
             }
         }
-        for reg in Reg::get_all_specials() {
+        for reg in Reg::get_all_specials_with_s0() {
             available_tmp_regs.use_reg(reg.get_color());
         }
 
@@ -300,18 +190,14 @@ impl Func {
 
         let this_func = ObjPtr::new(&self);
         for bb in self.blocks.iter() {
-            let mut phy_mems_for_handle_call = HashMap::new();
             //每个固定的中转物理寄存器使用相同的栈空间,以方便后面的无用读写删除优化
-            let mut build_tmp_slot = |func: &mut Func, reg: &Reg| -> i32 {
-                if phy_mems_for_handle_call.contains_key(reg) {
-                    return *phy_mems_for_handle_call.get(reg).unwrap();
-                }
+            //每次中转的时候使用新建的虚拟空间(以减少虚拟空间之间的冲突,以方便后面的栈重排)
+            let build_tmp_slot = |func: &mut Func, reg: &Reg| -> i32 {
                 let back = func.stack_addr.back().unwrap();
                 let pos = back.get_pos() + back.get_size();
                 let new_stack_slot = StackSlot::new(pos, ADDR_SIZE);
                 func.stack_addr.push_back(new_stack_slot);
                 let new_pos = new_stack_slot.get_pos();
-                phy_mems_for_handle_call.insert(*reg, new_pos);
                 new_pos
             };
             let mut new_insts = Vec::new();
@@ -354,8 +240,6 @@ impl Func {
                 for reg in caller_used {
                     borrowables.use_reg(reg.get_color());
                 }
-                //猜测fs1寄存器不能够被借用
-                borrowables.use_reg(Reg::get_fs1().get_color());
 
                 //剩下的borrowables就是能够借用来中转的寄存器
                 let mut tmp_map: HashMap<Reg, TmpHolder> = HashMap::new();
@@ -368,14 +252,13 @@ impl Func {
                         tmp_map.insert(*reg, TmpHolder::Reg(Reg::from_color(tmp_holder)));
                         continue;
                     }
-                    // //同色的没有,就找异色的,暂时关闭,等待LIR接口写好
+                    // //同色的没有,就找异色的,暂时关闭,等待LIR接口写好 (异色寄存器转储对于地址值的情况存在bug,)
                     // let tmp_holder =
                     //     borrowables.get_available_reg(if reg.get_type() == ScalarType::Int {
                     //         ScalarType::Float
                     //     } else {
                     //         ScalarType::Int
                     //     });
-
                     // if let Some(tmp_holder) = tmp_holder {
                     //     borrowables.use_reg(tmp_holder);
                     //     tmp_map.insert(*reg, TmpHolder::Reg(Reg::from_color(tmp_holder)));

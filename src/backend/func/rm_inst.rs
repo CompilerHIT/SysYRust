@@ -77,7 +77,7 @@ impl Func {
         if_rm
     }
 
-    //移除无意义的mv
+    //移除无意义的def
     pub fn remove_meaningless_def(
         &mut self,
         regs_used_but_not_saved: &HashMap<String, HashSet<Reg>>,

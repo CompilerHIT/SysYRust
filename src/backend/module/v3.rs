@@ -24,20 +24,6 @@ impl AsmModule {
             .for_each(|(_, func)| func.as_mut().rearrange_stack_slot());
     }
 
-    ///处理 函数调用前后的保存和恢复
-    /// 1. 插入保存和恢复caller save的指令
-    pub fn handle_call_v3(&mut self, pool: &mut BackendPool) {
-        // 分析并刷新每个函数的call指令前后需要保存的caller save信息,以及call内部的函数需要保存的callee save信息
-        // 对于 handle call
-        for (_, func) in self.name_func.iter() {
-            if func.is_extern {
-                continue;
-            }
-            func.as_mut()
-                .handle_call_v3(pool, &self.caller_regs_to_saveds);
-        }
-    }
-
     ///加入外部函数,
     pub fn add_external_func(&mut self, pool: &mut BackendPool) {
         // debug_assert!(self.name_func.contains_key("putint"));
