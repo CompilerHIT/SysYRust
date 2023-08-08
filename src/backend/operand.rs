@@ -2,7 +2,7 @@
 use crate::utility::ScalarType;
 use std::{collections::HashSet, fmt::Display};
 
-use super::block::FLOAT_BASE;
+use super::{block::FLOAT_BASE, structs::FloatArray};
 pub const REG_COUNT: i32 = 32;
 pub const ARG_REG_COUNT: i32 = 8;
 pub const REG_SP: i32 = 2;
@@ -325,6 +325,17 @@ impl Reg {
             args.insert(Reg::from_color(i));
         }
         args
+    }
+
+    pub fn get_tmp_for_handle_spill() -> HashSet<Reg> {
+        let mut out = HashSet::new();
+        for i in 5..=7 {
+            out.insert(Reg::from_color(i));
+        }
+        for i in 18..=20 {
+            out.insert(Reg::from_color(i + FLOAT_BASE));
+        }
+        out
     }
 
     ///获取所有非特殊寄存器

@@ -19,7 +19,7 @@ impl AsmModule {
         self.remove_unuse_inst_pre_alloc();
 
         //检查是否有存在name func里面没有,但是被调用了的函数
-        let is_opt = true;
+        // let is_opt = true;
         if is_opt {
             // // gep偏移计算合并
             // BackendPass::new(obj_module).opt_gep();
