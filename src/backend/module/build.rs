@@ -21,24 +21,28 @@ impl AsmModule {
         // self.print_func();
 
         //检查是否有存在name func里面没有,但是被调用了的函数
-
+        let is_opt = true;
         if is_opt {
             // // gep偏移计算合并
             // BackendPass::new(obj_module).opt_gep();
 
-            // // 设置一些寄存器为临时变量
-            // self.cal_tmp_var();
+            // 设置一些寄存器为临时变量
+            self.cal_tmp_var();
 
-            // // 对非临时寄存器进行分配
-            // self.allocate_reg();
-            // // 将非临时寄存器映射到物理寄存器
-            // self.map_v_to_p();
-            // // 代码调度，列表调度法
-            // // self.list_scheduling_tech();
-
-            // // 为临时寄存器分配寄存器
-            // self.clear_tmp_var();
+            // 对非临时寄存器进行分配
             self.allocate_reg();
+            // 将非临时寄存器映射到物理寄存器
+            self.map_v_to_p();
+            // 代码调度，列表调度法
+            self.list_scheduling_tech();
+
+            let func = *self.name_func.get("loop3").unwrap();
+            func.print_live_interval("tmp_before.txt");
+            // // 为临时寄存器分配寄存器
+            self.clear_tmp_var();
+            self.allocate_reg();
+            func.print_live_interval("tmp_after.txt");
+            // self.print_asm("after_alloc_tmp.txt");
             self.map_v_to_p();
         } else {
             self.allocate_reg();

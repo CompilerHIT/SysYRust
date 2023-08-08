@@ -35,3 +35,31 @@ impl Func {
         );
     }
 }
+
+impl Func {
+    pub fn print_live_interval(&self, path: &str) {
+        log_file!(path, "func:{}", self.label);
+        for bb in self.blocks.iter() {
+            log_file!(path, "bb:{}", bb.label);
+            log_file!(
+                path,
+                "in edges:{:?}",
+                bb.in_edge
+                    .iter()
+                    .map(|bb| bb.label.clone())
+                    .collect::<Vec<String>>()
+            );
+            for inst in bb.insts.iter() {
+                log_file!(path, "{}", inst.as_ref());
+            }
+            log_file!(
+                path,
+                "out edges:{:?}",
+                bb.in_edge
+                    .iter()
+                    .map(|bb| bb.label.clone())
+                    .collect::<Vec<String>>()
+            );
+        }
+    }
+}
