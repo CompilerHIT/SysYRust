@@ -1,4 +1,4 @@
-use crate::log;
+use crate::{log, backend::regalloc};
 
 use super::*;
 
@@ -37,9 +37,16 @@ impl AsmModule {
             let func = *self.name_func.get("loop3").unwrap();
             func.calc_live_base();
             func.print_live_interval("tmp_before.txt");
+            let graph = regalloc::regalloc::build_interference(&func);
+            regalloc::dump::dump_interefgraph(&graph, "interference_graph.txt");
             // // 为临时寄存器分配寄存器
             self.clear_tmp_var();
+
+            self.name_func.iter().for_each(|(_, func)| {
+                debug_assert_eq!(func.tmp_vars.len(), 0)
+            });
             self.allocate_reg();
+            log!("{:?}", func.reg_alloc_info.spillings);
             func.print_live_interval("tmp_after.txt");
             // self.print_asm("after_alloc_tmp.txt");
             self.map_v_to_p();
@@ -48,9 +55,8 @@ impl AsmModule {
             self.map_v_to_p();
         }
 
-        // self.print_func();
+        self.print_asm("after_schedule.txt");
         self.remove_unuse_inst_suf_alloc();
-        // self.print_func();
 
         //加入外部函数
         self.add_external_func(pool);
