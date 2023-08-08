@@ -37,6 +37,7 @@ pub fn optimizer_run(
 
         // pre
         partial_redundancy_elimination::pre(module, optimize_flag, &mut pools);
+        
 
         // 循环优化
         loop_operation::loop_optimize(module, &mut pools);
@@ -44,7 +45,7 @@ pub fn optimizer_run(
         functional_optimizer(module, &mut pools, optimize_flag);
 
         // 指令下沉
-        // sink::sink(module, &mut pools);
+        sink::sink(module, &mut pools);
 
         // // 尾递归优化
         tail_call_optimize::tail_call_optimize(module, &mut pools);
@@ -59,7 +60,7 @@ pub fn optimizer_run(
         functional_optimizer(module, &mut pools, optimize_flag);
 
         // pre
-        // partial_redundancy_elimination::pre(module, optimize_flag, &mut pools);
+        partial_redundancy_elimination::pre(module, optimize_flag, &mut pools);
 
         // 循环优化
         loop_operation::loop_optimize(module, &mut pools);

@@ -51,7 +51,6 @@ pub fn pre(
     pools: &mut (&mut ObjPool<BasicBlock>, &mut ObjPool<Inst>),
 ) {
     block_opt(module, pools, opt_option);
-    // dump_now(&module, "pre_before.ll");
     let mut vec_congruence_class = global_value_numbering::gvn(module, opt_option).unwrap();
     let mut index = 0;
     func_process(module, |_, func| {
@@ -60,10 +59,6 @@ pub fn pre(
         }
         index += 1;
     });
-    phi_run(module);
-    // dump_now(&module, "pre.ll");
-    // hoist(module, opt_option, pools);
-    // dump_now(&module, "hoist.ll");
     phi_run(module);
     dead_code_eliminate(module, opt_option);
     global_eliminate(module);
@@ -76,8 +71,8 @@ pub fn pre_congruence(
     pools: &mut (&mut ObjPool<BasicBlock>, &mut ObjPool<Inst>),
 ) {
     let mut pre_context = PreContext { index: 0 };
-    let mut downstream_tree = DownStreamTree::make_downstream_tree(head);
     let mut dominator_tree = calculate_dominator(head);
+    let mut downstream_tree = DownStreamTree::make_downstream_tree(head, &dominator_tree);
     for index_class in 0..congruence.vec_class.len() {
         loop {
             let mut changed = false;
@@ -119,44 +114,41 @@ pub fn pre_group(
             }
         }
         for i in 0..congruence.vec_class[index_class].len() {
-            for j in 0..congruence.vec_class[index_class].len() {
-                if i == j {
-                    continue;
-                } else {
-                    if downstream_tree.is_upstream(
-                        congruence.vec_class[index_class][j].get_parent_bb(),
-                        congruence.vec_class[index_class][i].get_parent_bb(),
-                    ) && !downstream_tree.is_upstream(
-                        congruence.vec_class[index_class][i].get_parent_bb(),
-                        congruence.vec_class[index_class][j].get_parent_bb(),
-                    ) {
-                        let down = congruence.vec_class[index_class][i].get_parent_bb();
-                        let pres = down.get_up_bb();
-                        if pres.len() == 1 {
-                            if pres[0].get_next_bb().len() > 1 {
-                                continue;
-                            }
+            for j in i+1..congruence.vec_class[index_class].len() {
+                if downstream_tree.is_upstream(
+                    congruence.vec_class[index_class][j].get_parent_bb(),
+                    congruence.vec_class[index_class][i].get_parent_bb(),
+                ) && !downstream_tree.is_upstream(
+                    congruence.vec_class[index_class][i].get_parent_bb(),
+                    congruence.vec_class[index_class][j].get_parent_bb(),
+                ) {// 其中一个指令所在块是另一个块的上游，且不互为上下游(不在同一个循环体中)
+                    let down = congruence.vec_class[index_class][i].get_parent_bb();
+                    let pres = down.get_up_bb();
+                    if pres.len() == 1 {
+                        if pres[0].get_next_bb().len() > 1 {
+                            continue;
                         }
-                        flag |= true;
-                        changed |= true;
-                        if insert_inst_in_pre(
-                            index_class,
-                            congruence,
-                            congruence.vec_class[index_class].clone(),
-                            pre_context,
-                            congruence.vec_class[index_class][i],
-                            &dominator_tree,
-                            pools.1,
-                            pools.0,
-                        ) {
-                            println!("计算新树");
-                            *downstream_tree = DownStreamTree::make_downstream_tree(head);
-                            println!("计算新支配树");
-                            *dominator_tree = calculate_dominator(head);
-                            println!("计算完成");
-                        }
-                        break; //替换过指令，刷新，从头开始比较
                     }
+                    flag |= true;
+                    changed |= true;
+                    if insert_inst_in_pre(
+                        index_class,
+                        congruence,
+                        congruence.vec_class[index_class].clone(),
+                        pre_context,
+                        congruence.vec_class[index_class][i],
+                        &dominator_tree,
+                        pools.1,
+                        pools.0,
+                    ) {
+                        println!("计算新树");
+                        *dominator_tree = calculate_dominator(head);
+                        *downstream_tree = DownStreamTree::make_downstream_tree(head,dominator_tree);
+                        println!("计算新支配树");
+                        // *dominator_tree = calculate_dominator(head);
+                        println!("计算完成");
+                    }
+                    break; //替换过指令，刷新，从头开始比较
                 }
             }
             if flag {
@@ -171,6 +163,7 @@ pub fn pre_group(
     }
     changed
 }
+// todo:循环中的pre需要另外处理
 
 pub fn insert_inst_in_pre(
     index: usize,

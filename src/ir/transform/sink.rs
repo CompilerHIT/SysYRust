@@ -25,22 +25,6 @@ pub fn sink(module: &mut Module,pools: &mut (&mut ObjPool<BasicBlock>, &mut ObjP
 
 pub fn sink_inst(pool: &mut ObjPool<Inst>,dominator_tree: & DominatorTree,inst:ObjPtr<Inst>,bb:ObjPtr<BasicBlock>,use_list:Vec<ObjPtr<Inst>>){
     let nexts = bb.get_next_bb();
-    for next in nexts{// 后继节点中，若有节点满足其前继节点由自己支配，且这个节点对应的支配树中有用到这条指令，则该节点为循环头，不应将指令下沉，导致多次计算同一值
-        let next_ups = next.get_up_bb();
-        for next_up in next_ups{
-            if dominator_tree.is_dominate(next, next_up){
-                let mut vec_user = vec![];
-                for user in &use_list{
-                    if dominator_tree.is_dominate(next, &user.get_parent_bb()){
-                        vec_user.push(*user);
-                    }
-                }
-                if vec_user.len()>0{// 后继节点中，若有节点满足其前继节点由自己支配，且这个节点对应的支配树中有用到这条指令
-                    return;
-                }
-            }
-        }
-    }
     let mut vec_vec_user = vec![];
     for next in nexts{
         let mut vec_user = vec![];
@@ -58,6 +42,20 @@ pub fn sink_inst(pool: &mut ObjPool<Inst>,dominator_tree: & DominatorTree,inst:O
     if len<use_list.len(){
         return;
     }
+
+    for next in nexts{// 后继节点中，若有节点满足其前继节点由自己支配，且这个节点对应的支配树中有用到这条指令，则该节点为循环头，不应将指令下沉，导致多次计算同一值
+        let next_ups = next.get_up_bb();
+        for next_up in next_ups{
+            if dominator_tree.is_dominate(next, next_up){// 后继节点中，若有节点满足其前继节点由自己支配
+                for user in &use_list{
+                    if dominator_tree.is_dominate(next, &user.get_parent_bb()){// 这个节点对应的支配树中有用到这条指令
+                        return;
+                    }
+                }
+            }
+        }
+    }
+
     let mut index_next = 0;
     for next in nexts{
         if vec_vec_user[index_next].len()>0{// 等于0代表这一节点的支配树中根本没有指令使用了这条指令，所以不用插
