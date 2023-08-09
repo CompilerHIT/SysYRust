@@ -12,6 +12,13 @@ impl Func {
         HashMap<ObjPtr<BB>, HashSet<StackSlot>>,
         HashMap<ObjPtr<BB>, HashSet<StackSlot>>,
     ) {
+        let (live_uses, live_defs) = Func::build_live_use_def_for_stackslots(func);
+        let (live_in, live_out) =
+            Func::build_live_in_live_out_for_stackslots_from_live_use_and_live_def(
+                &live_uses, &live_defs,
+            );
+        return (live_uses, live_defs, live_in, live_out);
+        todo!();
         //计算使用的内存地址的活跃区间
         let mut live_ins: HashMap<ObjPtr<BB>, HashSet<StackSlot>> = HashMap::new();
         let mut live_outs: HashMap<ObjPtr<BB>, HashSet<StackSlot>> = HashMap::new();
@@ -119,21 +126,35 @@ impl Func {
 
     ///通过live use 和live def 建立live in和live out
     pub fn build_live_in_live_out_for_stackslots_from_live_use_and_live_def(
-        live_use: &HashMap<ObjPtr<BB>, HashSet<StackSlot>>,
-        live_def: &HashMap<ObjPtr<BB>, HashSet<StackSlot>>,
+        live_uses: &HashMap<ObjPtr<BB>, HashSet<StackSlot>>,
+        live_defs: &HashMap<ObjPtr<BB>, HashSet<StackSlot>>,
     ) -> (
         HashMap<ObjPtr<BB>, HashSet<StackSlot>>,
         HashMap<ObjPtr<BB>, HashSet<StackSlot>>,
     ) {
         let mut live_ins: HashMap<ObjPtr<BB>, HashSet<StackSlot>> = HashMap::new();
         let mut live_outs: HashMap<ObjPtr<BB>, HashSet<StackSlot>> = HashMap::new();
-        // let mut to_process
-        for (bb, used) in live_use.iter() {
+        let mut to_backward: VecDeque<(ObjPtr<BB>, StackSlot)> = VecDeque::with_capacity(10000);
+        for (bb, used) in live_uses.iter() {
             live_ins.insert(*bb, used.clone());
+            for sst in used.iter() {
+                to_backward.push_back((*bb, *sst));
+            }
             live_outs.insert(*bb, HashSet::new());
         }
-
-        todo!();
+        while !to_backward.is_empty() {
+            let (bb, sst) = to_backward.pop_front().unwrap();
+            for in_bb in bb.in_edge.iter() {
+                if live_outs.get_mut(in_bb).unwrap().insert(sst) {
+                    if !live_defs.get(in_bb).unwrap().contains(&sst)
+                        && live_ins.get_mut(in_bb).unwrap().insert(sst)
+                    {
+                        to_backward.push_back((*in_bb, sst));
+                    }
+                }
+            }
+        }
+        (live_ins, live_outs)
     }
 
     ///分析函数用到的栈空间的冲突,传入
@@ -252,6 +273,7 @@ impl Func {
                 }
             }
             let mut to_assign_with: Option<StackSlot> = None;
+            //随机一定次数在已经分配的寄存器中寻找空间
             for p_sst in allocated_ssts.iter() {
                 if unavailables_ssts.contains(p_sst) {
                     continue;

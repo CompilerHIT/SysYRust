@@ -20,7 +20,7 @@ impl AsmModule {
             if func.is_extern {
                 return;
             }
-            func.as_mut().handle_spill_v3(pool);
+            func.as_mut().handle_spill_tmp(pool);
         });
     }
 

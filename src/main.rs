@@ -51,7 +51,7 @@ fn run_main() {
     let o1_option = matches.is_present("O1");
 
     if o1_option {
-        config::set_time_limit_secs(178);
+        config::set_time_limit_secs(175);
     } else {
         config::set_time_limit_secs(58);
     }

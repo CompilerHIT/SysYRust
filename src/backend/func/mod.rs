@@ -252,33 +252,12 @@ impl Func {
         let mut slot = StackSlot::new(offset, offset);
         assert!(self.stack_addr.is_empty());
         self.stack_addr.push_front(StackSlot::new(0, 0));
-        slot.set_fix();
+
         self.stack_addr.push_front(slot);
     }
 
     pub fn get_first_block(&self) -> ObjPtr<BB> {
         self.blocks[1].clone()
-    }
-
-    /// 能够在 vtop 之前调用的 , 根据regallocinfo得到callee 表的方法
-    /// 该方法应该在handle spill之后调用
-    pub fn build_callee_map(&mut self) {
-        for bb in self.blocks.iter() {
-            for inst in bb.insts.iter() {
-                for reg in inst.get_reg_def() {
-                    let p_reg = if reg.is_physic() {
-                        reg
-                    } else if self.reg_alloc_info.dstr.contains_key(&reg.get_id()) {
-                        Reg::from_color(*self.reg_alloc_info.dstr.get(&reg.get_id()).unwrap())
-                    } else {
-                        unreachable!()
-                    };
-                    if p_reg.is_callee_save() {
-                        self.callee_saved.insert(p_reg);
-                    }
-                }
-            }
-        }
     }
 
     pub fn update_array_offset(&mut self, pool: &mut BackendPool) {

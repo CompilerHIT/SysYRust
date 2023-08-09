@@ -91,7 +91,7 @@ impl Func {
             spill_stack_map.insert(*spilling_reg, new_stack_slot);
             self.stack_addr.push_back(new_stack_slot);
         }
-        //为物理寄存器相关的借还开辟空间
+
         Func::print_func(ObjPtr::new(&self), "before_handle_spill.txt");
         let to_process = self.blocks.iter().cloned().collect::<Vec<ObjPtr<BB>>>();
         for bb in to_process.iter() {
@@ -100,6 +100,7 @@ impl Func {
             }
             Func::handle_spill_of_block_tmp(bb, pool, &spill_stack_map);
         }
+        // self.remove_inst_suf_spill(pool);
     }
 
     ///在handle spill之后调用
