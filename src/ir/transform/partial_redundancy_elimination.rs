@@ -58,7 +58,6 @@ pub fn pre(
     phi_run(module);
     dead_code_eliminate(module, opt_option);
     global_eliminate(module);
-    // println!("pre finished");
 }
 
 pub fn pre_congruence(
