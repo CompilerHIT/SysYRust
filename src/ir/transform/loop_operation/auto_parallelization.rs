@@ -452,7 +452,7 @@ fn thread_create_ir(
         .new_basic_block(format!("thread_loop_call_{}", header.get_name()));
     let call = pools
         .1
-        .make_int_call("hitsz_thread_creat".to_string(), Vec::new());
+        .make_int_call("hitsz_thread_create".to_string(), Vec::new());
     let ne = pools.1.make_ne(call, const_0);
 
     thread_loop_call.push_back(call);
@@ -467,7 +467,7 @@ fn thread_create_ir(
     let i_add = pools.1.make_add(phi_i, step);
 
     thread_loop_update.push_back(start_add);
-    thread_loop_head.push_back(i_add);
+    thread_loop_update.push_back(i_add);
     thread_loop_update.push_back(pools.1.make_jmp());
 
     // thread_loop_jmp
@@ -563,7 +563,7 @@ fn thread_exit_ir(
     let jmp = pools.1.make_jmp();
 
     thread_exit_join.push_back(call);
-    thread_exit_join.push_front(jmp);
+    thread_exit_join.push_back(jmp);
 
     // thread_exit_exit
     let mut thread_exit_exit = pools
@@ -575,7 +575,7 @@ fn thread_exit_ir(
     let jmp = pools.1.make_jmp();
 
     thread_exit_exit.push_back(call);
-    thread_exit_exit.push_front(jmp);
+    thread_exit_exit.push_back(jmp);
 
     // thread_exit_jmp
     let mut thread_exit_jmp = pools
@@ -583,7 +583,7 @@ fn thread_exit_ir(
         .new_basic_block(format!("thread_exit_jmp_{}", exiting_block.get_name()));
     let jmp = pools.1.make_jmp();
 
-    thread_exit_jmp.push_front(jmp);
+    thread_exit_jmp.push_back(jmp);
 
     // 修改cfg结构
     exiting_block.replace_next_bb(exit_block, thread_exit_if);
@@ -599,5 +599,5 @@ fn thread_exit_ir(
     thread_exit_exit.set_up_bb(vec![thread_exit_if]);
 
     thread_exit_jmp.set_next_bb(vec![exit_block]);
-    thread_exit_jmp.set_up_bb(vec![thread_exit_if, thread_exit_exit]);
+    thread_exit_jmp.set_up_bb(vec![thread_exit_join, thread_exit_exit]);
 }

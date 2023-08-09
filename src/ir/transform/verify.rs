@@ -71,7 +71,15 @@ fn bb_verify(
         let up_bb = bb_map.get_mut(next);
         debug_assert_ne!(up_bb, None);
         let up_bb = up_bb.unwrap();
-        let index = up_bb.iter().position(|x| x == &bb).unwrap();
+        let index = up_bb.iter().position(|x| x == &bb);
+        debug_assert!(
+            !index.is_none(),
+            "bb: {:?} not in {}'s up_bb: {:?}",
+            bb.get_name(),
+            next.get_name(),
+            up_bb.iter().map(|x| x.get_name()).collect::<Vec<_>>()
+        );
+        let index = index.unwrap();
         up_bb.remove(index);
         if up_bb.len() == 0 {
             bb_map.remove(next);
