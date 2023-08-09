@@ -71,6 +71,16 @@ pub fn hoist_group(
             for up1 in ups1{
                 if dominator_tree.is_dominate(up1,&bb1)&&up1.get_next_bb().len()==1{// 若前继块支配该块且只有当前块一个后继，则将指令移动到该前继中
                     let inst1 = congruence.vec_class[index_gp][i];
+                    let mut tttflag = false;
+                    for user in inst1.get_use_list(){//operand在当前块，不移动
+                        if user.get_parent_bb()==bb1{
+                            tttflag = true;
+                            break;
+                        }
+                    }
+                    if tttflag{
+                        break;
+                    }
                     let tail = up1.get_tail_inst();
                     let inst_new = make_same_inst(inst1, pool);
                     congruence.add_inst(inst_new, index_gp);

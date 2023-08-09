@@ -1,4 +1,4 @@
-use crate::{ir::{module::Module, tools::{func_process, bfs_inst_process, bfs_bb_proceess, inst_process_in_bb, replace_inst, inst_process_in_bb_reverse}, analysis::dominator_tree::{calculate_dominator, self, DominatorTree}, instruction::Inst, basicblock::BasicBlock}, utility::{ObjPtr, ObjPool}};
+use crate::{ir::{module::Module, tools::{func_process, bfs_inst_process, bfs_bb_proceess, inst_process_in_bb, replace_inst, inst_process_in_bb_reverse}, analysis::dominator_tree::{calculate_dominator, self, DominatorTree}, instruction::{Inst, InstKind}, basicblock::BasicBlock}, utility::{ObjPtr, ObjPool}};
 
 use super::gvn_hoist::make_same_inst;
 
@@ -15,7 +15,7 @@ pub fn sink(module: &mut Module,pools: &mut (&mut ObjPool<BasicBlock>, &mut ObjP
                         break;
                     }
                 }
-                if !flag{
+                if !flag&&use_list.len()!=0{
                     sink_inst(pools.1, &dominator_tree, inst, bb, use_list.clone());
                 }
             })
@@ -24,22 +24,52 @@ pub fn sink(module: &mut Module,pools: &mut (&mut ObjPool<BasicBlock>, &mut ObjP
 }
 
 pub fn sink_inst(pool: &mut ObjPool<Inst>,dominator_tree: & DominatorTree,inst:ObjPtr<Inst>,bb:ObjPtr<BasicBlock>,use_list:Vec<ObjPtr<Inst>>){
+    match inst.get_kind() {
+        InstKind::Alloca(_)|
+        InstKind::Branch|
+        InstKind::Call(_)|
+        InstKind::Load|
+        InstKind::Parameter|
+        InstKind::Phi|
+        InstKind::Return|
+        InstKind::Store=>{
+            return;
+        }
+        // InstKind::Branch =>{
+        //     if inst.is_br_cond(){
+        //         println!("branch");
+        //         sink_inst(pool, dominator_tree, inst.get_operand(0), bb, inst.get_operand(0).get_use_list().clone());
+        //         return;
+        //     }
+        // }
+        _=>{
+            for user in &use_list{
+                if user.is_br(){
+                    // println!("branch cond");
+                }
+            }
+        }
+    }
     let nexts = bb.get_next_bb();
     let mut vec_vec_user = vec![];
+    let mut len = 0;
     for next in nexts{
         let mut vec_user = vec![];
         for user in &use_list{// 将该指令的use_list分类，构建新的下沉指令，并按user分类分别设置新的use_list
             if dominator_tree.is_dominate(next, &user.get_parent_bb()){
+                if user.is_phi(){//如果有user是phi,且下一个节点就是phi所在的节点,则不下沉指令
+                    if *next==user.get_parent_bb(){
+                        return;
+                    }
+                }
                 vec_user.push(*user);
+                len +=1;
             }
         }
         vec_vec_user.push(vec_user);
     }
-    let mut len = 0;
-    for vec in & vec_vec_user{
-        len += vec.len();
-    }
     if len<use_list.len(){
+        // println!("沉1");
         return;
     }
 
@@ -49,12 +79,14 @@ pub fn sink_inst(pool: &mut ObjPool<Inst>,dominator_tree: & DominatorTree,inst:O
             if dominator_tree.is_dominate(next, next_up){// 后继节点中，若有节点满足其前继节点由自己支配
                 for user in &use_list{
                     if dominator_tree.is_dominate(next, &user.get_parent_bb()){// 这个节点对应的支配树中有用到这条指令
+                        // println!("沉2");
                         return;
                     }
                 }
             }
         }
     }
+    // println!("沉");
 
     let mut index_next = 0;
     for next in nexts{

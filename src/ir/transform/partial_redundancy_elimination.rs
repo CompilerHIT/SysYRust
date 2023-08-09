@@ -3,20 +3,16 @@ use std::collections::HashMap;
 use crate::{
     ir::{
         analysis::{
-            dominator_tree::{self, calculate_dominator, DominatorTree},
-            downstream_tree::{self, DownStreamTree},
+            dominator_tree::{calculate_dominator, DominatorTree},
+            downstream_tree::DownStreamTree,
         },
         basicblock::BasicBlock,
-        dump_now,
         instruction::{Inst, InstKind},
         module::Module,
         tools::{func_process, replace_inst},
         transform::{
             dead_code_eliminate::{dead_code_eliminate, global_eliminate},
-            functional_optimizer,
-            gvn_hoist::hoist,
-            phi_optimizer::{self, phi_run},
-            sink::sink,
+            phi_optimizer::phi_run,
         },
     },
     utility::{ObjPool, ObjPtr},
@@ -62,7 +58,7 @@ pub fn pre(
     phi_run(module);
     dead_code_eliminate(module, opt_option);
     global_eliminate(module);
-    println!("pre finished");
+    // println!("pre finished");
 }
 
 pub fn pre_congruence(
@@ -118,9 +114,6 @@ pub fn pre_group(
                 if downstream_tree.is_upstream(
                     congruence.vec_class[index_class][j].get_parent_bb(),
                     congruence.vec_class[index_class][i].get_parent_bb(),
-                ) && !downstream_tree.is_upstream(
-                    congruence.vec_class[index_class][i].get_parent_bb(),
-                    congruence.vec_class[index_class][j].get_parent_bb(),
                 ) {// 其中一个指令所在块是另一个块的上游，且不互为上下游(不在同一个循环体中)
                     let down = congruence.vec_class[index_class][i].get_parent_bb();
                     let pres = down.get_up_bb();
@@ -141,12 +134,12 @@ pub fn pre_group(
                         pools.1,
                         pools.0,
                     ) {
-                        println!("计算新树");
+                        // println!("计算新树");
                         *dominator_tree = calculate_dominator(head);
                         *downstream_tree = DownStreamTree::make_downstream_tree(head,dominator_tree);
-                        println!("计算新支配树");
+                        // println!("计算新支配树");
                         // *dominator_tree = calculate_dominator(head);
-                        println!("计算完成");
+                        // println!("计算完成");
                     }
                     break; //替换过指令，刷新，从头开始比较
                 }
@@ -157,7 +150,7 @@ pub fn pre_group(
             }
         }
         if !flag {
-            println!("end loop");
+            // println!("end loop");
             break;
         }
     }
@@ -185,9 +178,6 @@ pub fn insert_inst_in_pre(
     //只有一个前继且前继有多个后继,不处理
     //只有一个前继且前继只有当前块一个后继，直接把指令塞上去
     if pres.len() == 1 {
-        // if pres[0].get_next_bb().len()>1{
-        //     return flag;
-        // }else
         if pres[0].get_next_bb().len() == 1 {
             let inst_new = make_same_inst(inst_old, pool_inst);
             pres[0].get_tail_inst().as_mut().insert_before(inst_new);
@@ -239,7 +229,7 @@ pub fn insert_inst_in_pre(
             unreachable!("前继块没后继,upbb和nextbb管理出错")
         }
     }
-    insert_phi(bb, vec_index, vec_operands_phi, pool_inst, inst_old);
+    insert_phi(vec_index, vec_operands_phi, pool_inst, inst_old);
     flag
 }
 
@@ -252,7 +242,6 @@ pub fn bb_contains_inst(bb: ObjPtr<BasicBlock>, gp: Vec<ObjPtr<Inst>>) -> Option
 }
 
 pub fn insert_phi(
-    bb: ObjPtr<BasicBlock>,
     vec_index: Vec<usize>,
     vec_operands_phi: Vec<(usize, ObjPtr<Inst>)>,
     pool: &mut ObjPool<Inst>,
@@ -273,8 +262,8 @@ pub fn insert_phi(
             .add_operand(map_temp.get(&i).unwrap().clone())
     }
     inst_old.get_parent_bb().as_mut().push_front(inst_phi);
-    println!("插phi bb:{:?}", inst_phi.get_parent_bb().get_name());
+    // println!("插phi bb:{:?}", inst_phi.get_parent_bb().get_name());
     replace_inst(inst_old, inst_phi);
-    println!("phi ops:{:?}", inst_phi.get_operands().len());
-    println!("bb up :{:?}", inst_phi.get_parent_bb().get_up_bb().len());
+    // println!("phi ops:{:?}", inst_phi.get_operands().len());
+    // println!("bb up :{:?}", inst_phi.get_parent_bb().get_up_bb().len());
 }
