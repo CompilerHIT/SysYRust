@@ -36,16 +36,13 @@ pub fn optimizer_run(
         functional_optimizer(module, &mut pools, optimize_flag);
 
         // pre
-        partial_redundancy_elimination::pre(module, optimize_flag, &mut pools);
-        // functional_optimizer(module, &mut pools, optimize_flag);
-        // dump_now(module, "after_pre.ll");
+        // partial_redundancy_elimination::pre(module, optimize_flag, &mut pools);
 
         // 循环优化
         loop_operation::loop_optimize(module, &mut pools);
         simplify_cfg::simplify_cfg_run(module, &mut pools);
         functional_optimizer(module, &mut pools, optimize_flag);
 
-        // println!("asdf");
         // 指令下沉
         // sink::sink(module, &mut pools);
 
@@ -61,11 +58,8 @@ pub fn optimizer_run(
         simplify_cfg::simplify_cfg_run(module, &mut pools);
         functional_optimizer(module, &mut pools, optimize_flag);
 
-        // dump_now(module, "dump.ll");
         // pre
-        partial_redundancy_elimination::pre(module, optimize_flag, &mut pools);
-        // functional_optimizer(module, &mut pools, optimize_flag);
-        // dump_now(module, "dump_opt.ll");
+        // partial_redundancy_elimination::pre(module, optimize_flag, &mut pools);
 
         // 循环优化
         loop_operation::loop_optimize(module, &mut pools);
