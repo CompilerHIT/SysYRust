@@ -1,4 +1,4 @@
-use crate::{backend::regalloc, config, log, log_file_new};
+use crate::config;
 
 use super::*;
 
@@ -51,8 +51,6 @@ impl AsmModule {
             self.allocate_reg();
             self.map_v_to_p();
         }
-        config::record_event("finish first_alloc");
-        self.print_asm("after_schedule.txt");
         self.remove_unuse_inst_suf_alloc();
         config::record_event("finish rm inst suf first alloc");
         //加入外部函数
