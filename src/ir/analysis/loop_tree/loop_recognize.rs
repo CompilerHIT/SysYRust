@@ -89,8 +89,6 @@ fn recognize_one_loop(
                     tree.sub_loops.push(sub_loop.clone());
                 } else if !tree.blocks.contains(&bb) {
                     tree.blocks.push(bb);
-                } else {
-                    unreachable!();
                 }
             } else {
                 tree.blocks.push(bb);
