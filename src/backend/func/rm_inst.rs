@@ -41,6 +41,7 @@ impl Func {
         self.remove_unuse_def();
 
         self.short_cut_mv(regs_used_but_not_saved);
+
         while self.remove_self_mv() || self.remove_unuse_def() {
             self.short_cut_mv(regs_used_but_not_saved);
         }
@@ -57,7 +58,9 @@ impl Func {
         }
         self.remove_self_mv();
         self.remove_meaningless_def(regs_used_but_not_saved);
-        // Func::print_func(ObjPtr::new(&self), "after_rm_suf_update_array_offset.txt");
+        self.remove_unuse_def();
+        self.remove_self_mv();
+        Func::print_func(ObjPtr::new(&self), "after_rm_suf_update_array_offset.txt");
     }
 
     //移除
