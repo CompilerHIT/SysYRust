@@ -69,11 +69,13 @@ fn recognize_one_loop(
         let mut stack = vec![latch];
         while let Some(bb) = stack.pop() {
             // 将当前块的前继中没有在循环中的块加入stack
-            bb.get_up_bb().iter().for_each(|up_bb| {
-                if up_bb != &header && !dom_tree.is_dominate(&bb, up_bb) {
-                    stack.push(up_bb.clone());
-                }
-            });
+            if bb != header {
+                bb.get_up_bb().iter().for_each(|up_bb| {
+                    if up_bb != &header && !dom_tree.is_dominate(&bb, up_bb) {
+                        stack.push(up_bb.clone());
+                    }
+                })
+            };
 
             // 找到当前块所在的循环,并设置相应的子循环和父循环
             if visited.contains(&bb) {
