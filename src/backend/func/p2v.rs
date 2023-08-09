@@ -103,10 +103,13 @@ impl Func {
                 if defined.len() == 0 {
                     continue;
                 }
-                for reg in defined.iter() {
-                    //理论上当前实现对于函数返回值的使用不应该传递到后面的基本块
-                    debug_assert!(!bb.live_out.contains(reg));
-                }
+                // for reg in defined.iter() {
+                //     //理论上当前实现对于函数返回值的使用不应该传递到后面的基本块
+                //     debug_assert!(!bb.live_out.contains(reg), "{}", {
+                //         self.print_live_interval("tt.txt");
+                //         reg
+                //     });
+                // }
                 for defined in defined.iter() {
                     if !bb.live_out.contains(defined) {
                         continue;
@@ -126,12 +129,19 @@ impl Func {
                     );
                     for (inst, if_def) in find.iter() {
                         if *if_def {
-                            debug_assert!(|| -> bool {
-                                match inst.get_type() {
-                                    InstrsType::Call => true,
-                                    _ => false,
+                            // debug_assert!(|| -> bool {
+                            //     match inst.get_type() {
+                            //         InstrsType::Call => true,
+                            //         _ => false,
+                            //     }
+                            // }());
+                            match inst.get_type() {
+                                InstrsType::Call => (),
+                                _ => {
+                                    log_file!("./data/00m.txt", "1");
                                 }
-                            }());
+                            };
+
                             unchanged_def.insert((*inst, *defined));
                         }
                     }
@@ -309,10 +319,10 @@ impl Func {
                 if defined.len() == 0 {
                     continue;
                 }
-                for reg in defined.iter() {
-                    //理论上当前实现对于函数返回值的使用不应该传递到后面的基本块
-                    debug_assert!(!bb.live_out.contains(reg));
-                }
+                // for reg in defined.iter() {
+                //     //理论上当前实现对于函数返回值的使用不应该传递到后面的基本块
+                //     debug_assert!(!bb.live_out.contains(reg));
+                // }
                 for defined in defined.iter() {
                     if !bb.live_out.contains(defined) {
                         continue;

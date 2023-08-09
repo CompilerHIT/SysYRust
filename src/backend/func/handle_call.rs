@@ -151,7 +151,7 @@ impl Func {
     /// callee_used_bug unsaved指定函数使用了但是没有保存的寄存器 <br>
     /// 使用中转寄存器<br>
     /// 使用临时栈空间 <br>
-    pub fn handle_call_v4(
+    pub fn handle_call(
         &mut self,
         pool: &mut BackendPool,
         callers_used: &HashMap<String, HashSet<Reg>>,
@@ -308,6 +308,65 @@ impl Func {
         }
         // self.print_func();
         self.rm_unuse_sl_suf_handle_call(callers_used, callees_used, callees_be_saved);
+    }
+}
+
+//tmp handle call
+impl Func {
+    ///完全保存所有caller saved,然后直接恢复,使用固定空间
+    pub fn handle_call_tmp(&mut self, pool: &mut BackendPool) {
+        let mut p_mems = HashMap::new();
+        let mut build_tmp_slot = |func: &mut Func, reg: &Reg| -> i32 {
+            if let Some(pos) = p_mems.get(reg) {
+                return *pos;
+            }
+            let back = func.stack_addr.back().unwrap();
+            let pos = back.get_pos() + back.get_size();
+            let new_stack_slot = StackSlot::new(pos, ADDR_SIZE);
+            func.stack_addr.push_back(new_stack_slot);
+            let new_pos = new_stack_slot.get_pos();
+            p_mems.insert(*reg, new_pos);
+            new_pos
+        };
+        self.calc_live_for_handle_call();
+        let bb_to_process: Vec<ObjPtr<BB>> = self
+            .blocks
+            .iter()
+            .filter(|bb| bb.insts.len() != 0)
+            .cloned()
+            .collect();
+        for bb in bb_to_process {
+            let mut new_insts: Vec<ObjPtr<LIRInst>> = Vec::new();
+            Func::analyse_inst_with_live_now_backorder(bb, &mut |inst, live_now| {
+                if inst.get_type() != InstrsType::Call {
+                    new_insts.push(inst);
+                    return;
+                }
+                //不需要保存instdef地寄存器
+                let mut live_now = live_now.clone();
+                live_now.retain(|reg| reg.is_caller_save());
+                for reg in inst.get_reg_def() {
+                    live_now.remove(&reg);
+                }
+                //恢复
+                let live_now: Vec<Reg> = live_now.iter().cloned().collect();
+                debug_assert!(live_now.iter().filter(|reg| !reg.is_physic()).count() == 0);
+                for reg in live_now.iter() {
+                    let pos = build_tmp_slot(self, reg);
+                    let load_inst = LIRInst::build_loadstack_inst(reg, pos);
+                    new_insts.push(pool.put_inst(load_inst));
+                }
+                new_insts.push(inst);
+                for reg in live_now.iter() {
+                    let pos = build_tmp_slot(self, reg);
+                    let load_inst = LIRInst::build_storetostack_inst(reg, pos);
+                    new_insts.push(pool.put_inst(load_inst));
+                }
+                //暂存
+            });
+            new_insts.reverse();
+            bb.as_mut().insts = new_insts;
+        }
     }
 }
 

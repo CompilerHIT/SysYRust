@@ -1,14 +1,19 @@
 use super::*;
 
 impl AsmModule {
-    pub fn rm_inst_suf_handle_call(
+    pub fn rm_inst_before_rearrange(
         &mut self,
         pool: &mut BackendPool,
         used_but_not_saveds: &HashMap<String, HashSet<Reg>>,
     ) {
         for (_, func) in self.name_func.iter() {
-            func.as_mut()
-                .remove_unuse_inst_suf_handle_call(pool, &used_but_not_saveds);
+            if func.is_extern {
+                continue;
+            }
+            func.as_mut().remove_unuse_store();
+            // while func.as_mut().remove_unuse_def() {
+            //     func.as_mut().remove_unuse_store();
+            // }
         }
     }
 
@@ -17,7 +22,7 @@ impl AsmModule {
         pool: &mut BackendPool,
         used_but_not_saveds: &HashMap<String, HashSet<Reg>>,
     ) {
-        for (_, func) in self.name_func.iter() {
+        for (_, func) in self.name_func.iter().filter(|(_, f)| !f.is_extern) {
             func.as_mut()
                 .rm_inst_suf_update_array_offset(pool, &used_but_not_saveds);
         }

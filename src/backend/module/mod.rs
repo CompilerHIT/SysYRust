@@ -8,7 +8,6 @@ use crate::backend::operand::ToString;
 use crate::backend::opt::BackendPass;
 use crate::backend::structs::{FGlobalVar, FloatArray, GlobalVar, IGlobalVar, IntArray};
 use crate::backend::BackendPool;
-use crate::container::bitmap::Bitmap;
 use crate::ir::function::Function;
 use crate::ir::instruction::{Inst, InstKind};
 use crate::ir::ir_type::IrType;

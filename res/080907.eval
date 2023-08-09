@@ -1,0 +1,532 @@
+
+sy_path:performance/00_bitset1.sy
+spill	:0 times
+offset_overflow	:0 times
+branch_overflow	:0 times
+caller_save	:0 times
+callee_save	:0 times
+mem_rearrange	:0 times
+reg_merge	:2 times
+
+sy_path:performance/00_bitset2.sy
+spill	:0 times
+offset_overflow	:0 times
+branch_overflow	:0 times
+caller_save	:0 times
+callee_save	:0 times
+mem_rearrange	:0 times
+reg_merge	:5 times
+
+sy_path:performance/00_bitset3.sy
+spill	:0 times
+offset_overflow	:0 times
+branch_overflow	:0 times
+caller_save	:0 times
+callee_save	:0 times
+mem_rearrange	:0 times
+reg_merge	:2 times
+
+sy_path:performance/01_mm1.sy
+spill	:0 times
+offset_overflow	:0 times
+branch_overflow	:0 times
+caller_save	:0 times
+callee_save	:0 times
+mem_rearrange	:0 times
+reg_merge	:36 times
+
+sy_path:performance/01_mm2.sy
+spill	:0 times
+offset_overflow	:0 times
+branch_overflow	:0 times
+caller_save	:0 times
+callee_save	:0 times
+mem_rearrange	:0 times
+reg_merge	:31 times
+
+sy_path:performance/01_mm3.sy
+spill	:0 times
+offset_overflow	:0 times
+branch_overflow	:0 times
+caller_save	:0 times
+callee_save	:0 times
+mem_rearrange	:0 times
+reg_merge	:36 times
+
+sy_path:performance/02_mv1.sy
+spill	:0 times
+offset_overflow	:0 times
+branch_overflow	:0 times
+caller_save	:0 times
+callee_save	:0 times
+mem_rearrange	:0 times
+reg_merge	:338 times
+
+sy_path:performance/02_mv2.sy
+spill	:0 times
+offset_overflow	:0 times
+branch_overflow	:0 times
+caller_save	:0 times
+callee_save	:0 times
+mem_rearrange	:0 times
+reg_merge	:349 times
+
+sy_path:performance/02_mv3.sy
+spill	:0 times
+offset_overflow	:0 times
+branch_overflow	:0 times
+caller_save	:0 times
+callee_save	:0 times
+mem_rearrange	:0 times
+reg_merge	:313 times
+
+sy_path:performance/03_sort1.sy
+spill	:0 times
+offset_overflow	:0 times
+branch_overflow	:0 times
+caller_save	:0 times
+callee_save	:12 times
+mem_rearrange	:0 times
+reg_merge	:1 times
+
+sy_path:performance/03_sort2.sy
+spill	:0 times
+offset_overflow	:0 times
+branch_overflow	:0 times
+caller_save	:0 times
+callee_save	:14 times
+mem_rearrange	:8 times
+reg_merge	:1 times
+
+sy_path:performance/03_sort3.sy
+spill	:0 times
+offset_overflow	:0 times
+branch_overflow	:0 times
+caller_save	:0 times
+callee_save	:14 times
+mem_rearrange	:0 times
+reg_merge	:7 times
+
+sy_path:performance/04_spmv1.sy
+spill	:0 times
+offset_overflow	:0 times
+branch_overflow	:0 times
+caller_save	:0 times
+callee_save	:0 times
+mem_rearrange	:0 times
+reg_merge	:35 times
+
+sy_path:performance/04_spmv2.sy
+spill	:0 times
+offset_overflow	:0 times
+branch_overflow	:0 times
+caller_save	:0 times
+callee_save	:0 times
+mem_rearrange	:0 times
+reg_merge	:0 times
+
+sy_path:performance/04_spmv3.sy
+spill	:0 times
+offset_overflow	:0 times
+branch_overflow	:0 times
+caller_save	:0 times
+callee_save	:0 times
+mem_rearrange	:0 times
+reg_merge	:38 times
+
+sy_path:performance/brainfuck-bootstrap.sy
+spill	:0 times
+offset_overflow	:0 times
+branch_overflow	:0 times
+caller_save	:0 times
+callee_save	:0 times
+mem_rearrange	:0 times
+reg_merge	:6 times
+
+sy_path:performance/brainfuck-mandelbrot-nerf.sy
+spill	:0 times
+offset_overflow	:0 times
+branch_overflow	:0 times
+caller_save	:0 times
+callee_save	:0 times
+mem_rearrange	:0 times
+reg_merge	:4 times
+
+sy_path:performance/brainfuck-pi-nerf.sy
+spill	:0 times
+offset_overflow	:0 times
+branch_overflow	:0 times
+caller_save	:0 times
+callee_save	:0 times
+mem_rearrange	:0 times
+reg_merge	:11 times
+
+sy_path:performance/conv0.sy
+spill	:182 times
+offset_overflow	:0 times
+branch_overflow	:0 times
+caller_save	:0 times
+callee_save	:0 times
+mem_rearrange	:64 times
+reg_merge	:3 times
+
+sy_path:performance/conv1.sy
+spill	:219 times
+offset_overflow	:0 times
+branch_overflow	:0 times
+caller_save	:0 times
+callee_save	:0 times
+mem_rearrange	:120 times
+reg_merge	:0 times
+
+sy_path:performance/conv2.sy
+spill	:228 times
+offset_overflow	:0 times
+branch_overflow	:0 times
+caller_save	:0 times
+callee_save	:0 times
+mem_rearrange	:136 times
+reg_merge	:0 times
+
+sy_path:performance/crypto-1.sy
+spill	:984 times
+offset_overflow	:1 times
+branch_overflow	:0 times
+caller_save	:0 times
+callee_save	:0 times
+mem_rearrange	:504 times
+reg_merge	:0 times
+
+sy_path:performance/crypto-2.sy
+spill	:1056 times
+offset_overflow	:1 times
+branch_overflow	:0 times
+caller_save	:0 times
+callee_save	:0 times
+mem_rearrange	:496 times
+reg_merge	:0 times
+
+sy_path:performance/crypto-3.sy
+spill	:1345 times
+offset_overflow	:1 times
+branch_overflow	:0 times
+caller_save	:0 times
+callee_save	:0 times
+mem_rearrange	:480 times
+reg_merge	:0 times
+
+sy_path:performance/dead-code-elimination-1.sy
+spill	:0 times
+offset_overflow	:0 times
+branch_overflow	:0 times
+caller_save	:0 times
+callee_save	:0 times
+mem_rearrange	:0 times
+reg_merge	:0 times
+
+sy_path:performance/dead-code-elimination-2.sy
+spill	:0 times
+offset_overflow	:0 times
+branch_overflow	:0 times
+caller_save	:0 times
+callee_save	:0 times
+mem_rearrange	:0 times
+reg_merge	:0 times
+
+sy_path:performance/dead-code-elimination-3.sy
+spill	:0 times
+offset_overflow	:0 times
+branch_overflow	:0 times
+caller_save	:0 times
+callee_save	:0 times
+mem_rearrange	:0 times
+reg_merge	:0 times
+
+sy_path:performance/fft0.sy
+spill	:0 times
+offset_overflow	:0 times
+branch_overflow	:0 times
+caller_save	:0 times
+callee_save	:48 times
+mem_rearrange	:0 times
+reg_merge	:4 times
+
+sy_path:performance/fft1.sy
+spill	:0 times
+offset_overflow	:0 times
+branch_overflow	:0 times
+caller_save	:0 times
+callee_save	:46 times
+mem_rearrange	:0 times
+reg_merge	:5 times
+
+sy_path:performance/fft2.sy
+spill	:0 times
+offset_overflow	:0 times
+branch_overflow	:0 times
+caller_save	:0 times
+callee_save	:42 times
+mem_rearrange	:0 times
+reg_merge	:5 times
+
+sy_path:performance/floyd-0.sy
+spill	:0 times
+offset_overflow	:0 times
+branch_overflow	:0 times
+caller_save	:0 times
+callee_save	:0 times
+mem_rearrange	:0 times
+reg_merge	:4 times
+
+sy_path:performance/floyd-1.sy
+spill	:0 times
+offset_overflow	:0 times
+branch_overflow	:0 times
+caller_save	:0 times
+callee_save	:0 times
+mem_rearrange	:0 times
+reg_merge	:4 times
+
+sy_path:performance/floyd-2.sy
+spill	:0 times
+offset_overflow	:0 times
+branch_overflow	:0 times
+caller_save	:0 times
+callee_save	:0 times
+mem_rearrange	:0 times
+reg_merge	:6 times
+
+sy_path:performance/gameoflife-gosper.sy
+spill	:0 times
+offset_overflow	:0 times
+branch_overflow	:0 times
+caller_save	:0 times
+callee_save	:0 times
+mem_rearrange	:0 times
+reg_merge	:9 times
+
+sy_path:performance/gameoflife-oscillator.sy
+spill	:0 times
+offset_overflow	:0 times
+branch_overflow	:0 times
+caller_save	:0 times
+callee_save	:0 times
+mem_rearrange	:0 times
+reg_merge	:10 times
+
+sy_path:performance/gameoflife-p61glidergun.sy
+spill	:0 times
+offset_overflow	:0 times
+branch_overflow	:0 times
+caller_save	:0 times
+callee_save	:0 times
+mem_rearrange	:0 times
+reg_merge	:5 times
+
+sy_path:performance/hoist-1.sy
+spill	:0 times
+offset_overflow	:0 times
+branch_overflow	:0 times
+caller_save	:0 times
+callee_save	:0 times
+mem_rearrange	:0 times
+reg_merge	:0 times
+
+sy_path:performance/hoist-2.sy
+spill	:0 times
+offset_overflow	:0 times
+branch_overflow	:0 times
+caller_save	:0 times
+callee_save	:0 times
+mem_rearrange	:0 times
+reg_merge	:0 times
+
+sy_path:performance/hoist-3.sy
+spill	:0 times
+offset_overflow	:0 times
+branch_overflow	:0 times
+caller_save	:0 times
+callee_save	:0 times
+mem_rearrange	:0 times
+reg_merge	:1 times
+
+sy_path:performance/instruction-combining-1.sy
+spill	:0 times
+offset_overflow	:0 times
+branch_overflow	:0 times
+caller_save	:0 times
+callee_save	:0 times
+mem_rearrange	:0 times
+reg_merge	:1 times
+
+sy_path:performance/instruction-combining-2.sy
+spill	:0 times
+offset_overflow	:0 times
+branch_overflow	:0 times
+caller_save	:0 times
+callee_save	:0 times
+mem_rearrange	:0 times
+reg_merge	:0 times
+
+sy_path:performance/instruction-combining-3.sy
+spill	:0 times
+offset_overflow	:0 times
+branch_overflow	:0 times
+caller_save	:0 times
+callee_save	:0 times
+mem_rearrange	:0 times
+reg_merge	:1 times
+
+sy_path:performance/integer-divide-optimization-1.sy
+spill	:0 times
+offset_overflow	:0 times
+branch_overflow	:0 times
+caller_save	:0 times
+callee_save	:0 times
+mem_rearrange	:0 times
+reg_merge	:1 times
+
+sy_path:performance/integer-divide-optimization-2.sy
+spill	:0 times
+offset_overflow	:0 times
+branch_overflow	:0 times
+caller_save	:0 times
+callee_save	:0 times
+mem_rearrange	:0 times
+reg_merge	:0 times
+
+sy_path:performance/integer-divide-optimization-3.sy
+spill	:0 times
+offset_overflow	:0 times
+branch_overflow	:0 times
+caller_save	:0 times
+callee_save	:0 times
+mem_rearrange	:0 times
+reg_merge	:2 times
+
+sy_path:performance/median0.sy
+spill	:0 times
+offset_overflow	:0 times
+branch_overflow	:0 times
+caller_save	:0 times
+callee_save	:0 times
+mem_rearrange	:0 times
+reg_merge	:2 times
+
+sy_path:performance/median1.sy
+spill	:0 times
+offset_overflow	:0 times
+branch_overflow	:0 times
+caller_save	:0 times
+callee_save	:0 times
+mem_rearrange	:0 times
+reg_merge	:5 times
+
+sy_path:performance/median2.sy
+spill	:0 times
+offset_overflow	:0 times
+branch_overflow	:0 times
+caller_save	:0 times
+callee_save	:0 times
+mem_rearrange	:0 times
+reg_merge	:4 times
+
+sy_path:performance/shuffle0.sy
+spill	:0 times
+offset_overflow	:0 times
+branch_overflow	:0 times
+caller_save	:0 times
+callee_save	:0 times
+mem_rearrange	:0 times
+reg_merge	:2 times
+
+sy_path:performance/shuffle1.sy
+spill	:0 times
+offset_overflow	:0 times
+branch_overflow	:0 times
+caller_save	:0 times
+callee_save	:0 times
+mem_rearrange	:0 times
+reg_merge	:2 times
+
+sy_path:performance/shuffle2.sy
+spill	:0 times
+offset_overflow	:0 times
+branch_overflow	:0 times
+caller_save	:0 times
+callee_save	:0 times
+mem_rearrange	:0 times
+reg_merge	:2 times
+
+sy_path:performance/sl1.sy
+spill	:24 times
+offset_overflow	:0 times
+branch_overflow	:0 times
+caller_save	:0 times
+callee_save	:0 times
+mem_rearrange	:16 times
+reg_merge	:14 times
+
+sy_path:performance/sl2.sy
+spill	:29 times
+offset_overflow	:0 times
+branch_overflow	:0 times
+caller_save	:0 times
+callee_save	:0 times
+mem_rearrange	:24 times
+reg_merge	:13 times
+
+sy_path:performance/sl3.sy
+spill	:28 times
+offset_overflow	:0 times
+branch_overflow	:0 times
+caller_save	:0 times
+callee_save	:0 times
+mem_rearrange	:8 times
+reg_merge	:12 times
+
+sy_path:performance/stencil0.sy
+spill	:0 times
+offset_overflow	:1024 times
+branch_overflow	:1 times
+caller_save	:0 times
+callee_save	:0 times
+mem_rearrange	:0 times
+reg_merge	:4 times
+
+sy_path:performance/stencil1.sy
+spill	:0 times
+offset_overflow	:0 times
+branch_overflow	:0 times
+caller_save	:0 times
+callee_save	:0 times
+mem_rearrange	:0 times
+reg_merge	:6 times
+
+sy_path:performance/transpose0.sy
+spill	:0 times
+offset_overflow	:0 times
+branch_overflow	:0 times
+caller_save	:0 times
+callee_save	:0 times
+mem_rearrange	:0 times
+reg_merge	:3 times
+
+sy_path:performance/transpose1.sy
+spill	:0 times
+offset_overflow	:0 times
+branch_overflow	:0 times
+caller_save	:0 times
+callee_save	:0 times
+mem_rearrange	:0 times
+reg_merge	:3 times
+
+sy_path:performance/transpose2.sy
+spill	:0 times
+offset_overflow	:0 times
+branch_overflow	:0 times
+caller_save	:0 times
+callee_save	:0 times
+mem_rearrange	:0 times
+reg_merge	:1 times
+

@@ -25,13 +25,61 @@ impl Func {
 
     pub fn print_func(func: ObjPtr<Func>, path: &str) {
         let func_print_path = path.to_string();
-        func.as_mut().generate_row(
-            OpenOptions::new()
-                .create(true)
-                .append(true)
-                .open(func_print_path)
-                .as_mut()
-                .unwrap(),
-        );
+        debug_assert!({
+            func.as_mut().generate_row(
+                OpenOptions::new()
+                    .create(true)
+                    .append(true)
+                    .open(func_print_path)
+                    .as_mut()
+                    .unwrap(),
+            );
+            true
+        });
+    }
+}
+
+impl Func {
+    ///依赖外部的calc live
+    pub fn print_live_interval(&self, path: &str) {
+        log_file!(path, "func:{}", self.label);
+        for bb in self.blocks.iter() {
+            log_file!(path, "bb:{}", bb.label);
+            log_file!(
+                path,
+                "live in:{:?}",
+                bb.live_in
+                    .iter()
+                    .map(|reg| reg.to_string(false))
+                    .collect::<Vec<String>>()
+            );
+            log_file!(
+                path,
+                "in edges:{:?}",
+                bb.in_edge
+                    .iter()
+                    .map(|bb| bb.label.clone())
+                    .collect::<Vec<String>>()
+            );
+            for inst in bb.insts.iter() {
+                log_file!(path, "{}", inst.as_ref());
+            }
+            log_file!(
+                path,
+                "live out:{:?}",
+                bb.live_out
+                    .iter()
+                    .map(|reg| reg.to_string(false))
+                    .collect::<Vec<String>>()
+            );
+            log_file!(
+                path,
+                "out edges:{:?}",
+                bb.in_edge
+                    .iter()
+                    .map(|bb| bb.label.clone())
+                    .collect::<Vec<String>>()
+            );
+        }
     }
 }
