@@ -101,7 +101,7 @@ fn run_main() {
         &mut AsmModule::new(module),
         is_opt,
     );
-
+    config::record_event("finish compile");
     // 编译结束后打印记录的属性
     // config::dump();
     config::dump_not_log("./performance_eval.txt"); //该行未使用debug模式包裹,一般情况下需要注释掉

@@ -44,6 +44,7 @@ impl Func {
             live_ins.insert(*bb, live_use);
             live_outs.insert(*bb, HashSet::new());
         }
+
         //计算live in 和 live out
         loop {
             let mut finish_flag = true;
@@ -80,6 +81,61 @@ impl Func {
 
         (live_uses, live_defs, live_ins, live_outs)
     }
+
+    pub fn build_live_use_def_for_stackslots(
+        func: &Func,
+    ) -> (
+        HashMap<ObjPtr<BB>, HashSet<StackSlot>>,
+        HashMap<ObjPtr<BB>, HashSet<StackSlot>>,
+    ) {
+        let mut live_defs: HashMap<ObjPtr<BB>, HashSet<StackSlot>> = HashMap::new();
+        let mut live_uses: HashMap<ObjPtr<BB>, HashSet<StackSlot>> = HashMap::new();
+        //计算stackslot的 live use, live def
+        for bb in func.blocks.iter() {
+            let mut live_def: HashSet<StackSlot> = HashSet::new();
+            let mut live_use: HashSet<StackSlot> = HashSet::new();
+            for inst in bb.insts.iter().rev() {
+                match inst.get_type() {
+                    InstrsType::LoadFromStack => {
+                        let offset = inst.get_stack_offset().get_data();
+                        let stackslot = StackSlot::new(offset, ADDR_SIZE);
+                        live_def.remove(&stackslot);
+                        live_use.insert(stackslot);
+                    }
+                    InstrsType::StoreToStack => {
+                        let offset = inst.get_stack_offset().get_data();
+                        let stackslot = StackSlot::new(offset, ADDR_SIZE);
+                        live_use.remove(&stackslot);
+                        live_def.insert(stackslot);
+                    }
+                    _ => (),
+                }
+            }
+            live_defs.insert(*bb, live_def);
+            live_uses.insert(*bb, live_use.clone());
+        }
+        (live_uses, live_defs)
+    }
+
+    ///通过live use 和live def 建立live in和live out
+    pub fn build_live_in_live_out_for_stackslots_from_live_use_and_live_def(
+        live_use: &HashMap<ObjPtr<BB>, HashSet<StackSlot>>,
+        live_def: &HashMap<ObjPtr<BB>, HashSet<StackSlot>>,
+    ) -> (
+        HashMap<ObjPtr<BB>, HashSet<StackSlot>>,
+        HashMap<ObjPtr<BB>, HashSet<StackSlot>>,
+    ) {
+        let mut live_ins: HashMap<ObjPtr<BB>, HashSet<StackSlot>> = HashMap::new();
+        let mut live_outs: HashMap<ObjPtr<BB>, HashSet<StackSlot>> = HashMap::new();
+        // let mut to_process
+        for (bb, used) in live_use.iter() {
+            live_ins.insert(*bb, used.clone());
+            live_outs.insert(*bb, HashSet::new());
+        }
+
+        todo!();
+    }
+
     ///分析函数用到的栈空间的冲突,传入
     pub fn calc_stackslot_interef_with_rearrangable_set(
         func: &Func,

@@ -36,7 +36,7 @@ impl Func {
         // self.print_func();
         //只有传参过程存在unchanged def,以及call指令可能存在unchanged def
         let mut unchanged_def: HashSet<(ObjPtr<LIRInst>, Reg)> = HashSet::new();
-        let mut path_build_unchagned_def = "unchanged_def.txt";
+        // let mut path_build_unchagned_def = "unchanged_def.txt";
         for bb in self.blocks.iter() {
             for (i, inst) in bb.insts.iter().enumerate() {
                 if inst.get_type() != InstrsType::Call {
@@ -724,73 +724,12 @@ impl Func {
         (all_v_regs, p2v_actions)
     }
 
-    //把某条指令的某个物理寄存器给解着色,并返回产生的虚拟寄存器
-    pub fn p2v_certain_reg_and_inst(
-        bb: ObjPtr<BB>,
-        index: usize,
-        p_reg: &Reg,
-        def_or_use: bool,
-    ) -> Reg {
-        debug_assert!(p_reg.is_physic());
-        let mut v_reg = Reg::init(p_reg.get_type());
-        let inst = bb.insts.get(index).unwrap();
-        unimplemented!();
-        debug_assert!(
-            (def_or_use && inst.get_reg_def().contains(p_reg))
-                || (!def_or_use && inst.get_reg_use().contains(p_reg))
-        );
-        if def_or_use {
-            //作为def来解着色
-            let mut index = index + 1;
-            inst.as_mut().replace_only_def_reg(p_reg, &v_reg);
-            while index < bb.insts.len() {
-                let inst = bb.insts.get(index).unwrap();
-                if inst.get_reg_use().contains(p_reg) {
-                    inst.as_mut().replace_only_use_reg(p_reg, &v_reg);
-                }
-                if inst.get_reg_def().contains(&v_reg) {
-                    break;
-                }
-                index += 1;
-            }
-            if index == bb.insts.len() && bb.live_out.contains(p_reg) {
-                //正向,与反向
-            }
-        } else {
-        }
-
-        v_reg
-    }
-
     pub fn undo_p2v(p2v_actions: &Vec<(ObjPtr<LIRInst>, Reg, Reg, bool)>) {
         for (inst, p_reg, v_reg, if_def) in p2v_actions {
             if *if_def {
                 inst.as_mut().replace_only_def_reg(v_reg, p_reg);
             } else {
                 inst.as_mut().replace_only_use_reg(v_reg, p_reg);
-            }
-        }
-    }
-}
-
-use std::io::{self, BufRead};
-
-fn read_number_from_console() -> i32 {
-    let stdin = io::stdin();
-    let mut handle = stdin.lock();
-
-    loop {
-        let mut input = String::new();
-        println!("请输入一个整数：");
-
-        match handle.read_line(&mut input) {
-            Ok(_) => match input.trim().parse::<i32>() {
-                Ok(number) => return number,
-                Err(_) => println!("输入不是一个有效的整数，请重新输入。"),
-            },
-            Err(error) => {
-                eprintln!("读取输入失败：{}", error);
-                std::process::exit(1);
             }
         }
     }

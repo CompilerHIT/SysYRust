@@ -65,7 +65,7 @@ impl AsmModule {
             config::record_event("finish realloc pre spilit func");
         }
         config::record_event("start handle spill");
-        if is_opt {
+        if false {
             self.handle_spill_v3(pool);
         } else {
             self.handle_spill_tmp(pool);
