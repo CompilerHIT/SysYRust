@@ -133,48 +133,59 @@ fn check_parallelization(
     // 先检查当前循环
     let mut flag = true;
     current_loop.get_current_loop_bb().iter().for_each(|bb| {
-        inst_process_in_bb(bb.get_head_inst(), |inst| match inst.get_kind() {
-            InstKind::Load => {
-                if inst.get_ptr().get_kind() == InstKind::Gep {
-                    let gep = inst.get_ptr();
+        inst_process_in_bb(bb.get_head_inst(), |inst| {
+            if !inst
+                .get_use_list()
+                .iter()
+                .all(|user| current_loop.is_in_current_loop(&user.get_parent_bb()))
+            {
+                flag = false;
+                return;
+            }
+
+            match inst.get_kind() {
+                InstKind::Load => {
+                    if inst.get_ptr().get_kind() == InstKind::Gep {
+                        let gep = inst.get_ptr();
+                        let array = get_gep_ptr(gep);
+                        debug_assert!(
+                            array.get_kind() == InstKind::Alloca(0)
+                                || array.is_param() && array.get_ir_type().is_pointer()
+                        );
+                        if let Some(x) = read_map.get_mut(&array) {
+                            x.insert(gep);
+                        } else {
+                            read_map.insert(array, HashSet::new());
+                        }
+                    }
+                }
+                InstKind::Store => {
+                    // store全局变量不可并行化
+                    if inst.get_dest().is_global_var() {
+                        flag = false;
+                        return;
+                    }
+
+                    let gep = inst.get_dest();
                     let array = get_gep_ptr(gep);
                     debug_assert!(
                         array.get_kind() == InstKind::Alloca(0)
                             || array.is_param() && array.get_ir_type().is_pointer()
                     );
-                    if let Some(x) = read_map.get_mut(&array) {
+                    if let Some(x) = write_map.get_mut(&array) {
                         x.insert(gep);
                     } else {
-                        read_map.insert(array, HashSet::new());
+                        write_map.insert(array, HashSet::new());
                     }
                 }
-            }
-            InstKind::Store => {
-                // store全局变量不可并行化
-                if inst.get_dest().is_global_var() {
-                    flag = false;
-                    return;
+                InstKind::Call(callee) => {
+                    if !call_op.contains(&callee) {
+                        flag = false;
+                        return;
+                    }
                 }
-
-                let gep = inst.get_dest();
-                let array = get_gep_ptr(gep);
-                debug_assert!(
-                    array.get_kind() == InstKind::Alloca(0)
-                        || array.is_param() && array.get_ir_type().is_pointer()
-                );
-                if let Some(x) = write_map.get_mut(&array) {
-                    x.insert(gep);
-                } else {
-                    write_map.insert(array, HashSet::new());
-                }
+                _ => {}
             }
-            InstKind::Call(callee) => {
-                if !call_op.contains(&callee) {
-                    flag = false;
-                    return;
-                }
-            }
-            _ => {}
         });
 
         if !flag {
@@ -346,7 +357,9 @@ fn parallelize(
     let index = iv
         .get_operands()
         .iter()
-        .position(|x| !current_loop.is_in_current_loop(&x.get_parent_bb()))
+        .position(|x| {
+            x.is_global_var_or_param() || !current_loop.is_in_current_loop(&x.get_parent_bb())
+        })
         .unwrap();
     let start = iv.get_operand(index);
     let mut update = iv.get_operand(1 - index);
