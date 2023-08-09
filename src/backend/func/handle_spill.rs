@@ -100,6 +100,7 @@ impl Func {
             }
             Func::handle_spill_of_block_tmp(bb, pool, &spill_stack_map);
         }
+        // rm inst suf spill对于hf32存在bug
         // self.remove_inst_suf_spill(pool);
     }
 
