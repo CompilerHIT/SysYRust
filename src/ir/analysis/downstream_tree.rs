@@ -36,15 +36,15 @@ impl DownStreamTree{
                 let index = next_vec.iter().position(|x|*x==head).unwrap();
                 // println!("断回边bb{:?},断前有",up.get_name());
 
-                for nn in up.get_next_bb().clone(){
-                    println!("{:?}",nn.get_name());
-                }
+                // for nn in up.get_next_bb().clone(){
+                //     println!("{:?}",nn.get_name());
+                // }
                 next_vec.remove(index);
                 up.as_mut().set_next_bb(next_vec);
                 // println!("现有nxt");
-                for nn in up.get_next_bb().clone(){
-                    println!("{:?}",nn.get_name());
-                }
+                // for nn in up.get_next_bb().clone(){
+                //     println!("{:?}",nn.get_name());
+                // }
             }
         }
         for next in head.get_next_bb(){
@@ -60,9 +60,9 @@ impl DownStreamTree{
             endpoint.as_mut().set_next_bb(vec_endpoint_next[index_endpoint].clone());
             // println!("连回边bb{:?}",endpoint.get_name());
             // println!("现有nxt");
-            for nn in endpoint.get_next_bb(){
-                println!("{:?}",nn.get_name());
-            }
+            // for nn in endpoint.get_next_bb(){
+            //     println!("{:?}",nn.get_name());
+            // }
             index_endpoint +=1;
         }
         // println!("bb:{:?}的下游包括:",head.get_name());

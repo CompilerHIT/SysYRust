@@ -59,10 +59,10 @@ pub fn optimizer_run(
         simplify_cfg::simplify_cfg_run(module, &mut pools);
         functional_optimizer(module, &mut pools, optimize_flag);
 
-        // dump_now(module, "brefore_pre.ll");
+        dump_now(module, "dump.ll");
         // pre
         partial_redundancy_elimination::pre(module, optimize_flag, &mut pools);
-        // dump_now(module, "after_pre.ll");
+        dump_now(module, "dump_opt.ll");
 
         // 循环优化
         loop_operation::loop_optimize(module, &mut pools);

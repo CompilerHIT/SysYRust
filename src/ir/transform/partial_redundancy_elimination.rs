@@ -214,7 +214,7 @@ pub fn insert_inst_in_pre(
             // 不只有当前块一个后继,需要插块
             flag = true;
             let newb = pre_context.get_new_block(pres[i], pool_block);
-            println!("插块bb:{:?}", newb.get_name());
+            // println!("插块bb:{:?}", newb.get_name());
             let inst_jmp = pool_inst.make_jmp();
             newb.as_mut().push_back(inst_jmp);
             let inst_new = make_same_inst(inst_old, pool_inst);
