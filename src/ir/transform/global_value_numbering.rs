@@ -101,7 +101,7 @@ impl CongruenceClass {
             InstKind::ItoF => Some(&self.itof_congruence),
             InstKind::Call(_) => Some(&self.call_congruence),
             _ => {
-                println!("kind:{:?}", inst.get_kind());
+                // println!("kind:{:?}", inst.get_kind());
                 None
             }
         }
