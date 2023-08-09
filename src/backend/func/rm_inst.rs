@@ -41,12 +41,17 @@ impl Func {
         self.remove_unuse_def();
 
         self.short_cut_mv(regs_used_but_not_saved);
-
-        while self.remove_unuse_def() || self.remove_self_mv() {
+        while self.remove_self_mv() || self.remove_unuse_def() {
             self.short_cut_mv(regs_used_but_not_saved);
         }
         self.short_cut_const();
-        self.remove_unuse_def();
+        while self.remove_unuse_def() {
+            self.short_cut_const();
+        }
+        self.short_cut_mv(regs_used_but_not_saved);
+        while self.remove_self_mv() || self.remove_unuse_def() {
+            self.short_cut_mv(regs_used_but_not_saved);
+        }
         while self.remove_unuse_store() {
             self.remove_unuse_def();
         }
