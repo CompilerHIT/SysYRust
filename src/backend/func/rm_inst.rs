@@ -19,19 +19,6 @@ impl Func {
         self.remove_unuse_def();
     }
 
-    ///v2p 后的移除无用指令
-    pub fn remove_unuse_inst_suf_handle_call(
-        &mut self,
-        pool: &mut BackendPool,
-        regs_used_but_not_saved: &HashMap<String, HashSet<Reg>>,
-    ) {
-        debug_assert!(self.draw_all_virtual_regs().len() == 0);
-        self.remove_self_mv();
-        while self.remove_unuse_store() {
-            self.remove_unuse_def();
-        }
-    }
-
     pub fn rm_inst_suf_update_array_offset(
         &mut self,
         pool: &mut BackendPool,
@@ -151,7 +138,9 @@ impl Func {
     pub fn remove_unuse_store(&mut self) -> bool {
         let mut out = false;
         //根据sst图进行无用store指令删除
+        config::record_event(format!("start build liveout for {}", self.label).as_str());
         let (_, _, _, live_outs) = Func::calc_stackslot_interval(self);
+        config::record_event(format!("finish build liveout for {}", self.label).as_str());
         for bb in self.blocks.iter() {
             let mut livenow: HashSet<StackSlot> = live_outs.get(bb).unwrap().clone();
             let mut to_rm: HashSet<ObjPtr<LIRInst>> = HashSet::new();

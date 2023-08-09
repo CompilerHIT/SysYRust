@@ -50,6 +50,12 @@ fn run_main() {
     // 是否使用优化
     let o1_option = matches.is_present("O1");
 
+    if o1_option {
+        config::set_time_limit_secs(178);
+    } else {
+        config::set_time_limit_secs(58);
+    }
+
     // 读取文件
     let file = std::fs::read_to_string(filename).unwrap();
 

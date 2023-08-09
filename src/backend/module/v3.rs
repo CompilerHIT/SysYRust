@@ -15,6 +15,14 @@ impl AsmModule {
             func.as_mut().handle_spill_v3(pool);
         });
     }
+    pub fn handle_spill_tmp(&mut self, pool: &mut BackendPool) {
+        self.name_func.iter().for_each(|(_, func)| {
+            if func.is_extern {
+                return;
+            }
+            func.as_mut().handle_spill_v3(pool);
+        });
+    }
 
     ///对于caller save 和 handle spill  使用到的栈空间 进行紧缩
     pub fn rearrange_stack_slot(&mut self) {

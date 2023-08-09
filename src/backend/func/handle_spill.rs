@@ -75,17 +75,38 @@ impl Func {
                 continue;
             }
             self.handle_spill_for_block(bb, pool);
-            // Func::handle_spill_of_block_tmp(
-            //     bb,
-            //     pool,
-            //     &self.reg_alloc_info.spillings,
-            //     &self.spill_stack_map,
-            //     &phisic_mems,
-            // );
         }
         // self.remove_inst_suf_spill(pool);
         Func::print_func(ObjPtr::new(&self), "after_handle_spill.txt");
         debug_assert!(self.draw_all_virtual_regs().len() == 0);
+    }
+
+    pub fn handle_spill_tmp(&mut self, pool: &mut BackendPool) {
+        self.calc_live_for_handle_spill();
+        //先分配空间
+        //对于spillings用到的空间直接一人一个
+        let mut spill_stack_map: HashMap<i32, StackSlot> = HashMap::new();
+        for spilling_reg in self.reg_alloc_info.spillings.iter() {
+            let last = self.stack_addr.back().unwrap();
+            let new_pos = last.get_pos() + last.get_size();
+            let new_stack_slot = StackSlot::new(new_pos, ADDR_SIZE);
+            spill_stack_map.insert(*spilling_reg, new_stack_slot);
+            self.stack_addr.push_back(new_stack_slot);
+        }
+        //为物理寄存器相关的借还开辟空间
+        Func::print_func(ObjPtr::new(&self), "before_handle_spill.txt");
+        let to_process = self.blocks.iter().cloned().collect::<Vec<ObjPtr<BB>>>();
+        for bb in to_process.iter() {
+            if bb.insts.len() == 0 {
+                continue;
+            }
+            Func::handle_spill_of_block_tmp(
+                bb,
+                pool,
+                &self.reg_alloc_info.spillings,
+                &spill_stack_map,
+            );
+        }
     }
 
     ///在handle spill之后调用
@@ -128,8 +149,7 @@ impl Func {
         bb: &ObjPtr<BB>,
         pool: &mut BackendPool,
         spillings: &HashSet<i32>,
-        spill_stack_map: &HashMap<Reg, StackSlot>,
-        phisic_mem: &HashMap<Reg, StackSlot>,
+        spill_stack_map: &HashMap<i32, StackSlot>,
     ) {
         //直接保存恢复保存恢复 (使用t0-t2三个寄存器)
         let mut new_insts = Vec::new();
@@ -160,7 +180,7 @@ impl Func {
                 let tmp_reg = Reg::from_color(tmp_reg);
                 //把值存到物理寄存器
                 //从栈上加载值
-                let pos = spill_stack_map.get(&reg).unwrap().get_pos();
+                let pos = spill_stack_map.get(&reg.get_id()).unwrap().get_pos();
                 let ld_inst = LIRInst::build_loadstack_inst(&tmp_reg, pos);
                 new_insts.push(pool.put_inst(ld_inst));
                 inst.as_mut().replace_reg(&reg, &tmp_reg);
@@ -174,7 +194,7 @@ impl Func {
             new_insts.push(*inst);
             for reg in defed.iter() {
                 if !reg.is_physic() {
-                    let pos = spill_stack_map.get(&reg).unwrap().get_pos();
+                    let pos = spill_stack_map.get(&reg.get_id()).unwrap().get_pos();
                     let borrowed = borrows.get(&reg).unwrap();
                     let sd_inst = LIRInst::build_storetostack_inst(&borrowed, pos);
                     new_insts.push(pool.put_inst(sd_inst));

@@ -1,4 +1,4 @@
-use crate::{backend::regalloc, log};
+use crate::{backend::regalloc, config, log, log_file_new};
 
 use super::*;
 
@@ -12,18 +12,25 @@ impl AsmModule {
     pub fn build_v4(&mut self, f: &mut File, _f2: &mut File, pool: &mut BackendPool, is_opt: bool) {
         let obj_module = ObjPtr::new(self);
         self.build_lir(pool);
+        config::record_event("finish build lir");
+
         // self.print_asm("asm_abastract.txt");
+        // let is_opt = true;
         if is_opt {
+            config::record_event("start block_pass_pre_clear");
             BackendPass::new(obj_module).block_pass_pre_clear(pool);
+            config::record_event("finish block_pass_pre_clear");
         }
+
         self.remove_unuse_inst_pre_alloc();
+        config::record_event("finish rm pre first alloc");
 
         //检查是否有存在name func里面没有,但是被调用了的函数
-        // let is_opt = true;
+
         if is_opt {
             // // gep偏移计算合并
             // BackendPass::new(obj_module).opt_gep();
-
+            config::record_event("start schedule");
             // 设置一些寄存器为临时变量
             self.cal_tmp_var();
 
@@ -39,70 +46,71 @@ impl AsmModule {
 
             self.allocate_reg();
             self.map_v_to_p();
+            config::record_event("finish schedule");
         } else {
             self.allocate_reg();
             self.map_v_to_p();
         }
-
+        config::record_event("finish first_alloc");
         self.print_asm("after_schedule.txt");
         self.remove_unuse_inst_suf_alloc();
-
+        config::record_event("finish rm inst suf first alloc");
         //加入外部函数
         self.add_external_func(pool);
-
         // //建立调用表
         self.build_own_call_map();
         // //寄存器重分配,重分析
-
-        // self.print_asm("asm_before_realloc_pre_spilt_func.txt");
-        // self.print_func();
-        self.realloc_pre_split_func();
-        // self.print_asm("asm_after_realloc_pre_spilt_func.txt");
-
-        self.handle_spill_v3(pool);
-
-        // self.print_func();
-        // self.print_asm("asm_after_handle_spill.txt");
-
-        self.analyse_callee_regs_to_saved();
-
-        self.remove_unuse_inst_suf_alloc();
-        // self.print_asm("asm_after_remove_unuse_inst_suf_handle_spill.txt");
-
-        self.anaylyse_for_handle_call_v4();
-
-        let is_opt = false;
         if is_opt {
-            //TODO
-            self.split_func(pool);
-            self.build_own_call_map();
-            self.analyse_callee_regs_to_saved();
-            self.analyse_caller_regs_to_saved();
+            self.realloc_pre_split_func();
+            config::record_event("finish realloc pre spilit func");
         }
-
-        // self.reduce_caller_to_saved_after_func_split();
-        // self.analyse_caller_regs_to_saved();
-        // self.print_asm("asm_after_realloc_suf_handle_call.txt");
-
+        config::record_event("start handle spill");
+        if is_opt {
+            self.handle_spill_v3(pool);
+        } else {
+            self.handle_spill_tmp(pool);
+        }
+        config::record_event("finish handle spill");
+        // if is_opt {
+        //     //似乎存在bug,并且目前没有收益,暂时放弃
+        //     self.split_func(pool);
+        //     self.build_own_call_map();
+        // }
         //此后栈空间大小以及 caller saved和callee saved都确定了
+
+        if is_opt {
+            let callers_used = self.build_caller_used();
+            let callees_used = self.build_callee_used();
+            self.caller_regs_to_saveds = callers_used.clone();
+            self.callee_regs_to_saveds = callees_used.clone();
+        } else {
+            self.anaylyse_for_handle_call_v4();
+        }
+        config::record_event("finish analyse for handle call");
         let callers_used = self.build_caller_used();
         let callees_used = self.build_callee_used();
         let callees_be_saved = &self.callee_regs_to_saveds.clone();
         let used_but_not_saved =
             AsmModule::build_used_but_not_saveds(&callers_used, &callees_used, callees_be_saved);
-        self.handle_call_v4(pool, &callers_used, &callees_used, callees_be_saved);
-        // self.print_asm("asm_after_handle_call.txt");
-
-        // self.print_asm("asm_before_rm_inst_suf_handle_call.txt");
-        self.rm_inst_suf_handle_call(pool, &used_but_not_saved);
-
-        // self.print_asm("asm_before_rearrange_stack_slot.txt");
-        self.rearrange_stack_slot();
+        config::record_event("start handle call");
+        if is_opt {
+            self.handle_call(pool, &callers_used, &callees_used, callees_be_saved);
+        } else {
+            self.handle_call_tmp(pool);
+        }
+        config::record_event("finish handle call");
+        if is_opt {
+            self.rm_inst_before_rearrange(pool, &used_but_not_saved);
+            config::record_event("finish rm before rearrange");
+            self.rearrange_stack_slot();
+            config::record_event("finish rearrange");
+        }
         self.update_array_offset(pool);
-
-        // self.print_asm("asm_before_rm_inst_suf_update_array_offset.txt");
-        self.rm_inst_suf_update_array_offset(pool, &used_but_not_saved);
-        // self.print_asm("asm_before_rm_inst_suf_update_array_offset.txt");
+        config::record_event("finish update_array_offset");
+        if is_opt {
+            self.rm_inst_suf_update_array_offset(pool, &used_but_not_saved);
+            config::record_event("finish rm suf update array offset");
+        }
         self.build_stack_info(f);
     }
 }
