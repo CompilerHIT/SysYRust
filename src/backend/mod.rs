@@ -93,8 +93,8 @@ pub fn generate_asm(
         
         if is_opt {
         //最后进行一次寄存器分配与合并
-        module.final_realloc(&mut pool);
-        
+        // module.final_realloc(&mut pool);
+
         // 再次进行指令重排
         // module.re_list_scheduling();
 
