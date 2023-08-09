@@ -82,11 +82,10 @@ fn recognize_one_loop(
                     .iter_mut()
                     .find(|loop_tree| loop_tree.blocks.contains(&bb))
                 {
-                    debug_assert!(
-                        sub_loop.parent.is_none() || sub_loop.parent == Some(tree.clone())
-                    );
-                    sub_loop.parent = Some(tree.clone());
-                    tree.sub_loops.push(sub_loop.clone());
+                    if sub_loop.parent.is_none() {
+                        sub_loop.parent = Some(tree.clone());
+                        tree.sub_loops.push(sub_loop.clone());
+                    }
                 } else if !tree.blocks.contains(&bb) {
                     tree.blocks.push(bb);
                 }
