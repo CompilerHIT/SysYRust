@@ -39,8 +39,12 @@ impl Func {
     ) {
         self.remove_meaningless_def(regs_used_but_not_saved);
         self.remove_unuse_def();
+
         self.short_cut_mv(regs_used_but_not_saved);
-        self.remove_unuse_def();
+
+        while self.remove_unuse_def() || self.remove_self_mv() {
+            self.short_cut_mv(regs_used_but_not_saved);
+        }
         self.short_cut_const();
         self.remove_unuse_def();
         while self.remove_unuse_store() {
@@ -288,6 +292,20 @@ impl Func {
                         val_occurs.insert(val.clone(), LinkedList::new());
                     }
                     let occurs = val_occurs.get_mut(&val).unwrap();
+                    //当这条指令是mv指令的时候做特殊处理
+                    match inst.get_type() {
+                        InstrsType::OpReg(SingleOp::Mv) => {
+                            //认为源寄存器更早出现
+                            let src_reg = inst.get_lhs().drop_reg();
+                            occurs.push_back(src_reg);
+                            debug_assert!(
+                                program_stat.reg_val.get(&src_reg).unwrap()
+                                    == program_stat.reg_val.get(&def_reg).unwrap()
+                            );
+                        }
+                        _ => (),
+                    };
+
                     occurs.push_back(def_reg);
                     while !occurs.is_empty() {
                         let front = occurs.front().unwrap();
