@@ -29,6 +29,7 @@ impl DownStreamTree{
         let mut vec_endpoint = vec![];
         let mut vec_endpoint_next = vec![];
         for up in ups.clone(){
+            // println!("up{:?}",up.get_name());
             if dominator_tree.is_dominate(&head, &up){
                 let mut next_vec = up.get_next_bb().clone(); 
                 vec_endpoint.push(up);
