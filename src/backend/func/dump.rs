@@ -25,14 +25,17 @@ impl Func {
 
     pub fn print_func(func: ObjPtr<Func>, path: &str) {
         let func_print_path = path.to_string();
-        func.as_mut().generate_row(
-            OpenOptions::new()
-                .create(true)
-                .append(true)
-                .open(func_print_path)
-                .as_mut()
-                .unwrap(),
-        );
+        debug_assert!({
+            func.as_mut().generate_row(
+                OpenOptions::new()
+                    .create(true)
+                    .append(true)
+                    .open(func_print_path)
+                    .as_mut()
+                    .unwrap(),
+            );
+            true
+        });
     }
 }
 
