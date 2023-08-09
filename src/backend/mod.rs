@@ -90,10 +90,9 @@ pub fn generate_asm(
     // 检查地址溢出，插入间接寻址
     module.handle_overflow(&mut pool);
 
-        
-        if is_opt {
+    if is_opt {
         //最后进行一次寄存器分配与合并
-        // module.final_realloc(&mut pool);
+        module.final_realloc(&mut pool);
 
         // 再次进行指令重排
         // module.re_list_scheduling();
