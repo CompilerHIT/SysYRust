@@ -133,12 +133,8 @@ pub fn pre_group(
                         pools.1,
                         pools.0,
                     ) {
-                        // println!("计算新树");
                         *dominator_tree = calculate_dominator(head);
                         *downstream_tree = DownStreamTree::make_downstream_tree(head,dominator_tree);
-                        // println!("计算新支配树");
-                        // *dominator_tree = calculate_dominator(head);
-                        // println!("计算完成");
                     }
                     break; //替换过指令，刷新，从头开始比较
                 }
@@ -149,7 +145,6 @@ pub fn pre_group(
             }
         }
         if !flag {
-            // println!("end loop");
             break;
         }
     }
@@ -213,7 +208,6 @@ pub fn insert_inst_in_pre(
             // 不只有当前块一个后继,需要插块
             flag = true;
             let newb = pre_context.get_new_block(pres[i], pool_block);
-            // println!("插块bb:{:?}", newb.get_name());
             let inst_jmp = pool_inst.make_jmp();
             newb.as_mut().push_back(inst_jmp);
             let inst_new = make_same_inst(inst_old, pool_inst);
@@ -261,8 +255,5 @@ pub fn insert_phi(
             .add_operand(map_temp.get(&i).unwrap().clone())
     }
     inst_old.get_parent_bb().as_mut().push_front(inst_phi);
-    // println!("插phi bb:{:?}", inst_phi.get_parent_bb().get_name());
     replace_inst(inst_old, inst_phi);
-    // println!("phi ops:{:?}", inst_phi.get_operands().len());
-    // println!("bb up :{:?}", inst_phi.get_parent_bb().get_up_bb().len());
 }
