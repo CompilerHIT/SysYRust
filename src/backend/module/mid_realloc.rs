@@ -189,7 +189,7 @@ impl AsmModule {
             if let Some(alloc_stat) = alloc_stat {
                 return alloc_stat;
             }
-            main_func.calc_live_for_handle_call();
+            main_func.calc_live_for_alloc_reg();
             let alloc_stat = try_alloc(base_alloc_stat.spillings.len(), callee_constraints);
             if let Some(alloc_stat) = alloc_stat {
                 return alloc_stat;
