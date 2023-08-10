@@ -65,7 +65,7 @@ impl AsmModule {
             config::record_event("finish realloc pre spilit func");
         }
         config::record_event("start handle spill");
-        if is_opt {
+        if false {
             self.handle_spill_v3(pool);
         } else {
             self.handle_spill_tmp(pool);
@@ -99,18 +99,24 @@ impl AsmModule {
             self.handle_call_tmp(pool);
         }
         config::record_event("finish handle call");
-        if is_opt {
+        let is_opt = true;
+        if is_opt && config::get_rest_secs() > 120 {
+            println!("{}", config::get_rest_secs());
+            assert!(config::get_rest_secs() > 60);
+            config::record_event("start rm before rearrange");
             self.rm_inst_before_rearrange(pool, &used_but_not_saved);
             config::record_event("finish rm before rearrange");
+            config::record_event("start mem rearrange");
             self.rearrange_stack_slot();
-            config::record_event("finish rearrange");
+            config::record_event("finish mem rearrange");
         }
         self.update_array_offset(pool);
         config::record_event("finish update_array_offset");
-        if is_opt {
+        if true {
             self.rm_inst_suf_update_array_offset(pool, &used_but_not_saved);
             config::record_event("finish rm suf update array offset");
         }
+        //检查代码中是否会def sp
         self.build_stack_info(f);
     }
 }

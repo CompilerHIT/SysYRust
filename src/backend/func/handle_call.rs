@@ -192,7 +192,7 @@ impl Func {
         for bb in self.blocks.iter() {
             //每个固定的中转物理寄存器使用相同的栈空间,以方便后面的无用读写删除优化
             //每次中转的时候使用新建的虚拟空间(以减少虚拟空间之间的冲突,以方便后面的栈重排)
-            let build_tmp_slot = |func: &mut Func, reg: &Reg| -> i32 {
+            let build_tmp_slot = |func: &mut Func| -> i32 {
                 let back = func.stack_addr.back().unwrap();
                 let pos = back.get_pos() + back.get_size();
                 let new_stack_slot = StackSlot::new(pos, ADDR_SIZE);
@@ -266,7 +266,7 @@ impl Func {
                     // }
 
                     //如果异色的都没有那么分配临时栈空间
-                    let tmp_holder = build_tmp_slot(this_func.as_mut(), reg);
+                    let tmp_holder = build_tmp_slot(this_func.as_mut());
                     tmp_map.insert(*reg, TmpHolder::StackOffset(tmp_holder));
                 }
 
@@ -387,7 +387,8 @@ impl Func {
             }
             let mut to_rm_insts: HashSet<ObjPtr<LIRInst>> = HashSet::new();
             //遇到call指令才开始统计
-            Func::analyse_inst_with_live_now_backorder(*bb, &mut |inst, live_now| {
+            bb.insts.iter().rev().for_each(|inst| {
+                let inst = *inst;
                 if inst.get_type() == InstrsType::Call {
                     //对于这个指令def的寄存器,移除影响
                     for reg in inst.get_regs() {

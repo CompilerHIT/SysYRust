@@ -1,10 +1,4 @@
-use rand::seq::index;
-
-use crate::{
-    backend::simulator::{execute_stat::ExecuteStat, program_stat::ProgramStat, structs::Value},
-    frontend::irgen::Process,
-    utility::ObjPool,
-};
+use crate::backend::simulator::{program_stat::ProgramStat, structs::Value};
 
 use super::*;
 
@@ -139,12 +133,12 @@ impl Func {
         let mut out = false;
         //根据sst图进行无用store指令删除
         config::record_event(format!("start build liveout for {}", self.label).as_str());
-        let (_, _, _, live_outs) = Func::calc_stackslot_interval(self);
+        let (_, _, _, mut live_outs) = Func::calc_stackslot_interval(self);
         config::record_event(format!("finish build liveout for {}", self.label).as_str());
         for bb in self.blocks.iter() {
-            let mut livenow: HashSet<StackSlot> = live_outs.get(bb).unwrap().clone();
+            let mut livenow: HashSet<StackSlot> = live_outs.remove(bb).unwrap();
             let mut to_rm: HashSet<ObjPtr<LIRInst>> = HashSet::new();
-            for (index, inst) in bb.insts.iter().enumerate().rev() {
+            for (_, inst) in bb.insts.iter().enumerate().rev() {
                 match inst.get_type() {
                     InstrsType::StoreToStack => {
                         let sst = inst.get_stackslot_with_addr_size();
@@ -412,34 +406,27 @@ impl Func {
     ///但是在不同块之间的时候可以用寄存器的借还操作代替从内存空间读取值的操作
     pub fn remove_inst_suf_spill(&mut self, pool: &mut BackendPool) {
         // //进行寄存器之间的移动操作
-        // self.calc_live_base();
+        self.calc_live_base();
         // //如果只有一个前继块,则前继块中的spilling优先使用可用的物理寄存器移动到后方
-        // self.remove_unuse_load_after_handle_spill(pool);
-        // while self.remove_self_mv() {
-        //     self.remove_unuse_load_after_handle_spill(pool);
-        // }
+        self.remove_unuse_load_after_handle_spill(pool);
     }
-    //无用的load指令
-    //当且仅当v2p后能够使用
+    //使用mv指令替换sl指令,依赖外部调用的calc live
     fn remove_unuse_load_after_handle_spill(&mut self, pool: &mut BackendPool) {
         // return;
         //找到一个load指令,先往前寻找,判断是否能够块内找到中间有能够使用的物理寄存器以及store指令
         //如果找到的话,就替换该指令
         //块内部分
         self.remove_unuse_load_in_block_after_handle_spill(pool);
+        self.remove_self_mv();
         // // // //块间部分,块间消除load,要找到前继块中所有的对应store,使用mv操作代替store和load操作
         self.remove_unuse_load_between_blocks_after_handle_spill(pool);
-        self.remove_self_mv();
-        // Func::print_func(ObjPtr::new(&self), "./pre_rm_unuse_store.txt");
-        self.remove_unuse_store();
-        // Func::print_func(ObjPtr::new(&self), "./suf_rm_unuse_store.txt");
-        // self.remove_unuse_def();
-        // Func::print_func(ObjPtr::new(&self), "after_rm_load.txt");
+        while self.remove_self_mv() {
+            self.remove_unuse_load_between_blocks_after_handle_spill(pool);
+        }
     }
 
+    //块内短路,依赖外部调用的calc live
     fn remove_unuse_load_in_block_after_handle_spill(&mut self, pool: &mut BackendPool) {
-        // self.calc_live_base();
-        // Func::print_func(ObjPtr::new(&self), "pre_rm_load_in_block.txt");
         //块内删除
         for bb in self.blocks.iter() {
             let mut to_process: Vec<(usize, usize)> = Vec::new();
@@ -511,14 +498,11 @@ impl Func {
                 index += 1;
             }
         }
-
-        self.remove_self_mv();
     }
 
+    //块间短路,依赖外部调用calc live
     fn remove_unuse_load_between_blocks_after_handle_spill(&mut self, pool: &mut BackendPool) {
         // Func::print_func(ObjPtr::new(&self), "before_rm_load.txt");
-        self.calc_live_base();
-        self.remove_self_mv();
 
         let mut rm_each =
             |bb: &ObjPtr<BB>, unchangable: &mut HashSet<(ObjPtr<BB>, ObjPtr<LIRInst>)>| -> bool {

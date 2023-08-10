@@ -110,7 +110,6 @@ impl AsmModule {
     pub fn handle_callee(&mut self, f: &mut File) {
         for (_, func) in self.name_func.iter() {
             debug_assert!(!func.is_extern);
-            func.as_mut().build_callee_map();
             func.as_mut().save_callee(f)
         }
     }

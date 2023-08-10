@@ -47,7 +47,6 @@ impl GlobalVar {
 
 #[derive(Clone, Copy, PartialEq, Debug, Hash, Eq)]
 pub struct StackSlot {
-    is_fixed: bool,
     pos: i32,
     size: i32,
 }
@@ -194,7 +193,7 @@ impl StackSlot {
         Self {
             pos,
             size,
-            is_fixed: false,
+            // is_fixed: false,
         }
     }
     pub fn get_pos(&self) -> i32 {
@@ -203,20 +202,11 @@ impl StackSlot {
     pub fn get_size(&self) -> i32 {
         self.size
     }
-
-    pub fn is_fixed(&self) -> bool {
-        self.is_fixed
-    }
-
     pub fn set_pos(&mut self, pos: i32) {
         self.pos = pos
     }
     pub fn set_size(&mut self, size: i32) {
         self.size = size
-    }
-
-    pub fn set_fix(&mut self) {
-        self.is_fixed = true;
     }
 }
 

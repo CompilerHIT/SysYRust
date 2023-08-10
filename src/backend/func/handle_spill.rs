@@ -1,5 +1,3 @@
-use rand::seq::index;
-
 use super::*;
 
 /// handle spill v3实现
@@ -93,20 +91,17 @@ impl Func {
             spill_stack_map.insert(*spilling_reg, new_stack_slot);
             self.stack_addr.push_back(new_stack_slot);
         }
-        //为物理寄存器相关的借还开辟空间
+
         Func::print_func(ObjPtr::new(&self), "before_handle_spill.txt");
         let to_process = self.blocks.iter().cloned().collect::<Vec<ObjPtr<BB>>>();
         for bb in to_process.iter() {
             if bb.insts.len() == 0 {
                 continue;
             }
-            Func::handle_spill_of_block_tmp(
-                bb,
-                pool,
-                &self.reg_alloc_info.spillings,
-                &spill_stack_map,
-            );
+            Func::handle_spill_of_block_tmp(bb, pool, &spill_stack_map);
         }
+        // rm inst suf spill对于hf32存在bug
+        // self.remove_inst_suf_spill(pool);
     }
 
     ///在handle spill之后调用
@@ -148,7 +143,6 @@ impl Func {
     fn handle_spill_of_block_tmp(
         bb: &ObjPtr<BB>,
         pool: &mut BackendPool,
-        spillings: &HashSet<i32>,
         spill_stack_map: &HashMap<i32, StackSlot>,
     ) {
         //直接保存恢复保存恢复 (使用t0-t2三个寄存器)
@@ -399,7 +393,7 @@ impl Func {
                 inst.as_mut().replace_reg(&reg, &tmp_reg);
             }
             //borrow结束后rentor中的寄存器应该都是临时寄存器
-            for (r, br) in rentors.iter() {
+            for (_, br) in rentors.iter() {
                 debug_assert!(Reg::get_tmp_for_handle_spill().contains(br));
             }
             rentors.clear();
