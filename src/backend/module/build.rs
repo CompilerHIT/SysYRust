@@ -22,10 +22,10 @@ impl AsmModule {
             config::record_event("finish block_pass_pre_clear");
         }
 
+        self.print_asm("after_block_opt.log");
+
         self.remove_unuse_inst_pre_alloc();
         config::record_event("finish rm pre first alloc");
-
-        //检查是否有存在name func里面没有,但是被调用了的函数
 
         if is_opt {
             // // gep偏移计算合并
@@ -38,8 +38,10 @@ impl AsmModule {
             self.allocate_reg();
             // 将非临时寄存器映射到物理寄存器
             self.map_v_to_p();
+            // 窥孔
+            // BackendPass::new(obj_module).fuse_tmp_regs();
             // 代码调度，列表调度法
-            self.list_scheduling_tech();
+            // self.list_scheduling_tech();
 
             // // 为临时寄存器分配寄存器
             self.clear_tmp_var();

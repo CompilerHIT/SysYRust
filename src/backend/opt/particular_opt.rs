@@ -71,6 +71,32 @@ impl BackendPass {
             });
         })
     }
+
+    pub fn fuse_tmp_regs(&mut self) {
+        // 需要保证临时寄存器存在，对临时寄存器进行窥孔
+        self.module.name_func.iter().for_each(|(_, func)| {
+            func.blocks.iter().for_each(|b| {
+                let mut index = 0; 
+                loop {
+                    if b.insts.len() < 2 || index >= b.insts.len() - 1 {
+                        break;
+                    }
+                    let inst1 = b.insts[index];
+                    let inst2 = b.insts[index + 1];
+                    if inst1.get_type() == InstrsType::OpReg(SingleOp::Mv) {
+                        let src = inst1.get_lhs();
+                        let dst = inst1.get_dst();
+                        if inst2.operands.contains(dst) {
+                            let pos = inst2.operands.iter().position(|x| x.clone() == dst.clone()).unwrap();
+                            inst2.as_mut().operands[pos] = src.clone();
+                            b.as_mut().insts.remove(index);
+                        }
+                    }
+                    index += 1;
+                }
+            })
+        })
+    }
 }
 
 fn is_sl(block: ObjPtr<BB>, pos: usize) -> bool {
