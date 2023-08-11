@@ -10,7 +10,7 @@ impl AsmModule {
     pub fn build_v4(&mut self, f: &mut File, _f2: &mut File, pool: &mut BackendPool, is_opt: bool) {
         let obj_module = ObjPtr::new(self);
         self.build_lir(pool);
-        // self.print_asm("asm_abastract.txt");
+        self.print_asm("asm_abastract.txt");
         if is_opt {
             BackendPass::new(obj_module).block_pass_pre_clear(pool);
         }

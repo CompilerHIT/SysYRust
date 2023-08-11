@@ -68,6 +68,11 @@ impl AsmModule {
             "putf",
             "_sysy_starttime",
             "_sysy_stoptime",
+            "hitsz_thread_init",
+            "hitsz_thread_create",
+            "hitsz_thread_join",
+            "hitsz_thread_exit",
+            "hitsz_get_thread_num",
         ];
         for name in extern_funcs.iter() {
             build_external_func(self, &name, pool);
