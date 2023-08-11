@@ -177,10 +177,6 @@ impl BackendPass {
                 flag = if imm_br_pred.len() == 0 { true } else { false };
 
                 imm_br_pred.iter().for_each(|(block, prevs)| {
-                    log!("block {}", block.label);
-                    for b in prevs.iter() {
-                        log!("prevs {}", b.label);
-                    }
                     let prevs = prevs.iter().map(|x| *x).collect::<Vec<_>>();
                     let after = block.get_after()[0];
                     if prevs.len() == block.get_prev().len() {

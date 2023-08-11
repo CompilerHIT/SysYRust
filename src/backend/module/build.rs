@@ -16,15 +16,23 @@ impl AsmModule {
 
         // self.print_asm("asm_abastract.txt");
         // let is_opt = true;
+        // build中的块合并，不会破坏块结构并暴露更多的指令移除的机会
         if is_opt {
             config::record_event("start block_pass_pre_clear");
             BackendPass::new(obj_module).block_pass_pre_clear(pool);
+            self.print_asm("after_block_pass_pre_clear.log");
             config::record_event("finish block_pass_pre_clear");
+            // 窥孔
+            config::record_event("start fuse_tmp_phi_regs");
+            // BackendPass::new(obj_module).fuse_tmp_regs();
+            self.log_insts();
+            self.print_asm("after_fuse_tmp_regs.log");
+            config::record_event("finish fuse_tmp_phi_regs");
         }
 
-        self.print_asm("after_block_opt.log");
-
+        
         self.remove_unuse_inst_pre_alloc();
+        self.print_asm("after_delete.log");
         config::record_event("finish rm pre first alloc");
 
         if is_opt {
@@ -39,8 +47,7 @@ impl AsmModule {
             self.alloc_without_tmp_and_s0();
             // 将非临时寄存器映射到物理寄存器
             self.map_v_to_p();
-            // 窥孔
-            // BackendPass::new(obj_module).fuse_tmp_regs();
+
             // 代码调度，列表调度法
             // self.list_scheduling_tech();
 

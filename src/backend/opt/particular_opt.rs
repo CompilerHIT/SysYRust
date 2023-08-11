@@ -1,3 +1,5 @@
+use std::collections::{HashSet, LinkedList};
+
 use super::*;
 
 impl BackendPass {
@@ -76,24 +78,91 @@ impl BackendPass {
         // 需要保证临时寄存器存在，对临时寄存器进行窥孔
         self.module.name_func.iter().for_each(|(_, func)| {
             func.blocks.iter().for_each(|b| {
-                let mut index = 0; 
+                let live_out = &b.live_out;
+                let mut delete_pos: HashSet<usize> = HashSet::new();
+                if b.insts.len() < 2 {
+                    return;
+                }
+                let mut index = b.insts.len() - 1;
                 loop {
-                    if b.insts.len() < 2 || index >= b.insts.len() - 1 {
+                    if index == 0 {
                         break;
                     }
-                    let inst1 = b.insts[index];
-                    let inst2 = b.insts[index + 1];
-                    if inst1.get_type() == InstrsType::OpReg(SingleOp::Mv) {
-                        let src = inst1.get_lhs();
-                        let dst = inst1.get_dst();
-                        if inst2.operands.contains(dst) {
-                            let pos = inst2.operands.iter().position(|x| x.clone() == dst.clone()).unwrap();
-                            inst2.as_mut().operands[pos] = src.clone();
-                            b.as_mut().insts.remove(index);
-                        }
+                    if b.insts[index].operands.len() < 2 {
+                        index -= 1;
+                        continue;
                     }
-                    index += 1;
+                    if b.insts[index].get_type() == InstrsType::Call {
+                        index -= 1;
+                        continue;
+                    }
+                    let (dst, srcs) = b.insts[index].operands.split_first().unwrap();
+                    if delete_pos.contains(&index) {
+                        index -= 1;
+                        continue;
+                    }
+                    let mut res = vec![];
+                    log!("srcs: {:?}", srcs);
+                    for src in srcs {
+                        let mut start = src.clone();
+                        match src {
+                            Operand::Reg(_) => {
+                                for i in 1..=index {
+                                    let inst = b.insts[index - i];
+                                    if inst.get_type() == InstrsType::Call {
+                                        break;
+                                    }
+                                    if inst.get_dst().clone() == start.clone() {
+                                        if live_out.contains(&inst.get_dst().drop_reg()) {
+                                            break;
+                                        }
+                                        if inst.get_type() == InstrsType::OpReg(SingleOp::Mv) {
+                                            start = inst.get_lhs().clone();
+                                            delete_pos.insert(index - i);
+                                        }
+                                    }
+                                }
+                                res.push(start.clone());
+
+                                // for i in 1..=index {
+                                //     let inst = b.insts[index - i];
+                                //     if inst.get_type() == InstrsType::Call {
+                                //         break;
+                                //     }
+                                //     if inst.get_dst().clone() == start.clone() {
+                                //         if live_out.contains(&inst.get_dst().drop_reg()) {
+                                //             break;
+                                //         }
+                                //         if b.insts[index].get_type()
+                                //             == InstrsType::OpReg(SingleOp::Mv)
+                                //         {
+                                //             b.insts[index].as_mut().replace_kind(inst.get_type());
+                                //             res = inst.operands.split_first().unwrap().1.clone().to_vec();
+                                //             delete_pos.insert(index - i);
+                                //             break;
+                                //         }
+                                //     }
+                                // }
+                            }
+                            _ => {
+                                res.push(start);
+                                continue;
+                            }
+                        };
+                    }
+                    res.insert(0, dst.clone());
+                    b.insts[index].as_mut().replace_op(res);
+                    index -= 1;
                 }
+                log!("delete_pos: {:?}, insts: {:?}", delete_pos, b.insts);
+                let new_insts: Vec<ObjPtr<LIRInst>> = b
+                    .insts
+                    .iter()
+                    .enumerate()
+                    .filter(|(i, _)| !delete_pos.contains(i))
+                    .map(|(_, x)| *x)
+                    .collect();
+                b.as_mut().insts = new_insts;
             })
         })
     }
