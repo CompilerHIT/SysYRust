@@ -69,8 +69,6 @@ pub fn init() {
             info.times.insert("callee_save".to_string(), 0);
             info.times.insert("mem_rearrange".to_string(), 0);
             info.times.insert("reg_merge".to_string(), 0);
-            info.file_infos
-                .insert("events".to_string(), LinkedList::new());
         }
         if SRC_PATH.is_none() {
             SRC_PATH = Some(String::from("default.sy"));
@@ -111,10 +109,13 @@ pub fn get_rest_secs() -> usize {
 
 pub fn record_event(event: &str) {
     init();
-    let kind = "events";
+    let path = "events.txt";
     let msg = format!("{} at:{}s", event, get_passed_secs());
     let info = unsafe { CONFIG_INFO.as_mut().unwrap() };
-    info.file_infos.get_mut(kind).unwrap().push_back(msg);
+    if !info.file_infos.contains_key(path) {
+        info.file_infos.insert(path.to_string(), LinkedList::new());
+    }
+    info.file_infos.get_mut(path).unwrap().push_back(msg);
 }
 
 ///把信息打印出来
@@ -129,17 +130,7 @@ pub fn dump() {
             log_file!(file, "{info}");
         }
     }
-    unsafe {
-        for msg in CONFIG_INFO
-            .as_ref()
-            .unwrap()
-            .file_infos
-            .get("events")
-            .unwrap()
-        {
-            log_file!("events.txt", "{msg}");
-        }
-    }
+
     //统计的总属性输出到一个专门的文件中 (粒度到源文件)
     unsafe {
         let performance_path = "performance_eval.txt";
@@ -192,7 +183,7 @@ pub fn dump_not_log(performance_path: &str) {
             .as_ref()
             .unwrap()
             .file_infos
-            .get("events")
+            .get("events.txt")
             .unwrap()
         {
             log_file!("events.txt", "{msg}");
