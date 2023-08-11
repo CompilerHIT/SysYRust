@@ -107,8 +107,7 @@ impl AsmModule {
         }
         config::record_event("finish handle call");
         let is_opt = true;
-        if is_opt && config::get_rest_secs() > 120 {
-            println!("{}", config::get_rest_secs());
+        if is_opt && config::get_rest_secs() > 130 {
             assert!(config::get_rest_secs() > 60);
             config::record_event("start rm before rearrange");
             self.rm_inst_before_rearrange(pool, &used_but_not_saved);
