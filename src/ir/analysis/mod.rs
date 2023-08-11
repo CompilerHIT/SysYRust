@@ -5,3 +5,4 @@ pub mod dominator_tree;
 pub mod loop_tree;
 pub mod scev;
 pub mod store_map;
+pub mod downstream_tree;

@@ -8,7 +8,6 @@ use crate::backend::operand::ToString;
 use crate::backend::opt::BackendPass;
 use crate::backend::structs::{FGlobalVar, FloatArray, GlobalVar, IGlobalVar, IntArray};
 use crate::backend::BackendPool;
-use crate::container::bitmap::Bitmap;
 use crate::ir::function::Function;
 use crate::ir::instruction::{Inst, InstKind};
 use crate::ir::ir_type::IrType;
@@ -111,7 +110,6 @@ impl AsmModule {
     pub fn handle_callee(&mut self, f: &mut File) {
         for (_, func) in self.name_func.iter() {
             debug_assert!(!func.is_extern);
-            func.as_mut().build_callee_map();
             func.as_mut().save_callee(f)
         }
     }
@@ -283,6 +281,7 @@ impl AsmModule {
 
     pub fn generate_row_asm(&mut self, f: &mut File) {
         debug_assert!(|| -> bool {
+            self.generate_global_var(f);
             self.name_func.iter_mut().for_each(|(_, func)| {
                 if func.is_extern {
                     return;

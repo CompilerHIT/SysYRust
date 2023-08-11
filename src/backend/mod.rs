@@ -10,11 +10,13 @@ pub mod regalloc;
 pub mod simulator;
 pub mod structs;
 
+pub mod parrallel;
 use std::fs::File;
 use std::io::Write;
 
 use crate::backend::module::AsmModule;
 use crate::backend::opt::BackendPass;
+use crate::config;
 use crate::utility::ObjPool;
 
 use self::func::Func;
@@ -80,29 +82,30 @@ pub fn generate_asm(
 
     //构造
     module.build_v4(&mut file, &mut file2, &mut pool, is_opt);
-    // module.generate_row_asm(&mut file2, &mut pool);
+    // module.generate_row_asm(&mut file2);
 
     // 后端优化
     if is_opt {
         BackendPass::new(ObjPtr::new(module)).run_pass(&mut pool);
     }
-
     // 检查地址溢出，插入间接寻址
     module.handle_overflow(&mut pool);
 
-    //最后进行一次寄存器分配与合并
-    // module.final_realloc(&mut pool);
-
     if is_opt {
+        //最后进行一次寄存器分配与合并
+        config::record_event("start merge reg");
+        module.final_realloc(&mut pool);
+        config::record_event("finish merge reg");
+
         // 再次进行指令重排
         // module.re_list_scheduling();
 
         // 额外的块优化处理
-        BackendPass::new(ObjPtr::new(module)).run_addition_block_pass();
+        BackendPass::new(ObjPtr::new(module)).run_addition_block_pass(&mut pool);
     }
 
     //生成抽象汇编
-    // module.generate_row_asm(&mut file2, &mut pool);
+    // module.generate_row_asm(&mut file2);
 
     //生成汇编
     module.generate_asm(&mut file, &mut pool);

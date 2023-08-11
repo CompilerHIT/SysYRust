@@ -2,7 +2,7 @@
 use crate::utility::ScalarType;
 use std::{collections::HashSet, fmt::Display};
 
-use super::block::FLOAT_BASE;
+use super::{block::FLOAT_BASE, structs::FloatArray};
 pub const REG_COUNT: i32 = 32;
 pub const ARG_REG_COUNT: i32 = 8;
 pub const REG_SP: i32 = 2;
@@ -327,6 +327,17 @@ impl Reg {
         args
     }
 
+    pub fn get_tmp_for_handle_spill() -> HashSet<Reg> {
+        let mut out = HashSet::new();
+        for i in 5..=7 {
+            out.insert(Reg::from_color(i));
+        }
+        for i in 18..=20 {
+            out.insert(Reg::from_color(i + FLOAT_BASE));
+        }
+        out
+    }
+
     ///获取所有非特殊寄存器
     ///也就是不包括0-4,以及s0
     pub fn get_all_not_specials() -> HashSet<Reg> {
@@ -339,14 +350,23 @@ impl Reg {
         out
     }
 
-    ///获取所有的特殊寄存器
-    pub fn get_all_specials() -> HashSet<Reg> {
+    ///获取所有的特殊寄存器 以及 s0
+    pub fn get_all_specials_with_s0() -> HashSet<Reg> {
         let mut out = HashSet::new();
         for reg in 0..=4 {
             let reg = Reg::from_color(reg);
             out.insert(reg);
         }
         out.insert(Reg::get_s0());
+        out
+    }
+    ///获取所有的特殊寄存器,包括x0-x5,不包括s0
+    pub fn get_all_specials() -> HashSet<Reg> {
+        let mut out = HashSet::new();
+        for reg in 0..=4 {
+            let reg = Reg::from_color(reg);
+            out.insert(reg);
+        }
         out
     }
 }

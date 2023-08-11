@@ -40,8 +40,8 @@ fn livo_in_loop(
         })
     });
 
-    let latchs = loop_info.get_latchs();
-    debug_assert_eq!(latchs.len(), 1);
+    let latchs = loop_info.get_latchs(dominator_tree);
+    debug_assert_eq!(latchs.len(), 1, "{:?}", loop_info);
     let latch = latchs[0];
 
     for inst in rec_set.iter() {

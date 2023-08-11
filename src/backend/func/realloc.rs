@@ -1,7 +1,4 @@
-use biheap::bivec::order;
-use rand::seq::index;
-
-use crate::backend::{module::constraints, regalloc::perfect_alloc};
+use crate::backend::regalloc::perfect_alloc;
 
 use super::*;
 

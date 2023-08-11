@@ -2,8 +2,11 @@ use std::collections::{HashMap, HashSet};
 
 use crate::{
     ir::{
-        analysis::dominator_tree::calculate_dominator, basicblock::BasicBlock, function::Function,
-        module::Module, tools::func_process,
+        analysis::dominator_tree::{calculate_dominator, DominatorTree},
+        basicblock::BasicBlock,
+        function::Function,
+        module::Module,
+        tools::func_process,
     },
     utility::ObjPtr,
 };
@@ -41,7 +44,8 @@ fn loop_recognize_in_function(func: ObjPtr<Function>) -> LoopList {
             if latch.len() == 0 {
                 visited.insert(bb);
             } else {
-                visited.extend(recognize_one_loop(&mut loop_list, bb, latch).blocks.clone());
+                let blocks = recognize_one_loop(&mut loop_list, bb, latch, &mut visited, &dom_tree);
+                visited.extend(blocks.blocks.clone());
             }
         }
     });
@@ -53,50 +57,45 @@ fn recognize_one_loop(
     loop_list: &mut LoopList,
     header: ObjPtr<BasicBlock>,
     latchs: Vec<ObjPtr<BasicBlock>>,
+    visited: &mut HashSet<ObjPtr<BasicBlock>>,
+    dom_tree: &DominatorTree,
 ) -> ObjPtr<LoopInfo> {
     let mut tree = loop_list.pool.put(LoopInfo::new(header));
     tree.blocks.push(header);
-    let mut visited = HashSet::new();
     // 将header加入visited
     visited.insert(header);
 
     for latch in latchs {
         let mut stack = vec![latch];
         while let Some(bb) = stack.pop() {
-            if visited.contains(&bb) {
-                continue;
-            }
-
-            // 如果当前基本块已经在别的循环中
-            if loop_list
-                .loops
-                .iter()
-                .any(|loop_tree| loop_tree.blocks.contains(&bb))
-            {
-                // 将当前块的前继中没有在循环中的块加入stack
+            // 将当前块的前继中没有在循环中的块加入stack
+            if bb != header {
                 bb.get_up_bb().iter().for_each(|up_bb| {
-                    if loop_list
-                        .loops
-                        .iter()
-                        .all(|loop_tree| !loop_tree.blocks.contains(up_bb))
-                    {
+                    if up_bb != &header && !dom_tree.is_dominate(&bb, up_bb) {
                         stack.push(up_bb.clone());
                     }
-                });
+                })
+            };
 
-                // 找到当前块所在的循环,并设置相应的子循环和父循环
-                let sub_loop = loop_list
+            // 找到当前块所在的循环,并设置相应的子循环和父循环
+            if visited.contains(&bb) {
+                if let Some(sub_loop) = loop_list
                     .loops
                     .iter_mut()
                     .find(|loop_tree| loop_tree.blocks.contains(&bb))
-                    .unwrap();
-                sub_loop.parent = Some(tree.clone());
-                tree.sub_loops.push(sub_loop.clone());
+                {
+                    if sub_loop.parent.is_none() {
+                        sub_loop.parent = Some(tree.clone());
+                        tree.sub_loops.push(sub_loop.clone());
+                    }
+                } else if !tree.blocks.contains(&bb) {
+                    tree.blocks.push(bb);
+                }
             } else {
                 tree.blocks.push(bb);
                 stack.extend(bb.get_up_bb().iter().cloned());
+                visited.insert(bb);
             }
-            visited.insert(bb);
         }
     }
 

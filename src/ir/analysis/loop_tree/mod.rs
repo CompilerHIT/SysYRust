@@ -5,6 +5,8 @@ use crate::{
     utility::{ObjPool, ObjPtr},
 };
 
+use super::dominator_tree::DominatorTree;
+
 pub mod loop_recognize;
 
 pub struct LoopList {
@@ -144,11 +146,11 @@ impl LoopInfo {
     }
 
     /// 获得latchs
-    pub fn get_latchs(&self) -> Vec<ObjPtr<BasicBlock>> {
+    pub fn get_latchs(&self, dom_tree: &DominatorTree) -> Vec<ObjPtr<BasicBlock>> {
         self.header
             .get_up_bb()
             .iter()
-            .filter(|bb| self.is_in_current_loop(bb))
+            .filter(|up_bb| dom_tree.is_dominate(&self.get_header(), &up_bb))
             .cloned()
             .collect()
     }

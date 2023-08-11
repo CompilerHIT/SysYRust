@@ -50,6 +50,12 @@ fn run_main() {
     // 是否使用优化
     let o1_option = matches.is_present("O1");
 
+    if o1_option {
+        config::set_time_limit_secs(175);
+    } else {
+        config::set_time_limit_secs(58);
+    }
+
     // 读取文件
     let file = std::fs::read_to_string(filename).unwrap();
 
@@ -96,7 +102,7 @@ fn run_main() {
         &mut AsmModule::new(module),
         is_opt,
     );
-
+    config::record_event("finish compile");
     // 编译结束后打印记录的属性
     // config::dump();
     //config::dump_not_log("./performance_eval.txt"); //该行未使用debug模式包裹,一般情况下需要注释掉

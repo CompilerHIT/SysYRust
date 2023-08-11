@@ -12,13 +12,14 @@ mod delete_redundant_load_store;
 mod func_inline;
 mod global_value_numbering;
 mod global_var_transform;
-mod hoist;
+mod gvn_hoist;
 mod loop_operation;
 mod meaningless_insts_folding;
 mod partial_redundancy_elimination;
 mod phi_optimizer;
 mod return_unused;
 mod simplify_cfg;
+mod sink;
 mod tail_call_optimize;
 mod verify;
 
@@ -35,13 +36,16 @@ pub fn optimizer_run(
         simplify_cfg::simplify_cfg_run(module, &mut pools);
         functional_optimizer(module, &mut pools, optimize_flag);
 
-        // gvn hoist
-        hoist::hoist(module, optimize_flag, &mut pools);
+        // 局部冗余消除 指令上提
+        partial_redundancy_elimination::pre(module, optimize_flag, &mut pools);
 
         // 循环优化
         loop_operation::loop_optimize(module, &mut pools, true);
         simplify_cfg::simplify_cfg_run(module, &mut pools);
         functional_optimizer(module, &mut pools, optimize_flag);
+
+        // 指令下沉
+        sink::sink(module, &mut pools);
 
         // // 尾递归优化
         tail_call_optimize::tail_call_optimize(module, &mut pools);
@@ -55,14 +59,16 @@ pub fn optimizer_run(
         simplify_cfg::simplify_cfg_run(module, &mut pools);
         functional_optimizer(module, &mut pools, optimize_flag);
 
-        // gvn hoist
-        hoist::hoist(module, optimize_flag, &mut pools);
+        // 局部冗余消除 指令上提
+        partial_redundancy_elimination::pre(module, optimize_flag, &mut pools);
 
         // 循环优化
         //loop_operation::loop_optimize(module, &mut pools, false);
         //simplify_cfg::simplify_cfg_run(module, &mut pools);
         //functional_optimizer(module, &mut pools, optimize_flag);
 
+        // 指令下沉
+        sink::sink(module, &mut pools);
         // TODO: 性能优化
 
         // 再做一次

@@ -16,6 +16,18 @@ where
     }
 }
 
+pub fn inst_process_in_bb_reverse<F>(mut inst: ObjPtr<Inst>, mut predicate: F)
+where
+    F: FnMut(ObjPtr<Inst>),
+{
+    while !inst.is_tail() {
+        // 这里需要先获取next，因为predicate可能会删除当前指令
+        let next = inst.get_prev();
+        predicate(inst);
+        inst = next;
+    }
+}
+
 /// 从head开始，广度优先遍历每一个基本块，并对基本块中的指令进行处理
 /// # Arguments
 /// * `head` - 广度优先遍历的起始点

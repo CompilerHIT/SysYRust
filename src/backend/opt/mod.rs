@@ -29,8 +29,8 @@ impl BackendPass {
         self.peephole_pass(pool);
     }
 
-    pub fn run_addition_block_pass(&mut self) {
+    pub fn run_addition_block_pass(&mut self, pool: &mut BackendPool) {
         // 块优化
-        self.block_pass();
+        self.block_pass(pool);
     }
 }

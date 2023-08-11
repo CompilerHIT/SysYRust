@@ -1,10 +1,12 @@
 use std::{
     collections::{HashMap, HashSet, LinkedList},
     fmt::format,
+    time::{self, Duration, Instant},
 };
 
 use crate::{
     backend::{instrs::LIRInst, operand::Reg},
+    ir::instruction::Inst,
     log_file,
     utility::ObjPtr,
 };
@@ -24,6 +26,7 @@ struct ConfigInfo {
     file_infos: HashMap<String, LinkedList<String>>, //记录要写入的文件以及要往文件中写入的信息 (默认是append模式)
     times: HashMap<String, i32>,                     //统计各种事件次数
     baned_set: HashSet<String>,
+    start_time: Instant,
 }
 impl ConfigInfo {
     pub fn new() -> ConfigInfo {
@@ -31,6 +34,7 @@ impl ConfigInfo {
             file_infos: HashMap::new(),
             times: HashMap::new(),
             baned_set: HashSet::new(),
+            start_time: Instant::now(),
         }
     }
 }
@@ -65,11 +69,53 @@ pub fn init() {
             info.times.insert("callee_save".to_string(), 0);
             info.times.insert("mem_rearrange".to_string(), 0);
             info.times.insert("reg_merge".to_string(), 0);
+            info.file_infos
+                .insert("events".to_string(), LinkedList::new());
         }
         if SRC_PATH.is_none() {
             SRC_PATH = Some(String::from("default.sy"));
         }
     }
+}
+
+pub fn get_passed_secs() -> usize {
+    let info = unsafe { CONFIG_INFO.as_ref() };
+    debug_assert!(info.is_some());
+    let info = info.as_ref().unwrap();
+    let passed = info.start_time.elapsed().as_secs();
+    passed as usize
+}
+pub fn get_passed_time() -> Duration {
+    let info = unsafe { CONFIG_INFO.as_ref() };
+    debug_assert!(info.is_some());
+    let info = info.as_ref().unwrap();
+    info.start_time.elapsed()
+}
+
+static mut TIME_LIMIT_SECS: usize = 0;
+pub fn set_time_limit_secs(limit: usize) {
+    unsafe { TIME_LIMIT_SECS = limit };
+}
+
+///获取剩余秒数
+pub fn get_rest_secs() -> usize {
+    init();
+    let passed = get_passed_secs();
+    let limit = unsafe { TIME_LIMIT_SECS };
+    if limit > passed {
+        limit - passed
+    } else {
+        0
+    }
+}
+
+pub fn record_event(event: &str) {
+    init();
+    let kind = "events";
+    let msg = format!("{} at:{}s", event, get_passed_secs());
+    println!("{msg}");
+    let info = unsafe { CONFIG_INFO.as_mut().unwrap() };
+    info.file_infos.get_mut(kind).unwrap().push_back(msg);
 }
 
 ///把信息打印出来
@@ -100,6 +146,7 @@ pub fn dump() {
             "caller_save",
             "callee_save",
             "mem_rearrange",
+            "reg_merge",
         ];
         for kind in order.iter() {
             let times = CONFIG_INFO
@@ -131,6 +178,18 @@ pub fn dump_not_log(performance_path: &str) {
     }};
     }
     init();
+    unsafe {
+        for msg in CONFIG_INFO
+            .as_ref()
+            .unwrap()
+            .file_infos
+            .get("events")
+            .unwrap()
+        {
+            log_file!("events.txt", "{msg}");
+        }
+    }
+
     //统计的总属性输出到一个专门的文件中 (粒度到源文件)
     unsafe {
         log_file!(
@@ -145,6 +204,7 @@ pub fn dump_not_log(performance_path: &str) {
             "caller_save",
             "callee_save",
             "mem_rearrange",
+            "reg_merge",
         ];
         for kind in order.iter() {
             let times = CONFIG_INFO
