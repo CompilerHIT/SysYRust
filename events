@@ -1,0 +1,21 @@
+finish build lir at:4s
+finish rm pre first alloc at:4s
+finish rm inst suf first alloc at:11s
+start first ralloc before handle spill at:11s
+finish first realloc before handle spill at:296s
+start handle spill at:296s
+finish handle spill at:296s
+finish analyse for handle call at:297s
+start handle call at:297s
+finish handle call at:298s
+finish update_array_offset at:298s
+start build liveout for fib at:300s
+finish build liveout for fib at:300s
+start build liveout for fib at:300s
+finish build liveout for fib at:300s
+start build liveout for fib at:300s
+finish build liveout for fib at:301s
+start build liveout for main at:301s
+finish build liveout for main at:301s
+finish rm suf update array offset at:301s
+finish compile at:302s

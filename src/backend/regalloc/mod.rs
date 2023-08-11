@@ -1,3 +1,4 @@
+pub mod chordal_alloc;
 pub mod dump;
 pub mod easy_gc_alloc;
 pub mod merge;

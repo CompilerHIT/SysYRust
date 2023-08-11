@@ -1,12 +1,7 @@
 // a impl of graph color register alloc algo
 
-use crate::{
-    backend::{instrs::Func, operand::Reg},
-    container::bitmap::Bitmap,
-    log_file, log_file_uln,
-};
-use core::panic;
-use std::collections::{HashMap, HashSet, LinkedList, VecDeque};
+use crate::backend::operand::Reg;
+use std::collections::{HashMap, HashSet};
 
 use super::{
     regalloc::{self, Regalloc},
@@ -14,7 +9,7 @@ use super::{
 };
 
 pub fn alloc(func: &crate::backend::func::Func) -> super::structs::FuncAllocStat {
-    let mut intereference_graph = regalloc::build_interference(func);
+    let intereference_graph = regalloc::build_interference(func);
     let mut availables = regalloc::build_availables_with_interef_graph(&intereference_graph);
     let spill_costs = regalloc::estimate_spill_cost(func);
     let mut to_colors: Vec<Reg> = intereference_graph.iter().map(|(r, _)| *r).collect();
