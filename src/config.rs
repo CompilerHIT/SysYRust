@@ -113,7 +113,6 @@ pub fn record_event(event: &str) {
     init();
     let kind = "events";
     let msg = format!("{} at:{}s", event, get_passed_secs());
-    println!("{msg}");
     let info = unsafe { CONFIG_INFO.as_mut().unwrap() };
     info.file_infos.get_mut(kind).unwrap().push_back(msg);
 }
