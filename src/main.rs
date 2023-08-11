@@ -103,7 +103,7 @@ fn run_main() {
     );
     config::record_event("finish compile");
     // 编译结束后打印记录的属性
-    // config::dump();
+    config::dump();
     let is_dump_not_log = false;
     if is_dump_not_log {
         config::dump_not_log("./performance_eval.txt");

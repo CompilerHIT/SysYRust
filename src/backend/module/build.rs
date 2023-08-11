@@ -66,6 +66,11 @@ impl AsmModule {
             self.realloc_pre_split_func();
             config::record_event("finish realloc pre spilit func");
         }
+
+        config::record_event("start first ralloc before handle spill");
+        self.first_realloc();
+        config::record_event("finish first realloc before handle spill");
+
         config::record_event("start handle spill");
         if false {
             self.handle_spill_v3(pool);

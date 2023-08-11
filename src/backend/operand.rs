@@ -327,17 +327,6 @@ impl Reg {
         args
     }
 
-    pub fn get_tmp_for_handle_spill() -> HashSet<Reg> {
-        let mut out = HashSet::new();
-        for i in 5..=7 {
-            out.insert(Reg::from_color(i));
-        }
-        for i in 18..=20 {
-            out.insert(Reg::from_color(i + FLOAT_BASE));
-        }
-        out
-    }
-
     ///获取所有非特殊寄存器
     ///也就是不包括0-4,以及s0
     pub fn get_all_not_specials() -> HashSet<Reg> {

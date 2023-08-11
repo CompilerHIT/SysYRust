@@ -129,7 +129,17 @@ pub fn dump() {
             log_file!(file, "{info}");
         }
     }
-
+    unsafe {
+        for msg in CONFIG_INFO
+            .as_ref()
+            .unwrap()
+            .file_infos
+            .get("events")
+            .unwrap()
+        {
+            log_file!("events.txt", "{msg}");
+        }
+    }
     //统计的总属性输出到一个专门的文件中 (粒度到源文件)
     unsafe {
         let performance_path = "performance_eval.txt";

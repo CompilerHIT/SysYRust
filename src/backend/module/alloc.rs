@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use crate::backend::operand::Reg;
+use crate::{backend::operand::Reg, frontend::ast::Continue};
 
 use super::AsmModule;
 
@@ -19,7 +19,7 @@ impl AsmModule {
             });
         });
     }
-    pub fn p2v(&mut self) {
+    fn p2v(&mut self) {
         self.name_func.iter().for_each(|(_, func)| {
             if func.is_extern {
                 return;
@@ -37,6 +37,30 @@ impl AsmModule {
             unavailables.insert(Reg::get_s0());
             func.as_mut().alloc_reg_without(&unavailables);
             // func.as_mut().allocate_reg();
+        });
+    }
+
+    ///在handle spill前进行的最后一次重分配
+    pub fn first_realloc(&mut self) {
+        self.name_func.iter_mut().for_each(|(_, func)| {
+            if func.is_extern {
+                return;
+            }
+            if func.reg_alloc_info.spillings.len() == 0 {
+                return;
+            }
+            //
+            func.as_mut().p2v(&Reg::get_all_recolorable_regs());
+            let mut unavailables = HashSet::new();
+            unavailables.insert(Reg::get_s0());
+            func.as_mut().alloc_reg_without(&unavailables);
+            if func.reg_alloc_info.spillings.len() == 0 {
+                func.as_mut().v2p(&func.reg_alloc_info.dstr);
+                return;
+            }
+            unavailables.extend(Reg::get_all_tmps());
+            func.as_mut().alloc_reg_without(&unavailables);
+            func.as_mut().v2p(&func.reg_alloc_info.dstr);
         });
     }
 
