@@ -306,7 +306,6 @@ impl Func {
             new_insts.reverse();
             bb.as_mut().insts = new_insts;
         }
-        // self.print_func();
         self.rm_unuse_sl_suf_handle_call(callers_used, callees_used, callees_be_saved);
     }
 }
