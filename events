@@ -1,0 +1,81 @@
+finish build lir at:4s
+finish rm pre first alloc at:4s
+finish rm inst suf first alloc at:11s
+start first ralloc before handle spill at:11s
+finish first realloc before handle spill at:296s
+start handle spill at:296s
+finish handle spill at:296s
+finish analyse for handle call at:297s
+start handle call at:297s
+finish handle call at:298s
+finish update_array_offset at:298s
+start build liveout for fib at:300s
+finish build liveout for fib at:300s
+start build liveout for fib at:300s
+finish build liveout for fib at:300s
+start build liveout for fib at:300s
+finish build liveout for fib at:301s
+start build liveout for main at:301s
+finish build liveout for main at:301s
+finish rm suf update array offset at:301s
+finish compile at:302s
+finish build lir at:0s
+start block_pass_pre_clear at:0s
+finish block_pass_pre_clear at:0s
+finish rm pre first alloc at:0s
+start schedule at:0s
+finish schedule at:0s
+finish rm inst suf first alloc at:0s
+finish realloc pre spilit func at:1s
+start first ralloc before handle spill at:1s
+finish first realloc before handle spill at:1s
+start handle spill at:1s
+finish handle spill at:1s
+finish analyse for handle call at:1s
+start handle call at:1s
+finish handle call at:1s
+start rm before rearrange at:1s
+start build liveout for main at:1s
+finish build liveout for main at:1s
+finish rm before rearrange at:1s
+start mem rearrange at:1s
+finish mem rearrange at:2s
+finish update_array_offset at:2s
+start build liveout for main at:2s
+finish build liveout for main at:2s
+start build liveout for main at:2s
+finish build liveout for main at:2s
+finish rm suf update array offset at:2s
+start merge reg at:2s
+finish merge reg at:2s
+finish compile at:2s
+finish build lir at:0s
+start block_pass_pre_clear at:0s
+finish block_pass_pre_clear at:0s
+finish rm pre first alloc at:0s
+start schedule at:0s
+finish schedule at:0s
+finish rm inst suf first alloc at:0s
+finish realloc pre spilit func at:1s
+start first ralloc before handle spill at:1s
+finish first realloc before handle spill at:1s
+start handle spill at:1s
+finish handle spill at:1s
+finish analyse for handle call at:1s
+start handle call at:1s
+finish handle call at:1s
+start rm before rearrange at:1s
+start build liveout for main at:1s
+finish build liveout for main at:1s
+finish rm before rearrange at:1s
+start mem rearrange at:1s
+finish mem rearrange at:1s
+finish update_array_offset at:1s
+start build liveout for main at:2s
+finish build liveout for main at:2s
+start build liveout for main at:2s
+finish build liveout for main at:2s
+finish rm suf update array offset at:2s
+start merge reg at:2s
+finish merge reg at:2s
+finish compile at:2s

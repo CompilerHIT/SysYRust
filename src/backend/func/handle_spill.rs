@@ -372,7 +372,7 @@ impl Func {
             //使用临时寄存器作为借用
             let mut regs = inst.get_regs();
             let mut availables = RegUsedStat::init_unavailable();
-            for reg in Reg::get_tmp_for_handle_spill() {
+            for reg in Reg::get_all_tmps() {
                 availables.release_reg(reg.get_color());
             }
             regs.retain(|reg| !reg.is_physic());
@@ -394,7 +394,7 @@ impl Func {
             }
             //borrow结束后rentor中的寄存器应该都是临时寄存器
             for (_, br) in rentors.iter() {
-                debug_assert!(Reg::get_tmp_for_handle_spill().contains(br));
+                debug_assert!(Reg::get_all_tmps().contains(br));
             }
             rentors.clear();
 

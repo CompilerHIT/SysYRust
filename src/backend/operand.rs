@@ -317,25 +317,14 @@ impl Reg {
     pub fn get_all_tmps() -> HashSet<Reg> {
         let mut args = HashSet::new();
         //通用参数寄存器a0-a7 :10-17
-        //浮点参数寄存器 : 42-49
+        //浮点参数寄存器 : 50-52
         for i in 5..=7 {
             args.insert(Reg::from_color(i));
         }
         for i in 18..=20 {
-            args.insert(Reg::from_color(i));
+            args.insert(Reg::from_color(i + FLOAT_BASE));
         }
         args
-    }
-
-    pub fn get_tmp_for_handle_spill() -> HashSet<Reg> {
-        let mut out = HashSet::new();
-        for i in 5..=7 {
-            out.insert(Reg::from_color(i));
-        }
-        for i in 18..=20 {
-            out.insert(Reg::from_color(i + FLOAT_BASE));
-        }
-        out
     }
 
     ///获取所有非特殊寄存器

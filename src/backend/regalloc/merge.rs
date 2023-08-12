@@ -3,13 +3,10 @@ use std::collections::{HashMap, HashSet};
 use crate::{
     backend::{
         instrs::{Func, InstrsType, SingleOp},
-        module::constraints,
         operand::Reg,
         regalloc::structs::RegUsedStat,
     },
-    config,
-    ir::instruction::Inst,
-    log, log_file,
+    config, log_file,
     utility::ObjPtr,
 };
 

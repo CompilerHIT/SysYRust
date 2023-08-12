@@ -20,9 +20,7 @@ impl Func {
     ) {
         self.remove_meaningless_def(regs_used_but_not_saved);
         self.remove_unuse_def();
-
         self.short_cut_mv(regs_used_but_not_saved);
-
         while self.remove_self_mv() || self.remove_unuse_def() {
             self.short_cut_mv(regs_used_but_not_saved);
         }
@@ -30,10 +28,7 @@ impl Func {
         while self.remove_unuse_def() {
             self.short_cut_const();
         }
-        self.short_cut_mv(regs_used_but_not_saved);
-        while self.remove_self_mv() || self.remove_unuse_def() {
-            self.short_cut_mv(regs_used_but_not_saved);
-        }
+        self.remove_meaningless_def(regs_used_but_not_saved);
         while self.remove_unuse_store() {
             self.remove_unuse_def();
         }
@@ -340,8 +335,10 @@ impl Func {
                 match val {
                     Value::IImm(val) => {
                         //常量替换
-                        let imm_li = LIRInst::build_li_inst(def_reg, val);
-                        *inst.as_mut() = imm_li;
+                        if operand::is_imm_12bs(val as i32) {
+                            let imm_li = LIRInst::build_li_inst(def_reg, val);
+                            *inst.as_mut() = imm_li;
+                        }
                     }
                     _ => (),
                 }

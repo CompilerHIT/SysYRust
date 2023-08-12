@@ -35,7 +35,8 @@ impl AsmModule {
             self.cal_tmp_var();
 
             // 对非临时寄存器进行分配
-            self.allocate_reg();
+
+            self.alloc_without_tmp_and_s0();
             // 将非临时寄存器映射到物理寄存器
             self.map_v_to_p();
             // 窥孔
@@ -46,15 +47,16 @@ impl AsmModule {
             // // 为临时寄存器分配寄存器
             self.clear_tmp_var();
 
-            self.allocate_reg();
+            self.alloc_without_tmp_and_s0();
             self.map_v_to_p();
             config::record_event("finish schedule");
         } else {
-            self.allocate_reg();
+            self.alloc_without_tmp_and_s0();
             self.map_v_to_p();
         }
         self.remove_unuse_inst_suf_alloc();
         config::record_event("finish rm inst suf first alloc");
+
         //加入外部函数
         self.add_external_func(pool);
         // //建立调用表
@@ -64,6 +66,11 @@ impl AsmModule {
             self.realloc_pre_split_func();
             config::record_event("finish realloc pre spilit func");
         }
+
+        config::record_event("start first ralloc before handle spill");
+        self.first_realloc();
+        config::record_event("finish first realloc before handle spill");
+
         config::record_event("start handle spill");
         if false {
             self.handle_spill_v3(pool);
@@ -100,8 +107,7 @@ impl AsmModule {
         }
         config::record_event("finish handle call");
         let is_opt = true;
-        if is_opt && config::get_rest_secs() > 120 {
-            println!("{}", config::get_rest_secs());
+        if is_opt && config::get_rest_secs() > 130 {
             assert!(config::get_rest_secs() > 60);
             config::record_event("start rm before rearrange");
             self.rm_inst_before_rearrange(pool, &used_but_not_saved);
