@@ -1,9 +1,6 @@
 use super::*;
 use crate::ir::{
-    analysis::{
-        dominator_tree::calculate_dominator,
-        scev::{scevexp::SCEVExpKind, SCEVAnalyzer},
-    },
+    analysis::scev::{scevexp::SCEVExp, SCEVAnalyzer},
     instruction::InstKind,
 };
 
@@ -11,6 +8,7 @@ use crate::ir::{
 pub fn loop_unrolling(
     module: &mut Module,
     loop_map: &mut HashMap<String, LoopList>,
+    max_loop_unrolling: usize,
     pools: &mut (&mut ObjPool<BasicBlock>, &mut ObjPool<Inst>),
 ) {
     func_process(module, |name, _| loop {
@@ -21,7 +19,12 @@ pub fn loop_unrolling(
         let mut remove_list = None;
         for loop_info in loop_list.get_loop_list().iter() {
             if loop_info.get_sub_loops().len() == 0 && loop_info.get_current_loop_bb().len() == 2 {
-                flag = attempt_loop_unrolling(&mut analyzer, loop_info.clone(), pools);
+                flag = attempt_loop_unrolling(
+                    &mut analyzer,
+                    loop_info.clone(),
+                    max_loop_unrolling,
+                    pools,
+                );
             }
 
             if flag {
@@ -50,6 +53,7 @@ enum IVC {
 fn attempt_loop_unrolling(
     analyzer: &mut SCEVAnalyzer,
     mut loop_info: ObjPtr<LoopInfo>,
+    max_loop_unrolling: usize,
     pools: &mut (&mut ObjPool<BasicBlock>, &mut ObjPool<Inst>),
 ) -> bool {
     if loop_info.get_sub_loops().len() != 0 || loop_info.get_current_loop_bb().len() != 2 {
@@ -66,28 +70,23 @@ fn attempt_loop_unrolling(
     let end;
     let round;
 
+    let check_ivc = |op: &ObjPtr<SCEVExp>| -> IVC {
+        if op.is_scev_constant() {
+            IVC::Const
+        } else if op.is_scev_rec()
+            && op.get_operands().len() == 2
+            && op.get_operands().iter().all(|x| x.is_scev_constant())
+        {
+            IVC::Introduction
+        } else {
+            IVC::Nothing
+        }
+    };
+
     match (
-        if lhs_scev.is_scev_constant() {
-            IVC::Const
-        } else if lhs_scev.is_scev_rec()
-            && lhs_scev.get_operands().len() == 2
-            && lhs_scev.get_operands().iter().all(|x| x.is_scev_constant())
-        {
-            IVC::Introduction
-        } else {
-            IVC::Nothing
-        },
+        check_ivc(&lhs_scev),
         end_cond.get_kind(),
-        if rhs_scev.is_scev_constant() {
-            IVC::Const
-        } else if rhs_scev.is_scev_rec()
-            && rhs_scev.get_operands().len() == 2
-            && rhs_scev.get_operands().iter().all(|x| x.is_scev_constant())
-        {
-            IVC::Introduction
-        } else {
-            IVC::Nothing
-        },
+        check_ivc(&rhs_scev),
     ) {
         (IVC::Introduction, InstKind::Binary(crate::ir::instruction::BinOp::Le), IVC::Const) => {
             // i <= 常数
@@ -171,7 +170,8 @@ fn attempt_loop_unrolling(
         _ => return false,
     }
 
-    if round > 1000 {
+    debug_assert!(round > 0);
+    if round as usize > max_loop_unrolling {
         return false;
     }
 

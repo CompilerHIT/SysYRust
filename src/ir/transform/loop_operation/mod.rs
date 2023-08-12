@@ -21,6 +21,7 @@ mod loop_unrolling;
 
 pub fn loop_optimize(
     module: &mut Module,
+    max_loop_unrolling: usize,
     pools: &mut (&mut ObjPool<BasicBlock>, &mut ObjPool<Inst>),
 ) {
     let mut loop_map = loop_recognize(module);
@@ -35,20 +36,14 @@ pub fn loop_optimize(
         licm_run(loop_map.get_mut(&name).unwrap(), pools);
     });
 
-    loop_unrolling::loop_unrolling(module, &mut loop_map, pools);
-    super::functional_optimizer(module, pools, true);
+    // 循环展开
+    loop_unrolling::loop_unrolling(module, &mut loop_map, max_loop_unrolling, pools);
 
     // 归纳变量强度削减
     func_process(module, |name, func| {
         let dominator_tree =
             crate::ir::analysis::dominator_tree::calculate_dominator(func.get_head());
         livo_run(dominator_tree, loop_map.get_mut(&name).unwrap(), pools);
-    });
-    super::functional_optimizer(module, pools, false);
-
-    // 循环不变量外提
-    func_process(module, |name, _| {
-        licm_run(loop_map.get_mut(&name).unwrap(), pools);
     });
 }
 
