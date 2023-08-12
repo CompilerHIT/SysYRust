@@ -62,6 +62,7 @@ impl AsmModule {
         }
         self.remove_unuse_inst_suf_alloc();
         config::record_event("finish rm inst suf first alloc");
+        self.print_asm("after_scehdule.log");
 
         //加入外部函数
         self.add_external_func(pool);
@@ -77,11 +78,13 @@ impl AsmModule {
         self.first_realloc();
         config::record_event("finish first realloc before handle spill");
         config::record_event("start handle spill");
+        self.print_asm("before_spill.log");
         if false {
             self.handle_spill_v3(pool);
         } else {
             self.handle_spill_tmp(pool);
         }
+        self.print_asm("after_spill.log");
         config::record_event("finish handle spill");
         // if is_opt {
         //     //似乎存在bug,并且目前没有收益,暂时放弃
@@ -105,11 +108,13 @@ impl AsmModule {
         let used_but_not_saved =
             AsmModule::build_used_but_not_saveds(&callers_used, &callees_used, callees_be_saved);
         config::record_event("start handle call");
+        self.print_asm("before_handle_call.log");
         if is_opt {
             self.handle_call(pool, &callers_used, &callees_used, callees_be_saved);
         } else {
             self.handle_call_tmp(pool);
         }
+        self.print_asm("after_handle_call.log");
         config::record_event("finish handle call");
         let is_opt = true;
         if is_opt && config::get_rest_secs() > 130 {
