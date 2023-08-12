@@ -63,54 +63,42 @@ impl ProgramStat {
     ///吞入一条指令,修改程序状态
     pub fn consume_inst(&mut self, inst: &ObjPtr<LIRInst>) -> ExecuteStat {
         match inst.get_type() {
-            InstrsType::Binary(op) => {
-                let mut op_str = match op {
-                    BinaryOp::Add => "add",
-                    BinaryOp::Sub => "sub",
-                    BinaryOp::Mul => "mul",
-                    BinaryOp::Div => "div",
-                    BinaryOp::Rem => "rem",
-                    BinaryOp::And => "and",
-                    BinaryOp::Or => "or",
-                    BinaryOp::Xor => "xor",
-                    BinaryOp::Slt => "slt",
-                    BinaryOp::Shl => "sll",
-                    BinaryOp::Shr => "srl",
-                    BinaryOp::Sar => "sra",
-                    BinaryOp::FCmp(cmp) => match cmp {
-                        CmpOp::Eq => "eq",
-                        CmpOp::Ne => "ne",
-                        CmpOp::Lt => "lt",
-                        CmpOp::Le => "le",
-                        CmpOp::Gt => "gt",
-                        CmpOp::Ge => "ge",
-                        _ => unreachable!(),
-                    },
-                };
-                let mut is_imm = match op_str {
-                    "add" | "sub" | "and" | "or" | "xor" | "sll" | "srl" | "sra" | "slt" => true,
-                    _ => false,
-                };
-                let mut is_double = inst.is_double();
-                let def_reg = inst.get_dst().drop_reg();
-                match op {
-                    BinaryOp::Add => {
-                        self.consume_add(inst);
-                    }
-                    // BinaryOp::Sub => {
-                    //     //对减法的计算
-                    //     todo!()
-                    // }
-                    _ => {
-                        self.reg_val.insert(def_reg, Value::Inst(*inst));
-                    }
-                }
+            InstrsType::Binary(..) => {
+                // let mut op_str = match op {
+                //     BinaryOp::Add => "add",
+                //     BinaryOp::Sub => "sub",
+                //     BinaryOp::Mul => "mul",
+                //     BinaryOp::Div => "div",
+                //     BinaryOp::Rem => "rem",
+                //     BinaryOp::And => "and",
+                //     BinaryOp::Or => "or",
+                //     BinaryOp::Xor => "xor",
+                //     BinaryOp::Slt => "slt",
+                //     BinaryOp::Shl => "sll",
+                //     BinaryOp::Shr => "srl",
+                //     BinaryOp::Sar => "sra",
+                //     BinaryOp::FCmp(cmp) => match cmp {
+                //         CmpOp::Eq => "eq",
+                //         CmpOp::Ne => "ne",
+                //         CmpOp::Lt => "lt",
+                //         CmpOp::Le => "le",
+                //         CmpOp::Gt => "gt",
+                //         CmpOp::Ge => "ge",
+                //         _ => unreachable!(),
+                //     },
+                // };
+                // let mut is_imm = match op_str {
+                //     "add" | "sub" | "and" | "or" | "xor" | "sll" | "srl" | "sra" | "slt" => true,
+                //     _ => false,
+                // };
+                // let mut is_double = inst.is_double();
+                // let def_reg = inst.get_dst().drop_reg();
+                self.consume_calc(*inst);
             }
             InstrsType::OpReg(op) => match op {
                 SingleOp::F2I
                 | SingleOp::I2F
                 | SingleOp::LoadFImm
-                | SingleOp::Neg
                 | SingleOp::Seqz
                 | SingleOp::Snez => {
                     let def_reg = inst.get_def_reg();
@@ -124,7 +112,7 @@ impl ProgramStat {
                 SingleOp::Li => {
                     self.consume_li(inst);
                 }
-                SingleOp::Mv => {
+                SingleOp::Mv | SingleOp::Neg => {
                     self.consume_mv(inst);
                 }
             },
