@@ -14,6 +14,8 @@ use crate::{
 
 use self::{licm::licm_run, livo::livo_run, loop_simplify::loop_simplify_run};
 
+use super::functional_optimizer;
+
 mod licm;
 mod livo;
 mod loop_simplify;
@@ -37,7 +39,11 @@ pub fn loop_optimize(
     });
 
     // 循环展开
+    dump_now(module, "dump.ll");
     loop_unrolling::loop_unrolling(module, &mut loop_map, max_loop_unrolling, pools);
+    super::phi_optimizer::phi_run(module);
+    super::dead_code_eliminate::dead_code_eliminate(module, false);
+    dump_now(module, "dump_opt.ll");
 
     // 归纳变量强度削减
     func_process(module, |name, func| {

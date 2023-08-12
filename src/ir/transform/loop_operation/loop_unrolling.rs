@@ -18,7 +18,7 @@ pub fn loop_unrolling(
         analyzer.set_loop_list(loop_list.get_loop_list().clone());
         let mut remove_list = None;
         for loop_info in loop_list.get_loop_list().iter() {
-            if loop_info.get_sub_loops().len() == 0 && loop_info.get_current_loop_bb().len() == 2 {
+            if loop_info.get_sub_loops().len() == 0 && loop_info.get_current_loop_bb().len() <= 2 {
                 flag = attempt_loop_unrolling(
                     &mut analyzer,
                     loop_info.clone(),
@@ -56,7 +56,7 @@ fn attempt_loop_unrolling(
     max_loop_unrolling: usize,
     pools: &mut (&mut ObjPool<BasicBlock>, &mut ObjPool<Inst>),
 ) -> bool {
-    if loop_info.get_sub_loops().len() != 0 || loop_info.get_current_loop_bb().len() != 2 {
+    if loop_info.get_sub_loops().len() != 0 || loop_info.get_current_loop_bb().len() > 2 {
         return false;
     }
 
@@ -133,7 +133,6 @@ fn attempt_loop_unrolling(
             start = lhs_scev.get_operands()[0].get_scev_const();
             step = lhs_scev.get_operands()[1].get_scev_const();
             end = rhs_scev.get_scev_const();
-            debug_assert!(step < 0);
             if (end - start) % step == 0 {
                 round = (end - start) / step;
             } else {
@@ -188,8 +187,9 @@ fn one_block_loop_full_unrolling(
 ) {
     let bodys = loop_info.get_current_loop_bb();
 
-    debug_assert_eq!(bodys.len(), 2);
-    let mut body = if bodys[0] == loop_info.get_header() {
+    let mut body = if bodys.len() == 1 {
+        bodys[0]
+    } else if bodys[0] == loop_info.get_header() {
         bodys[1]
     } else {
         bodys[0]
@@ -218,6 +218,9 @@ fn one_block_loop_full_unrolling(
     // 初始化last_insts
     let mut last_insts = Vec::new();
     let mut inst = body.get_head_inst();
+    while let InstKind::Phi = inst.get_kind() {
+        inst = inst.get_next();
+    }
     while !inst.is_br() {
         last_insts.push(inst);
         inst = inst.get_next();
@@ -275,7 +278,11 @@ fn one_block_loop_full_unrolling(
         });
     });
     let mut index = 0;
-    inst_process_in_bb(body.get_head_inst(), |x| {
+    inst = body.get_head_inst();
+    while let InstKind::Phi = inst.get_kind() {
+        inst = inst.get_next();
+    }
+    inst_process_in_bb(inst, |x| {
         x.get_use_list().clone().iter_mut().for_each(|user| {
             if !loop_info.is_in_current_loop(&user.get_parent_bb()) {
                 let operand_index = user.get_operand_index(x);
@@ -285,35 +292,56 @@ fn one_block_loop_full_unrolling(
         index = index + 1;
     });
 
-    // 将生成的指令插入循环体
-    let mut tail = body.get_tail_inst();
+    // 将生成的和原本在循环内的指令插入循环的preheader
+    let mut preheader = loop_info.get_preheader();
+    let header = loop_info.get_header();
+    let mut tail = preheader.get_tail_inst();
+    inst = header.get_head_inst();
+    body.remove_next_bb(header);
+    while !inst.is_br() {
+        let next = inst.get_next();
+        if let InstKind::Phi = inst.get_kind() {
+            inst.get_use_list().clone().iter().for_each(|user| {
+                let index = user.get_operand_index(inst);
+                user.as_mut().set_operand(inst.get_operand(0), index);
+            });
+            inst.remove_self();
+        } else {
+            inst.move_self();
+            tail.insert_before(inst);
+        }
+        inst = next;
+    }
+    if inst.is_br_cond() {
+        inst.remove_self();
+    }
+    if body != header {
+        inst = body.get_head_inst();
+        while !inst.is_br() {
+            let next = inst.get_next();
+            inst.move_self();
+            tail.insert_before(inst);
+            inst = next;
+        }
+        if inst.is_br_cond() {
+            inst.remove_self();
+        }
+    }
     insts.iter_mut().for_each(|x| tail.insert_before(*x));
 
     // 修改cfg
-    let mut header = loop_info.get_header();
-    let mut exit;
     let header_next = header.get_next_bb().clone();
+    let mut exit;
     if loop_info.is_in_current_loop(&header_next[0]) {
-        exit = header.get_next_bb()[1];
-        header.set_next_bb(vec![header_next[0]]);
+        exit = header_next[1];
     } else {
-        exit = header.get_next_bb()[0];
-        header.set_next_bb(vec![header_next[1]]);
+        exit = header_next[0];
     };
-    body.remove_next_bb(header);
-    body.set_next_bb(vec![exit]);
-    let upbb = exit.get_up_bb().clone();
-    exit.set_up_bb(
-        upbb.iter()
-            .map(|x| if *x == header { body } else { *x })
-            .collect(),
-    );
-    header.get_tail_inst().remove_self();
-    header.push_back(pools.1.make_jmp());
+    preheader.replace_next_bb(header, exit);
+    exit.replace_up_bb(header, preheader);
 
     // 修改循环信息
     if let Some(mut parent) = loop_info.get_parent_loop() {
         parent.remove_sub_loop(loop_info);
-        parent.add_bbs(loop_info.get_current_loop_bb().clone());
     }
 }
