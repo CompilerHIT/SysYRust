@@ -27,7 +27,7 @@ impl BackendPass {
         self.clear_empty_block();
         // jump的目标块如果紧邻，则删除jump语句
         self.clear_useless_jump();
-        self.clear_unreachable_block();
+        // self.clear_unreachable_block();
     }
 
     fn merge_br_jump(&mut self) {
@@ -145,11 +145,8 @@ impl BackendPass {
     }
 
     fn part_fuse(&mut self, pool: &mut BackendPool) {
-        let mut flag = false;
         loop {
-            if flag {
-                break;
-            }
+            let mut size = 0;
             self.module.name_func.iter().for_each(|(_, func)| {
                 let mut imm_br_pred: Vec<(ObjPtr<BB>, HashSet<ObjPtr<BB>>)> = vec![];
                 func.blocks.iter().for_each(|block| {
@@ -174,8 +171,8 @@ impl BackendPass {
                     }
                 });
 
-                flag = if imm_br_pred.len() == 0 { true } else { false };
-
+                size += imm_br_pred.len();
+                
                 imm_br_pred.iter().for_each(|(block, prevs)| {
                     let prevs = prevs.iter().map(|x| *x).collect::<Vec<_>>();
                     let after = block.get_after()[0];
@@ -206,6 +203,10 @@ impl BackendPass {
             });
             // 删除0出入度的块
             self.clear_unreachable_block();
+
+            if size == 0 {
+                break;
+            }
         }
     }
 
