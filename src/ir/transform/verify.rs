@@ -107,7 +107,7 @@ fn inst_verify(inst: ObjPtr<Inst>, inst_map: &mut HashMap<ObjPtr<Inst>, Vec<ObjP
 
     for user in inst.get_use_list() {
         let user_operands = inst_map.get_mut(user);
-        debug_assert_ne!(user_operands, None);
+        debug_assert_ne!(user_operands, None, "user: {:?}, inst: {:?}", user, inst);
         let user_operands = user_operands.unwrap();
         debug_assert!(user_operands.contains(&inst));
         user_operands.remove(user_operands.iter().position(|x| x == &inst).unwrap());
