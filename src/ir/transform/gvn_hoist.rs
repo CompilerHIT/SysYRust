@@ -1,10 +1,8 @@
 use crate::{
     ir::{
-        analysis::dominator_tree::{self, calculate_dominator, DominatorTree},
+        analysis::dominator_tree::{calculate_dominator, DominatorTree},
         basicblock::BasicBlock,
-        dump_now,
-        instruction::{BinOp, Inst, InstKind, UnOp},
-        ir_type::IrType,
+        instruction::{Inst, InstKind},
         module::Module,
         tools::{dfs_pre_order_bb_process, func_process, inst_process_in_bb, replace_inst},
     },
@@ -19,25 +17,29 @@ pub fn hoist(
     pools: &mut (&mut ObjPool<BasicBlock>, &mut ObjPool<Inst>),
 ) {
     if opt_option {
-        // dump_now(module, "before_gvn.ll");
         let mut vec_congruence_class = global_value_numbering::gvn(module, opt_option).unwrap();
-        // dump_now(module, "after_gvn.ll");
         let mut index = 0;
         func_process(module, |_, func| {
             let dominator_tree = calculate_dominator(func.get_head());
             loop {
                 let mut changed = false;
-                dfs_pre_order_bb_process(func.get_head(), |bb| {// dfs后序遍历bb,自底向上上提指令
+                dfs_pre_order_bb_process(func.get_head(), |bb| {
+                    // dfs后序遍历bb,自底向上上提指令
                     let next = bb.get_next_bb().clone();
-                    if next.len() == 1 {// 只有这一个后继
-                        if dominator_tree.is_dominate(&bb, &next[0]) {// 如果支配这个后继，就把后继中的指令上提
-                            if next[0].get_up_bb().len() == 1 {// 如果这个后继也只有当前块一个前继块,无条件上移指令
+                    if next.len() == 1 {
+                        // 只有这一个后继
+                        if dominator_tree.is_dominate(&bb, &next[0]) {
+                            // 如果支配这个后继，就把后继中的指令上提
+                            if next[0].get_up_bb().len() == 1 {
+                                // 如果这个后继也只有当前块一个前继块,无条件上移指令
                                 move_insts(bb, &mut vec_congruence_class[index], pools.1);
-                            } else {// 如果不只有当前块一个前继，那么则选择性的上移指令，这里可能需要留意一下
+                            } else {
+                                // 如果不只有当前块一个前继，那么则选择性的上移指令，这里可能需要留意一下
                                 move_insts_select(bb, &mut vec_congruence_class[index], pools.1);
                             }
                         }
-                    } else if next.len() > 1 {// 两个后继
+                    } else if next.len() > 1 {
+                        // 两个后继
                         changed |= check_successor(
                             bb,
                             next,
@@ -58,7 +60,7 @@ pub fn hoist(
 
 pub fn hoist_group(
     congruence: &mut Congruence,
-    mut index_gp: usize,
+    index_gp: usize,
     dominator_tree: &DominatorTree,
     pool: &mut ObjPool<Inst>,
 ) -> bool {
@@ -68,11 +70,13 @@ pub fn hoist_group(
         for i in 0..congruence.vec_class[index_gp].len() {
             let bb1 = congruence.vec_class[index_gp][i].get_parent_bb();
             let ups1 = bb1.get_up_bb();
-            for up1 in ups1{
-                if dominator_tree.is_dominate(up1,&bb1)&&up1.get_next_bb().len()==1{// 若前继块支配该块且只有当前块一个后继，则将指令移动到该前继中
+            for up1 in ups1 {
+                if dominator_tree.is_dominate(up1, &bb1) && up1.get_next_bb().len() == 1 {
+                    // 若前继块支配该块且只有当前块一个后继，则将指令移动到该前继中
                     let inst1 = congruence.vec_class[index_gp][i];
                     let mut tttflag = false;
-                    for op in inst1.get_operands(){//operand在当前块，不移动
+                    for op in inst1.get_operands() {
+                        //operand在当前块，不移动
                         if !op.is_global_var_or_param() {
                             if op.get_parent_bb() == bb1 {
                                 tttflag = true;
@@ -80,7 +84,8 @@ pub fn hoist_group(
                             }
                         }
                     }
-                    if tttflag{// 该指令所在块的其他前继块不可能也支配当块，直接退出这条指令的上提判断
+                    if tttflag {
+                        // 该指令所在块的其他前继块不可能也支配当块，直接退出这条指令的上提判断
                         break;
                     }
                     // 满足条件,上移
@@ -95,15 +100,16 @@ pub fn hoist_group(
                     break;
                 }
             }
-            if flag2{
+            if flag2 {
                 break;
             }
         }
-        if flag2{// 指令集变了，下一次循环
+        if flag2 {
+            // 指令集变了，下一次循环
             continue;
         }
         for i in 0..congruence.vec_class[index_gp].len() {
-            for j in i+1..congruence.vec_class[index_gp].len() {
+            for j in i + 1..congruence.vec_class[index_gp].len() {
                 let bb1 = congruence.vec_class[index_gp][i].get_parent_bb();
                 let bb2 = congruence.vec_class[index_gp][j].get_parent_bb();
                 if bb1 == bb2 {
@@ -163,8 +169,10 @@ pub fn check_successor(
     let bb2 = vec_successors[1];
     let mut flag = false;
     inst_process_in_bb(bb1.get_head_inst(), |inst1| {
-        inst_process_in_bb(bb2.get_head_inst(), |inst2| {// 遍历过程中删除指令应该不会有问题
-            if dominator_tree.is_dominate(&bb, &bb1) && dominator_tree.is_dominate(&bb, &bb2) {// 如果当前节点支配其两个后继，则可以考虑将相同计算提到当前节点中
+        inst_process_in_bb(bb2.get_head_inst(), |inst2| {
+            // 遍历过程中删除指令应该不会有问题
+            if dominator_tree.is_dominate(&bb, &bb1) && dominator_tree.is_dominate(&bb, &bb2) {
+                // 如果当前节点支配其两个后继，则可以考虑将相同计算提到当前节点中
                 if compare_two_inst(inst1, inst2, congruence_class) {
                     let tail = bb.get_tail_inst();
                     let inst_new = make_same_inst(inst1, pool);
