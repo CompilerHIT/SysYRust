@@ -121,6 +121,47 @@ pub fn merge_reg_with_constraints(
         }
         return false;
     };
+    /*
+    合并物理寄存器和虚拟寄存器
+     */
+    let per_process_between_v_and_p = |func: &mut Func,
+                                       r1: &Reg,
+                                       r2: &Reg,
+                                       interef_graph: &mut HashMap<Reg, HashSet<Reg>>,
+                                       availables: &mut HashMap<Reg, RegUsedStat>,
+                                       constraints: &mut HashMap<Reg, HashSet<Reg>>|
+     -> bool {
+        //合并物理寄存器和虚拟寄存器
+        if !r1.is_physic() && !r2.is_physic() {
+            return false;
+        }
+        if r1.is_physic() && r2.is_physic() {
+            return false;
+        }
+        //对于物理寄存器和虚拟寄存器的合并
+        let (v_reg, p_reg) = if r1.is_physic() { (r1, r2) } else { (r2, r1) };
+        if !availables
+            .get(v_reg)
+            .unwrap()
+            .is_available_reg(p_reg.get_color())
+        {
+            return false;
+        }
+        //记录加unavailable序列
+        let mut add_to_availables: Vec<(Reg, i32)> = Vec::new();
+        let p_color = p_reg.get_color();
+        for v_nb in interef_graph.get(v_reg).unwrap() {
+            debug_assert!(!v_nb.is_physic());
+            let available = availables.get_mut(v_nb).unwrap();
+            if available.is_available_reg(p_color) {
+                available.use_reg(p_color);
+                add_to_availables.push((*v_nb, p_color));
+            }
+        }
+        unimplemented!();
+
+        false
+    };
 
     /*
     p2v 并记录 去色动作序列
@@ -184,6 +225,20 @@ pub fn merge_reg_with_constraints(
     let mut if_merge = false;
     //统计所有的可着色对,然后按照约束和从小到大的顺序开始着色,如果失败,从表中移出
     for (r1, r2) in mergables.iter() {
+        if r1.is_physic() || r2.is_physic() {
+            // let ok = per_process_between_v_and_p(
+            //     func,
+            //     r1,
+            //     r2,
+            //     &mut interef_graph,
+            //     &mut availables,
+            //     &mut constraints,
+            // );
+            // if_merge |= ok;
+            // todo!()
+            continue;
+        }
+
         debug_assert!(!r1.is_physic() && !r2.is_physic());
         let ok = per_process(
             func,
@@ -258,9 +313,6 @@ pub fn analyse_mergable(func: &Func) -> HashSet<(Reg, Reg)> {
                     let reg_use = inst.get_lhs().drop_reg();
                     let reg_def = inst.get_def_reg().unwrap();
                     if live_now.contains(&reg_use) {
-                        return;
-                    }
-                    if reg_use.is_physic() || reg_def.is_physic() {
                         return;
                     }
                     if reg_use.get_type() != reg_def.get_type() {
