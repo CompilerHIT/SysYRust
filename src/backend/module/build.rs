@@ -24,8 +24,7 @@ impl AsmModule {
             config::record_event("finish block_pass_pre_clear");
             // 窥孔
             config::record_event("start fuse_tmp_phi_regs");
-            // BackendPass::new(obj_module).fuse_tmp_regs();
-            self.log_insts();
+            BackendPass::new(obj_module).fuse_tmp_regs_up();    
             self.print_asm("after_fuse_tmp_regs.log");
             config::record_event("finish fuse_tmp_phi_regs");
         }
@@ -49,7 +48,7 @@ impl AsmModule {
             self.map_v_to_p();
 
             // 代码调度，列表调度法
-            // self.list_scheduling_tech();
+            self.list_scheduling_tech();
 
             // // 为临时寄存器分配寄存器
             self.clear_tmp_var();
