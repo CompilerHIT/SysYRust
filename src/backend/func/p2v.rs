@@ -1,3 +1,5 @@
+use crate::log_file_new;
+
 use super::*;
 
 ///寄存器重分配相关接口的实现
@@ -401,6 +403,7 @@ impl Func {
         debug_assert!(use_reg.len() == 1 || self.label != "main");
         if let Some(use_reg) = use_reg.get(0) {
             //对于块内的情况
+            unchanged_use.insert((*last_inst, *use_reg));
             let mut index = final_bb.insts.len();
             let mut if_search_in_edge = true;
             while index > 0 {
@@ -409,6 +412,9 @@ impl Func {
                 if inst.get_reg_def().contains(use_reg) {
                     if_search_in_edge = false;
                     break;
+                }
+                if inst.get_reg_use().contains(use_reg) {
+                    unchanged_use.insert((*inst, *use_reg));
                 }
                 if index == 0 {
                     break;
@@ -592,28 +598,39 @@ impl Func {
         let mut all_v_regs: HashSet<Reg> = HashSet::new();
         let mut p2v_actions = Vec::new();
 
-        // Func::print_func(ObjPtr::new(&self), "before_rm_between_blocks.txt");
+        debug_assert!({
+            log_file!("unchange_def.txt", "func:{}", self.label);
+            for (inst, reg) in unchanged_def.iter() {
+                log_file!("unchange_def.txt", "{},{}", inst.to_string(), reg);
+            }
+            log_file!("unchange_use.txt", "func:{}", self.label);
+            for (inst, reg) in unchanged_use.iter() {
+                log_file!("unchange_use.txt", "{},{}", inst.to_string(), reg);
+            }
+            true
+        });
+        Func::print_func(ObjPtr::new(&self), "before_p2v.txt");
+        self.print_live_interval("live_interval_for_p2v.txt");
         // let to_check = read_number_from_console();
 
         //进行流处理 (以front作为栈顶)
         //先解决块间问题
         let mut forward_passed: HashSet<(ObjPtr<BB>, Reg)> = HashSet::new();
         let mut backward_passed: HashSet<(ObjPtr<BB>, Reg)> = HashSet::new();
+        let mut path = "p2v_between_blocks.txt";
+        log_file!(path, "func:{}", self.label);
         for bb in self.blocks.iter() {
             for reg in bb.live_out.iter() {
-                // if reg.get_id() == to_check {
-                //     let a = 2;
-                // }
-
                 if !regs_to_decolor.contains(reg) {
                     continue;
                 }
                 if !reg.is_physic() {
                     continue;
                 }
-                if backward_passed.contains(&(*bb, *reg)) {
-                    continue;
-                }
+                // if backward_passed.contains(&(*bb, *reg)) {
+                //     continue;
+                // }
+                log_file!(path, "process {} from {}", reg, bb.label);
                 //剩下部分用来着色,不同的块间不同的寄存器的反复着色状态不同
                 //首先判断该reg是否能够p2v
                 let mut to_forward = LinkedList::new();
@@ -631,14 +648,17 @@ impl Func {
                 //把内容加入passed表
                 for bb in f_passed {
                     forward_passed.insert((bb, *reg));
+                    log_file!(path, "forward search {} ", bb.label);
                     log_file!("btpassed.txt", "{}{}{}", self.label, bb.label, reg);
                 }
                 for bb in b_passed {
+                    log_file!(path, "backward search {} ", bb.label);
                     backward_passed.insert((bb, *reg));
                     log_file!("fwpassed.txt", "{}{}{}", self.label, bb.label, reg);
                 }
                 let mut if_p2v = true;
                 for (inst, if_def) in find.iter() {
+                    log_file!(path, "find:{},if_def:{}", inst.to_string(), if_def);
                     if (*if_def && unchanged_def.contains(&(*inst, *reg)))
                         || ((!*if_def) && unchanged_use.contains(&(*inst, *reg)))
                     {
@@ -650,12 +670,13 @@ impl Func {
                             inst.as_ref()
                         );
                         if_p2v = false;
-                        break;
                     }
                 }
                 if !if_p2v {
+                    log_file!(path, "process fail!");
                     continue;
                 }
+                log_file!(path, "process success!");
                 let v_reg = Reg::init(reg.get_type());
                 all_v_regs.insert(v_reg);
                 for (inst, if_def) in find {
@@ -681,12 +702,12 @@ impl Func {
                 let used = inst.get_reg_use();
                 for reg_use in used {
                     if (!regs_to_decolor.contains(&reg_use))
-                        || (!unchanged_use.contains(&(*inst, reg_use)))
-                        || (reg_use.is_physic())
+                        || (unchanged_use.contains(&(*inst, reg_use)))
+                        || (!reg_use.is_physic())
                     {
                         continue;
                     }
-                    debug_assert!(p2v.contains_key(&reg_use), "{}", {
+                    debug_assert!(p2v.contains_key(&reg_use), "{},{}", inst.to_string(), {
                         Func::print_func(ObjPtr::new(self), "bad1.txt");
                         reg_use
                     });
@@ -696,7 +717,7 @@ impl Func {
                 }
                 for reg_def in def {
                     p2v.remove(&reg_def);
-                    if reg_def.is_physic()
+                    if !reg_def.is_physic()
                         || !regs_to_decolor.contains(&reg_def)
                         || unchanged_def.contains(&(*inst, reg_def))
                     {
