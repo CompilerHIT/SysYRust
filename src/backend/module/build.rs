@@ -12,6 +12,7 @@ impl AsmModule {
     pub fn build_v4(&mut self, f: &mut File, _f2: &mut File, pool: &mut BackendPool, is_opt: bool) {
         let obj_module = ObjPtr::new(self);
         self.build_lir(pool);
+        self.print_asm("abstract_asm_after_initial_build.txt");
         config::record_event("finish build lir");
 
         // self.print_asm("asm_abastract.txt");
@@ -24,12 +25,13 @@ impl AsmModule {
             config::record_event("finish block_pass_pre_clear");
             // 窥孔
             config::record_event("start fuse_tmp_phi_regs");
-            BackendPass::new(obj_module).fuse_tmp_regs_up();    
+            BackendPass::new(obj_module).fuse_tmp_regs_up();
             self.print_asm("after_fuse_tmp_regs.log");
             config::record_event("finish fuse_tmp_phi_regs");
         }
 
-        
+        self.print_asm("abstract_asm_after_first_block_merge.txt");
+
         self.remove_unuse_inst_pre_alloc();
         self.print_asm("after_delete.log");
         config::record_event("finish rm pre first alloc");
@@ -64,16 +66,6 @@ impl AsmModule {
         config::record_event("finish rm inst suf first alloc");
         self.print_asm("after_scehdule.log");
 
-        //加入外部函数
-        self.add_external_func(pool);
-        // //建立调用表
-        self.build_own_call_map();
-        // //寄存器重分配,重分析
-        if is_opt {
-            self.realloc_pre_split_func();
-            config::record_event("finish realloc pre spilit func");
-        }
-
         config::record_event("start first ralloc before handle spill");
         self.first_realloc();
         config::record_event("finish first realloc before handle spill");
@@ -86,6 +78,17 @@ impl AsmModule {
         }
         self.print_asm("after_spill.log");
         config::record_event("finish handle spill");
+
+        //加入外部函数
+        self.add_external_func(pool);
+        // //建立调用表
+        self.build_own_call_map();
+        // //寄存器重分配,重分析
+        // if is_opt {
+        //     self.realloc_pre_spill();
+        //     config::record_event("finish realloc pre spilit func");
+        // }
+
         // if is_opt {
         //     //似乎存在bug,并且目前没有收益,暂时放弃
         //     self.split_func(pool);

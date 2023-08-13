@@ -218,6 +218,13 @@ impl Func {
         //只针对块内的局部短路
         for bb in self.blocks.iter() {
             let mut val_occurs: HashMap<Value, LinkedList<Reg>> = HashMap::new();
+            //初始加入0,
+            let zero_val = Value::IImm(0);
+            val_occurs.insert(zero_val.clone(), LinkedList::new());
+            val_occurs
+                .get_mut(&zero_val)
+                .unwrap()
+                .push_back(Reg::get_zero());
             let mut program_stat = ProgramStat::new();
             for inst in bb.insts.iter() {
                 //获取该指令涉及的寄存器,判断该指令后目的寄存器是否是常数

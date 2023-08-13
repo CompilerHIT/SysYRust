@@ -4,13 +4,13 @@ use crate::{
     backend::{
         instrs::{Func, InstrsType, SingleOp},
         operand::Reg,
-        regalloc::structs::RegUsedStat,
+        regalloc::{perfect_alloc::alloc_with_interef_graph_and_constraints, structs::RegUsedStat},
     },
     config, log_file,
     utility::ObjPtr,
 };
 
-use super::{perfect_alloc::alloc_with_v_interference_graph_and_base_available, *};
+use super::*;
 
 ///进行了寄存器合并的分配,在最后的最后进行
 /// availables为可能各个地方允许使用的寄存器的并集
@@ -98,9 +98,9 @@ pub fn merge_reg_with_constraints(
         //如果该移动边的两个顶点 其中有一个的邻居都是 小度点,则合并成功
 
         //尝试着色
-        if let Some(_) = alloc_with_v_interference_graph_and_base_available(
-            &interef_graph,
-            &availables,
+        if let Some(_) = alloc_with_interef_graph_and_constraints(
+            interef_graph.clone(),
+            availables.clone(),
             &constraints,
         ) {
             log_file!("final_merge.txt", "merge:{},{}", r1, r2);
@@ -257,9 +257,9 @@ pub fn merge_reg_with_constraints(
     if if_merge {
         assert!(func.remove_self_mv());
         loop {
-            if let Some(alloc_stat) = alloc_with_v_interference_graph_and_base_available(
-                &interef_graph,
-                &availables,
+            if let Some(alloc_stat) = alloc_with_interef_graph_and_constraints(
+                interef_graph.clone(),
+                availables.clone(),
                 &constraints,
             ) {
                 func.v2p(&alloc_stat.dstr);
@@ -300,7 +300,7 @@ fn build_constraints(
     return constraints;
 }
 
-//分析虚拟寄存器的合并机会
+//分析寄存器的合并机会
 pub fn analyse_mergable(func: &Func) -> HashSet<(Reg, Reg)> {
     let mut mergables: HashSet<(Reg, Reg)> = HashSet::new();
     //分析可以合并的虚拟寄存器

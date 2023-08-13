@@ -17,76 +17,7 @@ impl Func {
             Func::build_live_in_live_out_for_stackslots_from_live_use_and_live_def(
                 &live_uses, &live_defs,
             );
-        return (live_uses, live_defs, live_in, live_out);
-        todo!();
-        //计算使用的内存地址的活跃区间
-        let mut live_ins: HashMap<ObjPtr<BB>, HashSet<StackSlot>> = HashMap::new();
-        let mut live_outs: HashMap<ObjPtr<BB>, HashSet<StackSlot>> = HashMap::new();
-        let mut live_defs: HashMap<ObjPtr<BB>, HashSet<StackSlot>> = HashMap::new();
-        let mut live_uses: HashMap<ObjPtr<BB>, HashSet<StackSlot>> = HashMap::new();
-
-        //计算stackslot的 live use, live def
-        for bb in func.blocks.iter() {
-            let mut live_def: HashSet<StackSlot> = HashSet::new();
-            let mut live_use: HashSet<StackSlot> = HashSet::new();
-            for inst in bb.insts.iter().rev() {
-                match inst.get_type() {
-                    InstrsType::LoadFromStack => {
-                        let offset = inst.get_stack_offset().get_data();
-                        let stackslot = StackSlot::new(offset, ADDR_SIZE);
-                        live_def.remove(&stackslot);
-                        live_use.insert(stackslot);
-                    }
-                    InstrsType::StoreToStack => {
-                        let offset = inst.get_stack_offset().get_data();
-                        let stackslot = StackSlot::new(offset, ADDR_SIZE);
-                        live_use.remove(&stackslot);
-                        live_def.insert(stackslot);
-                    }
-                    _ => (),
-                }
-            }
-            live_defs.insert(*bb, live_def);
-            live_uses.insert(*bb, live_use.clone());
-            live_ins.insert(*bb, live_use);
-            live_outs.insert(*bb, HashSet::new());
-        }
-
-        //计算live in 和 live out
-        loop {
-            let mut finish_flag = true;
-            // new in =  (old_out-def)+old_in
-            // new out= [out_edge:uses]
-            //更新 live out
-            for bb in func.blocks.iter() {
-                let live_out = live_outs.get_mut(bb).unwrap();
-                let mut new_live_out = live_out.clone();
-                for out_bb in bb.out_edge.iter() {
-                    new_live_out.extend(live_ins.get(out_bb).unwrap().iter());
-                }
-                if new_live_out.len() > live_out.len() {
-                    *live_out = new_live_out;
-                    finish_flag = false;
-                }
-            }
-            //更新live in
-            for bb in func.blocks.iter() {
-                let live_in = live_ins.get_mut(bb).unwrap();
-                let def = live_defs.get(bb).unwrap();
-                let mut new_in = live_outs.get(bb).unwrap().clone();
-                new_in.retain(|sst| !def.contains(sst));
-                new_in.extend(live_in.iter());
-                if new_in.len() > live_in.len() {
-                    finish_flag = false;
-                    *live_in = new_in;
-                }
-            }
-            if finish_flag {
-                break;
-            }
-        }
-
-        (live_uses, live_defs, live_ins, live_outs)
+        (live_uses, live_defs, live_in, live_out)
     }
 
     pub fn build_live_use_def_for_stackslots(

@@ -39,8 +39,8 @@ impl AsmModule {
         callee_saved_times
     }
 
-    pub fn realloc_pre_split_func(&mut self) {
-        self.realloc_main_with_priority_pre_split();
+    pub fn realloc_pre_spill(&mut self) {
+        self.realloc_main_with_priority_pre_spill();
         self.realloc_not_main_with_priority();
     }
 
@@ -129,11 +129,13 @@ impl AsmModule {
     //统计每个虚拟寄存器收到不同的物理寄存器的约束个数,根据个数从多到少进行减少
 
     ///重新调整main函数的寄存器分布以减少被调用函数需要保存的寄存器
-    fn realloc_main_with_priority_pre_split(&mut self) {
+    fn realloc_main_with_priority_pre_spill(&mut self) {
         let main_func = *self.name_func.get("main").unwrap();
         let mut rs = Reg::get_all_recolorable_regs();
         rs.remove(&Reg::get_s0());
         main_func.as_mut().p2v_pre_handle_call(&rs);
+        main_func.as_mut().calc_live_for_alloc_reg();
+
         main_func.as_mut().allocate_reg();
         let callees_used = self.build_callee_used();
         let callee_constraints: HashMap<Reg, HashSet<Reg>> =
@@ -149,7 +151,8 @@ impl AsmModule {
              -> Option<FuncAllocStat> {
                 let mut callee_constraints = callee_constraints;
                 loop {
-                    let alloc_stat = perfect_alloc::alloc(&main_func, &callee_constraints);
+                    let alloc_stat =
+                        perfect_alloc::alloc_with_constraints(&main_func, &callee_constraints);
                     //每次减半直到分配成功
                     if alloc_stat.is_some() {
                         debug_assert!(alloc_stat.as_ref().unwrap().spillings.len() == 0);

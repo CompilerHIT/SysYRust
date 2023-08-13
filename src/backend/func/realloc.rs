@@ -41,7 +41,7 @@ impl Func {
             for v_reg in all_v_regs.iter() {
                 constraints.insert(*v_reg, unavailables.clone());
             }
-            let alloc_stat = perfect_alloc::alloc(&self, &constraints);
+            let alloc_stat = perfect_alloc::alloc_with_constraints(&self, &constraints);
             if alloc_stat.is_some() {
                 last_alloc_stat = alloc_stat;
                 continue;
@@ -108,7 +108,7 @@ impl Func {
         }
 
         self.calc_live_for_handle_call();
-        if let Some(alloc_stat) = perfect_alloc::alloc(&self, &constraints) {
+        if let Some(alloc_stat) = perfect_alloc::alloc_with_constraints(&self, &constraints) {
             self.v2p(&alloc_stat.dstr);
             return true;
         } else {
