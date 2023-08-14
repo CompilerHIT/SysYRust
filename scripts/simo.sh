@@ -1,3 +1,3 @@
 ./scripts/mcl.sh
-cargo run --release  a.sy -S -o a.s
+cargo run  a.sy -S -o a.s -O1
 

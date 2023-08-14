@@ -172,7 +172,7 @@ impl BackendPass {
                 });
 
                 size += imm_br_pred.len();
-                
+
                 imm_br_pred.iter().for_each(|(block, prevs)| {
                     let prevs = prevs.iter().map(|x| *x).collect::<Vec<_>>();
                     let after = block.get_after()[0];

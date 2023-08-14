@@ -1,6 +1,9 @@
 use std::collections::HashSet;
 
-use crate::{backend::operand::Reg, frontend::ast::Continue};
+use crate::{
+    backend::{instrs::Func, operand::Reg},
+    frontend::ast::Continue,
+};
 
 use super::AsmModule;
 
@@ -40,7 +43,7 @@ impl AsmModule {
         });
     }
 
-    ///在handle spill前进行的最后一次重分配,仍然保留tmps,s0
+    ///在handle spill前进行的最后一次重分配,只保留tmp
     pub fn first_realloc(&mut self) {
         self.name_func.iter_mut().for_each(|(_, func)| {
             if func.is_extern {
@@ -50,11 +53,18 @@ impl AsmModule {
                 return;
             }
             //
-            func.as_mut().p2v(&Reg::get_all_recolorable_regs());
-            let mut unavailables = Reg::get_all_tmps();
+            let (_, p2v_actions) = func.as_mut().p2v(&Reg::get_all_recolorable_regs());
+            let old_func_alloc_stat = func.reg_alloc_info.clone();
+            let mut unavailables = HashSet::new();
             unavailables.insert(Reg::get_s0());
             func.as_mut().alloc_reg_without(&unavailables);
-            func.as_mut().v2p(&func.reg_alloc_info.dstr);
+            if func.reg_alloc_info.spillings.len() == 0 {
+                func.as_mut().v2p(&func.reg_alloc_info.dstr);
+                return;
+            }
+
+            Func::undo_p2v(&p2v_actions);
+            func.as_mut().reg_alloc_info = old_func_alloc_stat;
         });
     }
 

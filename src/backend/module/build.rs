@@ -66,12 +66,12 @@ impl AsmModule {
         config::record_event("finish rm inst suf first alloc");
         self.print_asm("after_scehdule.log");
 
-        config::record_event("start first ralloc before handle spill");
-        self.first_realloc();
-        config::record_event("finish first realloc before handle spill");
         config::record_event("start handle spill");
         self.print_asm("before_spill.log");
-        if false {
+        if is_opt {
+            config::record_event("start first realloc before handle spill");
+            self.first_realloc();
+            config::record_event("finish first realloc before handle spill");
             self.handle_spill_v3(pool);
         } else {
             self.handle_spill_tmp(pool);
@@ -119,9 +119,8 @@ impl AsmModule {
         }
         self.print_asm("after_handle_call.log");
         config::record_event("finish handle call");
-        let is_opt = true;
-        if is_opt && config::get_rest_secs() > 130 {
-            assert!(config::get_rest_secs() > 60);
+
+        if config::get_rest_secs() >= 56 {
             config::record_event("start rm before rearrange");
             self.rm_inst_before_rearrange(pool, &used_but_not_saved);
             config::record_event("finish rm before rearrange");

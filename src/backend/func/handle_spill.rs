@@ -3,7 +3,7 @@ use super::*;
 /// handle spill v3实现
 impl Func {
     ///为handle spill 计算寄存器活跃区间
-    /// 会认为zero,ra,sp,tp,gp在所有块中始终活跃
+    /// 会认为zero,ra,sp,tp,gp,s0在所有块中始终活跃
     pub fn calc_live_for_handle_spill(&self) {
         self.calc_live_base();
         //把sp和ra寄存器加入到所有的块的live out,live in中，表示这些寄存器永远不能在函数中自由分配使用
@@ -33,8 +33,8 @@ impl Func {
         //先分配空间
         //对于spillings用到的空间直接一人一个
         let regs = self.draw_all_virtual_regs();
-        for spilling_reg in regs.iter() {
-            let spilling_reg = &spilling_reg.get_id();
+        debug_assert!(regs.len() == self.reg_alloc_info.spillings.len());
+        for spilling_reg in self.reg_alloc_info.spillings.iter() {
             debug_assert!(
                 regs.contains(&Reg::new(*spilling_reg, ScalarType::Int))
                     || regs.contains(&Reg::new(*spilling_reg, ScalarType::Float))
@@ -42,14 +42,14 @@ impl Func {
             let last = self.stack_addr.back().unwrap();
             let new_pos = last.get_pos() + last.get_size();
             let new_stack_slot = StackSlot::new(new_pos, ADDR_SIZE);
-            let spilling_reg = if regs.contains(&Reg::new(*spilling_reg, ScalarType::Int)) {
-                debug_assert!(!regs.contains(&Reg::new(*spilling_reg, ScalarType::Float)));
-                Reg::new(*spilling_reg, ScalarType::Int)
+            let if_i_reg = Reg::new(*spilling_reg, ScalarType::Int);
+            let if_f_reg = Reg::new(*spilling_reg, ScalarType::Float);
+            debug_assert!(!(regs.contains(&&if_i_reg) && regs.contains(&if_f_reg)));
+            let spilling_reg = if regs.contains(&if_i_reg) {
+                if_i_reg
             } else {
-                debug_assert!(regs.contains(&Reg::new(*spilling_reg, ScalarType::Float)));
-                Reg::new(*spilling_reg, ScalarType::Float)
+                if_f_reg
             };
-            debug_assert!(!self.spill_stack_map.contains_key(&spilling_reg));
             self.spill_stack_map.insert(spilling_reg, new_stack_slot);
             self.stack_addr.push_back(new_stack_slot);
         }
@@ -208,7 +208,7 @@ impl Func {
     //不需要给物理寄存器分配空间,因为每个块中都会为物理寄存器临时分配空间
     pub fn handle_spill_for_block(&mut self, bb: &ObjPtr<BB>, pool: &mut BackendPool) {
         let mut phisic_mems = HashMap::new();
-        for reg in Reg::get_all_regs() {
+        for reg in Reg::get_all_not_specials() {
             let back = self.stack_addr.back().unwrap();
             let new_pos = back.get_pos() + back.get_size();
             let new_sst = StackSlot::new(new_pos, ADDR_SIZE);
@@ -219,7 +219,10 @@ impl Func {
         let spill_stack_map = &self.spill_stack_map;
         let mut next_occurs = Func::build_next_occurs(bb);
 
-        let choose_borrow = Func::choose_borrow;
+        // TODO! 选择合适的启发函数来选择借用的寄存器
+        // let choose_borrow = Func::choose_borrow_1;
+        let choose_borrow = Func::choose_borrow_2;
+
         let borrow = Func::borrow;
         let refresh_rentors_and_holders_with_next_occur =
             Func::refresh_rentors_and_holders_with_next_occur;
@@ -278,7 +281,6 @@ impl Func {
             let mut availables: RegUsedStat = RegUsedStat::init_unspecial_regs_without_s0();
             let mut regs = inst.get_regs();
             //记录不能够使用的寄存器
-            regs.retain(|reg| !reg.is_physic());
             for reg in regs.iter() {
                 if let Some(borrowed) = rentors.get(reg) {
                     availables.use_reg(borrowed.get_color());
@@ -286,14 +288,15 @@ impl Func {
                     availables.use_reg(reg.get_color());
                 }
             }
-
-            //选择并租借物理寄存器
+            regs.retain(|reg| !reg.is_physic());
+            //给没有选中物理寄存器租借的虚拟寄存器寻找适合租借的物理寄存器
             for reg in regs.iter() {
                 if rentors.contains_key(&reg) {
                     continue;
                 }
                 let to_borrow = choose_borrow(reg, &next_occurs, &rentors, &holders, availables);
                 availables.use_reg(to_borrow.get_color());
+
                 borrow(
                     reg,
                     &to_borrow,
@@ -305,6 +308,7 @@ impl Func {
                     &mut new_insts,
                 );
             }
+            //把虚拟寄存器替换为它们租借的物理寄存器
             for reg in regs.iter() {
                 debug_assert!(rentors.contains_key(reg));
                 let borrow = rentors.get(reg).unwrap();
@@ -335,7 +339,7 @@ impl Func {
             index += 1;
         }
 
-        //归还所有物理寄存器
+        //归还所有虚拟寄存器
         let to_give_back: Vec<Reg> = rentors.iter().map(|(_, r)| *r).collect();
         for reg in to_give_back {
             let rentor = *holders.get(&reg).unwrap();
@@ -349,6 +353,19 @@ impl Func {
             rentors.remove(&rentor);
             holders.insert(reg, reg);
         }
+
+        // 此时,live out中存在的物理寄存器应该都已经归还到原主了
+        // 归还所有物理寄存器
+        bb.live_out.iter().for_each(|reg| {
+            if reg.is_physic() {
+                if !holders.contains_key(reg) {
+                    Func::load_back(&reg, &phisic_mems, pool, &mut new_insts);
+                    holders.insert(*reg, *reg);
+                } else {
+                    debug_assert!(holders.get(reg).unwrap() == reg);
+                }
+            }
+        });
 
         // println!("{index}");
         //对结尾跳转语句的处理(使用临时寄存器,不在live out里面的内容不去保存)
@@ -495,105 +512,6 @@ impl Func {
         );
     }
 
-    ///choose last
-    fn choose_borrow(
-        rentor: &Reg,
-        next_occurs: &HashMap<Reg, LinkedList<(usize, bool)>>,
-        rentors: &HashMap<Reg, Reg>,
-        holders: &HashMap<Reg, Reg>,
-        availables: RegUsedStat,
-    ) -> Reg {
-        let mut availables = availables;
-        availables.merge(&RegUsedStat::init_for_reg(rentor.get_type()));
-
-        //获取自己的下次出现,如果自己没有下次出现,则 (use 完就结束了,也就是最短使用了,也就随便选一个能用的寄存器就最好)
-        let self_next_occur = next_occurs.get(rentor);
-        if self_next_occur.is_none() {
-            let to_borrow = availables.get_available_reg(rentor.get_type()).unwrap();
-            let to_borrow = Reg::from_color(to_borrow);
-            return to_borrow;
-        }
-
-        //如果自己有下次出现,记录自己最后一次出现的下标
-        let self_last_occur = self_next_occur.unwrap().back().unwrap().0;
-        let mut choices: Vec<(Reg, usize, bool)> = Vec::new();
-        //然后建立可用寄存器列表
-        for reg in Reg::get_all_not_specials() {
-            if !availables.is_available_reg(reg.get_color()) {
-                continue;
-            }
-            let old_holder = holders.get(&reg);
-            let old_holder = if old_holder.is_some() {
-                old_holder.unwrap()
-            } else {
-                &reg
-            };
-            let next_occur = next_occurs.get(old_holder);
-            //如果next occur下次没有出现(则可以直接给他一个最大值,也就是自己的出现位置+2)
-            let (index, if_def) = if next_occur.is_none() {
-                (self_last_occur * 2 + 1, true)
-            } else {
-                next_occur.unwrap().front().unwrap().clone()
-            };
-            //因为def的情况代价更小更适合选,所以相同前置的情况下先设置为1,
-            choices.push((*old_holder, index, if_def));
-        }
-
-        //对 order 进行排序
-        choices.sort_by_key(|item| item.1);
-
-        //优先选择刚好下一次出现在自己最后一次出现后的一个
-        //首先寻找第一个下标大于自身的下次def自由寄存器,如果有自由寄存器,优先自由寄存器 (代价1)
-        // 然后寻找第一个下标大于自身的下次use自由寄存器,如果有自由寄存器,优先自由寄存器 (代价2)
-        //然后寻找第一个下次出现大于自身的下次use 可抢寄存器,代价3
-        //最后最大下标寄存器
-        let mut first_free_def: Option<Reg> = None;
-        let mut first_free_use: Option<Reg> = None;
-        let mut first_borrowable_use: Option<Reg> = None;
-        for (reg, _, if_def) in choices.iter().filter(|item| item.1 > self_last_occur) {
-            if reg.is_physic() && *if_def && first_free_def.is_none() {
-                first_free_def = Some(*reg);
-                break;
-            }
-        }
-        for (reg, _, if_def) in choices.iter().filter(|item| item.1 > self_last_occur) {
-            if reg.is_physic() && !*if_def && first_free_use.is_none() {
-                first_free_use = Some(*reg);
-                break;
-            }
-        }
-        for (reg, _, if_def) in choices.iter().filter(|item| item.1 > self_last_occur) {
-            if !reg.is_physic() && first_borrowable_use.is_none() {
-                debug_assert!(!*if_def);
-                first_borrowable_use = Some(*reg);
-                break;
-            }
-        }
-
-        if let Some(reg) = first_free_def {
-            log_file!("1.txt", "1");
-            return reg;
-        } else if let Some(reg) = first_free_use {
-            log_file!("2.txt", "2");
-            return reg;
-        } else if let Some(rentor) = first_borrowable_use {
-            log_file!("3.txt", "3");
-            return *rentors.get(&rentor).unwrap();
-        }
-        log_file!("4.txt", "4");
-
-        //获取该虚拟寄存器的下一次出现
-        debug_assert!(choices.len() != 0);
-        let to_borrow_from = choices.last().unwrap().0;
-        let to_borrow = if to_borrow_from.is_physic() {
-            to_borrow_from
-        } else {
-            rentors.get(&to_borrow_from).unwrap().clone()
-        };
-        debug_assert!(to_borrow.is_physic());
-        to_borrow
-    }
-
     ///如果下次rentor是def,则直接丢弃rentor
     fn refresh_rentors_and_holders_with_next_occur(
         rentors: &mut HashMap<Reg, Reg>,
@@ -663,6 +581,7 @@ impl Func {
             let store_inst = LIRInst::build_storetostack_inst(to_borrow, pos);
             new_insts.push(pool.put_inst(store_inst));
             rentors.remove(holder);
+            holders.remove(to_borrow);
         }
         //借用物理寄存器 (先把物理寄存器原值保存到栈上)
         let pos = spill_stack_map.get(rentor).unwrap().get_pos();
@@ -675,5 +594,122 @@ impl Func {
         );
         rentors.insert(*rentor, *to_borrow);
         holders.insert(*to_borrow, *rentor);
+    }
+}
+
+impl Func {
+    ///choose last
+    fn choose_borrow_1(
+        rentor: &Reg,
+        next_occurs: &HashMap<Reg, LinkedList<(usize, bool)>>,
+        rentors: &HashMap<Reg, Reg>,
+        holders: &HashMap<Reg, Reg>,
+        availables: RegUsedStat,
+    ) -> Reg {
+        let mut availables = availables;
+        availables.merge(&RegUsedStat::init_for_reg(rentor.get_type()));
+
+        //获取自己的下次出现,如果自己没有下次出现,则 (use 完就结束了,也就是最短使用了,也就随便选一个能用的寄存器就最好)
+        let self_next_occur = next_occurs.get(rentor);
+        let self_last_occur = if self_next_occur.is_none() {
+            0
+        } else {
+            self_next_occur.unwrap().back().unwrap().0
+        };
+        let mut choices: Vec<(Reg, usize, bool)> = Vec::new();
+        //然后建立可用寄存器列表
+        for reg in Reg::get_all_not_specials() {
+            if !availables.is_available_reg(reg.get_color()) {
+                continue;
+            }
+            let old_holder = holders.get(&reg);
+            let old_holder = if old_holder.is_some() {
+                old_holder.unwrap()
+            } else {
+                &reg
+            };
+            let next_occur = next_occurs.get(old_holder);
+            //如果next occur下次没有出现(则可以直接给他一个最大值,也就是自己的出现位置+2)
+            let (index, if_def) = if next_occur.is_none() {
+                (self_last_occur + 10000, true)
+            } else {
+                next_occur.unwrap().front().unwrap().clone()
+            };
+            choices.push((*old_holder, index, if_def));
+        }
+
+        //对 order 进行排序
+        choices.sort_by_key(|item| item.1);
+
+        //优先选择刚好下一次出现在自己最后一次出现后的一个
+        //首先寻找第一个下标大于自身的下次def自由寄存器,如果有自由寄存器,优先自由寄存器 (代价1)
+        // 然后寻找第一个下标大于自身的下次use自由寄存器,如果有自由寄存器,优先自由寄存器 (代价2)
+        //然后寻找第一个下次出现大于自身的下次use 可抢寄存器,代价3
+        //最后最大下标寄存器
+        let mut first_free_def: Option<Reg> = None;
+        let mut first_free_use: Option<Reg> = None;
+        let mut first_borrowable_use: Option<Reg> = None;
+        for (reg, _, if_def) in choices.iter().filter(|item| item.1 > self_last_occur) {
+            if reg.is_physic() && *if_def && first_free_def.is_none() {
+                first_free_def = Some(*reg);
+                break;
+            }
+        }
+        for (reg, _, if_def) in choices.iter().filter(|item| item.1 > self_last_occur) {
+            if reg.is_physic() && !*if_def && first_free_use.is_none() {
+                first_free_use = Some(*reg);
+                break;
+            }
+        }
+        for (reg, _, if_def) in choices.iter().filter(|item| item.1 > self_last_occur) {
+            if !reg.is_physic() && first_borrowable_use.is_none() {
+                debug_assert!(!*if_def);
+                first_borrowable_use = Some(*reg);
+                break;
+            }
+        }
+
+        if let Some(reg) = first_free_def {
+            log_file!("1.txt", "1");
+            return reg;
+        } else if let Some(reg) = first_free_use {
+            log_file!("2.txt", "2");
+            return reg;
+        } else if let Some(rentor) = first_borrowable_use {
+            log_file!("3.txt", "3");
+            return *rentors.get(&rentor).unwrap();
+        }
+        log_file!("4.txt", "4");
+
+        //获取该虚拟寄存器的下一次出现
+        debug_assert!(choices.len() != 0);
+        let to_borrow_from = choices.last().unwrap().0;
+        let to_borrow = if to_borrow_from.is_physic() {
+            to_borrow_from
+        } else {
+            rentors.get(&to_borrow_from).unwrap().clone()
+        };
+        debug_assert!(to_borrow.is_physic());
+        to_borrow
+    }
+
+    ///只选择临时寄存器
+    fn choose_borrow_2(
+        rentor: &Reg,
+        next_occurs: &HashMap<Reg, LinkedList<(usize, bool)>>,
+        rentors: &HashMap<Reg, Reg>,
+        holders: &HashMap<Reg, Reg>,
+        availables: RegUsedStat,
+    ) -> Reg {
+        let mut availables = availables;
+        availables.merge(&RegUsedStat::init_for_reg(rentor.get_type()));
+        for reg in Reg::get_all_tmps() {
+            if availables.is_available_reg(reg.get_color()) {
+                return reg;
+            }
+        }
+        debug_assert!(false);
+        let color = availables.get_available_reg(rentor.get_type()).unwrap();
+        Reg::from_color(color)
     }
 }

@@ -94,6 +94,9 @@ static mut TIME_LIMIT_SECS: usize = 0;
 pub fn set_time_limit_secs(limit: usize) {
     unsafe { TIME_LIMIT_SECS = limit };
 }
+pub fn get_time_limit_secs() -> usize {
+    unsafe { TIME_LIMIT_SECS }
+}
 
 ///获取剩余秒数
 pub fn get_rest_secs() -> usize {
