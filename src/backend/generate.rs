@@ -287,6 +287,7 @@ impl GenerateAsm for LIRInst {
                     CmpOp::Gt => "gt",
                     CmpOp::Ge => "ge",
                     CmpOp::Eqz => "eqz",
+                    CmpOp::Nez => "nez",
                 };
                 let lhs = match self.get_lhs() {
                     Operand::Reg(reg) => reg.to_string(row),
