@@ -47,9 +47,8 @@ pub fn optimizer_run(
         // 指令下沉
         sink::sink(module, &mut pools);
 
-        // // 尾递归优化
+        // 尾递归优化
         tail_call_optimize::tail_call_optimize(module, &mut pools);
-        functional_optimizer(module, &mut pools, optimize_flag);
 
         // 函数内联
         func_inline::inline_run(module, &mut pools);
@@ -64,20 +63,16 @@ pub fn optimizer_run(
 
         // 循环优化
         loop_operation::loop_optimize(module, std::usize::MAX, &mut pools, false);
-        simplify_cfg::simplify_cfg_run(module, &mut pools);
-        functional_optimizer(module, &mut pools, optimize_flag);
-
-        // 指令下沉
-        sink::sink(module, &mut pools);
-        // TODO: 性能优化
-
-        // 再做一次
-        functional_optimizer(module, &mut pools, optimize_flag);
     }
 }
 
 /// 增加一些调用后端函数的接口
-pub fn add_interface(module: &mut Module, func_pool: &mut ObjPool<Function>, optimize_flag: bool) {
+pub fn add_interface(
+    module: &mut Module,
+    func_pool: &mut ObjPool<Function>,
+    inst_pool: &mut ObjPool<Inst>,
+    optimize_flag: bool,
+) {
     if !optimize_flag {
         return;
     }
@@ -110,6 +105,26 @@ pub fn add_interface(module: &mut Module, func_pool: &mut ObjPool<Function>, opt
     let mut get_thread_num = func_pool.new_function();
     get_thread_num.set_return_type(super::ir_type::IrType::Int);
     module.push_function("hitsz_get_thread_num".to_string(), get_thread_num);
+
+    // void hitsz_memset(intptr array, int value, int n);
+    let mut memset = func_pool.new_function();
+    let array = inst_pool.make_param(super::ir_type::IrType::IntPtr);
+    let value = inst_pool.make_param(super::ir_type::IrType::Int);
+    let n = inst_pool.make_param(super::ir_type::IrType::Int);
+    memset.set_parameter("array".to_string(), array);
+    memset.set_parameter("value".to_string(), value);
+    memset.set_parameter("n".to_string(), n);
+    module.push_function("hitsz_memset".to_string(), memset);
+
+    // void hitsz_memcopy(intptr dst, intptr src, int n);
+    let mut hitsz_memcopy = func_pool.new_function();
+    let dst = inst_pool.make_param(super::ir_type::IrType::IntPtr);
+    let src = inst_pool.make_param(super::ir_type::IrType::IntPtr);
+    let n = inst_pool.make_param(super::ir_type::IrType::Int);
+    hitsz_memcopy.set_parameter("dst".to_string(), dst);
+    hitsz_memcopy.set_parameter("src".to_string(), src);
+    hitsz_memcopy.set_parameter("n".to_string(), n);
+    module.push_function("hitsz_memcopy".to_string(), hitsz_memcopy);
 }
 
 fn functional_optimizer(
