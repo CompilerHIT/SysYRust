@@ -126,7 +126,6 @@ fn siv_test(matrix_1: &[i32], matrix_2: &[i32], bound: &[[i32; 2]]) -> bool {
     debug_assert_eq!(matrix_1.len(), 2);
     debug_assert_eq!(matrix_2.len(), 2);
     debug_assert_eq!(bound.len(), 1);
-    debug_assert!(matrix_1[0] == matrix_2[0] && matrix_1[0] == 0);
 
     let matrix_1_64 = matrix_1.iter().map(|x| *x as i64).collect::<Vec<_>>();
     let matrix_2_64 = matrix_2.iter().map(|x| *x as i64).collect::<Vec<_>>();
