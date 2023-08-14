@@ -128,4 +128,11 @@ impl Func {
             })
         })
     }
+    pub fn replace_reg(&mut self, old_reg: &Reg, new_reg: &Reg) {
+        self.blocks.iter().for_each(|bb| {
+            bb.insts.iter().for_each(|inst| {
+                inst.as_mut().replace_reg(old_reg, new_reg);
+            })
+        })
+    }
 }
