@@ -36,7 +36,8 @@ impl Func {
                 })
                 .map(|x| *x)
                 .collect();
-
+            
+            let mut special_inst_pos: HashMap<ObjPtr<LIRInst>, usize> = HashMap::new();
             // 对于清除掉控制流语句的块，建立数据依赖图
             for (i, inst) in basicblock.iter().rev().enumerate() {
                 let pos = basicblock.len() - i - 1;
@@ -54,22 +55,26 @@ impl Func {
 
                 // call依赖于之前的所有指令
                 if inst.get_type() == InstrsType::Call {
-                    for index in 1..=pos {
-                        let i = basicblock[pos - index];
-                        graph.add_edge(*inst, (1, i));
-                    }
+                    special_inst_pos.insert(*inst, i);
                 }
+                // if inst.get_type() == InstrsType::Call {
+                //     for index in 1..=pos {
+                //         let i = basicblock[pos - index];
+                //         graph.add_edge(*inst, (1, i));
+                //     }
+                // }
 
                 // 认为load/store依赖之前的所有load/store
                 if inst.get_type() == InstrsType::Load || inst.get_type() == InstrsType::Store {
-                    for index in 1..=pos {
-                        let i = basicblock[pos - index];
-                        if i.get_type() == InstrsType::Load || i.get_type() == InstrsType::Store {
-                            graph.add_edge(*inst, (1, i));
-                        } else {
-                            continue;
-                        }
-                    }
+                    special_inst_pos.insert(*inst, i);
+                    // for index in 1..=pos {
+                    //     let i = basicblock[pos - index];
+                    //     if i.get_type() == InstrsType::Load || i.get_type() == InstrsType::Store {
+                    //         graph.add_edge(*inst, (1, i));
+                    //     } else {
+                    //         continue;
+                    //     }
+                    // }
                 }
 
                 let use_vec = inst.get_reg_use();
@@ -95,7 +100,7 @@ impl Func {
                     }
                 }
             }
-
+            println!("finish build graph");
             let mut queue: VecDeque<ObjPtr<LIRInst>> = VecDeque::new();
             let mut visited = HashSet::new();
 
