@@ -384,7 +384,7 @@ fn parallelize(
             .unwrap()
             .clone();
 
-        thread_exit_ir(exiting_block, exit_block, pools);
+        thread_exit_ir(exit_block, pools);
     }
 }
 
@@ -519,98 +519,23 @@ fn thread_create_ir(
 ///           ┌───────────────────────┐
 ///           │ exiting_block         │
 ///           │                       │
-///           └──────────┬────────────┘
-///                      │
-///           ┌──────────▼────────────┐
-///           │ id: get_thread_num()  │
-///           │ br: id != 0           │
-///           ├──────────┬────────────┤
-///           │ TRUE     │ FALSE      │
-///           │          │            │
-///           └──┬───────┴────────┬───┘
-///              │                │
-/// ┌────────────▼──────┐   ┌─────▼───────────────┐
-/// │ thread_join()     │   │ thread_exit()       │
-/// │                   │   │                     │
-/// │ jmp               │   │ jmp                 │
-/// └────────────┬──────┘   └────┬────────────────┘
-///              │               │
-///            ┌─▼───────────────▼────┐
-///            │                      │
-///            │ jmp                  │
-///            │                      │
-///            └─────────┬────────────┘
-///                      │
-///            ┌─────────▼────────────┐
-///            │ exit_block           │
-///            │                      │
-///            │                      │
-///            └──────────────────────┘
+///           └─────────┬─────────────┘
+///                     │
+///           ┌─────────▼────────────┐
+///           │ exit_block           │
+///           │ thread_exit()        │
+///           │                      │
+///           └──────────────────────┘
 fn thread_exit_ir(
-    mut exiting_block: ObjPtr<BasicBlock>,
-    mut exit_block: ObjPtr<BasicBlock>,
+    exiting_block: ObjPtr<BasicBlock>,
     pools: &mut (&mut ObjPool<BasicBlock>, &mut ObjPool<Inst>),
 ) {
-    // thread_exit_if
-    let mut thread_exit_if = pools
-        .0
-        .new_basic_block(format!("thread_exit_if_{}", exiting_block.get_name()));
-    let get_thread_num = pools
-        .1
-        .make_int_call("hitsz_get_thread_num".to_string(), Vec::new());
-    let const_0 = pools.1.make_int_const(0);
-    let ne = pools.1.make_ne(get_thread_num, const_0);
-
-    thread_exit_if.push_back(get_thread_num);
-    thread_exit_if.push_back(const_0);
-    thread_exit_if.push_back(ne);
-    thread_exit_if.push_back(pools.1.make_br(ne));
-
-    // thread_exit_join
-    let mut thread_exit_join = pools
-        .0
-        .new_basic_block(format!("thread_exit_join_{}", exiting_block.get_name()));
     let call = pools
         .1
-        .make_void_call("hitsz_thread_join".to_string(), Vec::new());
-    let jmp = pools.1.make_jmp();
-
-    thread_exit_join.push_back(call);
-    thread_exit_join.push_back(jmp);
-
-    // thread_exit_exit
-    let mut thread_exit_exit = pools
-        .0
-        .new_basic_block(format!("thread_exit_exit_{}", exiting_block.get_name()));
-    let call = pools
-        .1
-        .make_void_call("hitsz_thread_exit".to_string(), Vec::new());
-    let jmp = pools.1.make_jmp();
-
-    thread_exit_exit.push_back(call);
-    thread_exit_exit.push_back(jmp);
-
-    // thread_exit_jmp
-    let mut thread_exit_jmp = pools
-        .0
-        .new_basic_block(format!("thread_exit_jmp_{}", exiting_block.get_name()));
-    let jmp = pools.1.make_jmp();
-
-    thread_exit_jmp.push_back(jmp);
-
-    // 修改cfg结构
-    exiting_block.replace_next_bb(exit_block, thread_exit_if);
-    exit_block.replace_up_bb(exiting_block, thread_exit_jmp);
-
-    thread_exit_if.set_next_bb(vec![thread_exit_exit, thread_exit_join]);
-    thread_exit_if.set_up_bb(vec![exiting_block]);
-
-    thread_exit_join.set_next_bb(vec![thread_exit_jmp]);
-    thread_exit_join.set_up_bb(vec![thread_exit_if]);
-
-    thread_exit_exit.set_next_bb(vec![thread_exit_jmp]);
-    thread_exit_exit.set_up_bb(vec![thread_exit_if]);
-
-    thread_exit_jmp.set_next_bb(vec![exit_block]);
-    thread_exit_jmp.set_up_bb(vec![thread_exit_join, thread_exit_exit]);
+        .make_void_call("hitsz_thread_join".to_string(), vec![]);
+    let mut inst = exiting_block.get_head_inst();
+    while let InstKind::Phi = inst.get_kind() {
+        inst = inst.get_next();
+    }
+    inst.insert_before(call);
 }

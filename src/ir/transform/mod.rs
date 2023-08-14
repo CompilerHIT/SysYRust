@@ -83,6 +83,12 @@ pub fn add_interface(
     // 初始化线程池，在main函数中调用一次即可
     let thread_init = func_pool.new_function();
     module.push_function("hitsz_thread_init".to_string(), thread_init);
+    // 将这个函数插入到main函数的开头
+    let thread_init_call = inst_pool.make_void_call("hitsz_thread_init".to_string(), vec![]);
+    module
+        .get_function("main")
+        .get_head()
+        .push_front(thread_init_call);
 
     // int hitsz_thread_create();
     // 创建一个新的线程，返回线程id
@@ -91,14 +97,9 @@ pub fn add_interface(
     module.push_function("hitsz_thread_create".to_string(), thread_create);
 
     // void hitsz_thread_join();
-    // 等待线程结束，只有0号线程调用
+    // 等待线程结束
     let thread_join = func_pool.new_function();
     module.push_function("hitsz_thread_join".to_string(), thread_join);
-
-    // void hitsz_thread_exit();
-    // 线程退出，非0号线程调用
-    let thread_exit = func_pool.new_function();
-    module.push_function("hitsz_thread_exit".to_string(), thread_exit);
 
     // int hitsz_get_thread_num();
     // 获取当前线程id
