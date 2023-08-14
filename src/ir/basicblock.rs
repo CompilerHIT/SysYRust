@@ -180,7 +180,7 @@ impl BasicBlock {
 
         // 修改phi的参数
         let mut inst = self.get_head_inst();
-        while let InstKind::Phi = inst.as_ref().get_kind() {
+        while let InstKind::Phi = inst.get_kind() {
             inst.remove_operand_by_index(index);
             inst = inst.get_next();
         }

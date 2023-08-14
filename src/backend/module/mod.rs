@@ -8,6 +8,7 @@ use crate::backend::operand::ToString;
 use crate::backend::opt::BackendPass;
 use crate::backend::structs::{FGlobalVar, FloatArray, GlobalVar, IGlobalVar, IntArray};
 use crate::backend::BackendPool;
+use crate::frontend::ast::Continue;
 use crate::ir::function::Function;
 use crate::ir::instruction::{Inst, InstKind};
 use crate::ir::ir_type::IrType;
@@ -20,6 +21,7 @@ use super::instrs::{Context, InstrsType, LIRInst, BB};
 use super::operand::Reg;
 use super::regalloc::structs::{FuncAllocStat, RegUsedStat};
 use super::structs::GenerateAsm;
+pub mod alloc;
 pub mod build;
 pub mod constraints;
 pub mod final_realloc;
@@ -105,15 +107,6 @@ impl AsmModule {
             });
     }
 
-    /// 设置栈大小 ，设置开合栈以及进行callee saved的保存和恢复需要的前沿和后沿函数
-    /// 该函数需要在handle call后调用
-    pub fn handle_callee(&mut self, f: &mut File) {
-        for (_, func) in self.name_func.iter() {
-            debug_assert!(!func.is_extern);
-            func.as_mut().save_callee(f)
-        }
-    }
-
     pub fn handle_overflow(&mut self, pool: &mut BackendPool) {
         self.name_func.iter_mut().for_each(|(_, func)| {
             if !func.is_extern {
@@ -126,29 +119,6 @@ impl AsmModule {
     pub fn re_list_scheduling(&mut self) {
         self.name_func.iter_mut().for_each(|(_, func)| {
             func.list_scheduling_tech();
-        });
-    }
-
-    /// 第一次运行v2p时不映射临时寄存器，第二次运行前清空tmp_vars set
-    fn map_v_to_p(&mut self) {
-        self.name_func.iter().for_each(|(_, func)| {
-            if func.is_extern {
-                return;
-            }
-            func.blocks.iter().for_each(|block| {
-                block.insts.iter().for_each(|inst| {
-                    inst.as_mut()
-                        .v_to_phy(func.context.get_reg_map().clone(), func.tmp_vars.clone());
-                });
-            });
-        });
-    }
-
-    fn allocate_reg(&mut self) {
-        self.name_func.iter_mut().for_each(|(_, func)| {
-            // log!("allocate reg fun: {}", func.as_ref().label);
-            debug_assert!(!func.is_extern);
-            func.as_mut().allocate_reg();
         });
     }
 

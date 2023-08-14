@@ -20,9 +20,7 @@ impl Func {
     ) {
         self.remove_meaningless_def(regs_used_but_not_saved);
         self.remove_unuse_def();
-
         self.short_cut_mv(regs_used_but_not_saved);
-
         while self.remove_self_mv() || self.remove_unuse_def() {
             self.short_cut_mv(regs_used_but_not_saved);
         }
@@ -30,10 +28,7 @@ impl Func {
         while self.remove_unuse_def() {
             self.short_cut_const();
         }
-        self.short_cut_mv(regs_used_but_not_saved);
-        while self.remove_self_mv() || self.remove_unuse_def() {
-            self.short_cut_mv(regs_used_but_not_saved);
-        }
+        self.remove_meaningless_def(regs_used_but_not_saved);
         while self.remove_unuse_store() {
             self.remove_unuse_def();
         }
@@ -223,6 +218,13 @@ impl Func {
         //只针对块内的局部短路
         for bb in self.blocks.iter() {
             let mut val_occurs: HashMap<Value, LinkedList<Reg>> = HashMap::new();
+            //初始加入0,
+            let zero_val = Value::IImm(0);
+            val_occurs.insert(zero_val.clone(), LinkedList::new());
+            val_occurs
+                .get_mut(&zero_val)
+                .unwrap()
+                .push_back(Reg::get_zero());
             let mut program_stat = ProgramStat::new();
             for inst in bb.insts.iter() {
                 //获取该指令涉及的寄存器,判断该指令后目的寄存器是否是常数
@@ -340,8 +342,10 @@ impl Func {
                 match val {
                     Value::IImm(val) => {
                         //常量替换
-                        let imm_li = LIRInst::build_li_inst(def_reg, val);
-                        *inst.as_mut() = imm_li;
+                        if operand::is_imm_12bs(val as i32) {
+                            let imm_li = LIRInst::build_li_inst(def_reg, val);
+                            *inst.as_mut() = imm_li;
+                        }
                     }
                     _ => (),
                 }

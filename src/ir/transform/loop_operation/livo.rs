@@ -34,18 +34,18 @@ fn livo_in_loop(
     let mut rec_set = HashSet::new();
     loop_info.get_current_loop_bb().iter().for_each(|bb| {
         inst_process_in_bb(bb.get_head_inst(), |inst| {
-            if let SCEVExpKind::SCEVMulRecExpr = scev_analyzer.analyze(&inst).get_kind() {
+            if scev_analyzer.analyze(&inst).is_scev_rec() {
                 rec_set.insert(inst);
             }
         })
     });
 
-    let latchs = loop_info.get_latchs(dominator_tree);
-    debug_assert_eq!(latchs.len(), 1, "{:?}", loop_info);
-    let latch = latchs[0];
+    let latch = loop_info.get_latch(dominator_tree);
 
     for inst in rec_set.iter() {
-        if dominator_tree.is_dominate(&inst.get_parent_bb(), &latch) {
+        if scev_analyzer.analyze(inst).is_scev_mul_rec_expr()
+            && dominator_tree.is_dominate(&inst.get_parent_bb(), &latch)
+        {
             mul_livo(*inst, loop_info, pools, scev_analyzer);
         }
     }

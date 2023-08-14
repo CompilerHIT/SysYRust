@@ -34,6 +34,7 @@ fn run_main() {
         .arg(Arg::with_name("S").short("S"))
         .arg(Arg::with_name("o").short("o").takes_value(true))
         .arg(Arg::with_name("O1").short("O").takes_value(true))
+        .arg(Arg::with_name("Events").short("E").takes_value(true))
         .get_matches();
 
     // 获取文件名
@@ -93,7 +94,7 @@ fn run_main() {
 
     // 后端解析
     let is_opt = o1_option;
-    // let is_opt = true;
+    let is_opt = true;
     // let is_opt = false;
     generate_asm(
         filename,
@@ -104,6 +105,9 @@ fn run_main() {
     );
     config::record_event("finish compile");
     // 编译结束后打印记录的属性
-    // config::dump();
-    //config::dump_not_log("./performance_eval.txt"); //该行未使用debug模式包裹,一般情况下需要注释掉
+    config::dump();
+    let is_dump_not_log = matches.is_present("Events");
+    if is_dump_not_log {
+        config::dump_not_log("./performance_eval.txt");
+    }
 }

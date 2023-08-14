@@ -59,7 +59,6 @@ pub fn check_mul_inst(
                             inst_old.as_mut().insert_before(inst_const);
                             let inst_new = pool.make_mul(inst2, inst_const);
                             inst_old.as_mut().insert_before(inst_new);
-                            // println!("replace");
                             replace_inst(inst_old, inst_new);
                             return true;
                         }
@@ -72,7 +71,6 @@ pub fn check_mul_inst(
                             inst_old.as_mut().insert_before(inst_const);
                             let inst_new = pool.make_mul(inst2, inst_const);
                             inst_old.as_mut().insert_before(inst_new);
-                            // println!("replace");
                             replace_inst(inst_old, inst_new);
                             return true;
                         }
@@ -93,12 +91,8 @@ pub fn convert_add_inst(inst: ObjPtr<Inst>, pool: &mut ObjPool<Inst>) {
             match binop {
                 BinOp::Add => {
                     let operands = inst.get_operands();
-                    // if operands[0] == operands[1] {
-                    //     println!("true");
-                    // }
                     if operands[0] == operands[1] && inst.get_ir_type() == IrType::Int {
                         //同一操作数的整数加法改为乘法指令
-                        // println!("加");
                         let inst_const = pool.make_int_const(2);
                         inst.as_mut().insert_before(inst_const);
                         let inst_new = pool.make_mul(inst_const, operands[0]);

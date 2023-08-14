@@ -25,6 +25,7 @@ mod loop_unrolling;
 
 pub fn loop_optimize(
     module: &mut Module,
+    max_loop_unrolling: usize,
     pools: &mut (&mut ObjPool<BasicBlock>, &mut ObjPool<Inst>),
     para: bool,
 ) {
@@ -41,27 +42,21 @@ pub fn loop_optimize(
     });
 
     // 循环展开
-    loop_unrolling(module, &mut loop_map, pools);
-    super::functional_optimizer(module, pools, true);
+    loop_unrolling(module, &mut loop_map, max_loop_unrolling, pools);
+    super::functional_optimizer(module, pools, false);
 
     if para {
         // 自动并行化
         auto_paralellization(module, &mut loop_map, pools);
+        super::functional_optimizer(module, pools, false);
+
+        // 归纳变量强度削减
+        func_process(module, |name, func| {
+            let dominator_tree =
+                crate::ir::analysis::dominator_tree::calculate_dominator(func.get_head());
+            livo_run(dominator_tree, loop_map.get_mut(&name).unwrap(), pools);
+        });
     }
-    super::functional_optimizer(module, pools, false);
-
-    // 归纳变量强度削减
-    func_process(module, |name, func| {
-        let dominator_tree =
-            crate::ir::analysis::dominator_tree::calculate_dominator(func.get_head());
-        livo_run(dominator_tree, loop_map.get_mut(&name).unwrap(), pools);
-    });
-    super::functional_optimizer(module, pools, false);
-
-    // 循环不变量外提
-    func_process(module, |name, _| {
-        licm_run(loop_map.get_mut(&name).unwrap(), pools);
-    });
 }
 
 /// 识别一个循环是否是有利于优化的，即循环中不会有break和continue

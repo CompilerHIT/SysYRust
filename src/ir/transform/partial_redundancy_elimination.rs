@@ -109,11 +109,12 @@ pub fn pre_group(
             }
         }
         for i in 0..congruence.vec_class[index_class].len() {
-            for j in i+1..congruence.vec_class[index_class].len() {
+            for j in i + 1..congruence.vec_class[index_class].len() {
                 if downstream_tree.is_upstream(
                     congruence.vec_class[index_class][j].get_parent_bb(),
                     congruence.vec_class[index_class][i].get_parent_bb(),
-                ) {// 其中一个指令所在块是另一个块的上游，且不互为上下游(不在同一个循环体中)
+                ) {
+                    // 其中一个指令所在块是另一个块的上游，且不互为上下游(不在同一个循环体中)
                     let down = congruence.vec_class[index_class][i].get_parent_bb();
                     let pres = down.get_up_bb();
                     if pres.len() == 1 {
@@ -134,7 +135,8 @@ pub fn pre_group(
                         pools.0,
                     ) {
                         *dominator_tree = calculate_dominator(head);
-                        *downstream_tree = DownStreamTree::make_downstream_tree(head,dominator_tree);
+                        *downstream_tree =
+                            DownStreamTree::make_downstream_tree(head, dominator_tree);
                     }
                     break; //替换过指令，刷新，从头开始比较
                 }
