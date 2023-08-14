@@ -249,11 +249,12 @@ impl Func {
         let overflow_param =
             max(0, self.param_cnt.0 - ARG_REG_COUNT) + max(0, self.param_cnt.1 - ARG_REG_COUNT);
         let offset = overflow_param * ADDR_SIZE;
-        let mut slot = StackSlot::new(offset, offset);
+        let slot = StackSlot::new(offset, offset);
         assert!(self.stack_addr.is_empty());
         self.stack_addr.push_front(StackSlot::new(0, 0));
-
-        self.stack_addr.push_front(slot);
+        if offset != 0 {
+            self.stack_addr.push_front(slot);
+        }
     }
 
     pub fn get_first_block(&self) -> ObjPtr<BB> {

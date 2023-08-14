@@ -317,7 +317,6 @@ pub fn analyse_mergable(func: &Func) -> HashSet<(Reg, Reg)> {
                     }
                     if reg_use.get_type() != reg_def.get_type() {
                         unreachable!();
-                        return;
                     }
                     mergables.insert((reg_use, reg_def));
                     mergables.insert((reg_def, reg_use));

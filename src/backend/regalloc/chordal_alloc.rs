@@ -1,10 +1,10 @@
 use std::collections::{HashMap, HashSet};
 
-use biheap::{bivec::order, BiHeap};
+use biheap::BiHeap;
 
 use crate::backend::{operand::Reg, regalloc::structs::FuncAllocStat};
 
-use super::{structs::RegUsedStat, *};
+use super::structs::RegUsedStat;
 
 pub fn try_best_alloc_with_live_graph_and_availables(
     live_neighbors: &HashMap<Reg, HashSet<Reg>>,

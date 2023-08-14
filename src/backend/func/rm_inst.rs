@@ -15,7 +15,6 @@ impl Func {
 
     pub fn rm_inst_suf_update_array_offset(
         &mut self,
-        pool: &mut BackendPool,
         regs_used_but_not_saved: &HashMap<String, HashSet<Reg>>,
     ) {
         self.remove_meaningless_def(regs_used_but_not_saved);
@@ -252,7 +251,8 @@ impl Func {
                 if inst.get_type() == InstrsType::Call {
                     let func = inst.get_func_name().unwrap();
                     let func = func.as_str();
-                    let reg_used_but_not_saved = regs_used_but_not_saved.get(func).unwrap();
+                    let default: HashSet<Reg> = HashSet::new();
+                    let reg_used_but_not_saved = regs_used_but_not_saved.get(func).unwrap_or(&default);
                     for (reg, val) in program_stat.reg_val.iter() {
                         if reg_used_but_not_saved.contains(reg) {
                             continue;
@@ -355,13 +355,13 @@ impl Func {
         self.calc_live_base();
         //
         unimplemented!("也许不需要计算这个,可以通过考虑全局的short cut mv解决");
-        for bb in self.blocks.iter() {
-            //分析blocks 内的def use关系
-            //记录值链以及中间的def use关系
-            let mut defs: HashMap<Reg, ObjPtr<LIRInst>> = HashMap::new();
-            // let mut used_between
-            let mut trans: Vec<(ObjPtr<LIRInst>, ObjPtr<LIRInst>)> = Vec::new();
-        }
+        // for bb in self.blocks.iter() {
+        //     //分析blocks 内的def use关系
+        //     //记录值链以及中间的def use关系
+        //     let mut defs: HashMap<Reg, ObjPtr<LIRInst>> = HashMap::new();
+        //     // let mut used_between
+        //     let mut trans: Vec<(ObjPtr<LIRInst>, ObjPtr<LIRInst>)> = Vec::new();
+        // }
     }
 
     ///针对特殊表达式进行的值短路

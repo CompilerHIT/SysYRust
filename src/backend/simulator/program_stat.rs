@@ -2,9 +2,8 @@ use super::{execute_stat::ExecuteStat, structs::*};
 
 use crate::{
     backend::{
-        instrs::{BinaryOp, CmpOp, InstrsType, LIRInst, Operand, SingleOp, BB},
+        instrs::{InstrsType, LIRInst, SingleOp, BB},
         operand::Reg,
-        regalloc::structs::RegUsedStat,
     },
     utility::ObjPtr,
 };

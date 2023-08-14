@@ -4,8 +4,8 @@ use crate::backend::operand::Reg;
 use std::collections::{HashMap, HashSet};
 
 use super::{
-    regalloc::{self, Regalloc},
-    structs::{FuncAllocStat, RegUsedStat},
+    regalloc::{self},
+    structs::FuncAllocStat,
 };
 
 pub fn alloc(func: &crate::backend::func::Func) -> super::structs::FuncAllocStat {
@@ -29,7 +29,7 @@ pub fn alloc(func: &crate::backend::func::Func) -> super::structs::FuncAllocStat
             .get(reg)
             .unwrap()
             .num_available_regs(reg.get_type());
-        let div = (nln as f32 - nac as f32);
+        let div = nln as f32 - nac as f32;
         val = (val * 1000.0) / (div * 1000.0 + 1.0);
         (val * 1000000.0) as usize
     });
