@@ -50,7 +50,7 @@ impl Func {
                 "live in:{:?}",
                 bb.live_in
                     .iter()
-                    .map(|reg| reg.to_string(false))
+                    .map(|reg| reg.to_string(true))
                     .collect::<Vec<String>>()
             );
             log_file!(
@@ -69,13 +69,13 @@ impl Func {
                 "live out:{:?}",
                 bb.live_out
                     .iter()
-                    .map(|reg| reg.to_string(false))
+                    .map(|reg| reg.to_string(true))
                     .collect::<Vec<String>>()
             );
             log_file!(
                 path,
                 "out edges:{:?}",
-                bb.in_edge
+                bb.out_edge
                     .iter()
                     .map(|bb| bb.label.clone())
                     .collect::<Vec<String>>()
