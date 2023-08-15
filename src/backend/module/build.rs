@@ -18,7 +18,7 @@ impl AsmModule {
         // self.print_asm("asm_abastract.txt");
         // let is_opt = true;
         // build中的块合并，不会破坏块结构并暴露更多的指令移除的机会
-        if true {
+        if is_opt {
             config::record_event("start block_pass_pre_clear");
             BackendPass::new(obj_module).block_pass_pre_clear(pool);
             // self.print_asm("after_block_pass_pre_clear.log");
@@ -44,7 +44,6 @@ impl AsmModule {
             self.cal_tmp_var();
 
             // 对非临时寄存器进行分配
-
             self.alloc_without_tmp_and_s0();
             // 将非临时寄存器映射到物理寄存器
             self.map_v_to_p();

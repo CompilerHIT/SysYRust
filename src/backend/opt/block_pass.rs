@@ -21,13 +21,10 @@ impl BackendPass {
         self.resolve_merge_br();
         // 处理fuse_imm_br中，中间的基本块有多个前继的情况
         self.fuse_muti2imm_br(pool);
-        // 对于指令数量较少的那些块，复制上提
-        // self.copy_exec();
         // 清除空块(包括entry块)
         self.clear_empty_block();
         // jump的目标块如果紧邻，则删除jump语句
         self.clear_useless_jump();
-        // self.clear_unreachable_block();
     }
 
     fn merge_br_jump(&mut self) {
@@ -214,59 +211,6 @@ impl BackendPass {
             }
         }
     }
-
-    // fn copy_exec(&mut self) {
-    //     self.module.name_func.iter().for_each(|(_, func)| {
-    //         let mut imm_br_pred: Vec<(ObjPtr<BB>, HashSet<ObjPtr<BB>>)> = vec![];
-    //         func.blocks.iter().for_each(|block| {
-    //             // 获取那些通过jump跳到该块的前继
-    //             let prevs: HashSet<_> = block
-    //                 .get_prev()
-    //                 .iter()
-    //                 .filter(|&&prev| {
-    //                     prev.insts.len() > 0
-    //                         && prev.get_tail_inst().get_type() == InstrsType::Jump
-    //                         && (prev.get_tail_inst().get_label().clone()
-    //                             == Operand::Addr(block.label.clone()))
-    //                 })
-    //                 .map(|prev| *prev)
-    //                 .collect();
-
-    //             // 如果只有一个后继且满足上述条件的前继块数量大于0
-    //             if block.insts.len() <= 5 && prevs.len() > 0 {
-    //                 imm_br_pred.push((block.clone(), prevs.clone()));
-    //             }
-    //         });
-
-    //         imm_br_pred.iter().for_each(|(block, prevs)| {
-    //             let prevs = prevs.iter().map(|x| *x).collect::<Vec<_>>();
-    //             // 前继不经由branch跳到该块
-    //             if prevs.len() == block.get_prev().len() && !exist_br_label(prevs.clone(), &block.label) {
-    //                 for after in block.get_after().iter() {
-    //                     adjust_after_in(after.clone(), prevs.clone(), &block.label);
-    //                 }
-    //                 block.as_mut().out_edge.clear();
-    //             } else {
-    //                 for after in block.get_after().iter() {
-    //                     adjust_after_in(after.clone(), prevs.clone(), &String::from(""));
-    //                 }
-    //             }
-    //             for prev in prevs.iter() {
-    //                 let mut insts = block.insts.clone();
-    //                 prev.as_mut().insts.pop();
-    //                 prev.as_mut().push_back_list(&mut insts);
-    //                 adjust_prev_out(prev.clone(), block.get_after().clone(), &block.label);
-    //             }
-    //             block.as_mut().in_edge = block
-    //                 .as_mut()
-    //                 .in_edge
-    //                 .iter()
-    //                 .filter(|&&b| prevs.iter().all(|&prev| prev != b))
-    //                 .map(|b| *b)
-    //                 .collect::<Vec<ObjPtr<BB>>>();
-    //         })
-    //     })
-    // }
 
     fn fuse_basic_block(&mut self) {
         self.module.name_func.iter().for_each(|(_, func)| {
