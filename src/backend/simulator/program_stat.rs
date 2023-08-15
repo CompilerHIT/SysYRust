@@ -99,7 +99,8 @@ impl ProgramStat {
                 | SingleOp::I2F
                 | SingleOp::LoadFImm
                 | SingleOp::Seqz
-                | SingleOp::Snez => {
+                | SingleOp::Snez
+                | SingleOp::Neg => {
                     let def_reg = inst.get_def_reg();
                     if let Some(def_reg) = def_reg {
                         self.reg_val.insert(def_reg, Value::Inst(*inst));
@@ -111,7 +112,7 @@ impl ProgramStat {
                 SingleOp::Li => {
                     self.consume_li(inst);
                 }
-                SingleOp::Mv | SingleOp::Neg => {
+                SingleOp::Mv => {
                     self.consume_mv(inst);
                 }
             },

@@ -12,10 +12,7 @@ use super::{
 ///简单值传递 , mv, li,la等
 impl ProgramStat {
     pub fn consume_mv(&mut self, inst: &ObjPtr<LIRInst>) {
-        debug_assert!(
-            inst.get_type() == InstrsType::OpReg(crate::backend::instrs::SingleOp::Mv)
-                || inst.get_type() == InstrsType::OpReg(crate::backend::instrs::SingleOp::Neg)
-        );
+        debug_assert!(inst.get_type() == InstrsType::OpReg(crate::backend::instrs::SingleOp::Mv));
         let dst_reg = inst.get_dst().drop_reg();
         let src_reg = inst.get_lhs().drop_reg();
         let old_val = self.reg_val.get(&src_reg);
