@@ -98,12 +98,12 @@ impl AsmModule {
         //此后栈空间大小以及 caller saved和callee saved都确定了
 
         if is_opt {
+            self.anaylyse_for_handle_call_v4();
+        } else {
             let callers_used = self.build_caller_used();
             let callees_used = self.build_callee_used();
             self.caller_regs_to_saveds = callers_used.clone();
             self.callee_regs_to_saveds = callees_used.clone();
-        } else {
-            self.anaylyse_for_handle_call_v4();
         }
         config::record_event("finish analyse for handle call");
         let callers_used = self.build_caller_used();
