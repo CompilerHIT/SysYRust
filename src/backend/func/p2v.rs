@@ -46,6 +46,8 @@ impl Func {
             debug_assert!(!regs_to_decolor.contains(&reg));
         }
         self.calc_live_base();
+        Func::print_func(ObjPtr::new(&self), "before_p2v.txt");
+        self.print_live_interval("live_interval_before_p2v.txt");
         let unchanged_def = self.build_unchanged_def();
         let unchanged_use = self.build_unchanged_use();
         // 打印unchanged_def
@@ -69,8 +71,6 @@ impl Func {
 
         let mut all_v_regs: HashSet<Reg> = HashSet::new();
         let mut p2v_actions = Vec::new();
-        Func::print_func(ObjPtr::new(&self), "before_p2v.txt");
-        self.print_live_interval("live_interval_before_p2v.txt");
         // 处理块间
         // TODO,判断需要处理第二次块间是否是因为什么bug
 
@@ -213,6 +213,7 @@ impl Func {
                     args.remove(&reg_def);
                 }
             }
+            args.retain(|reg| first_block.live_out.contains(reg));
             for arg in args {
                 let (_, _, mut find) = Func::search_from_out_edge(&first_block, &arg);
                 find.retain(|(_, if_def)| *if_def);
@@ -380,7 +381,7 @@ impl Func {
                     args.remove(&reg_def);
                 }
             }
-
+            args.retain(|reg| first_block.live_out.contains(reg));
             for arg in args {
                 let (_, _, mut find) = Func::search_from_out_edge(&first_block, &arg);
                 find.retain(|(_, if_def)| !*if_def);
@@ -573,11 +574,22 @@ impl Func {
         // 修改结束后验证块间的 live in out关系,现在所有块的live in out都不会存在能够p2v的寄存器
         debug_assert!({
             for bb in self.blocks.iter() {
-                for reg in bb.live_in.iter() {
-                    debug_assert!(!regs_to_decolor.contains(reg));
-                }
                 for reg in bb.live_out.iter() {
-                    debug_assert!(!regs_to_decolor.contains(reg));
+                    debug_assert!(
+                        !regs_to_decolor.contains(reg),
+                        "live out:{},{}",
+                        bb.label,
+                        reg
+                    );
+                }
+                // 跳过entry block
+                if self.entry.unwrap() == *bb {
+                    continue;
+                }
+                for reg in bb.live_in.iter() {
+                    debug_assert!(!regs_to_decolor.contains(reg), "live in:{},{}", bb.label, {
+                        reg
+                    });
                 }
             }
             true
@@ -606,6 +618,7 @@ impl Func {
             debug_assert!(in_bb.live_out.contains(reg));
             to_backward.push_back(*in_bb);
         }
+        to_forward.push_back(*bb);
         let find = Func::search_forward_and_backward_until_def(
             reg,
             &mut to_forward,
@@ -635,6 +648,7 @@ impl Func {
                 to_forward.push_back(*out_bb);
             }
         }
+        to_backward.push_back(*bb);
         let find = Func::search_forward_and_backward_until_def(
             reg,
             &mut to_forward,
