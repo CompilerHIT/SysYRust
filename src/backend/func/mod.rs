@@ -301,10 +301,18 @@ impl Func {
         }
     }
 
-    pub fn handle_overflow(&mut self, pool: &mut BackendPool) {
+    pub fn handle_overflow_br(&mut self, pool: &mut BackendPool) {
         let this = pool.put_func(self.clone());
         for block in self.blocks.iter() {
-            block.as_mut().handle_overflow(this, pool);
+            block.as_mut().handle_overflow_br(this, pool);
+        }
+        self.update(this);
+    }
+
+    pub fn handle_overflow_sl(&mut self, pool: &mut BackendPool) {
+        let this = pool.put_func(self.clone());
+        for block in self.blocks.iter() {
+            block.as_mut().handle_overflow_sl(this, pool);
         }
         self.update(this);
     }

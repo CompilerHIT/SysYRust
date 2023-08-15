@@ -106,11 +106,15 @@ impl AsmModule {
             });
     }
 
-    pub fn handle_overflow(&mut self, pool: &mut BackendPool) {
-        self.name_func.iter_mut().for_each(|(_, func)| {
-            if !func.is_extern {
-                func.as_mut().handle_overflow(pool);
-            }
+    pub fn handle_overflow_sl(&mut self, pool: &mut BackendPool) {
+        self.name_func.iter().for_each(|(_, func)| {
+            func.as_mut().handle_overflow_sl(pool);
+        })
+    }
+
+    pub fn handle_overflow_br(&mut self, pool: &mut BackendPool) {
+        self.name_func.iter().for_each(|(_, func)| {
+            func.as_mut().handle_overflow_br(pool);
         });
     }
 
