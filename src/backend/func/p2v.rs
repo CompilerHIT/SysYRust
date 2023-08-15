@@ -41,6 +41,10 @@ impl Func {
         regs_to_decolor: &HashSet<Reg>,
     ) -> (HashSet<Reg>, Vec<(ObjPtr<LIRInst>, Reg, Reg, bool)>) {
         //一种简单的p2v方式
+        // 反着色的寄存器列表中不能包括特殊寄存器
+        for reg in Reg::get_all_specials() {
+            debug_assert!(!regs_to_decolor.contains(&reg));
+        }
         self.calc_live_base();
         let unchanged_def = self.build_unchanged_def();
         let unchanged_use = self.build_unchanged_use();
@@ -69,22 +73,15 @@ impl Func {
         self.print_live_interval("live_interval_before_p2v.txt");
         // 处理块间
         // TODO,判断需要处理第二次块间是否是因为什么bug
-        loop {
-            self.calc_live_base();
-            let old_v_len = all_v_regs.len();
-            self.p2v_inter_blocks(
-                &unchanged_def,
-                &unchanged_use,
-                regs_to_decolor,
-                &mut p2v_actions,
-                &mut all_v_regs,
-            );
-            // break;
-            if old_v_len == all_v_regs.len() {
-                break;
-            }
-        }
-        self.calc_live_base();
+
+        let old_v_len = all_v_regs.len();
+        self.p2v_inter_blocks(
+            &unchanged_def,
+            &unchanged_use,
+            regs_to_decolor,
+            &mut p2v_actions,
+            &mut all_v_regs,
+        );
         Func::print_func(ObjPtr::new(&self), "p2v_before_inner_block.txt");
         self.print_live_interval("live_interval_before_inner_p2v.txt");
         self.p2v_inner_blocks(
@@ -204,13 +201,10 @@ impl Func {
             }
         }
 
-        //考虑参数寄存器引入的def
-        //考虑使用参数寄存器传参的情况,该情况只会发生在函数的第一个块
-        //然后从entry块开始p2v
+        //考虑函数初始时有值的寄存器
         let first_block = *self.entry.unwrap().out_edge.get(0).unwrap();
         let live_in: HashSet<Reg> = first_block.live_in.iter().cloned().collect();
         if live_in.len() != 0 {
-            // println!("{}", first_block.label.clone());
             let mut args: HashSet<Reg> = Reg::get_all_args();
             args.retain(|reg| live_in.contains(reg));
             //对于参数从前往后传递
@@ -219,27 +213,11 @@ impl Func {
                     args.remove(&reg_def);
                 }
             }
-            if args.len() != 0 {
-                //从该处往后搜索,搜索到的指令应该都是已经加入到的use，且不可能有def
-                for arg in args.iter() {
-                    // if liveou
-                    let mut to_forward: LinkedList<ObjPtr<BB>> = LinkedList::new();
-                    let mut to_backward = LinkedList::new();
-                    let mut forward_passed: HashSet<ObjPtr<BB>> = HashSet::new();
-                    let mut backward_passed: HashSet<ObjPtr<BB>> = HashSet::new();
-                    to_backward.push_back(first_block);
-                    let find = Func::search_forward_and_backward_until_def(
-                        arg,
-                        &mut to_forward,
-                        &mut to_backward,
-                        &mut backward_passed,
-                        &mut forward_passed,
-                    );
-                    for (inst, if_def) in find {
-                        if if_def {
-                            unchanged_def.insert((inst, *arg));
-                        }
-                    }
+            for arg in args {
+                let (_, _, mut find) = Func::search_from_out_edge(&first_block, &arg);
+                find.retain(|(_, if_def)| *if_def);
+                for (inst, _) in find {
+                    unchanged_def.insert((inst, arg));
                 }
             }
         }
@@ -267,12 +245,11 @@ impl Func {
                 }
             }
             if if_search_in_edge {
-                let (_, _, find) = Func::search_from_in_edge(&final_bb, use_reg);
-                for (inst, if_def) in find {
-                    if if_def {
-                        unchanged_def.insert((inst, *use_reg));
-                    }
-                }
+                let (_, _, mut find) = Func::search_from_in_edge(&final_bb, use_reg);
+                find.retain(|(_, if_def)| *if_def);
+                find.iter().for_each(|(inst, _)| {
+                    unchanged_def.insert((*inst, *use_reg));
+                });
             }
         }
 
@@ -282,6 +259,7 @@ impl Func {
         //首先根据call上下文初始化 unchanged use 和 unchanged def.这些告诉我们哪些寄存器不能够p2v
         let mut unchanged_use: HashSet<(ObjPtr<LIRInst>, Reg)> = HashSet::new();
 
+        //考虑call指令定义以及使用的寄存器
         for bb in self.blocks.iter() {
             for (i, inst) in bb.insts.iter().enumerate() {
                 if inst.get_type() != InstrsType::Call {
@@ -384,8 +362,7 @@ impl Func {
             }
         }
 
-        //考虑使用参数寄存器传参的情况,该情况只会发生在函数的第一个块
-        //然后从entry块开始p2v
+        //考虑函数一开始就有值的寄存器(获取参数的参数寄存器，固定值的zero寄存器等)
         let first_block = *self.entry.unwrap().out_edge.get(0).unwrap();
         let live_in: HashSet<Reg> = first_block.live_in.iter().cloned().collect();
         if live_in.len() != 0 {
@@ -403,33 +380,17 @@ impl Func {
                     args.remove(&reg_def);
                 }
             }
-            if args.len() != 0 {
-                //从该处往后搜索,搜索到的指令应该都是已经加入到的use，且不可能有def
-                for arg in args.iter() {
-                    // if liveou
-                    let mut to_forward: LinkedList<ObjPtr<BB>> = LinkedList::new();
-                    let mut to_backward = LinkedList::new();
-                    let mut forward_passed: HashSet<ObjPtr<BB>> = HashSet::new();
-                    let mut backward_passed: HashSet<ObjPtr<BB>> = HashSet::new();
-                    to_backward.push_back(first_block);
-                    let find = Func::search_forward_and_backward_until_def(
-                        arg,
-                        &mut to_forward,
-                        &mut to_backward,
-                        &mut backward_passed,
-                        &mut forward_passed,
-                    );
-                    for (inst, if_def) in find {
-                        if !if_def {
-                            unchanged_use.insert((inst, *arg));
-                        }
-                    }
+
+            for arg in args {
+                let (_, _, mut find) = Func::search_from_out_edge(&first_block, &arg);
+                find.retain(|(_, if_def)| !*if_def);
+                for (inst, _) in find {
+                    unchanged_use.insert((inst, arg));
                 }
             }
         }
 
-        // 考虑ret
-        // 一个block中只可能出现一条return最多
+        // 考虑ret用到的寄存器
         let final_bb = self.get_final_bb();
         let last_inst = final_bb.insts.last().unwrap();
         let use_reg = last_inst.get_reg_use();
@@ -455,13 +416,11 @@ impl Func {
             }
 
             if if_search_in_edge {
-                debug_assert!(final_bb.live_in.contains(use_reg));
-                let (_, _, find) = Func::search_from_in_edge(&final_bb, use_reg);
-                for (inst, if_def) in find {
-                    if !if_def {
-                        unchanged_use.insert((inst, *use_reg));
-                    }
-                }
+                let (_, _, mut find) = Func::search_from_in_edge(&final_bb, use_reg);
+                find.retain(|(_, if_def)| !if_def);
+                find.iter().for_each(|(inst, _)| {
+                    unchanged_use.insert((*inst, *use_reg));
+                });
             }
         }
 
@@ -536,7 +495,7 @@ impl Func {
         }
     }
 
-    ///块间P2v
+    ///块间P2v,边p2v边修改块的 live in out 关系
     fn p2v_inter_blocks(
         &mut self,
         unchanged_def: &HashSet<(ObjPtr<LIRInst>, Reg)>,
@@ -558,9 +517,8 @@ impl Func {
                 to_process.push((*bb, *reg));
             }
         }
-        let mut backward_bb_reg_passed: HashSet<(ObjPtr<BB>, Reg)> = HashSet::new();
         for (bb, reg) in to_process.iter() {
-            if backward_bb_reg_passed.contains(&(*bb, *reg)) {
+            if !bb.live_out.contains(reg) {
                 continue;
             }
             let (forward_passed, backward_passed, find) = Func::search_from_out_edge(bb, reg);
@@ -574,21 +532,25 @@ impl Func {
             }
             // 记录搜索过的路径,搜索过的路径之后不再搜索
             for backward_bb in backward_passed {
-                backward_bb_reg_passed.insert((backward_bb, *reg));
+                backward_bb.as_mut().live_out.remove(reg);
+            }
+            for forward_bb in forward_passed {
+                forward_bb.as_mut().live_in.remove(reg);
             }
             let mut if_replace = true;
             for (inst, if_def) in find.iter() {
                 if *if_def && unchanged_def.contains(&(*inst, *reg)) {
                     if_replace = false;
-                    log_file!(path, "find unchanged def: {} -{},stop!", inst.as_ref(), reg);
                     break;
                 } else if !*if_def && unchanged_use.contains(&(*inst, *reg)) {
                     if_replace = false;
-                    log_file!(path, "find unchanged use: {} -{},stop!", inst.as_ref(), reg);
                     break;
                 }
             }
             if !if_replace {
+                for (inst, _) in find {
+                    log_file!(path, "fail: {}-{}", inst.as_ref(), reg);
+                }
                 log_file!(path, "p2v {} from {} fail!", reg, bb.label);
                 continue;
             }
@@ -607,10 +569,22 @@ impl Func {
                 log_file!(path, "to {} ", inst.as_ref());
             }
         }
+
+        // 修改结束后验证块间的 live in out关系,现在所有块的live in out都不会存在能够p2v的寄存器
+        debug_assert!({
+            for bb in self.blocks.iter() {
+                for reg in bb.live_in.iter() {
+                    debug_assert!(!regs_to_decolor.contains(reg));
+                }
+                for reg in bb.live_out.iter() {
+                    debug_assert!(!regs_to_decolor.contains(reg));
+                }
+            }
+            true
+        });
     }
 }
 
-///
 ///从指定块得 inedge/outedges 出发寻找指定寄存器的某个值的所有可能定义和使用
 /// 搜索包括自身
 impl Func {
@@ -684,6 +658,18 @@ impl Func {
         forward_passed: &mut HashSet<ObjPtr<BB>>,
     ) -> Vec<(ObjPtr<LIRInst>, bool)> {
         let mut find = Vec::new();
+
+        // 对于 to forward和 to backward作检查
+        debug_assert!({
+            for bb in to_forward.iter() {
+                assert!(bb.live_in.contains(reg));
+            }
+            for bb in to_backward.iter() {
+                assert!(bb.live_out.contains(reg));
+            }
+            true
+        });
+
         let mut new_to_forward: HashSet<ObjPtr<BB>> = to_forward.iter().cloned().collect();
         let mut new_to_backward: HashSet<ObjPtr<BB>> = to_backward.iter().cloned().collect();
         loop {

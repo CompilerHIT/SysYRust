@@ -92,7 +92,7 @@ pub fn generate_asm(
     // 检查地址溢出，插入间接寻址
     module.handle_overflow_sl(&mut pool);
 
-    if is_opt {
+    if true {
         //最后进行一次寄存器分配与合并
         config::record_event("start merge reg");
         module.final_realloc(&mut pool);
