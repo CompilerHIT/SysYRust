@@ -21,7 +21,7 @@ impl AsmModule {
         if is_opt {
             config::record_event("start block_pass_pre_clear");
             BackendPass::new(obj_module).block_pass_pre_clear(pool);
-            self.print_asm("after_block_pass_pre_clear.log");
+            // self.print_asm("after_block_pass_pre_clear.log");
             config::record_event("finish block_pass_pre_clear");
             // 窥孔等特殊指令删除操作
             config::record_event("start fuse_tmp_phi_regs");
