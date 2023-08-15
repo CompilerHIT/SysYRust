@@ -196,6 +196,7 @@ pub fn fold_two_mixed_binst(
     tp: Type,
     pool: &mut ObjPool<Inst>,
 ) -> bool {
+    // 处理累加累乘指令
     let operands1 = inst.get_operands();
     let inst_operand = operands1[num_operand];
     let const1 = operands1[num_const1];
