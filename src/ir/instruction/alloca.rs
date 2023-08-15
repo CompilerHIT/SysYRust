@@ -119,4 +119,25 @@ impl Inst {
             unreachable!("Inst::get_array_length")
         }
     }
+
+    /// 判断当前是否为数组
+    /// # Return
+    /// 如果是返回true，否则返回false
+    pub fn is_array(&self) -> bool {
+        self.get_kind() == InstKind::Alloca(0)
+    }
+
+    /// 判断当前是否为全局数组
+    /// # Return
+    /// 如果是返回true，否则返回false
+    pub fn is_global_array(&self) -> bool {
+        self.is_array() && self.parent_bb.is_none()
+    }
+
+    /// 判断当前是否为局部数组
+    /// # Return
+    /// 如果是返回true，否则返回false
+    pub fn is_local_array(&self) -> bool {
+        self.is_array() && self.parent_bb.is_some()
+    }
 }
