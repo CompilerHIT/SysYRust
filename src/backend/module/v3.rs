@@ -65,7 +65,6 @@ impl AsmModule {
             "hitsz_thread_init",
             "hitsz_thread_create",
             "hitsz_thread_join",
-            "hitsz_thread_exit",
             "hitsz_get_thread_num",
         ];
         for name in extern_funcs.iter() {
