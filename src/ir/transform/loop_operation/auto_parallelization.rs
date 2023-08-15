@@ -412,7 +412,7 @@ fn parallelize(
 ///                     │       │                                │       │                           │
 ///                     │       │ thread_id: call thread_create()│       │                           │
 ///                     │       │                                │       │                           │
-///                     │       │ br thread_id != 0              │       │           ┌───────────────▼────────────────┐
+///                     │       │ br thread_id == 0              │       │           ┌───────────────▼────────────────┐
 ///                     │       │                                │       │           │                                │
 ///                     │       │                                │       │           │ Header                         │
 ///                     │       ├───────────────┬────────────────┤       │           │                                │
@@ -466,7 +466,7 @@ fn thread_create_ir(
     let call = pools
         .1
         .make_int_call("hitsz_thread_create".to_string(), Vec::new());
-    let ne = pools.1.make_ne(call, const_0);
+    let ne = pools.1.make_eq(call, const_0);
 
     thread_loop_call.push_back(call);
     thread_loop_call.push_back(ne);
