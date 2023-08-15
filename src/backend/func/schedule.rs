@@ -100,7 +100,6 @@ impl Func {
                     }
                 }
             }
-            println!("finish build graph");
             let mut queue: VecDeque<ObjPtr<LIRInst>> = VecDeque::new();
             let mut visited = HashSet::new();
 
