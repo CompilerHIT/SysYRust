@@ -176,6 +176,7 @@ pub fn simplify_live_graph_and_build_last_tocolors(
             for reg in to_rm {
                 last_to_colors.push_front(reg);
             }
+            live_intereference_graph.clear();
             break;
         }
 
@@ -195,7 +196,7 @@ pub fn simplify_live_graph_and_build_last_tocolors(
 pub fn simplify_live_graph_and_build_pre_colors(
     live_intereference_graph: &mut HashMap<Reg, HashSet<Reg>>,
     availables: &HashMap<Reg, RegUsedStat>,
-) -> HashMap<i32, i32> {
+) -> HashMap<Reg, i32> {
     let mut pre_colors = HashMap::new();
     let mut new_pre_color: Vec<Reg> = Vec::with_capacity(live_intereference_graph.len());
     loop {
@@ -210,6 +211,7 @@ pub fn simplify_live_graph_and_build_pre_colors(
             let mut choices = Reg::get_all_regs();
             choices.retain(|reg| self_available.is_available_reg(reg.get_color()));
             choices.retain(|reg| !reg_use_stat.is_available_reg(reg.get_color()));
+            choices.retain(|reg| reg.get_type() == r.get_type());
             if choices.len() == 0 {
                 continue;
             }
@@ -220,12 +222,18 @@ pub fn simplify_live_graph_and_build_pre_colors(
                 }
                 color.unwrap()
             };
-            pre_colors.insert(r.get_id(), color);
+            pre_colors.insert(*r, color);
             new_pre_color.push(*r);
         }
         if new_pre_color.len() == 0 {
             break;
         }
+
+        if new_pre_color.len() == live_intereference_graph.len() {
+            live_intereference_graph.clear();
+            break;
+        }
+
         for r in new_pre_color.iter() {
             let nbs = live_intereference_graph.remove(r).unwrap();
             for nb in nbs.iter() {
@@ -272,20 +280,49 @@ pub fn alloc_with_interef_graph_and_availables_and_constraints(
 
     let mut live_neighbors = build_live_neighbors_from_all_neigbhors(&all_neighbors);
     let base_live_neighbors = live_neighbors.clone();
-    let mut last_to_colors =
-        simplify_live_graph_and_build_last_tocolors(&mut live_neighbors, &availables);
+    let mut last_to_colors = LinkedList::new();
+    let mut pre_colors: HashMap<Reg, i32> = HashMap::new();
+    // 如果仍然无法完美优化,试探是否有某种着色不影响邻居可着色性的着色个例进行优化
+    loop {
+        let tmp_last_tocolors =
+            simplify_live_graph_and_build_last_tocolors(&mut live_neighbors, &availables);
+        for reg in tmp_last_tocolors.iter().rev() {
+            last_to_colors.push_front(*reg);
+        }
+        if live_neighbors.len() == 0 {
+            break;
+        }
+        let tmp_pre_colors =
+            simplify_live_graph_and_build_pre_colors(&mut live_neighbors, &availables);
+        pre_colors.extend(tmp_pre_colors.iter());
+        if live_neighbors.len() == 0 {
+            break;
+        }
+        if tmp_last_tocolors.len() == 0 && tmp_pre_colors.len() == 0 {
+            break;
+        }
+    }
+
+    // 加入pre color的影响,需要考虑pre color 对剩余未着色寄存器的影响
+    for (r, color) in pre_colors.iter() {
+        let nbs = base_live_neighbors.get(r).unwrap();
+        for nb in nbs.iter() {
+            availables.get_mut(nb).unwrap().use_reg(*color);
+        }
+    }
+
     if live_neighbors.len() == 0 {
-        let colors =
+        let mut colors =
             color_last_tocolors(&mut last_to_colors, &base_live_neighbors, &mut availables);
+        for (r, color) in pre_colors.iter() {
+            colors.insert(r.get_id(), *color);
+        }
         let fat = FuncAllocStat {
             spillings: HashSet::new(),
             dstr: colors,
         };
         return Some(fat);
     }
-
-    // 如果仍然无法完美优化,试探是否有某种着色不影响邻居可着色性的着色个例进行优化
-    let mut pre_colors: HashMap<i32, i32> = HashMap::new();
 
     // 如果不能够通过化简直接完成分配,则使用chordal_alloc进行分配 (利用弦图性质)
     let FuncAllocStat {
@@ -297,7 +334,7 @@ pub fn alloc_with_interef_graph_and_availables_and_constraints(
     );
     let mut availables = availables;
     if spillings.len() == 0 {
-        // 合并着色结果
+        // 加入chordal着色的结果
         for (r, _) in live_neighbors.iter() {
             let color = dstr.get(&r.get_id()).unwrap();
             for nb in all_neighbors.get(r).unwrap() {
@@ -310,6 +347,12 @@ pub fn alloc_with_interef_graph_and_availables_and_constraints(
         let colors =
             color_last_tocolors(&mut last_to_colors, &base_live_neighbors, &mut availables);
         dstr.extend(colors);
+
+        // dstr还要加上pre_colors
+        for (r, color) in pre_colors {
+            dstr.insert(r.get_id(), color);
+        }
+
         return Some(FuncAllocStat { spillings, dstr });
     }
     None
