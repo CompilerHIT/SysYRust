@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use crate::backend::operand::Reg;
+use crate::backend::{instrs::Func, operand::Reg};
 
 use super::AsmModule;
 
