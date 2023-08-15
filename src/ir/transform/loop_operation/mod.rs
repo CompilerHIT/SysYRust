@@ -12,10 +12,12 @@ use crate::{
     utility::{ObjPool, ObjPtr},
 };
 
-use self::{licm::licm_run, livo::livo_run, loop_simplify::loop_simplify_run};
+use self::{
+    auto_parallelization::auto_paralellization, licm::licm_run, livo::livo_run,
+    loop_simplify::loop_simplify_run, loop_unrolling::loop_unrolling,
+};
 
-use super::functional_optimizer;
-
+mod auto_parallelization;
 mod licm;
 mod livo;
 mod loop_simplify;
@@ -25,6 +27,7 @@ pub fn loop_optimize(
     module: &mut Module,
     max_loop_unrolling: usize,
     pools: &mut (&mut ObjPool<BasicBlock>, &mut ObjPool<Inst>),
+    para: bool,
 ) {
     let mut loop_map = loop_recognize(module);
     func_process(module, |name, _| {
@@ -39,18 +42,21 @@ pub fn loop_optimize(
     });
 
     // 循环展开
-    dump_now(module, "dump.ll");
-    loop_unrolling::loop_unrolling(module, &mut loop_map, max_loop_unrolling, pools);
-    super::phi_optimizer::phi_run(module);
-    super::dead_code_eliminate::dead_code_eliminate(module, false);
-    dump_now(module, "dump_opt.ll");
+    loop_unrolling(module, &mut loop_map, max_loop_unrolling, pools);
+    super::functional_optimizer(module, pools, false);
 
-    // 归纳变量强度削减
-    func_process(module, |name, func| {
-        let dominator_tree =
-            crate::ir::analysis::dominator_tree::calculate_dominator(func.get_head());
-        livo_run(dominator_tree, loop_map.get_mut(&name).unwrap(), pools);
-    });
+    if para {
+        // 自动并行化
+        auto_paralellization(module, &mut loop_map, pools);
+        super::functional_optimizer(module, pools, false);
+
+        // 归纳变量强度削减
+        func_process(module, |name, func| {
+            let dominator_tree =
+                crate::ir::analysis::dominator_tree::calculate_dominator(func.get_head());
+            livo_run(dominator_tree, loop_map.get_mut(&name).unwrap(), pools);
+        });
+    }
 }
 
 /// 识别一个循环是否是有利于优化的，即循环中不会有break和continue

@@ -114,7 +114,7 @@ pub fn record_event(event: &str) {
     init();
     let path = "events.txt";
     let msg = format!("{} at:{}s", event, get_passed_secs());
-    println!("{}", msg);
+    // println!("{}", msg);
     let info = unsafe { CONFIG_INFO.as_mut().unwrap() };
     if !info.file_infos.contains_key(path) {
         info.file_infos.insert(path.to_string(), LinkedList::new());

@@ -12,7 +12,7 @@ impl AsmModule {
     pub fn build_v4(&mut self, f: &mut File, _f2: &mut File, pool: &mut BackendPool, is_opt: bool) {
         let obj_module = ObjPtr::new(self);
         self.build_lir(pool);
-        self.print_asm("abstract_asm_after_initial_build.txt");
+        // self.print_asm("abstract_asm_after_initial_build.txt");
         config::record_event("finish build lir");
 
         // self.print_asm("asm_abastract.txt");
@@ -21,25 +21,25 @@ impl AsmModule {
         if is_opt {
             config::record_event("start block_pass_pre_clear");
             BackendPass::new(obj_module).block_pass_pre_clear(pool);
-            self.print_asm("after_block_pass_pre_clear.log");
+            // self.print_asm("after_block_pass_pre_clear.log");
             config::record_event("finish block_pass_pre_clear");
             // 窥孔
             config::record_event("start fuse_tmp_phi_regs");
-            BackendPass::new(obj_module).fuse_tmp_regs_up();
-            self.print_asm("after_fuse_tmp_regs.log");
+            // BackendPass::new(obj_module).fuse_tmp_regs_up();
+            // self.print_asm("after_fuse_tmp_regs.log");
             config::record_event("finish fuse_tmp_phi_regs");
         }
 
-        self.print_asm("abstract_asm_after_first_block_merge.txt");
+        // self.print_asm("abstract_asm_after_first_block_merge.txt");
 
         self.remove_unuse_inst_pre_alloc();
-        self.print_asm("after_delete.log");
+        // self.print_asm("after_delete.log");
         config::record_event("finish rm pre first alloc");
 
         if is_opt {
             // // gep偏移计算合并
             // BackendPass::new(obj_module).opt_gep();
-            config::record_event("start schedule");
+            config::record_event("start pre schedule");
             // 设置一些寄存器为临时变量
             self.cal_tmp_var();
 
@@ -48,6 +48,8 @@ impl AsmModule {
             self.alloc_without_tmp_and_s0();
             // 将非临时寄存器映射到物理寄存器
             self.map_v_to_p();
+
+            config::record_event("finish first alloc");
 
             // 代码调度，列表调度法
             self.list_scheduling_tech();
@@ -64,7 +66,7 @@ impl AsmModule {
         }
         self.remove_unuse_inst_suf_alloc();
         config::record_event("finish rm inst suf first alloc");
-        self.print_asm("after_scehdule.log");
+        // self.print_asm("after_scehdule.log");
 
         config::record_event("start handle spill");
         self.print_asm("before_spill.log");
@@ -76,7 +78,7 @@ impl AsmModule {
         } else {
             self.handle_spill_tmp(pool);
         }
-        self.print_asm("after_spill.log");
+        // self.print_asm("after_spill.log");
         config::record_event("finish handle spill");
 
         //加入外部函数
@@ -111,13 +113,13 @@ impl AsmModule {
         let used_but_not_saved =
             AsmModule::build_used_but_not_saveds(&callers_used, &callees_used, callees_be_saved);
         config::record_event("start handle call");
-        self.print_asm("before_handle_call.log");
+        // self.print_asm("before_handle_call.log");
         if is_opt {
             self.handle_call(pool, &callers_used, &callees_used, callees_be_saved);
         } else {
             self.handle_call_tmp(pool);
         }
-        self.print_asm("after_handle_call.log");
+        // self.print_asm("after_handle_call.log");
         config::record_event("finish handle call");
 
         if config::get_rest_secs() >= 56 {

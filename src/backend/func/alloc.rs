@@ -52,6 +52,7 @@ impl Func {
         regalloc::check_alloc_v2(&self, &alloc_stat.dstr, &alloc_stat.spillings);
         self.reg_alloc_info = alloc_stat;
         self.context.as_mut().set_reg_map(&self.reg_alloc_info.dstr);
+        config::record_event("finish easygc alloc");
         return;
     }
 

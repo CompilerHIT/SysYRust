@@ -12,7 +12,7 @@ impl BackendPass {
         // 在直接跳转到另一个块, 并且跳转目标块没有其它前继的情况下, 可以直接把两个块合成为一个大块
         self.fuse_basic_block();
         // 部分上提：前一个块没有b型指令，不会破坏块结构则上提，fuse_muti2imm_br的特殊处理
-        self.part_fuse(pool);
+        // self.part_fuse(pool);
     }
     pub fn block_pass(&mut self, pool: &mut BackendPool) {
         // 若branch的下一条jump指令的目标块，只有一个前驱，则将该jump指令删除，并将其合并到这个块中

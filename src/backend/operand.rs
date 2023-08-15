@@ -2,7 +2,7 @@
 use crate::utility::ScalarType;
 use std::{collections::HashSet, fmt::Display};
 
-use super::{block::FLOAT_BASE, structs::FloatArray};
+use super::block::FLOAT_BASE;
 pub const REG_COUNT: i32 = 32;
 pub const ARG_REG_COUNT: i32 = 8;
 pub const REG_SP: i32 = 2;
