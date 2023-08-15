@@ -1,5 +1,5 @@
 use std::collections::HashSet;
-
+use crate::config;
 use crate::backend::{instrs::Func, operand::Reg};
 
 use super::AsmModule;
@@ -7,10 +7,8 @@ use super::AsmModule;
 impl AsmModule {
     /// 第一次运行v2p时不映射临时寄存器，第二次运行前清空tmp_vars set
     pub fn map_v_to_p(&mut self) {
+        config::record_event("start map v to p");
         self.name_func.iter().for_each(|(_, func)| {
-            if func.is_extern {
-                return;
-            }
             func.blocks.iter().for_each(|block| {
                 block.insts.iter().for_each(|inst| {
                     inst.as_mut()

@@ -129,6 +129,10 @@ impl<'f> AsmBuilder<'f> {
         writeln!(self.f, "    beqz {reg}, {label}").unwrap();
     }
 
+    pub fn bnez(&mut self, reg: &str, label: &str) {
+        writeln!(self.f, "    bnez {reg}, {label}").unwrap();
+    }
+
     pub fn j(&mut self, label: &str) {
         writeln!(self.f, "	j {label}").unwrap()
     }

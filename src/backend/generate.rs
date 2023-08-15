@@ -295,6 +295,8 @@ impl GenerateAsm for LIRInst {
                 };
                 if cond == "eqz" {
                     builder.beqz(&lhs, &label);
+                } else if cond == "nez" {
+                    builder.bnez(&lhs, &label);
                 } else {
                     let rhs = match self.get_rhs() {
                         Operand::Reg(reg) => reg.to_string(row),
