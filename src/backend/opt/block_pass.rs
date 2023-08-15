@@ -172,9 +172,14 @@ impl BackendPass {
                 });
 
                 size += imm_br_pred.len();
-                
+
                 imm_br_pred.iter().for_each(|(block, prevs)| {
-                    let prevs = prevs.iter().map(|x| *x).collect::<Vec<_>>();
+                    let true_prevs: HashSet<ObjPtr<BB>> = prevs
+                        .iter()
+                        .filter(|p| block.get_prev().contains(&p))
+                        .map(|x| *x)
+                        .collect();
+                    let prevs = true_prevs.iter().map(|x| *x).collect::<Vec<_>>();
                     let after = block.get_after()[0];
                     if prevs.len() == block.get_prev().len() {
                         adjust_after_in(after, prevs.clone(), &block.label);

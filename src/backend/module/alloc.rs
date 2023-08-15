@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use crate::{backend::operand::Reg, frontend::ast::Continue};
+use crate::backend::operand::Reg;
 
 use super::AsmModule;
 
