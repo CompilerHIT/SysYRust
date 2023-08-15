@@ -34,7 +34,7 @@ impl Func {
     ///该函数计算结果依赖外部调用的calc liv3
     pub fn build_unchanged_def(&mut self) -> HashSet<(ObjPtr<LIRInst>, Reg)> {
         // self.print_func();
-        //只有传参过程存在unchanged def,以及call指令可能存在unchanged def
+        //call指令存在unchanged def ;call指令的 use会传递到unchanged def
         let mut unchanged_def: HashSet<(ObjPtr<LIRInst>, Reg)> = HashSet::new();
         // let mut path_build_unchagned_def = "unchanged_def.txt";
         for bb in self.blocks.iter() {
@@ -67,10 +67,15 @@ impl Func {
                             continue;
                         }
                         let mut to_backward = LinkedList::new();
-                        to_backward.push_back(*bb);
                         let mut to_forward = LinkedList::new();
                         let mut forward_passed = HashSet::new();
                         let mut backward_passed = HashSet::new();
+                        for in_bb in bb.in_edge.iter() {
+                            if in_bb.live_out.contains(&reg) {
+                                to_backward.push_back(*in_bb);
+                            }
+                        }
+                        forward_passed.insert(*bb);
                         let find = Func::search_forward_and_backward_until_def(
                             &reg,
                             &mut to_forward,
@@ -279,10 +284,15 @@ impl Func {
                             continue;
                         }
                         let mut to_backward = LinkedList::new();
-                        to_backward.push_back(*bb);
                         let mut to_forward = LinkedList::new();
                         let mut forward_passed = HashSet::new();
                         let mut backward_passed = HashSet::new();
+                        for in_bb in bb.in_edge.iter() {
+                            if in_bb.live_out.contains(&reg) {
+                                to_backward.push_back(*in_bb);
+                            }
+                        }
+                        forward_passed.insert(*bb);
                         let find = Func::search_forward_and_backward_until_def(
                             &reg,
                             &mut to_forward,
@@ -593,9 +603,21 @@ impl Func {
         self.calc_live_base();
         let unchanged_def = self.build_unchanged_def();
         let unchanged_use = self.build_unchanged_use();
+        // 打印unchanged_def
+        log_file!("unchanged_def.txt", "func:{}", self.label);
+        for (inst, reg) in unchanged_def.iter() {
+            log_file!("unchanged_def.txt", "{},{}", inst.to_string(), reg);
+        }
+        log_file!("unchanged_use.txt", "func:{}", self.label);
+        for (inst, reg) in unchanged_use.iter() {
+            log_file!("unchanged_use.txt", "{},{}", inst.to_string(), reg);
+        }
+
         let mut all_v_regs: HashSet<Reg> = HashSet::new();
         let mut p2v_actions = Vec::new();
         self.calc_live_base();
+        Func::print_func(ObjPtr::new(&self), "before_p2v.txt");
+        self.print_live_interval("live_interval_before_p2v.txt");
         // 处理块间
         self.p2v_inter_blocks(
             &unchanged_def,
