@@ -31,6 +31,61 @@ impl Func {
 }
 
 impl Func {
+    //返回p2v产生的新虚拟寄存器,以及该过程的动作序列
+    // vregs  ,  (inst,p_reg,v_reg,def_or_use)
+    pub fn p2v(
+        &mut self,
+        regs_to_decolor: &HashSet<Reg>,
+    ) -> (HashSet<Reg>, Vec<(ObjPtr<LIRInst>, Reg, Reg, bool)>) {
+        //一种简单的p2v方式
+        self.calc_live_base();
+        let unchanged_def = self.build_unchanged_def();
+        let unchanged_use = self.build_unchanged_use();
+        // 打印unchanged_def
+        log_file!("unchanged_def.txt", "func:{}", self.label);
+        for (inst, reg) in unchanged_def.iter() {
+            log_file!("unchanged_def.txt", "{},{}", inst.to_string(), reg);
+        }
+        log_file!("unchanged_use.txt", "func:{}", self.label);
+        for (inst, reg) in unchanged_use.iter() {
+            log_file!("unchanged_use.txt", "{},{}", inst.to_string(), reg);
+        }
+
+        let mut all_v_regs: HashSet<Reg> = HashSet::new();
+        let mut p2v_actions = Vec::new();
+        self.calc_live_base();
+        Func::print_func(ObjPtr::new(&self), "before_p2v.txt");
+        self.print_live_interval("live_interval_before_p2v.txt");
+        // 处理块间
+        loop {
+            self.calc_live_base();
+            let old_v_len = all_v_regs.len();
+            self.p2v_inter_blocks(
+                &unchanged_def,
+                &unchanged_use,
+                regs_to_decolor,
+                &mut p2v_actions,
+                &mut all_v_regs,
+            );
+            if old_v_len == all_v_regs.len() {
+                break;
+            }
+        }
+        self.calc_live_base();
+        Func::print_func(ObjPtr::new(&self), "p2v_before_inner_block.txt");
+        self.print_live_interval("live_interval_before_inner_p2v.txt");
+        self.p2v_inner_blocks(
+            &unchanged_def,
+            &unchanged_use,
+            regs_to_decolor,
+            &mut p2v_actions,
+            &mut all_v_regs,
+        );
+        (all_v_regs, p2v_actions)
+    }
+}
+
+impl Func {
     ///该函数计算结果依赖外部调用的calc liv3
     pub fn build_unchanged_def(&mut self) -> HashSet<(ObjPtr<LIRInst>, Reg)> {
         // self.print_func();
@@ -591,52 +646,6 @@ impl Func {
             }
         }
         find
-    }
-
-    //返回p2v产生的新虚拟寄存器,以及该过程的动作序列
-    // vregs  ,  (inst,p_reg,v_reg,def_or_use)
-    pub fn p2v(
-        &mut self,
-        regs_to_decolor: &HashSet<Reg>,
-    ) -> (HashSet<Reg>, Vec<(ObjPtr<LIRInst>, Reg, Reg, bool)>) {
-        //一种简单的p2v方式
-        self.calc_live_base();
-        let unchanged_def = self.build_unchanged_def();
-        let unchanged_use = self.build_unchanged_use();
-        // 打印unchanged_def
-        log_file!("unchanged_def.txt", "func:{}", self.label);
-        for (inst, reg) in unchanged_def.iter() {
-            log_file!("unchanged_def.txt", "{},{}", inst.to_string(), reg);
-        }
-        log_file!("unchanged_use.txt", "func:{}", self.label);
-        for (inst, reg) in unchanged_use.iter() {
-            log_file!("unchanged_use.txt", "{},{}", inst.to_string(), reg);
-        }
-
-        let mut all_v_regs: HashSet<Reg> = HashSet::new();
-        let mut p2v_actions = Vec::new();
-        self.calc_live_base();
-        Func::print_func(ObjPtr::new(&self), "before_p2v.txt");
-        self.print_live_interval("live_interval_before_p2v.txt");
-        // 处理块间
-        self.p2v_inter_blocks(
-            &unchanged_def,
-            &unchanged_use,
-            regs_to_decolor,
-            &mut p2v_actions,
-            &mut all_v_regs,
-        );
-        self.calc_live_base();
-        Func::print_func(ObjPtr::new(&self), "p2v_before_inner_block.txt");
-        self.print_live_interval("live_interval_before_inner_p2v.txt");
-        self.p2v_inner_blocks(
-            &unchanged_def,
-            &unchanged_use,
-            regs_to_decolor,
-            &mut p2v_actions,
-            &mut all_v_regs,
-        );
-        (all_v_regs, p2v_actions)
     }
 
     ///块间p2v
