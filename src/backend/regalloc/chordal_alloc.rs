@@ -1,10 +1,10 @@
 use std::collections::{HashMap, HashSet};
 
-use biheap::{bivec::order, BiHeap};
+use biheap::BiHeap;
 
 use crate::backend::{instrs::Func, operand::Reg, regalloc::structs::FuncAllocStat};
 
-use super::{perfect_alloc::alloc_with_constraints, structs::RegUsedStat, *};
+use super::{structs::RegUsedStat, *};
 
 // 弦图分配,依赖外部使用的calc live
 pub fn alloc(func: &Func) -> FuncAllocStat {

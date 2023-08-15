@@ -18,15 +18,15 @@ impl AsmModule {
         // self.print_asm("asm_abastract.txt");
         // let is_opt = true;
         // build中的块合并，不会破坏块结构并暴露更多的指令移除的机会
-        if is_opt {
+        if true {
             config::record_event("start block_pass_pre_clear");
             BackendPass::new(obj_module).block_pass_pre_clear(pool);
             // self.print_asm("after_block_pass_pre_clear.log");
             config::record_event("finish block_pass_pre_clear");
-            // 窥孔
+            // 窥孔等特殊指令删除操作
             config::record_event("start fuse_tmp_phi_regs");
-            // BackendPass::new(obj_module).fuse_tmp_regs_up();
-            // self.print_asm("after_fuse_tmp_regs.log");
+            // BackendPass::new(obj_module).particular_opt();
+            self.print_asm("after_fuse_tmp_regs.log");
             config::record_event("finish fuse_tmp_phi_regs");
         }
 

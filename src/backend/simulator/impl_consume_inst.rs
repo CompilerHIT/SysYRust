@@ -1,10 +1,6 @@
-use crate::{
-    backend::{
-        instrs::{CmpOp, InstrsType, LIRInst, Operand, SingleOp},
-        operand::Reg,
-    },
-    ir::instruction::Inst,
-    utility::ScalarType,
+use crate::backend::{
+    instrs::{BinaryOp, CmpOp, InstrsType, LIRInst, Operand, SingleOp},
+    operand::Reg,
 };
 
 use super::{
@@ -16,7 +12,10 @@ use super::{
 ///简单值传递 , mv, li,la等
 impl ProgramStat {
     pub fn consume_mv(&mut self, inst: &ObjPtr<LIRInst>) {
-        debug_assert!(inst.get_type() == InstrsType::OpReg(crate::backend::instrs::SingleOp::Mv));
+        debug_assert!(
+            inst.get_type() == InstrsType::OpReg(crate::backend::instrs::SingleOp::Mv)
+                || inst.get_type() == InstrsType::OpReg(crate::backend::instrs::SingleOp::Neg)
+        );
         let dst_reg = inst.get_dst().drop_reg();
         let src_reg = inst.get_lhs().drop_reg();
         let old_val = self.reg_val.get(&src_reg);
@@ -249,7 +248,16 @@ impl ProgramStat {
                                         if_jump = true
                                     }
                                 }
-                                _ => unreachable!(),
+                                CmpOp::Nez => {
+                                    if lhs != rhs {
+                                        if_jump = true
+                                    }
+                                }
+                                CmpOp::Eqz => {
+                                    if lhs == rhs {
+                                        if_jump = true
+                                    }
+                                }
                             }
                         }
                     }
@@ -268,79 +276,51 @@ impl ProgramStat {
 
 ///关于计算
 impl ProgramStat {
-    pub fn consume_add(&mut self, inst: &ObjPtr<LIRInst>) {
-        debug_assert!(inst.get_type() == InstrsType::Binary(crate::backend::instrs::BinaryOp::Add));
+    pub fn consume_calc(&mut self, inst: ObjPtr<LIRInst>) {
         let def_reg = inst.get_def_reg().unwrap();
         let lhs = inst.get_lhs().drop_reg();
         let rhs = inst.get_rhs();
         let lhs = self.reg_val.get(&lhs);
+        let calc_kind = inst.get_type();
         if let Some(l_val) = lhs {
             match rhs {
                 Operand::Reg(rhs) => {
                     if let Some(r_val) = self.reg_val.get(rhs) {
-                        let new_v = Value::add(r_val, l_val);
+                        let new_v = do_calc(calc_kind, r_val, l_val);
                         if new_v.is_none() {
-                            self.reg_val.insert(def_reg, Value::Inst(*inst));
+                            self.reg_val.insert(def_reg, Value::Inst(inst));
                         } else {
                             self.reg_val.insert(def_reg, new_v.unwrap());
                         }
                     } else {
-                        self.reg_val.insert(def_reg, Value::Inst(*inst));
+                        self.reg_val.insert(def_reg, Value::Inst(inst));
                     }
                 }
                 Operand::IImm(rhs) => {
                     let r_val = Value::IImm(rhs.get_data() as i64);
-                    let new_v = Value::add(l_val, &r_val);
+                    let new_v = do_calc(calc_kind, l_val, &r_val);
                     if new_v.is_none() {
-                        self.reg_val.insert(def_reg, Value::Inst(*inst));
+                        self.reg_val.insert(def_reg, Value::Inst(inst));
                     } else {
                         self.reg_val.insert(def_reg, new_v.unwrap());
                     }
                 }
                 _ => {
-                    self.reg_val.insert(def_reg, Value::Inst(*inst));
+                    unreachable!("consume_calc rhs is not reg or iimm");
                 }
             }
         } else {
-            self.reg_val.insert(def_reg, Value::Inst(*inst));
+            self.reg_val.insert(def_reg, Value::Inst(inst));
         }
     }
+}
 
-    pub fn consume_sub(&mut self, inst: &ObjPtr<LIRInst>) {
-        debug_assert!(inst.get_type() == InstrsType::Binary(crate::backend::instrs::BinaryOp::Sub));
-        let def_reg = inst.get_def_reg().unwrap();
-        let lhs = inst.get_lhs().drop_reg();
-        let rhs = inst.get_rhs();
-        let lhs = self.reg_val.get(&lhs);
-        if let Some(l_val) = lhs {
-            match rhs {
-                Operand::Reg(rhs) => {
-                    if let Some(r_val) = self.reg_val.get(rhs) {
-                        let new_v = Value::minus(r_val, l_val);
-                        if new_v.is_none() {
-                            self.reg_val.insert(def_reg, Value::Inst(*inst));
-                        } else {
-                            self.reg_val.insert(def_reg, new_v.unwrap());
-                        }
-                    } else {
-                        self.reg_val.insert(def_reg, Value::Inst(*inst));
-                    }
-                }
-                Operand::IImm(rhs) => {
-                    let r_val = Value::IImm(rhs.get_data() as i64);
-                    let new_v = Value::minus(l_val, &r_val);
-                    if new_v.is_none() {
-                        self.reg_val.insert(def_reg, Value::Inst(*inst));
-                    } else {
-                        self.reg_val.insert(def_reg, new_v.unwrap());
-                    }
-                }
-                _ => {
-                    self.reg_val.insert(def_reg, Value::Inst(*inst));
-                }
-            }
-        } else {
-            self.reg_val.insert(def_reg, Value::Inst(*inst));
-        }
+fn do_calc(kind: InstrsType, one: &Value, another: &Value) -> Option<Value> {
+    match kind {
+        InstrsType::Binary(cal) => match cal {
+            BinaryOp::Add => Value::add(one, another),
+            _ => None,
+        },
+        _ => unreachable!("do_calc kind is not binary"),
     }
 }

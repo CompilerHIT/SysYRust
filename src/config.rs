@@ -1,12 +1,10 @@
 use std::{
     collections::{HashMap, HashSet, LinkedList},
-    fmt::format,
-    time::{self, Duration, Instant},
+    time::{Duration, Instant},
 };
 
 use crate::{
     backend::{instrs::LIRInst, operand::Reg},
-    ir::instruction::Inst,
     log_file,
     utility::ObjPtr,
 };
