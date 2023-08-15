@@ -58,7 +58,7 @@ impl Inst {
         if let InstKind::Branch = self.kind {
             debug_assert!(self.user.get_operands_size() <= 1);
         } else {
-            unreachable!("Inst::is_br_jmp")
+            unreachable!("Inst::is_br_jmp, {:?}", self)
         };
 
         self.user.get_operands_size() == 0

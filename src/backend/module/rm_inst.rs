@@ -24,7 +24,7 @@ impl AsmModule {
     ) {
         for (_, func) in self.name_func.iter().filter(|(_, f)| !f.is_extern) {
             func.as_mut()
-                .rm_inst_suf_update_array_offset(pool, &used_but_not_saveds);
+                .rm_inst_suf_update_array_offset(&used_but_not_saveds);
         }
     }
 

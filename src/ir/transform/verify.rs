@@ -71,7 +71,15 @@ fn bb_verify(
         let up_bb = bb_map.get_mut(next);
         debug_assert_ne!(up_bb, None);
         let up_bb = up_bb.unwrap();
-        let index = up_bb.iter().position(|x| x == &bb).unwrap();
+        let index = up_bb.iter().position(|x| x == &bb);
+        debug_assert!(
+            !index.is_none(),
+            "bb: {:?} not in {}'s up_bb: {:?}",
+            bb.get_name(),
+            next.get_name(),
+            up_bb.iter().map(|x| x.get_name()).collect::<Vec<_>>()
+        );
+        let index = index.unwrap();
         up_bb.remove(index);
         if up_bb.len() == 0 {
             bb_map.remove(next);
@@ -107,7 +115,7 @@ fn inst_verify(inst: ObjPtr<Inst>, inst_map: &mut HashMap<ObjPtr<Inst>, Vec<ObjP
 
     for user in inst.get_use_list() {
         let user_operands = inst_map.get_mut(user);
-        debug_assert_ne!(user_operands, None);
+        debug_assert_ne!(user_operands, None, "user: {:?}, inst: {:?}", user, inst);
         let user_operands = user_operands.unwrap();
         debug_assert!(user_operands.contains(&inst));
         user_operands.remove(user_operands.iter().position(|x| x == &inst).unwrap());

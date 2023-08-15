@@ -63,7 +63,7 @@ fn merge_one_line_bb(head: ObjPtr<BasicBlock>) {
     }
 }
 
-fn merge_bb(mut bb: ObjPtr<BasicBlock>) {
+pub fn merge_bb(mut bb: ObjPtr<BasicBlock>) {
     let next_bb = bb.get_next_bb()[0].clone();
     if next_bb.is_exit() {
         bb.clear_next_bb();

@@ -29,15 +29,17 @@ impl Func {
 
     ///显式禁止使用某些寄存器的分配方式
     pub fn alloc_reg_without(&mut self, unavailables: &HashSet<Reg>) {
+        config::record_event("start calc live");
         self.calc_live_base();
+        config::record_event("finish calc live");
         for bb in self.blocks.iter() {
             for reg in unavailables.iter() {
                 bb.as_mut().live_in.insert(*reg);
                 bb.as_mut().live_out.insert(*reg);
             }
         }
-
-        let alloc_stat = perfect_alloc::alloc(&self, &HashMap::new());
+        config::record_event("start  perfect alloc");
+        let alloc_stat = perfect_alloc::alloc_with_constraints(&self, &HashMap::new());
         if alloc_stat.is_some() {
             let alloc_stat = alloc_stat.unwrap();
             regalloc::check_alloc_v2(&self, &alloc_stat.dstr, &alloc_stat.spillings);
@@ -45,10 +47,12 @@ impl Func {
             self.context.as_mut().set_reg_map(&self.reg_alloc_info.dstr);
             return;
         }
+        config::record_event("start easygc alloc");
         let alloc_stat = easy_gc_alloc::alloc(&self);
         regalloc::check_alloc_v2(&self, &alloc_stat.dstr, &alloc_stat.spillings);
         self.reg_alloc_info = alloc_stat;
         self.context.as_mut().set_reg_map(&self.reg_alloc_info.dstr);
+        config::record_event("finish easygc alloc");
         return;
     }
 
@@ -56,7 +60,7 @@ impl Func {
         //分类分配
         //不保留临时寄存器的分配方式,这个时候采用完美试探分配,
         self.calc_live_for_alloc_reg();
-        let alloc_stat = perfect_alloc::alloc(self, &HashMap::new());
+        let alloc_stat = perfect_alloc::alloc_with_constraints(self, &HashMap::new());
         if alloc_stat.is_some() {
             let alloc_stat = alloc_stat.unwrap();
             regalloc::check_alloc_v2(&self, &alloc_stat.dstr, &alloc_stat.spillings);

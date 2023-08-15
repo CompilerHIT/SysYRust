@@ -74,6 +74,7 @@ pub enum CmpOp {
     Ge,
     Le,
     Eqz,
+    Nez,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -178,6 +179,7 @@ impl fmt::Display for LIRInst {
                     CmpOp::Gt => "gt",
                     CmpOp::Ge => "ge",
                     CmpOp::Eqz => "eqz",
+                    CmpOp::Nez => "nez",
                 };
             }
             InstrsType::Jump => {

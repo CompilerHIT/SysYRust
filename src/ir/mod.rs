@@ -15,6 +15,7 @@ pub mod value;
 
 pub use analysis::call_map::{call_map_gen, CallMap};
 pub use dump_ir::dump_now;
+pub use transform::add_interface;
 pub use transform::optimizer_run;
 
 /// 侵入式链表

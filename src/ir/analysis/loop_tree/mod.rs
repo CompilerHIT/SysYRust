@@ -146,13 +146,13 @@ impl LoopInfo {
     }
 
     /// 获得latchs
-    pub fn get_latchs(&self, dom_tree: &DominatorTree) -> Vec<ObjPtr<BasicBlock>> {
+    pub fn get_latch(&self, dom_tree: &DominatorTree) -> ObjPtr<BasicBlock> {
         self.header
             .get_up_bb()
             .iter()
-            .filter(|up_bb| dom_tree.is_dominate(&self.get_header(), &up_bb))
+            .find(|up_bb| dom_tree.is_dominate(&self.get_header(), &up_bb))
             .cloned()
-            .collect()
+            .unwrap()
     }
 
     /// 获得当前循环的块

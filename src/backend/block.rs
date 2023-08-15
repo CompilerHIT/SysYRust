@@ -677,35 +677,6 @@ impl BB {
                                     call_inst.set_param_cnts(3, 0);
                                     self.insts.push(pool.put_inst(call_inst));
                                 }
-                                // let mut set = Vec::new();
-                                // let mut inst = LIRInst::new(
-                                //     InstrsType::LoadParamFromStack,
-                                //     vec![
-                                //         Operand::Reg(a0).clone(),
-                                //         Operand::IImm(IImm::new(pos - 2 * ADDR_SIZE)),
-                                //     ],
-                                // );
-                                // inst.set_double();
-                                // set.push(pool.put_inst(inst));
-
-                                // let mut inst = LIRInst::new(
-                                //     InstrsType::LoadParamFromStack,
-                                //     vec![
-                                //         Operand::Reg(a1).clone(),
-                                //         Operand::IImm(IImm::new(pos - ADDR_SIZE)),
-                                //     ],
-                                // );
-                                // inst.set_double();
-                                // set.push(pool.put_inst(inst));
-
-                                // let mut inst = LIRInst::new(
-                                //     InstrsType::LoadParamFromStack,
-                                //     vec![Operand::Reg(a2).clone(), Operand::IImm(IImm::new(pos))],
-                                // );
-                                // inst.set_double();
-                                // set.push(pool.put_inst(inst));
-
-                                // self.push_back_list(&mut set);
                             } else {
                                 for i in (array_info.len() as i32)..size {
                                     self.insts.push(pool.put_inst(LIRInst::new(
@@ -720,32 +691,6 @@ impl BB {
                             }
                         }
                     }
-
-                    // let last = func.as_ref().stack_addr.front().unwrap();
-                    // let pos = last.get_pos() + ADDR_SIZE;
-                    // func.as_mut()
-                    //     .stack_addr
-                    //     .push_front(StackSlot::new(pos, ADDR_SIZE));
-                    // if first {
-                    //     let dst_reg =
-                    //         self.resolve_operand(func, ir_block_inst, true, map_info, pool);
-                    //     // let offset = pos;
-                    //     self.insts.push(pool.put_inst(LIRInst::new(
-                    //         InstrsType::OpReg(SingleOp::LoadAddr),
-                    //         vec![dst_reg.clone(), Operand::Addr(label.clone())],
-                    //     )));
-                    // }
-
-                    // let mut store = LIRInst::new(
-                    //     InstrsType::StoreParamToStack,
-                    //     vec![dst_reg.clone(), Operand::IImm(IImm::new(offset))],
-                    // );
-                    // store.set_double();
-                    // self.insts.push(pool.put_inst(store));
-
-                    // array: offset~offset+size(8字节对齐)
-                    // map_key: array_name
-                    // map_info.array_slot_map.insert(ir_block_inst, offset);
                 }
                 InstKind::Branch => {
                     // if jump
@@ -1402,9 +1347,8 @@ impl BB {
         self.insts[self.insts.len() - 1]
     }
 
-    pub fn handle_overflow(&mut self, func: ObjPtr<Func>, pool: &mut BackendPool) {
+    pub fn handle_overflow_sl(&mut self, func: ObjPtr<Func>, pool: &mut BackendPool) {
         let mut pos = 0;
-        // log!("{}, len: {}", self.label, self.insts.len());
         loop {
             if pos >= self.insts.len() {
                 break;
@@ -1528,7 +1472,20 @@ impl BB {
                         Operand::IImm(IImm::new(0)),
                     ]);
                 }
+                _ => {}
+            }
+            pos += 1;
+        }
+    }
 
+    pub fn handle_overflow_br(&mut self, func: ObjPtr<Func>, pool: &mut BackendPool) {
+        let mut pos = 0;
+        loop {
+            if pos >= self.insts.len() {
+                break;
+            }
+            let inst_ref = self.insts[pos].as_ref();
+            match inst_ref.get_type() {
                 InstrsType::Branch(..) => {
                     let target = match inst_ref.get_label() {
                         Operand::Addr(label) => label,
@@ -1581,13 +1538,6 @@ impl BB {
                             break;
                         }
                     }
-                }
-
-                InstrsType::Call => {
-                    // call 指令不会发生偏移量的溢出
-                }
-                InstrsType::Jump => {
-                    // j 型指令认为不会overflow
                 }
                 _ => {}
             }

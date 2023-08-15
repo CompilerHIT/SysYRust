@@ -1,12 +1,9 @@
 use std::collections::HashMap;
 use std::collections::HashSet;
-use std::fmt::format;
 use std::fmt::Display;
 use std::vec;
 
-use crate::backend::block::BB;
 use crate::backend::operand::Reg;
-use crate::utility::ObjPtr;
 use crate::utility::ScalarType;
 
 #[derive(Clone, Copy, PartialEq, Hash, Eq, PartialOrd, Ord)]

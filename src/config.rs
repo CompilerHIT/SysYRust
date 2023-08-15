@@ -1,12 +1,10 @@
 use std::{
     collections::{HashMap, HashSet, LinkedList},
-    fmt::format,
-    time::{self, Duration, Instant},
+    time::{Duration, Instant},
 };
 
 use crate::{
     backend::{instrs::LIRInst, operand::Reg},
-    ir::instruction::Inst,
     log_file,
     utility::ObjPtr,
 };
@@ -94,6 +92,9 @@ static mut TIME_LIMIT_SECS: usize = 0;
 pub fn set_time_limit_secs(limit: usize) {
     unsafe { TIME_LIMIT_SECS = limit };
 }
+pub fn get_time_limit_secs() -> usize {
+    unsafe { TIME_LIMIT_SECS }
+}
 
 ///获取剩余秒数
 pub fn get_rest_secs() -> usize {
@@ -111,6 +112,7 @@ pub fn record_event(event: &str) {
     init();
     let path = "events.txt";
     let msg = format!("{} at:{}s", event, get_passed_secs());
+    // println!("{}", msg);
     let info = unsafe { CONFIG_INFO.as_mut().unwrap() };
     if !info.file_infos.contains_key(path) {
         info.file_infos.insert(path.to_string(), LinkedList::new());

@@ -1,19 +1,6 @@
-use std::{
-    collections::{HashMap, HashSet, LinkedList},
-    hash::Hash,
-};
+use std::{collections::HashMap, hash::Hash};
 
-use regex::internal::Exec;
-
-use crate::{
-    backend::{
-        instrs::{AsmBuilder, BinaryOp, CmpOp, Func, InstrsType, LIRInst, Operand, SingleOp, BB},
-        operand::Reg,
-        BackendPool,
-    },
-    ir::{instruction::Inst, CallMap},
-    utility::{ObjPool, ObjPtr, ScalarType},
-};
+use crate::{backend::instrs::LIRInst, utility::ObjPtr};
 
 ///复杂值类型 (实际实现的时候需要)
 pub struct ComplexValue {
@@ -193,22 +180,6 @@ impl Value {
             if let Some(imm) = one.get_imm() {
                 let mut new_v = another.clone();
                 new_v.1 += imm;
-                return Some(Value::Addr(new_v));
-            }
-        }
-        None
-    }
-
-    ///如果运算成功,返回值,如果失败,返回None
-    pub fn minus(one: &Value, another: &Value) -> Option<Value> {
-        if one.get_type() == another.get_type() && one.get_type() == ValueType::IImm {
-            let v1 = one.get_imm().unwrap();
-            let v2 = another.get_imm().unwrap();
-            return Some(Value::IImm(v1 - v2));
-        } else if let Some(one) = one.get_addr() {
-            if let Some(imm) = another.get_imm() {
-                let mut new_v = one.clone();
-                new_v.1 -= imm;
                 return Some(Value::Addr(new_v));
             }
         }

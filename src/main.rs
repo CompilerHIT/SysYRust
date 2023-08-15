@@ -86,14 +86,14 @@ fn run_main() {
     drop(compunit);
 
     // ir优化
+    // sysylib::ir::add_interface(&mut module, &mut pool_func, &mut pool_inst, o1_option);
     sysylib::ir::optimizer_run(&mut module, (&mut pool_bb, &mut pool_inst), o1_option);
     let output2 = "row_asm.log";
-
     // dump_now(&module, "dump.ll");
 
     // 后端解析
     let is_opt = o1_option;
-    // let is_opt = true;
+    let is_opt = true;
     // let is_opt = false;
     generate_asm(
         filename,
