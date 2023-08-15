@@ -43,7 +43,7 @@ pub fn loop_unrolling(
 
 enum IVC {
     // 递归表达式且只有两个操作数
-    Introduction,
+    Induction,
     // rhs是常数
     Const,
     // 不是递归表达式
@@ -77,7 +77,7 @@ fn attempt_loop_unrolling(
             && op.get_operands().len() == 2
             && op.get_operands().iter().all(|x| x.is_scev_constant())
         {
-            IVC::Introduction
+            IVC::Induction
         } else {
             IVC::Nothing
         }
@@ -88,7 +88,7 @@ fn attempt_loop_unrolling(
         end_cond.get_kind(),
         check_ivc(&rhs_scev),
     ) {
-        (IVC::Introduction, InstKind::Binary(crate::ir::instruction::BinOp::Le), IVC::Const) => {
+        (IVC::Induction, InstKind::Binary(crate::ir::instruction::BinOp::Le), IVC::Const) => {
             // i <= 常数
             start = lhs_scev.get_operands()[0].get_scev_const();
             step = lhs_scev.get_operands()[1].get_scev_const();
@@ -96,7 +96,7 @@ fn attempt_loop_unrolling(
             debug_assert!(step > 0);
             round = (end - start) / step + 1;
         }
-        (IVC::Introduction, InstKind::Binary(crate::ir::instruction::BinOp::Lt), IVC::Const) => {
+        (IVC::Induction, InstKind::Binary(crate::ir::instruction::BinOp::Lt), IVC::Const) => {
             // i < 常数
             start = lhs_scev.get_operands()[0].get_scev_const();
             step = lhs_scev.get_operands()[1].get_scev_const();
@@ -108,7 +108,7 @@ fn attempt_loop_unrolling(
                 round = (end - start) / step + 1;
             }
         }
-        (IVC::Const, InstKind::Binary(crate::ir::instruction::BinOp::Le), IVC::Introduction) => {
+        (IVC::Const, InstKind::Binary(crate::ir::instruction::BinOp::Le), IVC::Induction) => {
             // 常数 <= i
             start = rhs_scev.get_operands()[0].get_scev_const();
             step = rhs_scev.get_operands()[1].get_scev_const();
@@ -116,7 +116,7 @@ fn attempt_loop_unrolling(
             debug_assert!(step < 0);
             round = (end - start) / step + 1;
         }
-        (IVC::Const, InstKind::Binary(crate::ir::instruction::BinOp::Lt), IVC::Introduction) => {
+        (IVC::Const, InstKind::Binary(crate::ir::instruction::BinOp::Lt), IVC::Induction) => {
             // 常数 < i
             start = rhs_scev.get_operands()[0].get_scev_const();
             step = rhs_scev.get_operands()[1].get_scev_const();
@@ -128,7 +128,7 @@ fn attempt_loop_unrolling(
                 round = (end - start) / step + 1;
             }
         }
-        (IVC::Introduction, InstKind::Binary(crate::ir::instruction::BinOp::Gt), IVC::Const) => {
+        (IVC::Induction, InstKind::Binary(crate::ir::instruction::BinOp::Gt), IVC::Const) => {
             // i > 常数
             start = lhs_scev.get_operands()[0].get_scev_const();
             step = lhs_scev.get_operands()[1].get_scev_const();
@@ -139,14 +139,14 @@ fn attempt_loop_unrolling(
                 round = (end - start) / step + 1;
             }
         }
-        (IVC::Introduction, InstKind::Binary(crate::ir::instruction::BinOp::Ge), IVC::Const) => {
+        (IVC::Induction, InstKind::Binary(crate::ir::instruction::BinOp::Ge), IVC::Const) => {
             // i >= 常数
             start = lhs_scev.get_operands()[0].get_scev_const();
             step = lhs_scev.get_operands()[1].get_scev_const();
             end = rhs_scev.get_scev_const();
             round = (end - start) / step + 1;
         }
-        (IVC::Const, InstKind::Binary(crate::ir::instruction::BinOp::Gt), IVC::Introduction) => {
+        (IVC::Const, InstKind::Binary(crate::ir::instruction::BinOp::Gt), IVC::Induction) => {
             // 常数 > i
             start = rhs_scev.get_operands()[0].get_scev_const();
             step = rhs_scev.get_operands()[1].get_scev_const();
@@ -158,7 +158,7 @@ fn attempt_loop_unrolling(
                 round = (end - start) / step + 1;
             }
         }
-        (IVC::Const, InstKind::Binary(crate::ir::instruction::BinOp::Ge), IVC::Introduction) => {
+        (IVC::Const, InstKind::Binary(crate::ir::instruction::BinOp::Ge), IVC::Induction) => {
             // 常数 >= i
             start = rhs_scev.get_operands()[0].get_scev_const();
             step = rhs_scev.get_operands()[1].get_scev_const();
