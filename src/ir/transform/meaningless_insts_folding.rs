@@ -13,7 +13,8 @@ pub fn meaningless_inst_folding(
     pools: &mut (&mut ObjPool<BasicBlock>, &mut ObjPool<Inst>),
 ) {
     func_process(module, |_, func| {
-        bfs_inst_process(func.get_head(), |inst| {delete_useless_inst(inst, pools.1);
+        bfs_inst_process(func.get_head(), |inst| {
+            delete_useless_inst(inst, pools.1);
             delete_useless_inst2(inst)
         })
     });
@@ -22,7 +23,7 @@ pub fn meaningless_inst_folding(
 pub fn delete_useless_inst(inst: ObjPtr<Inst>, pool: &mut ObjPool<Inst>) {
     match inst.get_kind() {
         InstKind::Binary(binop) => match binop {
-            BinOp::Add | BinOp::Sub => {
+            BinOp::Add => {// 删除0+,+0指令
                 let operands = inst.get_operands();
                 match operands[0].get_kind() {
                     InstKind::ConstInt(i) => {
@@ -38,6 +39,17 @@ pub fn delete_useless_inst(inst: ObjPtr<Inst>, pool: &mut ObjPool<Inst>) {
                         }
                         _ => {}
                     },
+                }
+            }
+            BinOp::Sub =>{// 删除-0指令
+                let operands = inst.get_operands();
+                match operands[1].get_kind() {
+                    InstKind::ConstInt(i) => {
+                        if i == 0 {
+                            replace_inst(inst, operands[1]);
+                        }
+                    }
+                    _ => {}
                 }
             }
             BinOp::Mul => {
