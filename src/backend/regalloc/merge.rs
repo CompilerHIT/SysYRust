@@ -25,7 +25,6 @@ pub fn try_merge_vv(
     live_neigbhors: &mut HashMap<Reg, HashSet<Reg>>,
     availables: &mut HashMap<Reg, RegUsedStat>,
 ) -> (bool, Option<FuncAllocStat>) {
-    return (false, None);
     debug_assert!(!v_reg1.is_physic());
     debug_assert!(!v_reg2.is_physic());
     debug_assert!(v_reg1.get_type() == v_reg2.get_type());
@@ -116,49 +115,49 @@ pub fn try_merge_vp(
         return (true, None);
     }
     // // 或者如果该寄存器直接地变成该物理寄存器不会影响图的可着色性
-    // let mut if_effect = false;
-    // for nb in live_neigbhors.get(v_reg).unwrap() {
-    //     let mut av = *availables.get(nb).unwrap();
-    //     av.use_reg(p_reg.get_color());
-    //     let na = av.num_available_regs(nb.get_type());
-    //     let nln = live_neigbhors.get(nb).unwrap().len() - 1;
-    //     if na <= nln {
-    //         if_effect = true;
-    //         break;
-    //     }
-    // }
-    // if !if_effect {
-    //     func.replace_reg(v_reg, p_reg);
-    //     let nbs = remove_node_from_intereference_graph(live_neigbhors, v_reg);
-    //     for nb in nbs.unwrap() {
-    //         availables.get_mut(&nb).unwrap().use_reg(p_reg.get_color());
-    //     }
-    //     availables.remove(v_reg);
-    //     return (true, None);
-    // }
+    let mut if_effect = false;
+    for nb in live_neigbhors.get(v_reg).unwrap() {
+        let mut av = *availables.get(nb).unwrap();
+        av.use_reg(p_reg.get_color());
+        let na = av.num_available_regs(nb.get_type());
+        let nln = live_neigbhors.get(nb).unwrap().len() - 1;
+        if na <= nln {
+            if_effect = true;
+            break;
+        }
+    }
+    if !if_effect {
+        func.replace_reg(v_reg, p_reg);
+        let nbs = remove_node_from_intereference_graph(live_neigbhors, v_reg);
+        for nb in nbs.unwrap() {
+            availables.get_mut(&nb).unwrap().use_reg(p_reg.get_color());
+        }
+        availables.remove(v_reg);
+        return (true, None);
+    }
 
-    // //最后是常规寄存器合并尝试
-    // let mut new_live_neigbhors = live_neigbhors.clone();
-    // let mut new_availables = availables.clone();
-    // let nbs = remove_node_from_intereference_graph(&mut new_live_neigbhors, v_reg).unwrap();
-    // for nb in nbs.iter() {
-    //     new_availables
-    //         .get_mut(nb)
-    //         .unwrap()
-    //         .use_reg(p_reg.get_color());
-    // }
-    // if let Some(func_alloc_stat) = perfect_alloc::alloc_with_live_neighbors_and_availables(
-    //     &mut new_live_neigbhors,
-    //     &mut new_availables,
-    // ) {
-    //     func.replace_reg(v_reg, p_reg);
-    //     let nbs = remove_node_from_intereference_graph(live_neigbhors, v_reg);
-    //     for nb in nbs.unwrap() {
-    //         availables.get_mut(&nb).unwrap().use_reg(p_reg.get_color());
-    //     }
-    //     availables.remove(v_reg);
-    //     return (true, Some(func_alloc_stat));
-    // }
+    //最后是常规寄存器合并尝试
+    let mut new_live_neigbhors = live_neigbhors.clone();
+    let mut new_availables = availables.clone();
+    let nbs = remove_node_from_intereference_graph(&mut new_live_neigbhors, v_reg).unwrap();
+    for nb in nbs.iter() {
+        new_availables
+            .get_mut(nb)
+            .unwrap()
+            .use_reg(p_reg.get_color());
+    }
+    if let Some(func_alloc_stat) = perfect_alloc::alloc_with_live_neighbors_and_availables(
+        &mut new_live_neigbhors,
+        &mut new_availables,
+    ) {
+        func.replace_reg(v_reg, p_reg);
+        let nbs = remove_node_from_intereference_graph(live_neigbhors, v_reg);
+        for nb in nbs.unwrap() {
+            availables.get_mut(&nb).unwrap().use_reg(p_reg.get_color());
+        }
+        availables.remove(v_reg);
+        return (true, Some(func_alloc_stat));
+    }
 
     (false, None)
 }
@@ -171,33 +170,39 @@ pub fn merge_reg_with_constraints(
 ) -> bool {
     let merge_action_path = "merge_actions.txt";
     log_file!(merge_action_path, "func:{}", func.label);
-    // return false;
+
     debug_assert!(!func.remove_unuse_def());
     Func::print_func(ObjPtr::new(&func), "before_p2v_for_merge.txt");
-    // func.remove_unuse_def();
     let availables: HashSet<Reg> = availables.clone();
-    let mut unavailables = Reg::get_all_regs();
-    unavailables.retain(|reg| !availables.contains(reg));
-    let unavailables = unavailables;
+    let mut unavailables_reg_use_stat = RegUsedStat::init_unavailable();
+    for reg in availables.iter() {
+        unavailables_reg_use_stat.release_reg(reg.get_color());
+    }
     //首先p2v
-    let (v_regs, p2v_actions) = func.p2v(&Reg::get_all_recolorable_regs());
+    let (mut v_regs, p2v_actions) = func.p2v(&Reg::get_all_recolorable_regs());
     Func::print_func(ObjPtr::new(&func), "before_merge.txt");
     debug_assert!(func.draw_all_virtual_regs().len() == v_regs.len());
 
+    //p2v后处理
     func.calc_live_base();
     let mut all_neighbors = regalloc::build_interference(func);
     let mut availables = regalloc::build_availables_with_interef_graph(&all_neighbors);
     // 建立约束,加入约束
-    let mut constraints = build_constraints(func, regs_used_but_not_saved);
-    for (_, constraint) in constraints.iter_mut() {
-        constraint.extend(unavailables.iter());
-    }
+    // 对于所有得虚拟寄存器都应该加入extend约束
+    let constraints = build_constraints(func, regs_used_but_not_saved);
     perfect_alloc::add_constraint_to_interference_graph(
         &mut all_neighbors,
         &mut availables,
         &constraints,
     );
     let mut live_neighbors = perfect_alloc::build_live_neighbors_from_all_neigbhors(&all_neighbors);
+    for (r, _) in live_neighbors.iter() {
+        availables
+            .get_mut(r)
+            .unwrap()
+            .merge(&unavailables_reg_use_stat);
+    }
+
     debug_assert!(live_neighbors.len() == v_regs.len());
     // 分析合并机会
     let mut mergables = analyse_mergable(func);
@@ -220,13 +225,6 @@ pub fn merge_reg_with_constraints(
     let mut if_merge = false;
     let mut pre_alloc_stat: Option<FuncAllocStat> = None;
     for (r1, r2) in mergables.iter() {
-        if r1.get_id() == 10 || r2.get_id() == 10 {
-            continue;
-        }
-        if r1.get_type() == ScalarType::Int {
-            continue;
-        }
-
         if !r1.is_physic() && !v_regs.contains(r1) {
             continue;
         }
@@ -243,18 +241,18 @@ pub fn merge_reg_with_constraints(
         if_merge |= result.0;
 
         if result.0 {
+            config::record_merge_reg(&func.label, r1, r2);
+            v_regs.remove(r1);
+            v_regs.remove(r2);
             if let Some(fas) = result.1 {
                 pre_alloc_stat = Some(fas);
             } else {
                 pre_alloc_stat = None;
             }
-            log_file!("merge_actions.txt", "merge {},{}", r1, r2);
             break;
         }
     }
-
     Func::print_func(ObjPtr::new(&func), "after_merge.txt");
-
     if if_merge {
         assert!(func.remove_self_mv());
         if let Some(alloc_stat) = pre_alloc_stat {
@@ -281,12 +279,9 @@ pub fn merge_reg_with_constraints(
         Func::undo_p2v(&p2v_actions);
     }
     debug_assert!(func.draw_all_virtual_regs().len() == 0);
-
     func.remove_self_mv();
-    // debug_assert!({
-    //     func.calc_live_base();
-    //     !func.remove_unuse_def()
-    // });
+    func.calc_live_base();
+    assert!(!func.remove_unuse_def());
     if_merge
 }
 
@@ -305,6 +300,7 @@ fn build_constraints(
             let func = inst.get_func_name().unwrap();
             let constraint: HashSet<Reg> =
                 regs_used_but_not_saved.get(func.as_str()).unwrap().clone();
+
             let live_now = live_now.clone();
             for r in live_now.iter().filter(|reg| !reg.is_physic()) {
                 if !constraints.contains_key(r) {
@@ -318,11 +314,10 @@ fn build_constraints(
     return constraints;
 }
 
-//分析寄存器的合并机会
+//分析寄存器的合并机会,依赖外部调用得calc live
 pub fn analyse_mergable(func: &Func) -> Vec<(Reg, Reg)> {
     let mut mergables: Vec<(Reg, Reg)> = Vec::new();
     //分析可以合并的虚拟寄存器
-    func.calc_live_base();
     for bb in func.blocks.iter() {
         Func::analyse_inst_with_live_now_backorder(
             *bb,

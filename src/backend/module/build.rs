@@ -89,14 +89,12 @@ impl AsmModule {
         //     self.realloc_pre_spill();
         //     config::record_event("finish realloc pre spilit func");
         // }
-
         // if is_opt {
         //     //似乎存在bug,并且目前没有收益,暂时放弃
         //     self.split_func(pool);
         //     self.build_own_call_map();
         // }
         //此后栈空间大小以及 caller saved和callee saved都确定了
-
         let callers_used = self.build_caller_used();
         let callees_used = self.build_callee_used();
         if is_opt {
@@ -129,11 +127,9 @@ impl AsmModule {
         }
         self.update_array_offset(pool);
         config::record_event("finish update_array_offset");
-        if true {
-            self.print_asm("before_rm_inst_suf_update_array.txt");
-            self.rm_inst_suf_update_array_offset(pool, &used_but_not_saved);
-            config::record_event("finish rm suf update array offset");
-        }
+        self.print_asm("before_rm_inst_suf_update_array.txt");
+        self.rm_inst_suf_update_array_offset(pool, &used_but_not_saved);
+        config::record_event("finish rm suf update array offset");
         //检查代码中是否会def sp
         self.build_stack_info(f);
     }
