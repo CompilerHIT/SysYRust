@@ -33,9 +33,11 @@ pub fn optimizer_run(
 
     if optimize_flag {
         // 简化cfg
+        dump_now(module, "before_cfg.ll");
         simplify_cfg::simplify_cfg_run(module, &mut pools);
+        dump_now(module, "after_cfg.ll");
         functional_optimizer(module, &mut pools, optimize_flag);
-
+        
         // 局部冗余消除 指令上提
         partial_redundancy_elimination::pre(module, optimize_flag, &mut pools);
 
@@ -49,11 +51,11 @@ pub fn optimizer_run(
 
         // 尾递归优化
         tail_call_optimize::tail_call_optimize(module, &mut pools);
-
+        dump_now(module, "before_inline.ll");
         // 函数内联
         func_inline::inline_run(module, &mut pools);
         functional_optimizer(module, &mut pools, optimize_flag);
-
+        dump_now(module, "after_inline.ll");
         // 简化cfg
         simplify_cfg::simplify_cfg_run(module, &mut pools);
         functional_optimizer(module, &mut pools, optimize_flag);

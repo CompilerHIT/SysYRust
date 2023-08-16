@@ -6,6 +6,7 @@ extern crate biheap;
 // extern crate libm;
 use sysylib::backend::module::AsmModule;
 use sysylib::frontend::irgen::irgen;
+use sysylib::ir::dump_now;
 use sysylib::ir::instruction::Inst;
 use sysylib::{self, backend::generate_asm, ir::module::Module, utility::ObjPool};
 lalrpop_mod! {
@@ -86,14 +87,13 @@ fn run_main() {
     drop(compunit);
 
     // ir优化
-    sysylib::ir::add_interface(&mut module, &mut pool_func, &mut pool_inst, o1_option);
+    // sysylib::ir::add_interface(&mut module, &mut pool_func, &mut pool_inst, o1_option);
     sysylib::ir::optimizer_run(&mut module, (&mut pool_bb, &mut pool_inst), o1_option);
     let output2 = "row_asm.log";
-    // dump_now(&module, "dump.ll");
 
     // 后端解析
     let is_opt = o1_option;
-    let is_opt = true;
+    // let is_opt = true;
     // let is_opt = false;
     generate_asm(
         filename,
@@ -105,8 +105,8 @@ fn run_main() {
     config::record_event("finish compile");
     // 编译结束后打印记录的属性
     config::dump();
-    // let is_dump_not_log = true;
-    let is_dump_not_log = matches.is_present("Events");
+    let is_dump_not_log = true;
+    // let is_dump_not_log = matches.is_present("Events");
     if is_dump_not_log {
         config::dump_not_log("./performance_eval.txt");
     }
