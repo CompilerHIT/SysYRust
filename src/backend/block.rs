@@ -1134,10 +1134,13 @@ impl BB {
                             }
                         }
                     }
-                    let mut lir_inst = LIRInst::new(
-                        InstrsType::Call,
-                        vec![Operand::Addr(func_label.to_string())],
-                    );
+                    let mut label = func_label.to_string();
+                    if label == "hitsz_memset" {
+                        label = String::from("memset");
+                    } else if label == "hitsz_memcopy" {
+                        label = String::from("memcpy");
+                    }
+                    let mut lir_inst = LIRInst::new(InstrsType::Call, vec![Operand::Addr(label)]);
                     lir_inst.set_param_cnts(int_param_cnt, float_param_cnt);
                     let call_type = if inst_ref.get_use_list().len() == 0 {
                         ScalarType::Void
