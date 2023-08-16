@@ -47,6 +47,8 @@ impl AsmModule {
         // let extern_func_path = "extern_func.txt";
         //补充外部函数 memset 和memcpy
         let extern_funcs = vec![
+            "memset",
+            "memcpy",
             "memset@plt",
             "memcpy@plt",
             "putint",
