@@ -194,6 +194,6 @@ impl Inst {
     }
 
     pub fn is_global_array_load(&self) -> bool {
-        self.get_ptr().get_kind() == InstKind::Alloca(0)
+        self.is_load() && self.get_ptr().get_kind() == InstKind::Alloca(0)
     }
 }
