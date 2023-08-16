@@ -1,7 +1,10 @@
 use std::collections::HashSet;
 
 use crate::ir::{
-    analysis::scev::{scevexp::SCEVExp, SCEVAnalyzer},
+    analysis::{
+        call_optimize::call_optimize,
+        scev::{scevexp::SCEVExp, SCEVAnalyzer},
+    },
     instruction::InstKind,
 };
 
@@ -11,6 +14,7 @@ pub fn loop_elimination(
     loop_map: &mut HashMap<String, LoopList>,
     pools: &mut (&mut ObjPool<BasicBlock>, &mut ObjPool<Inst>),
 ) {
+    let call_op_set = call_optimize(module);
     func_process(module, |name, _| {
         let mut delete_list = vec![];
         let looplist = loop_map.get_mut(&name).unwrap();
@@ -20,7 +24,7 @@ pub fn loop_elimination(
             if let Some(exit) = check_one_exiting(*loop_info) {
                 loop_induct(*loop_info, &mut analyzer, exit, pools);
                 loop_store_eliminate(*loop_info, &mut analyzer, exit, pools);
-                loop_dead_code_eliminate(*loop_info);
+                loop_dead_code_eliminate(*loop_info, &call_op_set);
                 if loop_eliminate(*loop_info, exit) {
                     delete_list.push(*loop_info);
                     analyzer.clear();
@@ -232,7 +236,7 @@ fn loop_eliminate(loop_info: ObjPtr<LoopInfo>, exit: [ObjPtr<BasicBlock>; 2]) ->
     }
 }
 
-fn loop_dead_code_eliminate(loop_info: ObjPtr<LoopInfo>) {
+fn loop_dead_code_eliminate(loop_info: ObjPtr<LoopInfo>, call_op_set: &HashSet<String>) {
     let mut visited: HashSet<&ObjPtr<Inst>> = HashSet::new();
 
     let mut insts = vec![];
@@ -242,6 +246,14 @@ fn loop_dead_code_eliminate(loop_info: ObjPtr<LoopInfo>) {
             insts.push(inst);
         })
     }
+
+    let check_call_op = |inst: ObjPtr<Inst>| -> bool {
+        if let InstKind::Call(callee) = inst.get_kind() {
+            !call_op_set.contains(&callee)
+        } else {
+            true
+        }
+    };
 
     let mut delete_list: Vec<ObjPtr<Inst>> = vec![];
     insts.iter().for_each(|inst| {
@@ -253,11 +265,13 @@ fn loop_dead_code_eliminate(loop_info: ObjPtr<LoopInfo>) {
                 current.insert(current_inst);
                 if !current_inst.is_store()
                     && !current_inst.is_br()
+                    && !check_call_op(*current_inst)
                     && current_inst.get_use_list().iter().all(|user| {
                         (user.is_global_var_or_param()
                             || loop_info.is_in_current_loop(&user.get_parent_bb()))
                             && !user.is_br()
                             && !user.is_store()
+                            && check_call_op(*user)
                     })
                 {
                     queue.extend(
