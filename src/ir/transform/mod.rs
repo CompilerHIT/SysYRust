@@ -63,6 +63,7 @@ pub fn optimizer_run(
 
         // 循环优化
         loop_operation::loop_optimize(module, 1000, &mut pools, false);
+        functional_optimizer(module, &mut pools, optimize_flag);
     }
 }
 

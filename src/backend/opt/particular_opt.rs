@@ -175,8 +175,8 @@ impl BackendPass {
             func.calc_live_base();
             func.blocks.iter().for_each(|b| {
                 let live_out = &b.live_out;
-                log!("start");
-                log!("block: {}, live_out: {:?}", b.label, live_out);
+                // log!("start");
+                // log!("block: {}, live_out: {:?}", b.label, live_out);
                 let mut delete_pos: HashSet<usize> = HashSet::new();
                 if b.insts.len() < 2 {
                     return;
@@ -233,7 +233,7 @@ impl BackendPass {
                                         }
                                         if inst.get_type() == InstrsType::OpReg(SingleOp::Mv) {
                                             if reg_def_pos.contains_key(&inst.get_lhs().drop_reg())
-                                                && index - i + 1
+                                                && index - i
                                                     < *reg_def_pos
                                                         .get(&inst.get_lhs().drop_reg())
                                                         .unwrap()
