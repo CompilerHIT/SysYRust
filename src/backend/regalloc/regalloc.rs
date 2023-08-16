@@ -317,7 +317,7 @@ pub fn check_alloc(
     out
 }
 
-///检查寄存器分配结果是否正确
+///检查寄存器分配结果是否正确,(依赖外部的calc live)
 pub fn check_alloc_v2(func: &Func, dstr: &HashMap<i32, i32>, _spillings: &HashSet<i32>) {
     for bb in func.blocks.iter() {
         let mut livenow: HashSet<Reg> = HashSet::new();

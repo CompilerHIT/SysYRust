@@ -132,9 +132,9 @@ pub fn build_live_neighbors_to_all_neighbors_with_availables(
     live_neighbors
 }
 
-///检查是否是全图
+///检查是否是完整的图 ,两个节点间有双向边
 #[inline]
-pub fn check_if_all_neighbors(all_neighbors: &HashMap<Reg, HashSet<Reg>>) {
+pub fn check_if_full_neighbors(all_neighbors: &HashMap<Reg, HashSet<Reg>>) {
     debug_assert!({
         for (r, nbs) in all_neighbors.iter() {
             for nb in nbs.iter() {
@@ -154,7 +154,7 @@ pub fn simplify_live_graph_and_build_last_tocolors(
     live_intereference_graph: &mut HashMap<Reg, HashSet<Reg>>,
     availables: &HashMap<Reg, RegUsedStat>,
 ) -> LinkedList<Reg> {
-    check_if_all_neighbors(&live_intereference_graph);
+    check_if_full_neighbors(&live_intereference_graph);
     let mut last_to_colors: LinkedList<Reg> = LinkedList::new();
     //新节点加入方式push front
     //最后着色方式pop front
@@ -277,23 +277,29 @@ pub fn alloc_with_interef_graph_and_availables_and_constraints(
     let mut availables = availables;
     // 根据constraints更新
     add_constraint_to_interference_graph(&mut all_neighbors, &mut availables, constraints);
-
     let mut live_neighbors = build_live_neighbors_from_all_neigbhors(&all_neighbors);
+    alloc_with_live_neighbors_and_availables(&mut live_neighbors, &mut availables)
+}
+
+#[inline]
+pub fn alloc_with_live_neighbors_and_availables(
+    live_neighbors: &mut HashMap<Reg, HashSet<Reg>>,
+    availables: &mut HashMap<Reg, RegUsedStat>,
+) -> Option<FuncAllocStat> {
     let base_live_neighbors = live_neighbors.clone();
     let mut last_to_colors = LinkedList::new();
     let mut pre_colors: HashMap<Reg, i32> = HashMap::new();
     // 如果仍然无法完美优化,试探是否有某种着色不影响邻居可着色性的着色个例进行优化
     loop {
         let tmp_last_tocolors =
-            simplify_live_graph_and_build_last_tocolors(&mut live_neighbors, &availables);
+            simplify_live_graph_and_build_last_tocolors(live_neighbors, &availables);
         for reg in tmp_last_tocolors.iter().rev() {
             last_to_colors.push_front(*reg);
         }
         if live_neighbors.len() == 0 {
             break;
         }
-        let tmp_pre_colors =
-            simplify_live_graph_and_build_pre_colors(&mut live_neighbors, &availables);
+        let tmp_pre_colors = simplify_live_graph_and_build_pre_colors(live_neighbors, &availables);
         pre_colors.extend(tmp_pre_colors.iter());
         if live_neighbors.len() == 0 {
             break;
@@ -312,8 +318,7 @@ pub fn alloc_with_interef_graph_and_availables_and_constraints(
     }
 
     if live_neighbors.len() == 0 {
-        let mut colors =
-            color_last_tocolors(&mut last_to_colors, &base_live_neighbors, &mut availables);
+        let mut colors = color_last_tocolors(&mut last_to_colors, &base_live_neighbors, availables);
         for (r, color) in pre_colors.iter() {
             colors.insert(r.get_id(), *color);
         }
@@ -337,10 +342,7 @@ pub fn alloc_with_interef_graph_and_availables_and_constraints(
         // 加入chordal着色的结果
         for (r, _) in live_neighbors.iter() {
             let color = dstr.get(&r.get_id()).unwrap();
-            for nb in all_neighbors.get(r).unwrap() {
-                if nb.is_physic() {
-                    continue;
-                }
+            for nb in base_live_neighbors.get(r).unwrap() {
                 availables.get_mut(nb).unwrap().use_reg(*color);
             }
         }

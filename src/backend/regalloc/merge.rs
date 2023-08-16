@@ -3,6 +3,7 @@ use std::collections::{HashMap, HashSet};
 use crate::{
     backend::{
         instrs::{Func, InstrsType, SingleOp},
+        module::constraints,
         operand::Reg,
         regalloc::{
             perfect_alloc::alloc_with_interef_graph_and_availables_and_constraints,
@@ -10,303 +11,268 @@ use crate::{
         },
     },
     config, log_file,
-    utility::ObjPtr,
+    utility::{ObjPtr, ScalarType},
 };
 
-use super::*;
+use super::{structs::FuncAllocStat, *};
 
-///进行了寄存器合并的分配,在最后的最后进行
-/// availables为可能各个地方允许使用的寄存器的并集
+#[inline]
+///尝试合并两个虚拟寄存器
+pub fn try_merge_vv(
+    func: &mut Func,
+    v_reg1: &Reg,
+    v_reg2: &Reg,
+    live_neigbhors: &mut HashMap<Reg, HashSet<Reg>>,
+    availables: &mut HashMap<Reg, RegUsedStat>,
+) -> (bool, Option<FuncAllocStat>) {
+    return (false, None);
+    debug_assert!(!v_reg1.is_physic());
+    debug_assert!(!v_reg2.is_physic());
+    debug_assert!(v_reg1.get_type() == v_reg2.get_type());
+    if live_neigbhors.get(v_reg1).unwrap().contains(v_reg2) {
+        return (false, None);
+    }
+    debug_assert!(!live_neigbhors.get(v_reg1).unwrap().contains(v_reg2));
+    debug_assert!(!live_neigbhors.get(v_reg2).unwrap().contains(v_reg1));
+    // 它们共享约束
+    let mut v_nbs = live_neigbhors.get(&v_reg1).unwrap().clone();
+    v_nbs.extend(live_neigbhors.get(&v_reg2).unwrap().iter());
+    v_nbs.remove(v_reg1);
+    v_nbs.remove(v_reg2);
+    let mut new_v_available = *availables.get(v_reg1).unwrap();
+    new_v_available.merge(availables.get(v_reg2).unwrap());
+    //判断是否合并直接可以进行
+    if new_v_available.num_available_regs(v_reg1.get_type()) > v_nbs.len() {
+        remove_node_from_intereference_graph(live_neigbhors, v_reg1);
+        remove_node_from_intereference_graph(live_neigbhors, v_reg2);
+        let new_v_reg = Reg::init(v_reg1.get_type());
+        add_node_to_intereference_graph(live_neigbhors, &new_v_reg, v_nbs);
+        availables.insert(new_v_reg, new_v_available);
+        availables.remove(v_reg1);
+        availables.remove(v_reg2);
+        func.replace_reg(v_reg1, &new_v_reg);
+        func.replace_reg(v_reg2, &new_v_reg);
+        return (true, None);
+    }
+    let new_v_reg = Reg::init(v_reg1.get_type());
+    //使用新寄存器尝试进行
+    let mut new_live_neigbhors = live_neigbhors.clone();
+    let mut new_availables = availables.clone();
+    remove_node_from_intereference_graph(&mut new_live_neigbhors, &v_reg1);
+    remove_node_from_intereference_graph(&mut new_live_neigbhors, v_reg2);
+    add_node_to_intereference_graph(&mut new_live_neigbhors, &new_v_reg, v_nbs.clone());
+    new_availables.insert(new_v_reg, new_v_available);
+    new_availables.remove(v_reg1);
+    new_availables.remove(v_reg2);
+    if let Some(alloc_stat) = perfect_alloc::alloc_with_live_neighbors_and_availables(
+        &mut new_live_neigbhors,
+        &mut new_availables,
+    ) {
+        remove_node_from_intereference_graph(live_neigbhors, v_reg1);
+        remove_node_from_intereference_graph(live_neigbhors, v_reg2);
+        add_node_to_intereference_graph(live_neigbhors, &new_v_reg, v_nbs);
+        func.replace_reg(v_reg1, &new_v_reg);
+        func.replace_reg(v_reg2, &new_v_reg);
+        availables.insert(new_v_reg, new_v_available);
+        availables.remove(v_reg1);
+        availables.remove(v_reg2);
+        return (true, Some(alloc_stat));
+    }
+    (false, None)
+}
+
+///尝试合并两个物理寄存器
+#[inline]
+pub fn try_merge_vp(
+    func: &mut Func,
+    v_reg: &Reg,
+    p_reg: &Reg,
+    live_neigbhors: &mut HashMap<Reg, HashSet<Reg>>,
+    availables: &mut HashMap<Reg, RegUsedStat>,
+) -> (bool, Option<FuncAllocStat>) {
+    // return (false, None);
+    debug_assert!(!v_reg.is_physic());
+    debug_assert!(p_reg.is_physic());
+    debug_assert!(v_reg.get_type() == p_reg.get_type());
+    if !availables
+        .get(v_reg)
+        .unwrap()
+        .is_available_reg(p_reg.get_color())
+    {
+        return (false, None);
+    }
+    // 首先快速判断是否能够直接着色
+    let mut available = *availables.get(v_reg).unwrap();
+    available.use_reg(p_reg.get_color());
+    let nln = live_neigbhors.get(v_reg).unwrap().len();
+    if available.num_available_regs(v_reg.get_type()) > nln {
+        func.replace_reg(v_reg, p_reg);
+        let nbs = remove_node_from_intereference_graph(live_neigbhors, v_reg);
+        debug_assert!(!live_neigbhors.contains_key(v_reg));
+        for nb in nbs.unwrap() {
+            availables.get_mut(&nb).unwrap().use_reg(p_reg.get_color());
+        }
+        availables.remove(v_reg);
+        return (true, None);
+    }
+    // // 或者如果该寄存器直接地变成该物理寄存器不会影响图的可着色性
+    // let mut if_effect = false;
+    // for nb in live_neigbhors.get(v_reg).unwrap() {
+    //     let mut av = *availables.get(nb).unwrap();
+    //     av.use_reg(p_reg.get_color());
+    //     let na = av.num_available_regs(nb.get_type());
+    //     let nln = live_neigbhors.get(nb).unwrap().len() - 1;
+    //     if na <= nln {
+    //         if_effect = true;
+    //         break;
+    //     }
+    // }
+    // if !if_effect {
+    //     func.replace_reg(v_reg, p_reg);
+    //     let nbs = remove_node_from_intereference_graph(live_neigbhors, v_reg);
+    //     for nb in nbs.unwrap() {
+    //         availables.get_mut(&nb).unwrap().use_reg(p_reg.get_color());
+    //     }
+    //     availables.remove(v_reg);
+    //     return (true, None);
+    // }
+
+    // //最后是常规寄存器合并尝试
+    // let mut new_live_neigbhors = live_neigbhors.clone();
+    // let mut new_availables = availables.clone();
+    // let nbs = remove_node_from_intereference_graph(&mut new_live_neigbhors, v_reg).unwrap();
+    // for nb in nbs.iter() {
+    //     new_availables
+    //         .get_mut(nb)
+    //         .unwrap()
+    //         .use_reg(p_reg.get_color());
+    // }
+    // if let Some(func_alloc_stat) = perfect_alloc::alloc_with_live_neighbors_and_availables(
+    //     &mut new_live_neigbhors,
+    //     &mut new_availables,
+    // ) {
+    //     func.replace_reg(v_reg, p_reg);
+    //     let nbs = remove_node_from_intereference_graph(live_neigbhors, v_reg);
+    //     for nb in nbs.unwrap() {
+    //         availables.get_mut(&nb).unwrap().use_reg(p_reg.get_color());
+    //     }
+    //     availables.remove(v_reg);
+    //     return (true, Some(func_alloc_stat));
+    // }
+
+    (false, None)
+}
+
+///新寄存器合并
 pub fn merge_reg_with_constraints(
     func: &mut Func,
     availables: &HashSet<Reg>,
     regs_used_but_not_saved: &HashMap<String, HashSet<Reg>>,
 ) -> bool {
-    /*
-    准备基础约束
-     */
+    let merge_action_path = "merge_actions.txt";
+    log_file!(merge_action_path, "func:{}", func.label);
+    // return false;
+    debug_assert!(!func.remove_unuse_def());
+    Func::print_func(ObjPtr::new(&func), "before_p2v_for_merge.txt");
+    // func.remove_unuse_def();
     let availables: HashSet<Reg> = availables.clone();
     let mut unavailables = Reg::get_all_regs();
     unavailables.retain(|reg| !availables.contains(reg));
     let unavailables = unavailables;
-    /*
-    准备每次合并的过程
-     */
+    //首先p2v
+    let (v_regs, p2v_actions) = func.p2v(&Reg::get_all_recolorable_regs());
+    Func::print_func(ObjPtr::new(&func), "before_merge.txt");
+    debug_assert!(func.draw_all_virtual_regs().len() == v_regs.len());
 
-    let per_process = |func: &mut Func,
-                       r1: &Reg,
-                       r2: &Reg,
-                       interef_graph: &mut HashMap<Reg, HashSet<Reg>>,
-                       availables: &mut HashMap<Reg, RegUsedStat>,
-                       constraints: &mut HashMap<Reg, HashSet<Reg>>|
-     -> bool {
-        if !constraints.contains_key(r1) || !constraints.contains_key(r2) {
-            return false;
-        }
-        if interef_graph.get(r1).unwrap().contains(r2) {
-            debug_assert!(interef_graph.get(r2).unwrap().contains(r1));
-            return false;
-        }
-        debug_assert!(r1.get_type() == r2.get_type());
-        debug_assert!(!interef_graph.get(r1).unwrap().contains(r2));
-        debug_assert!(!interef_graph.get(r2).unwrap().contains(r1));
-        Func::print_func(ObjPtr::new(func), "rm_inst.txt");
-        log_file!("final_merge.txt", "try merge:{},{}", r1, r2);
-        debug_assert!(
-            availables.contains_key(r1) && availables.contains_key(r2),
-            "{},{},{},{},{}",
-            {
-                // Func::print_func(ObjPtr::new(func), "rm_inst.txt");
-                let ok = func.remove_self_mv();
-                ok
-            },
-            r1,
-            r2,
-            availables.contains_key(r1),
-            availables.contains_key(r2)
-        );
-        //尝试合并,
-        let old_r1_constraints = constraints.remove(r1).unwrap();
-        let old_r2_constraints = constraints.remove(r2).unwrap();
-        //移除r1和r2的约束,然后从冲突图中移除原本的r1和r2
-        let old_r1_inter = remove_node_from_intereference_graph(interef_graph, r1).unwrap();
-        let old_r2_inter = remove_node_from_intereference_graph(interef_graph, r2).unwrap();
-        let mut merge_inter = old_r1_inter.clone();
-        merge_inter.extend(old_r2_inter.iter());
-        merge_inter.extend(old_r1_constraints.iter());
-        merge_inter.extend(old_r2_constraints.iter());
-        merge_inter.retain(|reg| reg.is_physic());
-        if merge_inter.len() == Reg::get_all_regs().len() {
-            return false;
-        }
-        //最后尝试合并,从表中把r1,r2去掉,然后加入r3
-        let new_v = Reg::init(r1.get_type());
-        let mut new_v_links_to: HashSet<Reg> = old_r1_inter.clone();
-        new_v_links_to.extend(old_r2_inter.iter());
-        new_v_links_to.remove(r1);
-        new_v_links_to.remove(r2);
-        add_node_to_intereference_graph(interef_graph, &new_v, new_v_links_to.clone());
-        let mut new_v_constraint: HashSet<Reg> = old_r1_constraints.clone();
-        new_v_constraint.extend(old_r2_constraints.iter());
-        constraints.insert(new_v, new_v_constraint.clone());
-        //更新available
-        let old_r1_available = availables.remove(r1).unwrap();
-        let old_r2_available = availables.remove(r2).unwrap();
-
-        let mut new_v_available = old_r1_available.clone();
-        new_v_available.merge(&old_r2_available);
-
-        availables.insert(new_v, new_v_available);
-
-        //如果该移动边的两个顶点 其中有一个的邻居都是 小度点,则合并成功
-
-        //尝试着色
-        if let Some(_) = alloc_with_interef_graph_and_availables_and_constraints(
-            interef_graph.clone(),
-            availables.clone(),
-            &constraints,
-        ) {
-            log_file!("final_merge.txt", "merge:{},{}", r1, r2);
-            //把func中所有寄存器通通替换
-            func.replace_v_reg(r1, &new_v);
-            func.replace_v_reg(r2, &new_v);
-            return true;
-        } else {
-            constraints.remove(&new_v);
-            constraints.insert(*r1, old_r1_constraints);
-            constraints.insert(*r2, old_r2_constraints);
-            remove_node_from_intereference_graph(interef_graph, &new_v);
-            add_node_to_intereference_graph(interef_graph, r2, old_r2_inter);
-            add_node_to_intereference_graph(interef_graph, r1, old_r1_inter);
-            availables.insert(*r1, old_r1_available);
-            availables.insert(*r2, old_r2_available);
-            availables.remove(&new_v);
-        }
-        return false;
-    };
-    /*
-    合并物理寄存器和虚拟寄存器
-     */
-    let per_process_between_v_and_p = |func: &mut Func,
-                                       r1: &Reg,
-                                       r2: &Reg,
-                                       interef_graph: &mut HashMap<Reg, HashSet<Reg>>,
-                                       availables: &mut HashMap<Reg, RegUsedStat>,
-                                       constraints: &mut HashMap<Reg, HashSet<Reg>>|
-     -> bool {
-        //合并物理寄存器和虚拟寄存器
-        if r1.is_physic() && r2.is_physic() {
-            return false;
-        }
-        if !(r1.is_physic() || r2.is_physic()) {
-            return false;
-        }
-        //对于物理寄存器和虚拟寄存器的合并
-        let (p_reg, v_reg) = if r1.is_physic() { (r1, r2) } else { (r2, r1) };
-        if !interef_graph.contains_key(v_reg) {
-            return false;
-        }
-        if constraints.contains_key(v_reg) && constraints.get(v_reg).unwrap().contains(p_reg) {
-            return false;
-        }
-        if !availables
-            .get(v_reg)
-            .unwrap()
-            .is_available_reg(p_reg.get_color())
-        {
-            return false;
-        }
-        //记录加unavailable序列
-        let mut add_to_availables: Vec<Reg> = Vec::new();
-        let p_color = p_reg.get_color();
-        //
-        let v_nbs = remove_node_from_intereference_graph(interef_graph, v_reg).unwrap();
-        let v_constraint = constraints.remove(v_reg).unwrap();
-
-        // 加速判断某个虚拟寄存器是否合并为物理寄存器之后仍然能够保证完美分配
-
-        for v_nb in v_nbs.iter() {
-            debug_assert!(!v_nb.is_physic());
-            let available = availables.get_mut(v_nb).unwrap();
-            if available.is_available_reg(p_color) {
-                available.use_reg(p_color);
-                add_to_availables.push(*v_nb);
-            }
-        }
-
-        // 加速判断某个虚拟寄存器是否合并为物理寄存器之后仍然能够保证完美分配
-        // let mut ok = true;
-        // for v_nb in v_nbs.iter() {
-        //     let num_available = availables
-        //         .get(v_nb)
-        //         .unwrap()
-        //         .num_available_regs(v_nb.get_type());
-        //     // 获取活邻居数量
-        //     let nln = interef_graph.get(v_nb).unwrap().len();
-        //     if nln >= num_available {
-        //         ok = false;
-        //         break;
-        //     }
-        // }
-
-        // 进行分配
-        if let Some(_) = alloc_with_interef_graph_and_availables_and_constraints(
-            interef_graph.clone(),
-            availables.clone(),
-            constraints,
-        ) {
-            func.replace_reg(v_reg, p_reg);
-            return true;
-        }
-        for v_nb in add_to_availables {
-            availables.get_mut(&v_nb).unwrap().release_reg(p_color);
-        }
-        add_node_to_intereference_graph(interef_graph, v_reg, v_nbs);
-        constraints.insert(*v_reg, v_constraint);
-        false
-    };
-
-    /*
-    p2v 并记录 去色动作序列
-     */
-    let to_recolors = Reg::get_all_recolorable_regs();
-
-    let (_, p2v_actions) = func.p2v(&to_recolors);
-
-    // println!("{}", p2v_actions.len());
-    Func::print_func(ObjPtr::new(&func), "p2v_for_merge.txt");
-
-    /*
-    准备待合并列表
-    并
-    初始化对新虚拟寄存器的约束
-    并根据约束分析可行性,根据可行性对 待合并列表进行排序
-    */
-    let mergables: Vec<(Reg, Reg)> = analyse_mergable(func);
-    let mut constraints: HashMap<Reg, HashSet<Reg>> =
-        build_constraints(func, regs_used_but_not_saved);
-    let all_virtual_regs: HashSet<Reg> = func.draw_all_virtual_regs();
-    //对所有寄存器建立除了availables以外的约束
-    for v_reg in all_virtual_regs.iter() {
-        if !constraints.contains_key(v_reg) {
-            constraints.insert(v_reg.clone(), HashSet::new());
-        }
-        constraints
-            .get_mut(v_reg)
-            .unwrap()
-            .extend(unavailables.iter());
+    func.calc_live_base();
+    let mut all_neighbors = regalloc::build_interference(func);
+    let mut availables = regalloc::build_availables_with_interef_graph(&all_neighbors);
+    // 建立约束,加入约束
+    let mut constraints = build_constraints(func, regs_used_but_not_saved);
+    for (_, constraint) in constraints.iter_mut() {
+        constraint.extend(unavailables.iter());
     }
-
-    let mut merge_lst: Vec<(Reg, Reg)> = mergables;
-    merge_lst.sort_by_cached_key(|(r1, r2)| {
+    perfect_alloc::add_constraint_to_interference_graph(
+        &mut all_neighbors,
+        &mut availables,
+        &constraints,
+    );
+    let mut live_neighbors = perfect_alloc::build_live_neighbors_from_all_neigbhors(&all_neighbors);
+    debug_assert!(live_neighbors.len() == v_regs.len());
+    // 分析合并机会
+    let mut mergables = analyse_mergable(func);
+    // 按照着色对可着色性的减少程度来排序可着色性
+    mergables.sort_by_cached_key(|(r1, r2)| {
         let mut ct1 = if r1.is_physic() {
             HashSet::new()
         } else {
-            constraints.get(r1).unwrap().clone()
+            live_neighbors.get(r1).unwrap().clone()
         };
-        if r2.is_physic() {
-            ct1.len()
-        } else {
-            ct1.extend(constraints.get(r2).unwrap().iter());
-            ct1.len()
-        }
+        if !r2.is_physic() {
+            debug_assert!(live_neighbors.contains_key(r2), "{}", {
+                Func::print_func(ObjPtr::new(func), "sort_merge.txt");
+                r2
+            });
+            ct1.extend(live_neighbors.get(r2).unwrap());
+        };
+        ct1.len()
     });
-
-    /*
-    建立活寄存器图和可用寄存器表
-     */
-    // func.calc_live_base();
-    let mut interef_graph = regalloc::build_interference(func);
-    //在总图上建立可用表
-    let mut availables = regalloc::build_availables_with_interef_graph(&interef_graph);
-    //把冲突图转化为活图,去掉图中的物理寄存器
-    interef_graph.retain(|reg, _| !reg.is_physic());
-    for (r, inter) in interef_graph.iter_mut() {
-        debug_assert!(availables.contains_key(r));
-        inter.retain(|reg| !reg.is_physic());
-    }
-
     let mut if_merge = false;
-    //统计所有的可着色对,然后按照约束和从小到大的顺序开始着色,如果失败,从表中移出
-    for (r1, r2) in merge_lst.iter() {
-        // println!("{},{}", r1, r2);
-        if r1.is_physic() || r2.is_physic() {
-            // println!("{},{}", r1, r2);
-            let ok = per_process_between_v_and_p(
-                func,
-                r1,
-                r2,
-                &mut interef_graph,
-                &mut availables,
-                &mut constraints,
-            );
-            if_merge |= ok;
+    let mut pre_alloc_stat: Option<FuncAllocStat> = None;
+    for (r1, r2) in mergables.iter() {
+        if r1.get_id() == 10 || r2.get_id() == 10 {
+            continue;
+        }
+        if r1.get_type() == ScalarType::Int {
             continue;
         }
 
-        debug_assert!(!r1.is_physic() && !r2.is_physic());
-        let ok = per_process(
-            func,
-            r1,
-            r2,
-            &mut interef_graph,
-            &mut availables,
-            &mut constraints,
-        );
-        if_merge |= ok;
-        if ok {
-            config::record_merge_reg(&func.label, r1, r2);
+        if !r1.is_physic() && !v_regs.contains(r1) {
+            continue;
+        }
+        if !r2.is_physic() && !v_regs.contains(r2) {
+            continue;
+        }
+        let result = if r1.is_physic() {
+            try_merge_vp(func, r2, r1, &mut live_neighbors, &mut availables)
+        } else if r2.is_physic() {
+            try_merge_vp(func, r1, r2, &mut live_neighbors, &mut availables)
+        } else {
+            try_merge_vv(func, r1, r2, &mut live_neighbors, &mut availables)
+        };
+        if_merge |= result.0;
+
+        if result.0 {
+            if let Some(fas) = result.1 {
+                pre_alloc_stat = Some(fas);
+            } else {
+                pre_alloc_stat = None;
+            }
+            log_file!("merge_actions.txt", "merge {},{}", r1, r2);
+            break;
         }
     }
-    //如果合并成功
+
+    Func::print_func(ObjPtr::new(&func), "after_merge.txt");
+
     if if_merge {
         assert!(func.remove_self_mv());
-        loop {
-            if let Some(alloc_stat) = alloc_with_interef_graph_and_availables_and_constraints(
-                interef_graph.clone(),
-                availables.clone(),
-                &constraints,
-            ) {
+        if let Some(alloc_stat) = pre_alloc_stat {
+            func.v2p(&alloc_stat.dstr);
+        } else {
+            Func::print_func(ObjPtr::new(&func), "merge.txt");
+            loop {
+                let alloc_stat = perfect_alloc::alloc_with_live_neighbors_and_availables(
+                    &mut live_neighbors,
+                    &mut availables,
+                );
+                if alloc_stat.is_none() {
+                    continue;
+                }
+                let alloc_stat = alloc_stat.unwrap();
+                if alloc_stat.spillings.len() != 0 {
+                    continue;
+                }
                 func.v2p(&alloc_stat.dstr);
                 break;
             }
@@ -314,15 +280,22 @@ pub fn merge_reg_with_constraints(
     } else {
         Func::undo_p2v(&p2v_actions);
     }
+    debug_assert!(func.draw_all_virtual_regs().len() == 0);
+
+    func.remove_self_mv();
+    // debug_assert!({
+    //     func.calc_live_base();
+    //     !func.remove_unuse_def()
+    // });
     if_merge
 }
 
-///根据regs used but not saved建立冲突图
+///根据regs used but not saved 以及 live interval建立冲突
+///live interval依赖于外部调用的calc live
 fn build_constraints(
     func: &Func,
     regs_used_but_not_saved: &HashMap<String, HashSet<Reg>>,
 ) -> HashMap<Reg, HashSet<Reg>> {
-    func.calc_live_base();
     let mut constraints = HashMap::new();
     for bb in func.blocks.iter() {
         Func::analyse_inst_with_live_now_backorder(*bb, &mut |inst, live_now| {

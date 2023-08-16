@@ -97,17 +97,15 @@ impl AsmModule {
         // }
         //此后栈空间大小以及 caller saved和callee saved都确定了
 
+        let callers_used = self.build_caller_used();
+        let callees_used = self.build_callee_used();
         if is_opt {
             self.anaylyse_for_handle_call_v4();
         } else {
-            let callers_used = self.build_caller_used();
-            let callees_used = self.build_callee_used();
             self.caller_regs_to_saveds = callers_used.clone();
             self.callee_regs_to_saveds = callees_used.clone();
         }
         config::record_event("finish analyse for handle call");
-        let callers_used = self.build_caller_used();
-        let callees_used = self.build_callee_used();
         let callees_be_saved = &self.callee_regs_to_saveds.clone();
         let used_but_not_saved =
             AsmModule::build_used_but_not_saveds(&callers_used, &callees_used, callees_be_saved);
@@ -132,6 +130,7 @@ impl AsmModule {
         self.update_array_offset(pool);
         config::record_event("finish update_array_offset");
         if true {
+            self.print_asm("before_rm_inst_suf_update_array.txt");
             self.rm_inst_suf_update_array_offset(pool, &used_but_not_saved);
             config::record_event("finish rm suf update array offset");
         }

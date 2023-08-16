@@ -34,8 +34,9 @@ impl Func {
 
 /// p2v  以及 undo p2v
 impl Func {
-    //返回p2v产生的新虚拟寄存器,以及该过程的动作序列
-    // vregs  ,  (inst,p_reg,v_reg,def_or_use)
+    ///返回p2v产生的新虚拟寄存器,以及该过程的动作序列
+    ///内部会调用calc live base
+    /// vregs  ,  (inst,p_reg,v_reg,def_or_use)
     pub fn p2v(
         &mut self,
         regs_to_decolor: &HashSet<Reg>,
