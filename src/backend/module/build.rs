@@ -108,13 +108,13 @@ impl AsmModule {
         let used_but_not_saved =
             AsmModule::build_used_but_not_saveds(&callers_used, &callees_used, callees_be_saved);
         config::record_event("start handle call");
-        // self.print_asm("before_handle_call.log");
+        self.print_asm("before_handle_call.txt");
         if is_opt {
             self.handle_call(pool, &callers_used, &callees_used, callees_be_saved);
         } else {
             self.handle_call_tmp(pool);
         }
-        // self.print_asm("after_handle_call.log");
+        self.print_asm("after_handle_call.txt");
         config::record_event("finish handle call");
 
         if config::get_rest_secs() >= 56 {

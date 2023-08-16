@@ -159,6 +159,10 @@ impl Func {
         callees_be_saved: &HashMap<String, HashSet<Reg>>,
     ) {
         debug_assert!(self.draw_all_virtual_regs().len() == 0);
+
+        self.handle_call_v2(pool, callers_used, callees_used, callees_be_saved);
+        return;
+
         //对于main函数来说,可以任意地使用上下文中当前还存活地寄存器作为中转
         //根据上下文使用中转寄存器来中转caller saved寄存器的使用
         self.calc_live_for_handle_call();

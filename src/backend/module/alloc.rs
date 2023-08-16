@@ -1,6 +1,6 @@
-use std::collections::HashSet;
-use crate::config;
 use crate::backend::{instrs::Func, operand::Reg};
+use crate::config;
+use std::collections::HashSet;
 
 use super::AsmModule;
 
@@ -55,9 +55,9 @@ impl AsmModule {
             func.as_mut().alloc_reg_without(&unavailables);
             if func.reg_alloc_info.spillings.len() == 0 {
                 func.as_mut().v2p(&func.reg_alloc_info.dstr);
+                debug_assert!(func.draw_all_virtual_regs().len() == 0);
                 return;
             }
-
             Func::undo_p2v(&p2v_actions);
             func.as_mut().reg_alloc_info = old_func_alloc_stat;
         });

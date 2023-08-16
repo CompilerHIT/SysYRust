@@ -4,7 +4,9 @@ use biheap::BiHeap;
 
 use crate::backend::{instrs::Func, operand::Reg, regalloc::structs::FuncAllocStat};
 
-use super::{structs::RegUsedStat, *};
+use super::{
+    perfect_alloc::fill_live_neighbors_to_all_neighbors_with_availables, structs::RegUsedStat, *,
+};
 
 // 弦图分配,依赖外部使用的calc live
 pub fn alloc(func: &Func) -> FuncAllocStat {
@@ -42,33 +44,7 @@ pub fn alloc_with_live_neighbors_and_availables(
     let mut intereference_graph: HashMap<Reg, HashSet<Reg>> = live_neighbors;
     let mut availables = availables;
     //还原成完整的图
-    let mut p_nbs: HashMap<Reg, HashSet<Reg>> = HashMap::new();
-    for reg in Reg::get_all_regs() {
-        debug_assert!(!intereference_graph.contains_key(&reg));
-        p_nbs.insert(reg, HashSet::new());
-    }
-    let all_p_regs = Reg::get_all_regs();
-    for (one, nbs) in intereference_graph.iter_mut() {
-        for p_reg in all_p_regs.iter() {
-            if availables
-                .get(one)
-                .unwrap()
-                .is_available_reg(p_reg.get_color())
-            {
-                continue;
-            }
-            nbs.insert(*p_reg);
-            p_nbs.get_mut(p_reg).unwrap().insert(*one);
-        }
-    }
-    for (p, p_nbs) in p_nbs {
-        if !intereference_graph.contains_key(&p) {
-            intereference_graph.insert(p, p_nbs);
-            continue;
-        }
-        intereference_graph.get_mut(&p).unwrap().extend(p_nbs);
-    }
-
+    fill_live_neighbors_to_all_neighbors_with_availables(&mut intereference_graph, &availables);
     let ordered_to_color = build_color_order(&intereference_graph);
     let mut colors: HashMap<i32, i32> = HashMap::new();
     let mut spillings: HashSet<i32> = HashSet::new();

@@ -225,6 +225,61 @@ impl Func {
         }
         available
     }
+    ///建立下次出现表,依赖于上次calc live的结果
+    ///表元素 (index,if_def)表示下次出现 是在def中还是在use中
+    /// 如果 有在同一个下标的指令中同时def和use,
+    /// （index,false)会在(index,true)前面
+    pub fn build_next_occurs(bb: &BB) -> HashMap<Reg, LinkedList<(usize, bool)>> {
+        let mut next_occurs: HashMap<Reg, LinkedList<(usize, bool)>> = HashMap::new();
+        //初始化holder
+        bb.live_in.iter().for_each(|reg| {
+            next_occurs.insert(*reg, LinkedList::new());
+        });
+        // 维护一个物理寄存器的作用区间队列,每次的def和use压入栈中 (先压入use,再压入def)
+        // 每个链表元素为(reg,if_def)
+        for (index, inst) in bb.insts.iter().enumerate() {
+            for reg in inst.get_reg_use() {
+                if !next_occurs.contains_key(&reg) {
+                    next_occurs.insert(reg, LinkedList::new());
+                }
+                next_occurs.get_mut(&reg).unwrap().push_back((index, false));
+            }
+            for reg in inst.get_reg_def() {
+                if !next_occurs.contains_key(&reg) {
+                    next_occurs.insert(reg, LinkedList::new());
+                }
+                next_occurs.get_mut(&reg).unwrap().push_back((index, true));
+            }
+        }
+        bb.live_out.iter().for_each(|reg| {
+            next_occurs
+                .get_mut(reg)
+                .unwrap()
+                .push_back((bb.insts.len(), false));
+        });
+        for (_, b) in next_occurs.iter() {
+            debug_assert!(b.len() >= 1);
+        }
+        next_occurs
+    }
+
+    pub fn refresh_next_occurs(
+        next_occurs: &mut HashMap<Reg, LinkedList<(usize, bool)>>,
+        cur_index: usize,
+    ) {
+        let mut to_free = Vec::new();
+        for (reg, next_occurs) in next_occurs.iter_mut() {
+            while !next_occurs.is_empty() && next_occurs.front().unwrap().0 <= cur_index {
+                next_occurs.pop_front();
+            }
+            if next_occurs.len() == 0 {
+                to_free.push(*reg);
+            }
+        }
+        for reg in to_free {
+            next_occurs.remove(&reg);
+        }
+    }
 }
 
 // #[cfg(predicate)]

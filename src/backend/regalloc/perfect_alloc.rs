@@ -86,10 +86,10 @@ pub fn fill_live_neighbors_to_all_neighbors_with_availables(
     availables: &HashMap<Reg, RegUsedStat>,
 ) {
     let mut p_nbs: HashMap<Reg, HashSet<Reg>> = HashMap::new();
-    for (reg, nbs) in live_neighbors.iter_mut() {
+    for (reg, _) in live_neighbors.iter_mut() {
         let available = availables.get(reg).unwrap();
         for p_reg in Reg::get_all_regs() {
-            if available.is_available_reg(reg.get_color()) {
+            if !available.is_available_reg(p_reg.get_color()) {
                 if !p_nbs.contains_key(&p_reg) {
                     p_nbs.insert(p_reg, HashSet::new());
                 }
@@ -145,6 +145,7 @@ pub fn check_if_full_neighbors(all_neighbors: &HashMap<Reg, HashSet<Reg>>) {
                     return false;
                 }
             }
+            debug_assert!(!nbs.contains(r));
         }
         true
     }());
