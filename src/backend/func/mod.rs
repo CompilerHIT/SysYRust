@@ -33,6 +33,7 @@ use crate::utility::{ObjPtr, ScalarType};
 use crate::{config, log_file};
 pub mod dump;
 pub mod handle_call;
+pub mod handle_call_v2;
 pub mod p2v;
 pub mod schedule;
 pub mod utils;
