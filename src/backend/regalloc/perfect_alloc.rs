@@ -75,6 +75,7 @@ pub fn build_live_neighbors_from_all_neigbhors(
     for (_, lns) in live_neighbors.iter_mut() {
         lns.retain(|reg| !reg.is_physic());
     }
+    check_if_full_neighbors(&live_neighbors);
     live_neighbors
 }
 
@@ -102,6 +103,7 @@ pub fn fill_live_neighbors_to_all_neighbors_with_availables(
         }
     }
     live_neighbors.extend(p_nbs);
+    check_if_full_neighbors(&live_neighbors);
 }
 
 ///根据活邻居图构建全图
@@ -129,20 +131,23 @@ pub fn build_live_neighbors_to_all_neighbors_with_availables(
         }
     }
     live_neighbors.extend(p_nbs);
+    check_if_full_neighbors(&live_neighbors);
     live_neighbors
 }
 
 ///检查是否是完整的图 ,两个节点间有双向边
 #[inline]
 pub fn check_if_full_neighbors(all_neighbors: &HashMap<Reg, HashSet<Reg>>) {
-    debug_assert!({
+    debug_assert!(|| -> bool {
         for (r, nbs) in all_neighbors.iter() {
             for nb in nbs.iter() {
-                assert!(all_neighbors.get(nb).unwrap().contains(r));
+                if !all_neighbors.get(nb).unwrap().contains(r) {
+                    return false;
+                }
             }
         }
         true
-    });
+    }());
 }
 
 ///化简活邻接图,获取最后消去序列
@@ -289,7 +294,7 @@ pub fn alloc_with_live_neighbors_and_availables(
     let base_live_neighbors = live_neighbors.clone();
     let mut last_to_colors = LinkedList::new();
     let mut pre_colors: HashMap<Reg, i32> = HashMap::new();
-    // 如果仍然无法完美优化,试探是否有某种着色不影响邻居可着色性的着色个例进行优化
+    // 迭代化简图,直到化简结束
     loop {
         let tmp_last_tocolors =
             simplify_live_graph_and_build_last_tocolors(live_neighbors, &availables);
