@@ -126,22 +126,8 @@ hitsz_thread_create:
 	sd ra,8(sp)
 	sd s0,0(sp)
 	sd	s1,16(sp)
-	lla a0,tmp_mem
-	sd	ra,0(a0)
-	sd	s0,8(a0)
-	sd 	s1,16(a0)
-	sd 	s2,24(a0)
-	sd	s3,32(a0)
-	sd	s4,40(a0)
-	sd 	s5,48(a0)
-	sd	s6,56(a0)
-	sd	s7,64(a0)
-	sd	s8,72(a0)
-	sd	s9,80(a0)
-	sd	s10,88(a0)
-	sd	s11,96(a0)
+	# 记录当前子线程应该具有的地址,加上对应乘法偏移
 	lla s0,tids
-	lla s1,num_tid
 	# 首先判断当前是否是main线程
 	call pthread_self@plt
 	ld	s1,0(s0)
@@ -154,6 +140,28 @@ LBB_leave_create_thread:
 	addi sp,sp,32
 	jr ra
 LBB_open_thread:
+	# 把内存存储到tmp mem,存储到对应未知的tmp_mem
+	ld s0,0(sp)
+	ld ra,8(sp)
+	ld	s1,16(sp)
+	lla a1,tmp_mem 
+	la a0,num_tid
+	ld a0,0(a0)
+	slliw	a0,a0,7
+	add	a1,a1,a0
+	sd	ra,0(a1)
+	sd	s0,8(a1)
+	sd 	s1,16(a1)
+	sd 	s2,24(a1)
+	sd	s3,32(a1)
+	sd	s4,40(a1)
+	sd 	s5,48(a1)
+	sd	s6,56(a1)
+	sd	s7,64(a1)
+	sd	s8,72(a1)
+	sd	s9,80(a1)
+	sd	s10,88(a1)
+	sd	s11,96(a1)
 	call get_next_pc
 	addi a2,a0,20
 	add	a0,sp,24
@@ -187,7 +195,9 @@ LBB_son_leave:
 	# 首先从对应栈区域恢复之前的ra(之前的ra是调用者ra)
 	# 从该位置恢复调用者ra,并且把数据保存到调用者ra上
 	call hitsz_thread_self
-	la	a1,tmp_mem
+	lla	a1,tmp_mem
+	slliw	a0,a0,7
+	add	a1,a1,a0
 	ld	ra,0(a1)
 	ld	s0,8(a1)
 	ld	s1,16(a1)
@@ -204,15 +214,7 @@ LBB_son_leave:
 	jr	ra
 	.size	hitsz_thread_create, .-hitsz_thread_create
 	
-	
 
-
-
-
-
-
-	
-	
 	.globl	num_tid
 	.globl	tids
 	.bss
