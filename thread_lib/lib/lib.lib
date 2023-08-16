@@ -129,7 +129,17 @@ hitsz_thread_create:
 	lla a0,tmp_mem
 	sd	ra,0(a0)
 	sd	s0,8(a0)
-	sd s1,16(a0)
+	sd 	s1,16(a0)
+	sd 	s2,24(a0)
+	sd	s3,32(a0)
+	sd	s4,40(a0)
+	sd 	s5,48(a0)
+	sd	s6,56(a0)
+	sd	s7,64(a0)
+	sd	s8,72(a0)
+	sd	s9,80(a0)
+	sd	s10,88(a0)
+	sd	s11,96(a0)
 	lla s0,tids
 	lla s1,num_tid
 	# 首先判断当前是否是main线程
@@ -152,7 +162,7 @@ LBB_open_thread:
 	call pthread_create@plt
 	# 恢复该线程应该有的sp,该线程的sp应该存在对应
 	j	LBB_main_leave
-	j	LBB_sun_leave
+	j	LBB_son_leave
 LBB_main_leave:
 	# 创建子线程后主线程的行为
 	lla s0,tids
@@ -172,7 +182,7 @@ LBB_main_leave:
 	mv	a0,zero	#a0返回主线程id
 	addi sp,sp,32
 	jr ra
-LBB_sun_leave:
+LBB_son_leave:
 	# 创建子线程后子线程的行为
 	# 首先从对应栈区域恢复之前的ra(之前的ra是调用者ra)
 	# 从该位置恢复调用者ra,并且把数据保存到调用者ra上
@@ -181,6 +191,16 @@ LBB_sun_leave:
 	ld	ra,0(a1)
 	ld	s0,8(a1)
 	ld	s1,16(a1)
+	ld 	s2,24(a1)
+	ld	s3,32(a1)
+	ld	s4,40(a1)
+	ld 	s5,48(a1)
+	ld	s6,56(a1)
+	ld	s7,64(a1)
+	ld	s8,72(a1)
+	ld	s9,80(a1)
+	ld	s10,88(a1)
+	ld	s11,96(a1)
 	jr	ra
 	.size	hitsz_thread_create, .-hitsz_thread_create
 	
