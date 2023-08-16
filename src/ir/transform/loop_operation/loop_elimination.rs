@@ -1,6 +1,9 @@
 use std::collections::HashSet;
 
-use crate::ir::analysis::scev::{scevexp::SCEVExp, SCEVAnalyzer};
+use crate::ir::{
+    analysis::scev::{scevexp::SCEVExp, SCEVAnalyzer},
+    instruction::InstKind,
+};
 
 use super::{livo::parse_scev_exp, *};
 pub fn loop_elimination(
@@ -29,7 +32,7 @@ pub fn loop_elimination(
 }
 
 fn check_one_exiting(loop_info: ObjPtr<LoopInfo>) -> Option<[ObjPtr<BasicBlock>; 2]> {
-    if loop_info.get_sub_loops().len() == 0 {
+    if loop_info.get_sub_loops().len() != 0 {
         None
     } else {
         let mut exit = loop_info
@@ -153,8 +156,7 @@ fn loop_store_eliminate(
 
     let check_value = |value: ObjPtr<Inst>| -> bool {
         !value.is_global_var()
-            && (value.is_global_var_or_param()
-                || loop_info.is_in_current_loop(&value.get_parent_bb()))
+            && (value.is_param() || !loop_info.is_in_current_loop(&value.get_parent_bb()))
     };
 
     insts.iter_mut().for_each(|store| {
@@ -174,18 +176,21 @@ fn loop_store_eliminate(
                     && iv.get_operands()[1].get_scev_const() == 1
                 {
                     let start = if iv.get_operands()[0].is_scev_constant() {
-                        pools
+                        let constx = pools
                             .1
-                            .make_int_const(iv.get_operands()[0].get_scev_const())
+                            .make_int_const(iv.get_operands()[0].get_scev_const());
+                        tail.insert_before(constx);
+                        constx
                     } else {
                         iv.get_operands()[0].get_bond_inst()
                     };
                     let new_gep_start = pools.1.make_gep(array, start);
                     let const_4 = pools.1.make_int_const(4);
                     let round_4 = pools.1.make_mul(round, const_4);
-                    let memset = pools
-                        .1
-                        .make_void_call("memset".to_string(), vec![new_gep_start, value, round_4]);
+                    let memset = pools.1.make_void_call(
+                        "hitsz_memset".to_string(),
+                        vec![new_gep_start, value, round_4],
+                    );
                     tail.insert_before(new_gep_start);
                     tail.insert_before(const_4);
                     tail.insert_before(round_4);
@@ -212,10 +217,9 @@ fn loop_eliminate(loop_info: ObjPtr<LoopInfo>, exit: [ObjPtr<BasicBlock>; 2]) ->
     if insts.iter().all(|x| {
         x.is_br()
             || !x.is_store()
-                && x.get_use_list().iter().all(|user| {
-                    user.is_global_var_or_param()
-                        || loop_info.is_in_current_loop(&user.get_parent_bb())
-                })
+                && x.get_use_list()
+                    .iter()
+                    .all(|user| loop_info.is_in_current_loop(&user.get_parent_bb()))
     }) {
         insts.iter_mut().for_each(|x| x.remove_self());
         let mut preheader = loop_info.get_preheader();
@@ -247,14 +251,18 @@ fn loop_dead_code_eliminate(loop_info: ObjPtr<LoopInfo>) {
             let mut flag = true;
             while let Some(current_inst) = queue.pop() {
                 current.insert(current_inst);
-                if inst.get_use_list().iter().all(|user| {
-                    user.is_global_var_or_param()
-                        || loop_info.is_in_current_loop(&user.get_parent_bb())
-                }) && !inst.is_br()
-                    && !inst.is_store()
+                if !current_inst.is_store()
+                    && !current_inst.is_br()
+                    && current_inst.get_use_list().iter().all(|user| {
+                        (user.is_global_var_or_param()
+                            || loop_info.is_in_current_loop(&user.get_parent_bb()))
+                            && !user.is_br()
+                            && !user.is_store()
+                    })
                 {
                     queue.extend(
-                        inst.get_use_list()
+                        current_inst
+                            .get_use_list()
                             .iter()
                             .filter(|user| !current.contains(user)),
                     );
@@ -287,43 +295,57 @@ fn parse_round(
     };
 
     let parse_answer = |start: ObjPtr<SCEVExp>,
-                        step: ObjPtr<SCEVExp>,
                         end: ObjPtr<SCEVExp>,
+                        can_be_equal: bool,
                         pools: &mut (&mut ObjPool<BasicBlock>, &mut ObjPool<Inst>)|
      -> ObjPtr<Inst> {
-        let tail = loop_info.get_preheader().get_tail_inst();
+        let mut tail = loop_info.get_preheader().get_tail_inst();
         let start = parse_one_inst(start, tail, pools);
-        let step = parse_one_inst(step, tail, pools);
         let end = parse_one_inst(end, tail, pools);
 
-        let minus = pools.1.make_sub(end, start);
-        let div = pools.1.make_div(minus, step);
-        div
+        let mut minus = pools.1.make_sub(end, start);
+        tail.insert_before(minus);
+        if can_be_equal {
+            let const_1 = pools.1.make_int_const(1);
+            minus = pools.1.make_add(minus, const_1);
+            tail.insert_before(const_1);
+            tail.insert_before(minus);
+        }
+        minus
+    };
+
+    let check_eq = |op: InstKind| match op {
+        InstKind::Binary(crate::ir::instruction::BinOp::Le)
+        | InstKind::Binary(crate::ir::instruction::BinOp::Ge)
+        | InstKind::Binary(crate::ir::instruction::BinOp::Eq) => true,
+        _ => false,
     };
 
     match (check_current_iv(&lhs), check_current_iv(&rhs)) {
         (true, false) => {
-            if rhs.get_in_loop().unwrap() == loop_info {
+            if rhs.get_in_loop() == Some(loop_info) {
                 None
             } else {
-                Some(parse_answer(
-                    lhs.get_operands()[0],
-                    lhs.get_operands()[1],
-                    rhs,
-                    pools,
-                ))
+                let start = lhs.get_operands()[0];
+                let step = lhs.get_operands()[1];
+                if step.is_scev_constant() && step.get_scev_const() == 1 {
+                    Some(parse_answer(start, rhs, check_eq(cond.get_kind()), pools))
+                } else {
+                    None
+                }
             }
         }
         (false, true) => {
-            if lhs.get_in_loop().unwrap() == loop_info {
+            if lhs.get_in_loop() == Some(loop_info) {
                 None
             } else {
-                Some(parse_answer(
-                    rhs.get_operands()[0],
-                    rhs.get_operands()[1],
-                    lhs,
-                    pools,
-                ))
+                let start = rhs.get_operands()[0];
+                let step = rhs.get_operands()[1];
+                if step.is_scev_constant() && step.get_scev_const() == 1 {
+                    Some(parse_answer(start, lhs, check_eq(cond.get_kind()), pools))
+                } else {
+                    None
+                }
             }
         }
         _ => None,
