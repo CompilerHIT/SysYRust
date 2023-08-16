@@ -4,7 +4,10 @@ use crate::{
     backend::{
         instrs::{Func, InstrsType, SingleOp},
         operand::Reg,
-        regalloc::{perfect_alloc::alloc_with_interef_graph_and_constraints, structs::RegUsedStat},
+        regalloc::{
+            perfect_alloc::alloc_with_interef_graph_and_availables_and_constraints,
+            structs::RegUsedStat,
+        },
     },
     config, log_file,
     utility::ObjPtr,
@@ -98,7 +101,7 @@ pub fn merge_reg_with_constraints(
         //如果该移动边的两个顶点 其中有一个的邻居都是 小度点,则合并成功
 
         //尝试着色
-        if let Some(_) = alloc_with_interef_graph_and_constraints(
+        if let Some(_) = alloc_with_interef_graph_and_availables_and_constraints(
             interef_graph.clone(),
             availables.clone(),
             &constraints,
@@ -159,6 +162,9 @@ pub fn merge_reg_with_constraints(
         //
         let v_nbs = remove_node_from_intereference_graph(interef_graph, v_reg).unwrap();
         let v_constraint = constraints.remove(v_reg).unwrap();
+
+        // 加速判断某个虚拟寄存器是否合并为物理寄存器之后仍然能够保证完美分配
+
         for v_nb in v_nbs.iter() {
             debug_assert!(!v_nb.is_physic());
             let available = availables.get_mut(v_nb).unwrap();
@@ -167,8 +173,24 @@ pub fn merge_reg_with_constraints(
                 add_to_availables.push(*v_nb);
             }
         }
+
+        // 加速判断某个虚拟寄存器是否合并为物理寄存器之后仍然能够保证完美分配
+        // let mut ok = true;
+        // for v_nb in v_nbs.iter() {
+        //     let num_available = availables
+        //         .get(v_nb)
+        //         .unwrap()
+        //         .num_available_regs(v_nb.get_type());
+        //     // 获取活邻居数量
+        //     let nln = interef_graph.get(v_nb).unwrap().len();
+        //     if nln >= num_available {
+        //         ok = false;
+        //         break;
+        //     }
+        // }
+
         // 进行分配
-        if let Some(_) = alloc_with_interef_graph_and_constraints(
+        if let Some(_) = alloc_with_interef_graph_and_availables_and_constraints(
             interef_graph.clone(),
             availables.clone(),
             constraints,
@@ -280,7 +302,7 @@ pub fn merge_reg_with_constraints(
     if if_merge {
         assert!(func.remove_self_mv());
         loop {
-            if let Some(alloc_stat) = alloc_with_interef_graph_and_constraints(
+            if let Some(alloc_stat) = alloc_with_interef_graph_and_availables_and_constraints(
                 interef_graph.clone(),
                 availables.clone(),
                 &constraints,

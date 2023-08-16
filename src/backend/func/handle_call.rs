@@ -179,7 +179,6 @@ impl Func {
         for reg in Reg::get_all_specials_with_s0() {
             available_tmp_regs.use_reg(reg.get_color());
         }
-
         //覆盖原本使之不可变
         let available_tmp_regs = available_tmp_regs;
         //定义中转者

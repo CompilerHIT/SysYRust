@@ -25,8 +25,8 @@ impl AsmModule {
             config::record_event("finish block_pass_pre_clear");
             // 窥孔等特殊指令删除操作
             config::record_event("start fuse_tmp_phi_regs");
-            // BackendPass::new(obj_module).particular_opt();
-            self.print_asm("after_fuse_tmp_regs.log");
+            BackendPass::new(obj_module).particular_opt();
+            // self.print_asm("after_fuse_tmp_regs.log");
             config::record_event("finish fuse_tmp_phi_regs");
         }
 

@@ -40,7 +40,7 @@ pub fn optimizer_run(
         partial_redundancy_elimination::pre(module, optimize_flag, &mut pools);
 
         // 循环优化
-        loop_operation::loop_optimize(module, 1000, &mut pools, true);
+        loop_operation::loop_optimize(module, 100, &mut pools, true);
         simplify_cfg::simplify_cfg_run(module, &mut pools);
         functional_optimizer(module, &mut pools, optimize_flag);
 
@@ -62,7 +62,8 @@ pub fn optimizer_run(
         partial_redundancy_elimination::pre(module, optimize_flag, &mut pools);
 
         // 循环优化
-        loop_operation::loop_optimize(module, std::usize::MAX, &mut pools, false);
+        loop_operation::loop_optimize(module, 1000, &mut pools, false);
+        functional_optimizer(module, &mut pools, optimize_flag);
     }
 }
 

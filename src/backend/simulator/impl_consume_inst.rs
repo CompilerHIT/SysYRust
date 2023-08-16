@@ -210,6 +210,13 @@ impl ProgramStat {
                             }
                         }
                     }
+                    CmpOp::Nez => {
+                        if let Value::IImm(val) = lhs {
+                            if val != &0 {
+                                if_jump = true
+                            }
+                        }
+                    }
                     _ => {
                         let rhs = inst.get_rhs().drop_reg();
                         let rhs = self.reg_val.get(&rhs);
@@ -245,16 +252,7 @@ impl ProgramStat {
                                         if_jump = true
                                     }
                                 }
-                                CmpOp::Nez => {
-                                    if lhs != rhs {
-                                        if_jump = true
-                                    }
-                                }
-                                CmpOp::Eqz => {
-                                    if lhs == rhs {
-                                        if_jump = true
-                                    }
-                                }
+                                _ => unreachable!(),
                             }
                         }
                     }
