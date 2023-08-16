@@ -55,7 +55,7 @@ pub fn check_mul_inst(
                 if operands1[0] == inst2 {
                     match operands1[1].get_kind() {
                         InstKind::ConstInt(i) => {
-                            let inst_const = pool.make_int_const(i + 1);
+                            let inst_const = pool.make_int_const((i as i64 + 1) as i32);
                             inst_old.as_mut().insert_before(inst_const);
                             let inst_new = pool.make_mul(inst2, inst_const);
                             inst_old.as_mut().insert_before(inst_new);
@@ -67,7 +67,7 @@ pub fn check_mul_inst(
                 } else if operands1[1] == inst2 {
                     match operands1[0].get_kind() {
                         InstKind::ConstInt(i) => {
-                            let inst_const = pool.make_int_const(i + 1);
+                            let inst_const = pool.make_int_const((i as i64+ 1) as i32);
                             inst_old.as_mut().insert_before(inst_const);
                             let inst_new = pool.make_mul(inst2, inst_const);
                             inst_old.as_mut().insert_before(inst_new);
@@ -218,7 +218,7 @@ pub fn fold_two_mixed_binst(
                     BinOp::Add => {
                         if iflag {
                             let inst_result =
-                                pool.make_int_const(const1.get_int_bond() + const2.get_int_bond());
+                                pool.make_int_const((const1.get_int_bond() as i64 + const2.get_int_bond() as i64) as i32);
                             let inst_new = pool.make_add(inst_result, inst_unknown);
                             replace_inst_with_new(inst, inst_new);
                             inst_new.as_mut().insert_before(inst_result);
@@ -229,13 +229,13 @@ pub fn fold_two_mixed_binst(
                         if iflag {
                             if num_unknown == 0 {
                                 let inst_result = pool
-                                    .make_int_const(const1.get_int_bond() - const2.get_int_bond());
+                                    .make_int_const((const1.get_int_bond() as i64 - const2.get_int_bond() as i64) as i32);
                                 let inst_new = pool.make_add(inst_result, inst_unknown);
                                 replace_inst_with_new(inst, inst_new);
                                 inst_new.as_mut().insert_before(inst_result);
                             } else {
                                 let inst_result = pool
-                                    .make_int_const(const1.get_int_bond() + const2.get_int_bond());
+                                    .make_int_const((const1.get_int_bond() as i64 + const2.get_int_bond() as i64) as i32);
                                 let inst_new = pool.make_sub(inst_result, inst_unknown);
                                 replace_inst_with_new(inst, inst_new);
                                 inst_new.as_mut().insert_before(inst_result);
@@ -257,25 +257,25 @@ pub fn fold_two_mixed_binst(
                         if iflag {
                             if num_unknown == 1 && num_operand == 1 {
                                 let inst_result = pool
-                                    .make_int_const(const1.get_int_bond() - const2.get_int_bond());
+                                    .make_int_const((const1.get_int_bond() as i64 - const2.get_int_bond() as i64) as i32);
                                 let inst_new = pool.make_add(inst_result, inst_unknown);
                                 replace_inst_with_new(inst, inst_new);
                                 inst_new.as_mut().insert_before(inst_result);
                             } else if num_unknown == 1 && num_operand == 0 {
                                 let inst_result = pool
-                                    .make_int_const(-const1.get_int_bond() + const2.get_int_bond());
+                                    .make_int_const((-const1.get_int_bond() as i64 + const2.get_int_bond() as i64) as i32);
                                 let inst_new = pool.make_sub(inst_result, inst_unknown);
                                 replace_inst_with_new(inst, inst_new);
                                 inst_new.as_mut().insert_before(inst_result);
                             } else if num_unknown == 0 && num_operand == 0 {
                                 let inst_result = pool
-                                    .make_int_const(const1.get_int_bond() + const2.get_int_bond());
+                                    .make_int_const((const1.get_int_bond() as i64 + const2.get_int_bond() as i64) as i32);
                                 let inst_new = pool.make_sub(inst_unknown, inst_result);
                                 replace_inst_with_new(inst, inst_new);
                                 inst_new.as_mut().insert_before(inst_result);
                             } else if num_unknown == 0 && num_operand == 1 {
                                 let inst_result = pool
-                                    .make_int_const(const1.get_int_bond() + const2.get_int_bond());
+                                    .make_int_const((const1.get_int_bond() as i64 + const2.get_int_bond() as i64) as i32);
                                 let inst_new = pool.make_sub(inst_result, inst_unknown);
                                 replace_inst_with_new(inst, inst_new);
                             }
@@ -286,13 +286,13 @@ pub fn fold_two_mixed_binst(
                         if iflag {
                             if num_operand == 0 {
                                 let inst_result = pool
-                                    .make_int_const(const2.get_int_bond() - const1.get_int_bond());
+                                    .make_int_const((const2.get_int_bond() as i64 - const1.get_int_bond() as i64) as i32);
                                 let inst_new = pool.make_add(inst_result, inst_unknown);
                                 replace_inst_with_new(inst, inst_new);
                                 inst_new.as_mut().insert_before(inst_result);
                             } else {
                                 let inst_result = pool
-                                    .make_int_const(const1.get_int_bond() - const2.get_int_bond());
+                                    .make_int_const((const1.get_int_bond() as i64 - const2.get_int_bond() as i64) as i32);
                                 let inst_new = pool.make_sub(inst_result, inst_unknown);
                                 replace_inst_with_new(inst, inst_new);
                                 inst_new.as_mut().insert_before(inst_result);
@@ -313,7 +313,7 @@ pub fn fold_two_mixed_binst(
                     BinOp::Mul => {
                         if iflag {
                             let inst_result =
-                                pool.make_int_const(const1.get_int_bond() * const2.get_int_bond());
+                                pool.make_int_const((const1.get_int_bond() as i64 * const2.get_int_bond() as i64) as i32);
                             let inst_new = pool.make_mul(inst_result, inst_unknown);
                             replace_inst_with_new(inst, inst_new);
                             inst_new.as_mut().insert_before(inst_result);
@@ -433,31 +433,31 @@ pub fn fold_inst(inst_old: ObjPtr<Inst>, pool: &mut ObjPool<Inst>) -> bool {
                                 BinOp::Add => {
                                     replace_inst_with_new(
                                         inst_old,
-                                        pool.make_int_const(val_left + val_right),
+                                        pool.make_int_const((val_left as i64 + val_right as i64) as i32),
                                     );
                                 }
                                 BinOp::Sub => {
                                     replace_inst_with_new(
                                         inst_old,
-                                        pool.make_int_const(val_left - val_right),
+                                        pool.make_int_const((val_left as i64 - val_right as i64) as i32),
                                     );
                                 }
                                 BinOp::Mul => {
                                     replace_inst_with_new(
                                         inst_old,
-                                        pool.make_int_const(val_left * val_right),
+                                        pool.make_int_const((val_left as i64 * val_right as i64) as i32),
                                     );
                                 }
                                 BinOp::Div => {
                                     replace_inst_with_new(
                                         inst_old,
-                                        pool.make_int_const(val_left / val_right),
+                                        pool.make_int_const((val_left as i64 / val_right as i64) as i32),
                                     );
                                 }
                                 BinOp::Rem => {
                                     replace_inst_with_new(
                                         inst_old,
-                                        pool.make_int_const(val_left % val_right),
+                                        pool.make_int_const((val_left as i64 % val_right as i64) as i32),
                                     );
                                 }
                                 BinOp::Eq => {
