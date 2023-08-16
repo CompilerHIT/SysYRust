@@ -1136,9 +1136,9 @@ impl BB {
                     }
                     let mut label = func_label.to_string();
                     if label == "hitsz_memset" {
-                        label = String::from("memset");
+                        label = String::from("memset@plt");
                     } else if label == "hitsz_memcopy" {
-                        label = String::from("memcpy");
+                        label = String::from("memcpy@plt");
                     }
                     let mut lir_inst = LIRInst::new(InstrsType::Call, vec![Operand::Addr(label)]);
                     lir_inst.set_param_cnts(int_param_cnt, float_param_cnt);
