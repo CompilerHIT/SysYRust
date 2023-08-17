@@ -95,7 +95,7 @@ pub fn generate_asm(
     if is_opt {
         //最后进行一次寄存器分配与合并
         config::record_event("start merge reg");
-        // module.final_realloc(&mut pool);
+        module.final_realloc(&mut pool);
         config::record_event("finish merge reg");
     }
     // 检查b型指令溢出，用j型指令替换

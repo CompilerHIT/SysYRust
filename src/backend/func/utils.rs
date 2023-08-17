@@ -225,9 +225,10 @@ impl Func {
         }
         available
     }
-    ///建立下次出现表,依赖于上次calc live的结果
-    ///表元素 (index,if_def)表示下次出现 是在def中还是在use中
-    /// 如果 有在同一个下标的指令中同时def和use,
+
+    ///建立下次出现表,依赖于上次calc live的结果<br>
+    ///表元素 (index,if_def)表示下次出现 是在def中还是在use中<br>
+    /// 如果 有在同一个下标的指令中同时def和use,<br>
     /// （index,false)会在(index,true)前面
     pub fn build_next_occurs(bb: &BB) -> HashMap<Reg, LinkedList<(usize, bool)>> {
         let mut next_occurs: HashMap<Reg, LinkedList<(usize, bool)>> = HashMap::new();
