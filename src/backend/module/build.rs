@@ -51,9 +51,10 @@ impl AsmModule {
 
             config::record_event("finish first alloc");
 
+            config::record_event("start scheduling");
             // 代码调度，列表调度法
             self.list_scheduling_tech();
-
+            config::record_event("finish scheduling");
             // // 为临时寄存器分配寄存器
             self.clear_tmp_var();
 
@@ -62,12 +63,17 @@ impl AsmModule {
             config::record_event("finish schedule");
         } else {
             self.alloc_without_tmp_and_s0();
-            self.map_v_to_p();
+            for (_, func) in self.name_func.iter() {
+                if !func.is_extern {
+                    func.as_mut().v2p(&func.reg_alloc_info.dstr);
+                }
+            }
+            // self.map_v_to_p();
         }
+        config::record_event("finish first alloc");
         self.remove_unuse_inst_suf_alloc();
         config::record_event("finish rm inst suf first alloc");
         // self.print_asm("after_scehdule.log");
-
         config::record_event("start handle spill");
         // self.print_asm("before_spill.log");
         if is_opt {
