@@ -354,6 +354,10 @@ pub fn has_val(
                         return false;
                     }
                 }
+                let congruence = congruence_class.get_congruence_mut(inst).unwrap();
+                let index = congruence.vec_class.len();
+                congruence.vec_class.push(vec![inst]); //加入新的congruent class
+                congruence.map.insert(inst, index); //增加索引映射
             }
             return false;
         }
