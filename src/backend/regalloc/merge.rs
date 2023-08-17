@@ -38,17 +38,17 @@ pub fn try_merge_vv(
     new_v_available.merge(availables.get(v_reg2).unwrap());
     let new_v_reg = Reg::init(v_reg1.get_type());
     //判断是否合并直接可以进行
-    // if new_v_available.num_available_regs(v_reg1.get_type()) > v_nbs.len() {
-    //     remove_node_from_intereference_graph(live_neigbhors, v_reg1);
-    //     remove_node_from_intereference_graph(live_neigbhors, v_reg2);
-    //     add_node_to_intereference_graph(live_neigbhors, &new_v_reg, v_nbs);
-    //     availables.insert(new_v_reg, new_v_available);
-    //     availables.remove(v_reg1);
-    //     availables.remove(v_reg2);
-    //     func.replace_reg(v_reg1, &new_v_reg);
-    //     func.replace_reg(v_reg2, &new_v_reg);
-    //     return (true, None);
-    // }
+    if new_v_available.num_available_regs(v_reg1.get_type()) > v_nbs.len() {
+        remove_node_from_intereference_graph(live_neigbhors, v_reg1);
+        remove_node_from_intereference_graph(live_neigbhors, v_reg2);
+        add_node_to_intereference_graph(live_neigbhors, &new_v_reg, v_nbs);
+        availables.insert(new_v_reg, new_v_available);
+        availables.remove(v_reg1);
+        availables.remove(v_reg2);
+        func.replace_reg(v_reg1, &new_v_reg);
+        func.replace_reg(v_reg2, &new_v_reg);
+        return (true, None);
+    }
     //使用新寄存器尝试进行
     let mut new_live_neigbhors = live_neigbhors.clone();
     let mut new_availables = availables.clone();
@@ -97,40 +97,31 @@ pub fn try_merge_vp(
         return (false, None);
     }
     // 首先快速判断是否能够直接着色
-    let mut available = *availables.get(v_reg).unwrap();
-    available.use_reg(p_reg.get_color());
-    let nln = live_neigbhors.get(v_reg).unwrap().len();
-    // if available.num_available_regs(v_reg.get_type()) > nln {
-    //     func.replace_reg(v_reg, p_reg);
-    //     let nbs = remove_node_from_intereference_graph(live_neigbhors, v_reg);
-    //     debug_assert!(!live_neigbhors.contains_key(v_reg));
-    //     for nb in nbs.unwrap() {
-    //         availables.get_mut(&nb).unwrap().use_reg(p_reg.get_color());
-    //     }
-    //     availables.remove(v_reg);
-    //     return (true, None);
-    // }
+
     // // 或者如果该寄存器直接地变成该物理寄存器不会影响图的可着色性
-    let mut if_effect = false;
+    let mut if_ok = false;
     for nb in live_neigbhors.get(v_reg).unwrap() {
         let mut av = *availables.get(nb).unwrap();
+        if !av.is_available_reg(p_reg.get_color()) {
+            continue;
+        }
         av.use_reg(p_reg.get_color());
         let na = av.num_available_regs(nb.get_type());
         let nln = live_neigbhors.get(nb).unwrap().len() - 1;
         if na <= nln {
-            if_effect = true;
+            if_ok = true;
             break;
         }
     }
-    // if !if_effect {
-    //     func.replace_reg(v_reg, p_reg);
-    //     let nbs = remove_node_from_intereference_graph(live_neigbhors, v_reg);
-    //     for nb in nbs.unwrap() {
-    //         availables.get_mut(&nb).unwrap().use_reg(p_reg.get_color());
-    //     }
-    //     availables.remove(v_reg);
-    //     return (true, None);
-    // }
+    if !if_ok {
+        func.replace_reg(v_reg, p_reg);
+        let nbs = remove_node_from_intereference_graph(live_neigbhors, v_reg);
+        for nb in nbs.unwrap() {
+            availables.get_mut(&nb).unwrap().use_reg(p_reg.get_color());
+        }
+        availables.remove(v_reg);
+        return (true, None);
+    }
 
     //最后是常规寄存器合并尝试
     let mut new_live_neigbhors = live_neigbhors.clone();
