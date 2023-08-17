@@ -355,6 +355,7 @@ pub fn has_val(
                     }
                 }
             }
+            return false;
         }
         _ => {
             let congruence = congruence_class.get_congruence_immut(inst).unwrap();
