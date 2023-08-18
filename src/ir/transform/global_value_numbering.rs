@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::{collections::{HashMap, HashSet, hash_map::DefaultHasher, btree_map::Entry}, hash::{Hash, Hasher}};
 
 use crate::{
     ir::{
@@ -60,28 +60,47 @@ impl CongruenceClass {
 
 
     pub fn hashcode(&mut self,inst:ObjPtr<Inst>)->i32{
-        if inst.is_int_const(){
-            self.inst_map.insert(inst, inst.get_int_bond());
-            return inst.get_int_bond();
-        }else if inst.is_float_const(){
-            let bond = inst.get_float_bond() as i32;
-            self.inst_map.insert(inst, bond);
-            return inst.get_int_bond();
+        if let Some(hashcode) = self.inst_map.get(&inst){
+            println!("you:{:?}",hashcode);
+            return *hashcode;
         }
 
-
-
-        let mut op_hash_vec = vec![];
-        for op in inst.get_operands(){
-            op_hash_vec.push(self.inst_map.get(op).unwrap());
+        match inst.get_kind() {
+            InstKind::Alloca(i) | InstKind::ConstInt(i) |InstKind::GlobalConstInt(i)|InstKind::GlobalInt(i)=>{
+                self.inst_map.insert(inst, i);
+                i
+            }
+            InstKind::Call(funcname) =>{
+                let mut hasher = DefaultHasher::new();
+                funcname.hash(&mut hasher);
+                let hashcode = hasher.finish() as i32;
+                self.inst_map.insert(inst, hashcode);
+                hashcode
+            }
+            InstKind::ConstFloat(f) | InstKind::GlobalConstFloat(f) | InstKind::GlobalFloat(f) =>{
+                self.inst_map.insert(inst, f as i32);
+                f as i32
+            }
+            InstKind::Parameter =>{
+                self.inst_map.insert(inst, 1129);
+                1129
+            }
+            _=>{
+                println!("hash");
+                let mut op_hash_vec = vec![];
+                for op in inst.get_operands(){
+                    println!("op hash");
+                    op_hash_vec.push(self.hashcode(*op));
+                }
+                let mut hashcode = 0;
+                for op in op_hash_vec{
+                    hashcode += op as i64;
+                }
+                let hashcode = hashcode as i32;
+                self.inst_map.insert(inst, hashcode);
+                hashcode
+            }
         }
-        let mut hashcode = 0;
-        for op in op_hash_vec{
-            hashcode += *op as i64;
-        }
-        let hashcode = hashcode as i32;
-        self.inst_map.insert(inst, hashcode);
-        hashcode
     }
 
     pub fn get_all_congruence_mut(&mut self) -> Vec<&mut Congruence> {
@@ -106,33 +125,58 @@ impl CongruenceClass {
         vec
     }
 
-    pub fn get_congruence_immut(&self, inst: ObjPtr<Inst>,inst_map:&HashMap<ObjPtr<Inst>,i32>) -> Option<&Congruence> {
-        let hashcode = inst_map.get(&inst).unwrap();
+    pub fn add_congruence(&mut self,inst: ObjPtr<Inst>){
+        let hashcode = self.hashcode(inst);
         match inst.get_kind() {
-            InstKind::Gep => Some(&self.gep_congruence_map.get(&hashcode).unwrap()),
+            InstKind::Gep => {self.gep_congruence_map.insert(hashcode, Congruence::new());},
             InstKind::Binary(binop) => match binop {
-                BinOp::Eq | BinOp::Ge | BinOp::Gt | BinOp::Le | BinOp::Lt => {
-                    Some(&self.cmp_congruence_map.get(&hashcode).unwrap())
-                }
-                BinOp::Add => Some(&self.add_congruence_map.get(&hashcode).unwrap()),
-                BinOp::Sub => Some(&self.sub_congruence_map.get(&hashcode).unwrap()),
-                BinOp::Mul => Some(&self.mul_congruence_map.get(&hashcode).unwrap()),
-                BinOp::Div => Some(&self.div_congruence_map.get(&hashcode).unwrap()),
-                BinOp::Rem => Some(&self.rem_congruence_map.get(&hashcode).unwrap()),
-                BinOp::Ne => Some(&self.ne_congruence_map.get(&hashcode).unwrap()),
+                BinOp::Eq | BinOp::Ge | BinOp::Gt | BinOp::Le | BinOp::Lt => {self.cmp_congruence_map.insert(hashcode, Congruence::new());},
+                BinOp::Add => {self.add_congruence_map.insert(hashcode, Congruence::new());},
+                BinOp::Sub => {self.sub_congruence_map.insert(hashcode, Congruence::new());},
+                BinOp::Mul => {self.mul_congruence_map.insert(hashcode, Congruence::new());},
+                BinOp::Div => {self.div_congruence_map.insert(hashcode, Congruence::new());},
+                BinOp::Rem => {self.rem_congruence_map.insert(hashcode, Congruence::new());},
+                BinOp::Ne => {self.ne_congruence_map.insert(hashcode, Congruence::new());},
             },
             InstKind::Unary(unop) => match unop {
-                UnOp::Pos => Some(&self.pos_congruence_map.get(&hashcode).unwrap()),
-                UnOp::Neg => Some(&self.neg_congruence_map.get(&hashcode).unwrap()),
-                UnOp::Not => Some(&self.not_congruence_map.get(&hashcode).unwrap()),
+                UnOp::Pos => {self.pos_congruence_map.insert(hashcode, Congruence::new());},
+                UnOp::Neg => {self.neg_congruence_map.insert(hashcode, Congruence::new());},
+                UnOp::Not => {self.not_congruence_map.insert(hashcode, Congruence::new());},
             },
-            InstKind::ConstInt(_) => Some(&self.int_congruence_map.get(&hashcode).unwrap()),
-            InstKind::ConstFloat(_) => Some(&self.float_congruence_map.get(&hashcode).unwrap()),
-            InstKind::FtoI => Some(&self.ftoi_congruence_map.get(&hashcode).unwrap()),
-            InstKind::ItoF => Some(&self.itof_congruence_map.get(&hashcode).unwrap()),
-            InstKind::Call(_) => Some(&self.call_congruence_map.get(&hashcode).unwrap()),
+            InstKind::ConstInt(_) => {self.int_congruence_map.insert(hashcode, Congruence::new());},
+            InstKind::ConstFloat(_) => {self.float_congruence_map.insert(hashcode, Congruence::new());},
+            InstKind::FtoI => {self.ftoi_congruence_map.insert(hashcode, Congruence::new());},
+            InstKind::ItoF => {self.itof_congruence_map.insert(hashcode, Congruence::new());},
+            InstKind::Call(_) => {self.call_congruence_map.insert(hashcode, Congruence::new());},
+            _ => {}
+        }
+    }
+
+    pub fn get_congruence_immut(&self, inst: ObjPtr<Inst>,inst_map:&HashMap<ObjPtr<Inst>,i32>) -> Option<&Congruence> {
+        let hashcode = inst_map.get(&inst).unwrap();
+        // let hashcode = &self.hashcode(inst);
+        match inst.get_kind() {
+            InstKind::Gep => self.gep_congruence_map.get(hashcode),
+            InstKind::Binary(binop) => match binop {
+                BinOp::Eq | BinOp::Ge | BinOp::Gt | BinOp::Le | BinOp::Lt => self.cmp_congruence_map.get(&hashcode),
+                BinOp::Add => self.add_congruence_map.get(&hashcode),
+                BinOp::Sub => self.sub_congruence_map.get(&hashcode),
+                BinOp::Mul => self.mul_congruence_map.get(&hashcode),
+                BinOp::Div => self.div_congruence_map.get(&hashcode),
+                BinOp::Rem => self.rem_congruence_map.get(&hashcode),
+                BinOp::Ne => self.ne_congruence_map.get(&hashcode),
+            },
+            InstKind::Unary(unop) => match unop {
+                UnOp::Pos => self.pos_congruence_map.get(&hashcode),
+                UnOp::Neg => self.neg_congruence_map.get(&hashcode),
+                UnOp::Not => self.not_congruence_map.get(&hashcode),
+            },
+            InstKind::ConstInt(_) => self.int_congruence_map.get(&hashcode),
+            InstKind::ConstFloat(_) => self.float_congruence_map.get(&hashcode),
+            InstKind::FtoI => self.ftoi_congruence_map.get(&hashcode),
+            InstKind::ItoF => self.itof_congruence_map.get(&hashcode),
+            InstKind::Call(_) => self.call_congruence_map.get(&hashcode),
             _ => {
-                // println!("kind:{:?}", inst.get_kind());
                 None
             }
         }
@@ -213,6 +257,13 @@ impl CongruenceClass {
                 return;
             }
             _ => {}
+        }
+        self.hashcode(inst);
+        match self.get_congruence_immut(inst,&self.inst_map) {
+            Some(_) =>{}
+            None =>{
+                self.add_congruence(inst);
+            }
         }
         let congruence = self.get_congruence_immut(inst,&self.inst_map).unwrap();
         if let Some(_index) = congruence.map.get(&inst) {
@@ -348,6 +399,13 @@ pub fn has_val(
             return false;
         }
         InstKind::Call(funcname) => {
+            congruence_class.hashcode(inst);
+            match congruence_class.get_congruence_immut(inst,&congruence_class.inst_map) {
+                Some(_) =>{}
+                None =>{
+                    congruence_class.add_congruence(inst);
+                }
+            }
             let congruence = congruence_class.get_congruence_immut(inst,&congruence_class.inst_map).unwrap(); //副本
             if set.contains(&funcname) {
                 //纯函数，可复用
@@ -394,6 +452,13 @@ pub fn has_val(
             return false;
         }
         _ => {
+            congruence_class.hashcode(inst);
+            match congruence_class.get_congruence_immut(inst,&congruence_class.inst_map) {
+                Some(_) =>{}
+                None =>{
+                    congruence_class.add_congruence(inst);
+                }
+            }
             let congruence = congruence_class.get_congruence_immut(inst,&congruence_class.inst_map).unwrap();
             if let Some(_index) = congruence.map.get(&inst) {
                 return false;
@@ -657,6 +722,12 @@ pub fn compare_two_inst_with_index(
         //针对全局指针
         return true;
     }
+    // match congrunce_class.get_congruence_immut(inst1,&congrunce_class.inst_map) {
+    //     Some(_) =>{}
+    //     None =>{
+    //         congrunce_class.add_congruence(inst1);
+    //     }
+    // }
     let congruence = congrunce_class.get_congruence_immut(inst1,&congrunce_class.inst_map).unwrap();
 
     if let Some(index1) = congruence.map.get(&inst1) {
