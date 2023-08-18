@@ -1120,36 +1120,6 @@ impl BB {
                         }
                         ScalarType::Void => {}
                     }
-
-                    // restore stack slot
-                    // let mut i = 0;
-                    // while i < ARG_REG_COUNT {
-                    //     let iarg = Reg::new(i + 10, ScalarType::Int);
-                    //     let farg = Reg::new(FLOAT_BASE + i + 10, ScalarType::Float);
-                    //     if let Some(slot) = func.as_ref().spill_stack_map.get(&iarg) {
-                    //         let mut inst = LIRInst::new(
-                    //             InstrsType::LoadParamFromStack,
-                    //             vec![
-                    //                 Operand::Reg(Reg::new(i + 10, ScalarType::Int)),
-                    //                 Operand::IImm(IImm::new(slot.get_pos())),
-                    //             ],
-                    //         );
-                    //         inst.set_double();
-                    //         self.insts.push(pool.put_inst(inst));
-                    //     }
-                    //     if let Some(slot) = func.as_ref().spill_stack_map.get(&farg) {
-                    //         let mut inst = LIRInst::new(
-                    //             InstrsType::LoadParamFromStack,
-                    //             vec![
-                    //                 Operand::Reg(Reg::new(FLOAT_BASE + i + 10, ScalarType::Float)),
-                    //                 Operand::IImm(IImm::new(slot.get_pos())),
-                    //             ],
-                    //         );
-                    //         inst.set_double();
-                    //         self.insts.push(pool.put_inst(inst));
-                    //     }
-                    //     i += 1;
-                    // }
                 }
                 InstKind::Return => match inst_ref.get_ir_type() {
                     IrType::Void => self.insts.push(

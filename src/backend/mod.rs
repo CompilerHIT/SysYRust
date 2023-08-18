@@ -83,7 +83,7 @@ pub fn generate_asm(
     //构造
     module.build_v4(&mut file, &mut file2, &mut pool, is_opt);
     // module.generate_row_asm(&mut file2);
-
+    module.print_asm("after_build.log");
     // 后端优化
     if is_opt {
         BackendPass::new(ObjPtr::new(module)).run_pass(&mut pool);

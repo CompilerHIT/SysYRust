@@ -12,6 +12,7 @@ use super::{
     *,
 };
 
+/// 该allco依赖于外部的calc_live，与外部使用的calc_live类型对应
 pub fn alloc(func: &Func) -> Option<FuncAllocStat> {
     let intereference_graph = regalloc::build_interference(func);
     let availables = regalloc::build_availables_with_interef_graph(&intereference_graph);

@@ -1,5 +1,7 @@
 use std::collections::HashSet;
 
+use crate::backend::regalloc::perfect_alloc;
+
 use super::*;
 
 impl BackendPass {
@@ -77,8 +79,22 @@ impl BackendPass {
     pub fn particular_opt(&mut self) {
         self.rm_useless_shift();
         self.fuse_br_cond();
-        self.fuse_tmp_regs_up();
+        let if_fuse = self.judge_spend();
+        self.fuse_tmp_regs_up(if_fuse);
         // self.fuse_tmp_regs_down();
+    }
+
+    fn judge_spend(&mut self) -> HashMap<String, bool> {
+        let mut res: HashMap<String, bool> = HashMap::new();
+        self.module.name_func.iter().for_each(|(name, func)| {
+            func.calc_live_for_alloc_reg();
+            if let Some(_) = perfect_alloc::alloc(func) {
+                res.insert(name.clone(), false);
+            } else {
+                res.insert(name.clone(), true);
+            }
+        });
+        res
     }
 
     pub fn rm_useless_shift(&mut self) {
@@ -169,10 +185,13 @@ impl BackendPass {
         })
     }
 
-    pub fn fuse_tmp_regs_up(&mut self) {
+    pub fn fuse_tmp_regs_up(&mut self, if_fuse: HashMap<String, bool>) {
         // 需要保证临时寄存器存在，对临时寄存器进行窥孔
-        self.module.name_func.iter().for_each(|(_, func)| {
+        self.module.name_func.iter().for_each(|(name, func)| {
             func.calc_live_base();
+            if !*if_fuse.get(name).unwrap() {
+                return;
+            }
             func.blocks.iter().for_each(|b| {
                 let live_out = &b.live_out;
                 // log!("start");
