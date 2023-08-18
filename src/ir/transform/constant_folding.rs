@@ -77,6 +77,40 @@ pub fn check_mul_inst(
                         }
                         _ => {}
                     }
+                } 
+                else{
+                    if inst2.get_kind()==InstKind::Binary(BinOp::Mul){
+                        let operands2 = inst2.get_operands();
+                        if operands1[0] == operands2[0]&&operands1[1].is_int_const() &&operands2[1].is_int_const(){
+                            let inst_const = pool.make_int_const(operands1[1].get_int_bond() + operands2[1].get_int_bond());
+                            inst_old.as_mut().insert_before(inst_const);
+                            let inst_new = pool.make_mul(operands1[0], inst_const);
+                            inst_old.as_mut().insert_before(inst_new);
+                            replace_inst(inst_old, inst_new);
+                            return true;
+                        }else if operands1[0] == operands2[1]&&operands1[1].is_int_const() &&operands2[0].is_int_const(){
+                            let inst_const = pool.make_int_const(operands1[1].get_int_bond() + operands2[0].get_int_bond());
+                            inst_old.as_mut().insert_before(inst_const);
+                            let inst_new = pool.make_mul(operands1[0], inst_const);
+                            inst_old.as_mut().insert_before(inst_new);
+                            replace_inst(inst_old, inst_new);
+                            return true;
+                        }else if operands1[1] == operands2[0]&&operands1[0].is_int_const() &&operands2[1].is_int_const(){
+                            let inst_const = pool.make_int_const(operands1[0].get_int_bond() + operands2[1].get_int_bond());
+                            inst_old.as_mut().insert_before(inst_const);
+                            let inst_new = pool.make_mul(operands1[1], inst_const);
+                            inst_old.as_mut().insert_before(inst_new);
+                            replace_inst(inst_old, inst_new);
+                            return true;
+                        }else if operands1[1] == operands2[1]&&operands1[0].is_int_const() &&operands2[0].is_int_const(){
+                            let inst_const = pool.make_int_const(operands1[0].get_int_bond() + operands2[0].get_int_bond());
+                            inst_old.as_mut().insert_before(inst_const);
+                            let inst_new = pool.make_mul(operands1[1], inst_const);
+                            inst_old.as_mut().insert_before(inst_new);
+                            replace_inst(inst_old, inst_new);
+                            return true;
+                        }
+                    }
                 }
             }
             _ => {}
@@ -86,7 +120,7 @@ pub fn check_mul_inst(
     false
 }
 
-pub fn convert_add_inst(inst: ObjPtr<Inst>, pool: &mut ObjPool<Inst>) {
+pub fn convert_add_inst(inst: ObjPtr<Inst>, pool: &mut ObjPool<Inst>) {// 转同一操作数的累加指令为乘法指令
     match inst.get_kind() {
         InstKind::Binary(binop) => {
             match binop {
