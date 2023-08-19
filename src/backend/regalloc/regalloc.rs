@@ -4,6 +4,7 @@ use crate::backend::func::Func;
 use crate::backend::instrs::{InstrsType, BB};
 use crate::backend::operand::Reg;
 use crate::backend::regalloc::structs::FuncAllocStat;
+use crate::log_file;
 use crate::utility::{ObjPtr, ScalarType};
 // use crate::{log, log_file};
 
@@ -26,6 +27,8 @@ pub fn estimate_spill_cost(func: &Func) -> HashMap<Reg, f32> {
     let (use_cost, def_cost, def_use_cost) = (use_coe * 3.0, def_coe * 3.0, def_use_coe * 4.0);
     //
     for bb in func.blocks.iter() {
+        let coe: usize = 10;
+        let coe = coe.pow(bb.depth as u32) as f32;
         for inst in bb.insts.iter() {
             // FIXME,使用跟精确的统计方法，针对具体指令类型
             let mut in_use: HashSet<Reg> = HashSet::new();
@@ -41,11 +44,11 @@ pub fn estimate_spill_cost(func: &Func) -> HashMap<Reg, f32> {
             }
             for reg in regs {
                 if in_use.contains(&reg) && in_def.contains(&reg) {
-                    out.insert(reg, out.get(&reg).unwrap_or(&0.0) + def_use_cost);
+                    out.insert(reg, out.get(&reg).unwrap_or(&0.0) + def_use_cost * coe);
                 } else if in_use.contains(&reg) {
-                    out.insert(reg, out.get(&reg).unwrap_or(&0.0) + use_cost);
+                    out.insert(reg, out.get(&reg).unwrap_or(&0.0) + use_cost * coe);
                 } else {
-                    out.insert(reg, out.get(&reg).unwrap_or(&0.0) + def_cost);
+                    out.insert(reg, out.get(&reg).unwrap_or(&0.0) + def_cost * coe);
                 }
             }
         }
