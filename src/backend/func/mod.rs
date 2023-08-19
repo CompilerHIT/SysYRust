@@ -186,7 +186,17 @@ impl Func {
             }
             index += 1;
         }
-        // 第三遍pass，拆phi
+        // 第三遍pass，store/load 得到真正的gep
+        for block in self.blocks.iter() {
+            for (lir, ir) in block.restore_sl.iter() {
+                if let Some(operand) = self.info.val_map.get(ir) {
+                    lir.as_mut().operands[1] = operand.clone();
+                } else {
+                    unreachable!("cannot find gep");
+                }
+            }
+        }
+        // 第四遍pass，拆phi
         let mut _size = 0;
         for block in self.blocks.iter() {
             if block.insts.len() == 0 {

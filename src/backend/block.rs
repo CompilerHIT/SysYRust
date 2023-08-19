@@ -58,8 +58,8 @@ pub struct BB {
 
     global_map: HashMap<ObjPtr<Inst>, Operand>,
     // 保存那些gep指令的地址(基地址+偏移量)
-    addr_map: HashMap<ObjPtr<Inst>, Operand>,
     pub depth: usize,
+    pub restore_sl: HashMap<ObjPtr<LIRInst>, ObjPtr<Inst>>,
 }
 
 impl BB {
@@ -76,10 +76,10 @@ impl BB {
             live_in: HashSet::new(),
             live_out: HashSet::new(),
             global_map: HashMap::new(),
-            addr_map: HashMap::new(),
             phis: Vec::new(),
             reg_intervals: HashMap::new(),
             depth: 0,
+            restore_sl: HashMap::new(),
         }
     }
 
@@ -376,37 +376,19 @@ impl BB {
                                     )));
                                 }
                                 _ => {
-                                    if !self.addr_map.contains_key(&addr) {
-                                        let tmp = Operand::Reg(Reg::init(ScalarType::Int));
-                                        self.addr_map.insert(addr, tmp.clone());
-                                        let offset = self.resolve_operand(
-                                            func,
-                                            addr.get_gep_offset(),
-                                            true,
-                                            map_info,
-                                            pool,
-                                        );
-                                        let tmp1 = Operand::Reg(Reg::init(ScalarType::Int));
-                                        self.insts.push(pool.put_inst(LIRInst::new(
-                                            InstrsType::Binary(BinaryOp::Shl),
-                                            vec![
-                                                tmp1.clone(),
-                                                offset.clone(),
-                                                Operand::IImm(IImm::new(2)),
-                                            ],
-                                        )));
-                                        let mut inst = LIRInst::new(
-                                            InstrsType::Binary(BinaryOp::Add),
-                                            vec![tmp.clone(), src_reg.clone(), tmp1],
-                                        );
-                                        inst.set_double();
-                                        self.insts.push(pool.put_inst(inst));
-                                        self.insts.push(pool.put_inst(LIRInst::new(
+                                    if !func.info.val_map.contains_key(&addr) {
+                                        let inst = pool.put_inst(LIRInst::new(
                                             InstrsType::Load,
-                                            vec![dst_reg.clone(), tmp, Operand::IImm(IImm::new(0))],
-                                        )));
+                                            vec![
+                                                dst_reg.clone(),
+                                                Operand::Reg(Reg::new(0, ScalarType::Int)),
+                                                Operand::IImm(IImm::new(0)),
+                                            ],
+                                        ));
+                                        self.restore_sl.insert(inst, addr);
+                                        self.insts.push(inst);
                                     } else {
-                                        let addr_reg = self.addr_map.get(&addr).unwrap();
+                                        let addr_reg = func.info.val_map.get(&addr).unwrap();
                                         self.insts.push(pool.put_inst(LIRInst::new(
                                             InstrsType::Load,
                                             vec![
@@ -468,38 +450,19 @@ impl BB {
                                     )));
                                 }
                                 _ => {
-                                    if !self.addr_map.contains_key(&addr) {
-                                        let tmp = Operand::Reg(Reg::init(ScalarType::Int));
-                                        self.addr_map.insert(addr, tmp.clone());
-                                        let temp = self.resolve_operand(
-                                            func,
-                                            addr.get_gep_offset(),
-                                            true,
-                                            map_info,
-                                            pool,
-                                        );
-                                        let tmp1 = Operand::Reg(Reg::init(ScalarType::Int));
-                                        self.insts.push(pool.put_inst(LIRInst::new(
-                                            InstrsType::Binary(BinaryOp::Shl),
-                                            vec![
-                                                tmp1.clone(),
-                                                temp.clone(),
-                                                Operand::IImm(IImm::new(2)),
-                                            ],
-                                        )));
-                                        let mut inst = LIRInst::new(
-                                            InstrsType::Binary(BinaryOp::Add),
-                                            vec![tmp.clone(), addr_reg.clone(), tmp1],
-                                        );
-                                        // log!("addr_reg: {:?}, value_reg: {:?}", addr_reg, value_reg);
-                                        inst.set_double();
-                                        self.insts.push(pool.put_inst(inst));
-                                        self.insts.push(pool.put_inst(LIRInst::new(
+                                    if !func.info.val_map.contains_key(&addr) {
+                                        let inst = pool.put_inst(LIRInst::new(
                                             InstrsType::Store,
-                                            vec![value_reg, tmp, Operand::IImm(IImm::new(0))],
-                                        )));
+                                            vec![
+                                                value_reg,
+                                                Operand::Reg(Reg::new(0, ScalarType::Int)),
+                                                Operand::IImm(IImm::new(0)),
+                                            ],
+                                        ));
+                                        self.restore_sl.insert(inst, addr);
+                                        self.insts.push(inst);
                                     } else {
-                                        let addr_reg = self.addr_map.get(&addr).unwrap();
+                                        let addr_reg = func.info.val_map.get(&addr).unwrap();
                                         self.insts.push(pool.put_inst(LIRInst::new(
                                             InstrsType::Store,
                                             vec![
@@ -521,6 +484,41 @@ impl BB {
                         }
                     }
                 }
+                InstKind::Gep => match ir_block_inst.get_gep_offset().get_kind() {
+                    InstKind::ConstInt(..) | InstKind::GlobalConstInt(..) => {}
+                    _ => {
+                        let addr_reg = self.resolve_operand(
+                            func,
+                            ir_block_inst.get_gep_ptr(),
+                            true,
+                            map_info,
+                            pool,
+                        );
+                        let tmp = Operand::Reg(Reg::init(ScalarType::Int));
+                        func.as_mut()
+                            .info
+                            .val_map
+                            .insert(ir_block_inst, tmp.clone());
+                        let temp = self.resolve_operand(
+                            func,
+                            ir_block_inst.get_gep_offset(),
+                            true,
+                            map_info,
+                            pool,
+                        );
+                        let tmp1 = Operand::Reg(Reg::init(ScalarType::Int));
+                        self.insts.push(pool.put_inst(LIRInst::new(
+                            InstrsType::Binary(BinaryOp::Shl),
+                            vec![tmp1.clone(), temp.clone(), Operand::IImm(IImm::new(2))],
+                        )));
+                        let mut inst = LIRInst::new(
+                            InstrsType::Binary(BinaryOp::Add),
+                            vec![tmp.clone(), addr_reg.clone(), tmp1],
+                        );
+                        inst.set_double();
+                        self.insts.push(pool.put_inst(inst));
+                    }
+                },
                 InstKind::Alloca(size) => {
                     let array_num = get_current_array_num();
                     let label = format!(".LC{array_num}");
