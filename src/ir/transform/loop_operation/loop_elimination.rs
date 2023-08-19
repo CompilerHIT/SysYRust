@@ -25,7 +25,7 @@ pub fn loop_elimination(
                 loop_induct(*loop_info, &mut analyzer, exit, pools);
                 loop_store_eliminate(*loop_info, &mut analyzer, exit, pools);
                 loop_dead_code_eliminate(*loop_info, &call_op_set);
-                if loop_eliminate(*loop_info, exit) {
+                if loop_eliminate(*loop_info, &call_op_set, exit) {
                     delete_list.push(*loop_info);
                     analyzer.clear();
                 }
@@ -209,7 +209,11 @@ fn loop_store_eliminate(
     })
 }
 
-fn loop_eliminate(loop_info: ObjPtr<LoopInfo>, exit: [ObjPtr<BasicBlock>; 2]) -> bool {
+fn loop_eliminate(
+    loop_info: ObjPtr<LoopInfo>,
+    call_op_set: &HashSet<String>,
+    exit: [ObjPtr<BasicBlock>; 2],
+) -> bool {
     let mut insts = vec![];
     let bbs = loop_info.get_current_loop_bb();
     for bb in bbs {
@@ -218,13 +222,21 @@ fn loop_eliminate(loop_info: ObjPtr<LoopInfo>, exit: [ObjPtr<BasicBlock>; 2]) ->
         })
     }
 
-    if insts.iter().all(|x| {
-        x.is_br()
-            || !x.is_store()
-                && x.get_use_list()
+    let check_inst_essential = |inst: &ObjPtr<Inst>| -> bool {
+        inst.is_br()
+            || !inst.is_store()
+                && if let InstKind::Call(callee) = inst.get_kind() {
+                    call_op_set.contains(&callee)
+                } else {
+                    false
+                }
+                && inst
+                    .get_use_list()
                     .iter()
                     .all(|user| loop_info.is_in_current_loop(&user.get_parent_bb()))
-    }) {
+    };
+
+    if insts.iter().all(|x| check_inst_essential(x)) {
         insts.iter_mut().for_each(|x| x.remove_self());
         let mut preheader = loop_info.get_preheader();
         let [exiting, mut exit] = exit;
