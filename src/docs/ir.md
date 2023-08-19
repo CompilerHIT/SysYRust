@@ -81,6 +81,19 @@ pub struct Inst {
 `init`在当前指令为数组时有效，用于初始化数组。
 `parent_bb`记录当前指令所属的块，为`None`时为全局变量。
 
+考虑如下代码：
+
+```c/c++
+int main()
+{
+    int i = 0;
+    while (i < 10) {
+        i = i + 1;
+    }
+    return 0;
+}
+```
+
 # 优化
 
 ## 常规优化
@@ -242,7 +255,7 @@ int i = 0;
 int b;
 while (i < 0) {
 	b = 4 * i;
-	i = i + 4;
+	i = i + 1;
 }
 ```
 
@@ -253,7 +266,7 @@ int i = 0;
 int b = 0;
 while (i < 0) {
 	b = b + 4;
-	i = i + 4;
+	i = i + 1;
 }
 
 ```
