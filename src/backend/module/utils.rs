@@ -143,7 +143,6 @@ impl AsmModule {
 
 fn get_block_depth(loop_info: &ObjPtr<LoopInfo>) -> usize {
     if let Some(parent) = loop_info.get_parent_loop() {
-        println!("occur");
         get_block_depth(&parent) + 1
     } else {
         1

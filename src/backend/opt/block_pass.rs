@@ -23,6 +23,8 @@ impl BackendPass {
         self.fuse_muti2imm_br(pool);
         // 清除空块(包括entry块)
         self.clear_empty_block();
+    }
+    pub fn block_last_pass(&mut self) {
         // jump的目标块如果紧邻，则删除jump语句
         self.clear_useless_jump();
     }

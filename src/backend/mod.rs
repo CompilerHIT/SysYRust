@@ -83,7 +83,7 @@ pub fn generate_asm(
     //构造
     module.build_v4(&mut file, &mut file2, &mut pool, is_opt);
     // module.generate_row_asm(&mut file2);
-    module.print_asm("after_build.log");
+    // module.print_asm("after_build.log");
     // 后端优化
     if is_opt {
         BackendPass::new(ObjPtr::new(module)).run_pass(&mut pool);
@@ -99,14 +99,18 @@ pub fn generate_asm(
         config::record_event("finish merge reg");
     }
     // 检查b型指令溢出，用j型指令替换
-    module.handle_overflow_br(&mut pool);
-
+    
     if is_opt {
         // 再次进行指令重排
         // module.re_list_scheduling();
-
+        
         // 额外的块优化处理
+        BackendPass::new(ObjPtr::new(module)).block_pass_pre_clear(&mut pool);
         BackendPass::new(ObjPtr::new(module)).block_pass(&mut pool);
+    }
+    module.handle_overflow_br(&mut pool);
+    if is_opt {
+        BackendPass::new(ObjPtr::new(module)).block_last_pass();
     }
 
     //生成抽象汇编

@@ -34,12 +34,9 @@ pub fn optimizer_run(
     if optimize_flag {
         // 简化cfg
         simplify_cfg::simplify_cfg_run(module, &mut pools);
-        dump_now(module, "after_cfg.ll");
         functional_optimizer(module, &mut pools, optimize_flag);
-        dump_now(module, "after_fir_opt.ll");
         // 局部冗余消除 指令上提
         partial_redundancy_elimination::pre(module, optimize_flag, &mut pools);
-        dump_now(module, "after_up.ll");
 
         // 循环优化
         loop_operation::loop_optimize(module, 100, &mut pools, true);

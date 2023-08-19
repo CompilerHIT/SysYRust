@@ -22,12 +22,12 @@ impl AsmModule {
         if is_opt {
             config::record_event("start block_pass_pre_clear");
             BackendPass::new(obj_module).block_pass_pre_clear(pool);
-            self.print_asm("after_block_pass_pre_clear.log");
+            // self.print_asm("after_block_pass_pre_clear.log");
             config::record_event("finish block_pass_pre_clear");
             // 窥孔等特殊指令删除操作
             config::record_event("start fuse_tmp_phi_regs");
             BackendPass::new(obj_module).particular_opt();
-            self.print_asm("after_fuse_tmp_regs.log");
+            // self.print_asm("after_fuse_tmp_regs.log");
             config::record_event("finish fuse_tmp_phi_regs");
         }
 
@@ -69,7 +69,7 @@ impl AsmModule {
         // self.print_asm("after_scehdule.log");
 
         config::record_event("start handle spill");
-        self.print_asm("before_spill.log");
+        // self.print_asm("before_spill.log");
         if is_opt {
             config::record_event("start first realloc before handle spill");
             self.first_realloc();
@@ -109,13 +109,13 @@ impl AsmModule {
         let used_but_not_saved =
             AsmModule::build_used_but_not_saveds(&callers_used, &callees_used, callees_be_saved);
         config::record_event("start handle call");
-        self.print_asm("before_handle_call.txt");
+        // self.print_asm("before_handle_call.txt");
         if is_opt {
             self.handle_call(pool, &callers_used, &callees_used, callees_be_saved);
         } else {
             self.handle_call_tmp(pool);
         }
-        self.print_asm("after_handle_call.txt");
+        // self.print_asm("after_handle_call.txt");
         config::record_event("finish handle call");
 
         if config::get_rest_secs() >= 56 {
@@ -128,7 +128,7 @@ impl AsmModule {
         }
         self.update_array_offset(pool);
         config::record_event("finish update_array_offset");
-        self.print_asm("before_rm_inst_suf_update_array.txt");
+        // self.print_asm("before_rm_inst_suf_update_array.txt");
         self.rm_inst_suf_update_array_offset(pool, &used_but_not_saved);
         config::record_event("finish rm suf update array offset");
         //检查代码中是否会def sp
