@@ -47,8 +47,8 @@ pub fn loop_optimize(
 
     if para {
         // 自动并行化
-        // auto_paralellization(module, &mut loop_map, pools);
-        // super::functional_optimizer(module, pools, false);
+        auto_paralellization(module, &mut loop_map, pools);
+        super::functional_optimizer(module, pools, false);
 
         // 归纳变量强度削减
         func_process(module, |name, func| {
