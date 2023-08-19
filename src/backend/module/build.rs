@@ -59,7 +59,11 @@ impl AsmModule {
             self.clear_tmp_var();
 
             self.alloc_without_tmp_and_s0();
-            self.map_v_to_p();
+            for (_, func) in self.name_func.iter() {
+                if !func.is_extern {
+                    func.as_mut().v2p(&func.reg_alloc_info.dstr);
+                }
+            }
             config::record_event("finish schedule");
         } else {
             self.alloc_without_tmp_and_s0();
