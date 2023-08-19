@@ -124,6 +124,20 @@ impl Inst {
         }
     }
 
+    /// 判断是否是数组的存储
+    /// # Return
+    /// 如果是返回true，否则返回false
+    pub fn is_array_store(&self) -> bool {
+        self.is_store() && !self.is_global_var_store()
+    }
+
+    /// 判断是否是变量的存储
+    /// # Return
+    /// 如果是返回true，否则返回false
+    pub fn is_store(&self) -> bool {
+        InstKind::Store == self.get_kind()
+    }
+
     /// 获得存储的值
     /// # Return
     /// 值指令的引用

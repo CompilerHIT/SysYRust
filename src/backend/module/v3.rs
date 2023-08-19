@@ -47,6 +47,8 @@ impl AsmModule {
         // let extern_func_path = "extern_func.txt";
         //补充外部函数 memset 和memcpy
         let extern_funcs = vec![
+            "memset",
+            "memcpy",
             "memset@plt",
             "memcpy@plt",
             "putint",
@@ -65,7 +67,6 @@ impl AsmModule {
             "hitsz_thread_init",
             "hitsz_thread_create",
             "hitsz_thread_join",
-            "hitsz_thread_exit",
             "hitsz_get_thread_num",
         ];
         for name in extern_funcs.iter() {

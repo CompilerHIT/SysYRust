@@ -179,7 +179,21 @@ impl Inst {
         }
     }
 
+    /// 判断是否是Load指令
+    /// # Return
+    /// 如果是返回true，否则返回false
+    pub fn is_load(&self) -> bool {
+        self.get_kind() == InstKind::Load
+    }
+
+    /// 判断是否是加载数组
+    /// # Return
+    /// 如果是返回true，否则返回false
+    pub fn is_array_load(&self) -> bool {
+        self.is_load() && !self.is_global_var_load()
+    }
+
     pub fn is_global_array_load(&self) -> bool {
-        self.get_ptr().get_kind() == InstKind::Alloca(0)
+        self.is_load() && self.get_ptr().get_kind() == InstKind::Alloca(0)
     }
 }
