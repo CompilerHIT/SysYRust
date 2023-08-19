@@ -59,6 +59,7 @@ pub struct BB {
     global_map: HashMap<ObjPtr<Inst>, Operand>,
     // 保存那些gep指令的地址(基地址+偏移量)
     addr_map: HashMap<ObjPtr<Inst>, Operand>,
+    pub depth: usize,
 }
 
 impl BB {
@@ -78,6 +79,7 @@ impl BB {
             addr_map: HashMap::new(),
             phis: Vec::new(),
             reg_intervals: HashMap::new(),
+            depth: 0,
         }
     }
 

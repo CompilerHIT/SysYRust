@@ -1,4 +1,5 @@
 use super::*;
+use crate::ir::analysis::loop_tree::{loop_recognize, LoopInfo};
 use crate::log;
 ///一些进行分析需要用到的工具
 impl AsmModule {
@@ -115,5 +116,36 @@ impl AsmModule {
                 })
             })
         });
+    }
+}
+
+impl AsmModule {
+    pub fn calc_loop_depth(&mut self) {
+        let map = loop_recognize::loop_recognize(&mut self.upper_module);
+        self.name_func.iter().for_each(|(name, func)| {
+            let loop_list = map.get(name).unwrap().get_loop_list();
+            func.blocks.iter().for_each(|b| {
+                if let Some(info) = loop_list.iter().find(|l| {
+                    if let Some(ir_block) = func.info.block_ir_map.get(b) {
+                        l.is_in_loop(ir_block)
+                    } else {
+                        false
+                    }
+                }) {
+                    b.as_mut().depth = get_block_depth(info);
+                } else {
+                    return
+                }
+            })
+        })
+    }
+}
+
+fn get_block_depth(loop_info: &ObjPtr<LoopInfo>) -> usize {
+    if let Some(parent) = loop_info.get_parent_loop() {
+        println!("occur");
+        get_block_depth(&parent) + 1
+    } else {
+        1
     }
 }

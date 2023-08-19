@@ -210,6 +210,7 @@ impl StackSlot {
     }
 }
 
+#[derive(Clone)]
 pub struct Mapping {
     pub ir_block_map: HashMap<ObjPtr<BasicBlock>, ObjPtr<BB>>,
     pub block_ir_map: HashMap<ObjPtr<BB>, ObjPtr<BasicBlock>>,

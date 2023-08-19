@@ -62,6 +62,7 @@ pub struct Func {
     pub array_slot: Vec<i32>,
 
     pub tmp_vars: HashSet<Reg>,
+    pub info: Mapping
 }
 
 /// 函数的构造
@@ -88,6 +89,7 @@ impl Func {
             array_slot: Vec::new(),
 
             tmp_vars: HashSet::new(),
+            info: Mapping::new()
         }
     }
 
@@ -98,11 +100,10 @@ impl Func {
         func_seq: i32,
         pool: &mut BackendPool,
     ) {
-        let mut info = Mapping::new();
         // 处理全局变量&数组
         let globl = &module.global_var_list;
         globl.iter().for_each(|(inst, var)| {
-            info.val_map
+            self.info.val_map
                 .insert(inst.clone(), Operand::Addr(var.get_name().clone()));
         });
 
@@ -123,8 +124,8 @@ impl Func {
         let fblock = ir_func.get_head();
         let mut ir_block_set: HashSet<ObjPtr<BasicBlock>> = HashSet::new();
         let first_block = pool.put_block(BB::new(&label, &self.label));
-        info.ir_block_map.insert(fblock, first_block);
-        info.block_ir_map.insert(first_block, fblock);
+        self.info.ir_block_map.insert(fblock, first_block);
+        self.info.block_ir_map.insert(first_block, fblock);
         ir_block_set.insert(fblock);
 
         let mut tmp = VecDeque::new();
@@ -147,15 +148,15 @@ impl Func {
             if ir_block_set.insert(fblock) {
                 let label = format!(".LBB{func_seq}_{block_seq}");
                 let block = pool.put_block(BB::new(&label, &self.label));
-                info.ir_block_map.insert(fblock, block);
-                info.block_ir_map.insert(block, fblock);
+                self.info.ir_block_map.insert(fblock, block);
+                self.info.block_ir_map.insert(block, fblock);
                 self.blocks.push(block);
                 block_seq += 1;
             }
         }
         self.handle_parameters(ir_func);
         // 第二遍pass
-        let first_block = info.ir_block_map.get(&ir_func.get_head()).unwrap();
+        let first_block = self.info.ir_block_map.get(&ir_func.get_head()).unwrap();
         self.entry.unwrap().as_mut().out_edge.push(*first_block);
         first_block.as_mut().in_edge.push(self.entry.unwrap());
         let mut i = 0;
@@ -170,16 +171,16 @@ impl Func {
                 if i == 0 {
                     block.as_mut().showed = false;
                 }
-                let basicblock = info.block_ir_map.get(&block).unwrap();
+                let basicblock = self.info.block_ir_map.get(&block).unwrap();
                 if i + 1 < self.blocks.len() {
                     let next_block = Some(self.blocks[i + 1]);
                     block
                         .as_mut()
-                        .construct(this, *basicblock, next_block, &mut info, pool);
+                        .construct(this, *basicblock, next_block, &mut self.info, pool);
                 } else {
                     block
                         .as_mut()
-                        .construct(this, *basicblock, None, &mut info, pool);
+                        .construct(this, *basicblock, None, &mut self.info, pool);
                 }
                 i += 1;
             }
@@ -210,7 +211,7 @@ impl Func {
             if !insert_before {
                 index += 1;
             }
-            if let Some(target) = info.phis_to_block.get_mut(&block.label) {
+            if let Some(target) = self.info.phis_to_block.get_mut(&block.label) {
                 for inst in target.iter() {
                     block.as_mut().insts.insert(index, *inst);
                 }

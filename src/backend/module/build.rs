@@ -1,6 +1,7 @@
 use crate::config;
 
 use super::*;
+use crate::log;
 
 impl AsmModule {
     /// build v4:
@@ -12,6 +13,7 @@ impl AsmModule {
     pub fn build_v4(&mut self, f: &mut File, _f2: &mut File, pool: &mut BackendPool, is_opt: bool) {
         let obj_module = ObjPtr::new(self);
         self.build_lir(pool);
+        self.calc_loop_depth();
         config::record_event("finish build lir");
 
         // self.print_asm("asm_abastract.txt");

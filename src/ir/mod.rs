@@ -1,7 +1,7 @@
 //! src/ir/mod.rs
 
 use crate::utility::ObjPtr;
-mod analysis;
+pub mod analysis;
 pub mod basicblock;
 mod dump_ir;
 pub mod function;

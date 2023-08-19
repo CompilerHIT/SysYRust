@@ -157,7 +157,7 @@ impl BackendPass {
                                 && prev.get_tail_inst().get_type() == InstrsType::Jump
                                 && (prev.get_tail_inst().get_label().clone()
                                     == Operand::Addr(block.label.clone()))
-                                && !exist_br(prev.clone())
+                                && !exist_br(prev.clone()) && !cannot_up(prev.clone())
                         })
                         .map(|prev| *prev)
                         .collect();
@@ -485,4 +485,15 @@ fn print_context(block: ObjPtr<BB>) {
     for after in block.get_after().iter() {
         log!("after: {}", after.label);
     }
+}
+
+fn cannot_up(block: ObjPtr<BB>) -> bool {
+    for inst in block.insts.iter() {
+        if inst.get_type() == InstrsType::Call {
+            if inst.get_label().drop_addr().clone() == "_sysy_starttime" || inst.get_label().drop_addr().clone() == "_sysy_stoptime" {
+                return true
+            }
+        }
+    }
+    false
 }

@@ -282,5 +282,3 @@ impl Func {
         }
     }
 }
-
-// #[cfg(predicate)]
