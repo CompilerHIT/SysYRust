@@ -46,7 +46,6 @@ pub fn pre(
     opt_option: bool,
     pools: &mut (&mut ObjPool<BasicBlock>, &mut ObjPool<Inst>),
 ) {
-    println!("pre");
     block_opt(module, pools, opt_option);
     let mut vec_congruence_class = global_value_numbering::gvn(module, opt_option).unwrap();
     let mut index = 0;
@@ -54,31 +53,6 @@ pub fn pre(
         let mut dominator_tree = calculate_dominator(func.get_head());
         let mut downstream_tree = DownStreamTree::make_downstream_tree(func.get_head(), &dominator_tree);
         for congruence in vec_congruence_class[index].get_all_congruence_mut() {
-            println!("oo{:?}",congruence.vec_class.len());
-            if congruence.vec_class.len()>10{
-                println!("len:{:?}",congruence.vec_class.len());
-            }
-    //         let mut pre_context = PreContext { index: 0 };
-    // let mut dominator_tree = calculate_dominator(func.get_head());
-    // let mut downstream_tree = DownStreamTree::make_downstream_tree(func.get_head(), &dominator_tree);
-    // for index_class in 0..congruence.vec_class.len() {
-    //     loop {
-    //         let mut changed = false;
-    //         changed |= pre_group(
-    //             &mut pre_context,
-    //             func.get_head(),
-    //             &mut dominator_tree,
-    //             &mut downstream_tree,
-    //             congruence,
-    //             index_class,
-    //             pools,
-    //         );
-    //         changed |= hoist_group(congruence, index_class, &dominator_tree, pools.1);
-    //         if !changed {
-    //             break;
-    //         }
-    //     }
-    // }
             pre_congruence(congruence, func.get_head(), pools,&mut dominator_tree,&mut downstream_tree);
         }
         index += 1;
@@ -86,7 +60,6 @@ pub fn pre(
     phi_run(module);
     dead_code_eliminate(module, opt_option);
     global_eliminate(module);
-    println!("pre结束");
 }
 
 pub fn pre_congruence(
@@ -97,16 +70,12 @@ pub fn pre_congruence(
     downstream_tree: &mut DownStreamTree,
 ) {
     let mut pre_context = PreContext { index: 0 };
-    // let mut dominator_tree = calculate_dominator(head);
-    // let mut downstream_tree = DownStreamTree::make_downstream_tree(head, &dominator_tree);
     for index_class in 0..congruence.vec_class.len() {
-        println!("gp.len:{:?}",congruence.vec_class[index_class].len());
         if congruence.vec_class[index_class].len()<=1{
             continue;
         }
         loop {
             let mut changed = false;
-            println!("pregp");
             changed |= pre_group(
                 &mut pre_context,
                 head,
@@ -116,7 +85,6 @@ pub fn pre_congruence(
                 index_class,
                 pools,
             );
-            println!("hoist");
             changed |= hoist_group(congruence, index_class, &dominator_tree, pools.1);
             if !changed {
                 break;
@@ -262,7 +230,7 @@ pub fn insert_inst_in_pre(
             newb.as_mut().set_next_bb(vec![bb]);
             newb.as_mut().set_up_bb(vec![pres[i]]);
             vec_operands_phi.push((i, inst_new));
-            *dominator_tree = calculate_dominator(head);
+            *dominator_tree = calculate_dominator(head);// 插块后重新计算支配树和上下游
             *downstream_tree = DownStreamTree::make_downstream_tree(head, &dominator_tree);
         } else {
             unreachable!("前继块没后继,upbb和nextbb管理出错")
