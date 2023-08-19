@@ -60,6 +60,7 @@ impl AsmModule {
             }
             Func::undo_p2v(&p2v_actions);
             func.as_mut().reg_alloc_info = old_func_alloc_stat;
+            func.context.as_mut().set_reg_map(&func.reg_alloc_info.dstr);
         });
     }
 

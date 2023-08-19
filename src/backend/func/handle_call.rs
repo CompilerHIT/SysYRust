@@ -33,6 +33,7 @@ impl Func {
         };
         let pos = sst.get_pos();
         let sd_inst = LIRInst::build_storetostack_inst(reg_to_split, pos);
+        config::record_caller_save_sl(&self.label, "", sd_inst.to_string().as_str());
         new_insts.push(pool.put_inst(sd_inst));
         split_maps.insert(*reg_to_split, TmpHolder::StackOffset(pos));
     }
@@ -45,6 +46,7 @@ impl Func {
         pool: &mut BackendPool,
     ) {
         let ld_inst = LIRInst::build_loadstack_inst(reg, pos);
+        config::record_caller_save_sl("", "", ld_inst.to_string().as_str());
         new_insts.push(pool.put_inst(ld_inst));
     }
 
@@ -61,6 +63,7 @@ impl Func {
         //
         //如果能够找到同类寄存器做中转
         let mv_inst = LIRInst::build_mv(&reg_to_split, &tmp_holder_reg);
+        config::record_caller_save_sl(&self.label, "", mv_inst.to_string().as_str());
         new_insts.push(pool.put_inst(mv_inst));
         tmp_holder_regs.insert(*tmp_holder_reg, *reg_to_split);
         split_maps.insert(*reg_to_split, TmpHolder::Reg(*tmp_holder_reg));
@@ -73,6 +76,7 @@ impl Func {
         pool: &mut BackendPool,
     ) {
         let mv_inst = LIRInst::build_mv(tmp_holder_reg, reg_splited);
+        config::record_caller_save_sl("", "", mv_inst.to_string().as_str());
         new_insts.push(pool.put_inst(mv_inst));
     }
 

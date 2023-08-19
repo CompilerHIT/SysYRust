@@ -1,3 +1,4 @@
-echo > ./data/print_all_funcs.txt
-echo > rm ./data/log
-./test -u bugs3
+
+./scripts/mcl.sh
+cargo run a.sy -S -o a.s -O1
+# ./test -u bugs3

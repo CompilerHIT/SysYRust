@@ -2,6 +2,38 @@ use super::*;
 
 /// 从函数中提取信息
 impl Func {
+    ///在handle spill之后调用
+    /// 返回该函数使用了哪些callee saved的寄存器
+    pub fn draw_used_callees(&self) -> HashSet<Reg> {
+        let mut callees: HashSet<Reg> = HashSet::new();
+        for bb in self.blocks.iter() {
+            for inst in bb.insts.iter() {
+                for reg in inst.get_regs() {
+                    if reg.is_callee_save() {
+                        callees.insert(reg);
+                    }
+                }
+            }
+        }
+        callees
+    }
+
+    /// 该函数应该在vtop之后调用
+    /// 获取该函数使用到的caller save寄存器
+    pub fn draw_used_callers(&self) -> HashSet<Reg> {
+        let mut callers: HashSet<Reg> = HashSet::new();
+        for bb in self.blocks.iter() {
+            for inst in bb.insts.iter() {
+                for reg in inst.get_regs() {
+                    if reg.is_caller_save() {
+                        callers.insert(reg);
+                    }
+                }
+            }
+        }
+        callers
+    }
+
     // 实现一些关于函数信息的估计和获取的方法
     pub fn draw_phisic_regs(&self) -> RegUsedStat {
         let mut used = RegUsedStat::new();
