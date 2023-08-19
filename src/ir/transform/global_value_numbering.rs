@@ -17,6 +17,7 @@ use crate::{
 use super::delete_redundant_load_store::load_store_opt;
 
 pub struct CongruenceClass {
+    phi_hash:i32,
     inst_map:HashMap<ObjPtr<Inst>,i32>,
     gep_congruence_map: HashMap<i32,Congruence>,
     pos_congruence_map: HashMap<i32,Congruence>,
@@ -38,6 +39,7 @@ pub struct CongruenceClass {
 impl CongruenceClass {
     pub fn new() -> CongruenceClass {
         CongruenceClass {
+            phi_hash:0,
             inst_map: HashMap::new(),
             gep_congruence_map: HashMap::new(),
             pos_congruence_map: HashMap::new(),
@@ -61,15 +63,17 @@ impl CongruenceClass {
 
     pub fn hashcode(&mut self,inst:ObjPtr<Inst>)->i32{
         if let Some(hashcode) = self.inst_map.get(&inst){
-            println!("you:{:?}",hashcode);
+            // println!("you:{:?}",hashcode);
             return *hashcode;
         }
 
         match inst.get_kind() {
-            // InstKind::Phi =>{
-            //     self.inst_map.insert(inst, i);
-            //     i
-            // }
+            InstKind::Phi =>{
+                let i = self.phi_hash;
+                self.inst_map.insert(inst, i);
+                self.phi_hash += 1;
+                i
+            }
             InstKind::Alloca(i) | InstKind::ConstInt(i) |InstKind::GlobalConstInt(i)|InstKind::GlobalInt(i)=>{
                 self.inst_map.insert(inst, i);
                 i
@@ -85,15 +89,15 @@ impl CongruenceClass {
                 self.inst_map.insert(inst, f as i32);
                 f as i32
             }
-            InstKind::Parameter =>{
+            InstKind::Parameter |InstKind::Branch |InstKind::Return =>{
                 self.inst_map.insert(inst, 1129);
                 1129
             }
             _=>{
-                println!("hash");
+                // println!("hash");
                 let mut op_hash_vec = vec![];
                 for op in inst.get_operands(){
-                    println!("op hash");
+                    // println!("op hash");
                     op_hash_vec.push(self.hashcode(*op));
                 }
                 let mut hashcode = 0;
