@@ -116,6 +116,20 @@ impl Func {
     }
 }
 
+// 为每个指令创建寄存器的in和 out
+impl Func {
+    /// 依赖外部调用的calc live
+    pub fn build_live_out_for_insts(&mut self) -> HashMap<ObjPtr<LIRInst>, HashSet<Reg>> {
+        let mut live_out_for_insts: HashMap<ObjPtr<LIRInst>, HashSet<Reg>> = HashMap::new();
+        self.blocks.iter().for_each(|bb| {
+            Func::analyse_inst_with_live_now_backorder(*bb, &mut |inst, live_now| {
+                live_out_for_insts.insert(inst, live_now.clone());
+            })
+        });
+        live_out_for_insts
+    }
+}
+
 ///为函数创建寄存器活跃区间
 impl Func {
     /// 为函数创建寄存器活跃区间

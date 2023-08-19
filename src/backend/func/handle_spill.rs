@@ -30,7 +30,7 @@ impl Func {
     /// * 如果要使用unavailable的寄存器,才需要进行spill操作来保存和恢复原值
     ///     优先使用caller save的寄存器,
     /// * 一定要spill到内存上的时候,使用递增的slot,把slot记录到数组的表中,等待重排
-    pub fn handle_spill_v3(&mut self, pool: &mut BackendPool) {
+    pub fn handle_spill(&mut self, pool: &mut BackendPool) {
         self.calc_live_for_handle_spill();
         //先分配空间
         //对于spillings用到的空间直接一人一个

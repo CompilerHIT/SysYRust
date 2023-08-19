@@ -62,7 +62,7 @@ pub struct Func {
     pub array_slot: Vec<i32>,
 
     pub tmp_vars: HashSet<Reg>,
-    pub info: Mapping
+    pub info: Mapping,
 }
 
 /// 函数的构造
@@ -89,7 +89,7 @@ impl Func {
             array_slot: Vec::new(),
 
             tmp_vars: HashSet::new(),
-            info: Mapping::new()
+            info: Mapping::new(),
         }
     }
 
@@ -103,7 +103,8 @@ impl Func {
         // 处理全局变量&数组
         let globl = &module.global_var_list;
         globl.iter().for_each(|(inst, var)| {
-            self.info.val_map
+            self.info
+                .val_map
                 .insert(inst.clone(), Operand::Addr(var.get_name().clone()));
         });
 
