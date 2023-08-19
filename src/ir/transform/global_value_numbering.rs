@@ -66,6 +66,10 @@ impl CongruenceClass {
         }
 
         match inst.get_kind() {
+            // InstKind::Phi =>{
+            //     self.inst_map.insert(inst, i);
+            //     i
+            // }
             InstKind::Alloca(i) | InstKind::ConstInt(i) |InstKind::GlobalConstInt(i)|InstKind::GlobalInt(i)=>{
                 self.inst_map.insert(inst, i);
                 i
