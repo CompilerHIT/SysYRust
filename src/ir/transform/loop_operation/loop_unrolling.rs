@@ -63,6 +63,9 @@ fn attempt_loop_unrolling(
     debug_assert_eq!(loop_info.get_exit_blocks().len(), 1);
 
     let end_cond = loop_info.get_exit_blocks()[0].get_tail_inst().get_br_cond();
+    if !end_cond.is_cond() {
+        return false;
+    }
     let lhs_scev = analyzer.analyze(&end_cond.get_lhs());
     let rhs_scev = analyzer.analyze(&end_cond.get_rhs());
     let start;

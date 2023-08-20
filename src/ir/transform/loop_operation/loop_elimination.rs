@@ -314,6 +314,9 @@ fn parse_round(
     cond: ObjPtr<Inst>,
     pools: &mut (&mut ObjPool<BasicBlock>, &mut ObjPool<Inst>),
 ) -> Option<ObjPtr<Inst>> {
+    if !cond.is_cond() {
+        return None;
+    }
     let lhs = analyzer.analyze(&cond.get_lhs());
     let rhs = analyzer.analyze(&cond.get_rhs());
 
