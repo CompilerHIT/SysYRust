@@ -68,9 +68,9 @@ pub fn optimizer_run(
         partial_redundancy_elimination::pre(module, optimize_flag, &mut pools);
 
         // 循环尾指令上提
-        // sink::sink_opt(module, &mut pools, optimize_flag);
+        sink::sink_opt(module, &mut pools, optimize_flag);
         // hoist_to_loop_head(module, &mut pools);
-        // functional_optimizer(module, &mut pools, optimize_flag);
+        functional_optimizer(module, &mut pools, optimize_flag);
 
         // 循环优化
         loop_operation::loop_optimize(module, 100, &mut pools, false);
