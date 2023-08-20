@@ -17,14 +17,13 @@ impl Func {
     }
 
     /// 块内代码调度
-    pub fn list_scheduling_tech(&mut self) {
-        let size = 50;
+    pub fn list_scheduling_tech(&mut self, size: usize) {
         // 建立数据依赖图
         for b in self.blocks.iter() {
             let mut graph: Graph<ObjPtr<LIRInst>, (i32, ObjPtr<LIRInst>)> = Graph::new();
             let mut control_insts: Vec<ObjPtr<LIRInst>> = Vec::new();
             // 对于涉及控制流的语句，不能进行调度
-            let basicblock: Vec<ObjPtr<LIRInst>> = b
+            let mut basicblock: Vec<ObjPtr<LIRInst>> = b
                 .insts
                 .iter()
                 .filter(|inst| match inst.get_type() {
@@ -38,64 +37,74 @@ impl Func {
                 .map(|x| *x)
                 .collect();
 
-            // 对于清除掉控制流语句的块，建立数据依赖图
-            for (i, inst) in basicblock.iter().rev().enumerate() {
-                let pos = basicblock.len() - i - 1;
-                graph.add_node(*inst);
+            // 按50条指令进行局部调度防止spill
+            let mut set: Vec<Vec<ObjPtr<LIRInst>>> = Vec::new();
+            for i in 0..basicblock.len() / size {
+                let a = basicblock.splice(i..i + size, vec![]).collect();
+                set.push(a);
+            }
+            set.push(basicblock);
 
-                // call支配后续所有指令
-                for index in 1..=pos {
-                    let i = basicblock[pos - index];
-                    if i.get_type() == InstrsType::Call {
-                        graph.add_edge(*inst, (1, i));
-                    } else {
-                        continue;
-                    }
-                }
+            for s in set.iter() {
+                // 对于清除掉控制流语句的块，建立数据依赖图
+                for (i, inst) in s.iter().rev().enumerate() {
+                    let pos = s.len() - i - 1;
+                    graph.add_node(*inst);
 
-                // call依赖于之前的所有指令
-                // if inst.get_type() == InstrsType::Call {
-                //     special_inst_pos.insert(*inst, i);
-                // }
-                if inst.get_type() == InstrsType::Call {
+                    // call支配后续所有指令
                     for index in 1..=pos {
-                        let i = basicblock[pos - index];
-                        graph.add_edge(*inst, (1, i));
-                    }
-                }
-
-                // 认为load/store依赖之前的load/store
-                if inst.get_type() == InstrsType::Load || inst.get_type() == InstrsType::Store {
-                    // special_inst_pos.insert(*inst, i);
-                    for index in 1..=pos {
-                        let i = basicblock[pos - index];
-                        if sl_conflict(*inst, i) {
+                        let i = s[pos - index];
+                        if i.get_type() == InstrsType::Call {
                             graph.add_edge(*inst, (1, i));
                         } else {
                             continue;
                         }
                     }
-                }
 
-                let use_vec = inst.get_reg_use();
-                let def_vec = inst.get_reg_def();
-
-                for reg in use_vec.iter() {
-                    // 向上找一个use的最近def,将指令加入图中
-                    for index in 1..=pos {
-                        let i = basicblock[pos - index];
-                        if i.get_reg_def().contains(reg) {
+                    // call依赖于之前的所有指令
+                    // if inst.get_type() == InstrsType::Call {
+                    //     special_inst_pos.insert(*inst, i);
+                    // }
+                    if inst.get_type() == InstrsType::Call {
+                        for index in 1..=pos {
+                            let i = s[pos - index];
                             graph.add_edge(*inst, (1, i));
                         }
                     }
-                }
 
-                for reg in def_vec.iter() {
-                    // 向上找一个def的最近use,将指令加入图中
-                    for index in 1..=pos {
-                        let i = basicblock[pos - index];
-                        if i.get_reg_use().contains(reg) {
-                            graph.add_edge(*inst, (1, i));
+                    // 认为load/store依赖之前的load/store
+                    if inst.get_type() == InstrsType::Load || inst.get_type() == InstrsType::Store {
+                        // special_inst_pos.insert(*inst, i);
+                        for index in 1..=pos {
+                            let i = s[pos - index];
+                            if sl_conflict(*inst, i) {
+                                graph.add_edge(*inst, (1, i));
+                            } else {
+                                continue;
+                            }
+                        }
+                    }
+
+                    let use_vec = inst.get_reg_use();
+                    let def_vec = inst.get_reg_def();
+
+                    for reg in use_vec.iter() {
+                        // 向上找一个use的最近def,将指令加入图中
+                        for index in 1..=pos {
+                            let i = s[pos - index];
+                            if i.get_reg_def().contains(reg) {
+                                graph.add_edge(*inst, (1, i));
+                            }
+                        }
+                    }
+
+                    for reg in def_vec.iter() {
+                        // 向上找一个def的最近use,将指令加入图中
+                        for index in 1..=pos {
+                            let i = s[pos - index];
+                            if i.get_reg_use().contains(reg) {
+                                graph.add_edge(*inst, (1, i));
+                            }
                         }
                     }
                 }

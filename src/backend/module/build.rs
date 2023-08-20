@@ -42,21 +42,21 @@ impl AsmModule {
             // BackendPass::new(obj_module).opt_gep();
             config::record_event("start pre schedule");
             // 设置一些寄存器为临时变量
-            self.cal_tmp_var();
+            // self.cal_tmp_var();
 
-            // 对非临时寄存器进行分配
-            self.alloc_without_tmp_and_s0();
-            // 将非临时寄存器映射到物理寄存器
-            self.map_v_to_p();
+            // // 对非临时寄存器进行分配
+            // self.alloc_without_tmp_and_s0();
+            // // 将非临时寄存器映射到物理寄存器
+            // self.map_v_to_p();
 
-            config::record_event("finish first alloc");
+            // config::record_event("finish first alloc");
 
-            config::record_event("start scheduling");
-            // 代码调度，列表调度法
-            self.list_scheduling_tech();
-            config::record_event("finish scheduling");
-            // // 为临时寄存器分配寄存器
-            self.clear_tmp_var();
+            // config::record_event("start scheduling");
+            // // 代码调度，列表调度法
+            // self.list_scheduling_tech();
+            // config::record_event("finish scheduling");
+            // // // 为临时寄存器分配寄存器
+            // self.clear_tmp_var();
 
             self.alloc_without_tmp_and_s0();
             for (_, func) in self.name_func.iter() {

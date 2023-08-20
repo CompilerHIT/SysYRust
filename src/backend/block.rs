@@ -58,6 +58,7 @@ pub struct BB {
 
     global_map: HashMap<ObjPtr<Inst>, Operand>,
     // 保存那些gep指令的地址(基地址+偏移量)
+    //addr_map: HashMap<ObjPtr<Inst>, Operand>,
     pub depth: usize,
     pub restore_sl: HashMap<ObjPtr<LIRInst>, ObjPtr<Inst>>,
 }
@@ -76,6 +77,7 @@ impl BB {
             live_in: HashSet::new(),
             live_out: HashSet::new(),
             global_map: HashMap::new(),
+            //addr_map: HashMap::new(),
             phis: Vec::new(),
             reg_intervals: HashMap::new(),
             depth: 0,
@@ -967,6 +969,7 @@ impl BB {
                                                 map_info,
                                                 pool,
                                             );
+                                            log!("{:?}", arg.get_gep_ptr().get_kind());
                                             let tmp = self.resolve_operand(
                                                 func,
                                                 arg.get_gep_offset(),
@@ -1586,6 +1589,18 @@ impl BB {
             }
             _ => {
                 if map.val_map.contains_key(&src) {
+                    let op = map.val_map.get(&src).unwrap().clone();
+                    match op {
+                        Operand::Addr(..) => {
+                            let res = Operand::Reg(Reg::init(ScalarType::Int));
+                            self.insts.push(pool.put_inst(LIRInst::new(
+                                InstrsType::OpReg(SingleOp::LoadAddr),
+                                vec![res.clone(), op],
+                            )));
+                            return res;
+                        }
+                        _ => {}
+                    }
                     return map.val_map.get(&src).unwrap().clone();
                 }
                 let op: Operand = match src.as_ref().get_ir_type() {
