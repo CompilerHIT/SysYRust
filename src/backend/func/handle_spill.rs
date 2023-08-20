@@ -413,6 +413,8 @@ impl Func {
                             pool,
                             &mut new_insts,
                         );
+                    } else {
+                        return;
                     }
                 }
                 Func::load_back_phy(
