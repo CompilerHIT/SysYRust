@@ -91,6 +91,10 @@ impl Func {
         callees_be_saved: &HashMap<String, HashSet<Reg>>,
     ) {
         self.calc_live_for_handle_call();
+
+        //来到handle call的时候代码中不存在虚拟寄存器
+        debug_assert!(self.draw_all_virtual_regs().len() == 0, "{}", self.label);
+
         let mut available_tmp_regs: RegUsedStat = RegUsedStat::init_unavailable();
         if self.label != "main" {
             for reg in callees_used.get(self.label.as_str()).unwrap() {
@@ -253,7 +257,8 @@ impl Func {
                 for reg in inst.get_regs() {
                     debug_assert!(!tmp_holder_regs_choicess.is_available_reg(reg.get_color()));
                 }
-
+                assert!(!tmp_holder_regs_choicess.is_available_reg(Reg::get_ra().get_color()));
+                assert!(!to_saved.contains(&Reg::get_ra()));
                 //首先为寄存器寻找租借者
                 for reg in to_saved {
                     if let Some(color) = tmp_holder_regs_choicess.get_available_reg(reg.get_type())
@@ -340,7 +345,7 @@ impl Func {
                 }
                 //不需要保存instdef地寄存器
                 let mut live_now = live_now.clone();
-                live_now.retain(|reg| reg.is_caller_save());
+                live_now.retain(|reg| reg.is_caller_save() && reg != &Reg::get_ra());
                 for reg in inst.get_reg_def() {
                     live_now.remove(&reg);
                 }
