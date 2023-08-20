@@ -11,7 +11,7 @@ static HANDLE_CALL_ACTIONS_PATH: &str = "handle_call_actions.txt";
 // 把一个寄存器的值抛出到中转者手中
 
 impl Func {
-    // 把寄存器的值分裂到栈上
+    /// 把寄存器的值分裂到栈上
     fn split_to_stack(
         &mut self,
         reg_to_split: &Reg,
@@ -38,7 +38,7 @@ impl Func {
         split_maps.insert(*reg_to_split, TmpHolder::StackOffset(pos));
     }
 
-    //把寄存器中的值从栈上恢复
+    ///把寄存器中的值从栈上恢复
     fn load_back_from_certain_pos(
         reg: &Reg,
         pos: i32,
@@ -50,7 +50,7 @@ impl Func {
         new_insts.push(pool.put_inst(ld_inst));
     }
 
-    //把寄存器的值分裂到空余寄存器里
+    ///把寄存器的值分裂到空余寄存器里
     fn split_to_reg(
         &mut self,
         reg_to_split: &Reg,
@@ -123,7 +123,6 @@ impl Func {
 
             let mut index = 0;
             let mut new_insts: Vec<ObjPtr<LIRInst>> = Vec::with_capacity(bb.insts.len());
-
             //初始化live now
             while index < bb.insts.len() {
                 let inst = bb.insts.get(index).unwrap();

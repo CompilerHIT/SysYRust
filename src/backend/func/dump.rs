@@ -1,6 +1,7 @@
 use super::*;
 /// 打印函数当前的汇编形式
 impl Func {
+    ///生成抽象汇编
     pub fn generate_row(&mut self, f: &mut File) {
         if self.const_array.len() > 0 || self.float_array.len() > 0 {
             writeln!(f, "	.data\n   .align  3").unwrap();
@@ -23,6 +24,7 @@ impl Func {
         }
     }
 
+    ///打印调试用的汇编到指定文件中
     pub fn print_func(func: ObjPtr<Func>, path: &str) {
         let func_print_path = path.to_string();
         debug_assert!({
@@ -40,7 +42,7 @@ impl Func {
 }
 
 impl Func {
-    ///依赖外部的calc live
+    ///打印calc live后的寄存器生存区间: 依赖外部的calc live
     pub fn print_live_interval(&self, path: &str) {
         log_file!(path, "func:{}", self.label);
         for bb in self.blocks.iter() {

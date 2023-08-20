@@ -87,7 +87,7 @@ fn run_main() {
     drop(compunit);
 
     // let is_pa = o1_option;
-    let is_pa = false;
+    let is_pa = true;
     // ir优化
     sysylib::ir::add_interface(
         &mut module,

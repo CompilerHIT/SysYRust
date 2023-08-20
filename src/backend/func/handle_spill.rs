@@ -2,7 +2,7 @@ use crate::log_file_uln;
 
 use super::*;
 
-static spill_actions_path: &str = "spill_actions.txt";
+static SPILL_ACTIONS_PATH: &str = "spill_actions.txt";
 
 /// handle spill v3实现
 impl Func {
@@ -69,17 +69,13 @@ impl Func {
             phisic_mems.insert(reg, new_stack_slot);
         }
 
-        Func::print_func(
-            ObjPtr::new(&self),
-            format!("asm_before_handle_spill_{}.txt", self.label).as_str(),
-        );
         self.print_live_interval(
             format!("live_interval_before_handle_spill_{}.txt", self.label).as_str(),
         );
         // debug_assert!();
         let to_process = self.blocks.iter().cloned().collect::<Vec<ObjPtr<BB>>>();
         // Func::print_func(ObjPtr::new(&self), "before_handle_spill.txt");
-        log_file!(spill_actions_path, "\n\nfunc:{}", self.label);
+        log_file!(SPILL_ACTIONS_PATH, "\n\nfunc:{}", self.label);
         for bb in to_process.iter() {
             if bb.insts.len() == 0 {
                 continue;
@@ -91,9 +87,7 @@ impl Func {
             ObjPtr::new(&self),
             format!("after_handle_spill_{}.txt", self.label).as_str(),
         );
-        self.print_live_interval(
-            format!("live_interval_after_handle_spill_{}.txt", self.label).as_str(),
-        );
+
         debug_assert!(self.draw_all_virtual_regs().len() == 0);
     }
 
@@ -330,7 +324,7 @@ impl Func {
         //根据next occur更新rentor和holder
         Func::refresh_rentors_and_holders_with_next_occur(rentors, holders, &next_occurs);
         new_insts.push(*inst);
-        log_file!(spill_actions_path, "{}", inst.to_string());
+        log_file!(SPILL_ACTIONS_PATH, "{}", inst.to_string());
     }
 
     //不需要给物理寄存器分配空间,因为每个块中都会为物理寄存器临时分配空间
@@ -340,7 +334,7 @@ impl Func {
         bb: &ObjPtr<BB>,
         pool: &mut BackendPool,
     ) {
-        log_file!(spill_actions_path, "\nblock:{}", bb.label);
+        log_file!(SPILL_ACTIONS_PATH, "\nblock:{}", bb.label);
         let spill_stack_map = &self.spill_stack_map;
         let mut next_occurs = Func::build_next_occurs(bb);
         let mut new_insts = Vec::new();

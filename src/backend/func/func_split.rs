@@ -68,7 +68,8 @@ impl Func {
             bb.as_mut().func_label = new_name.clone();
         }
     }
-    /// 给label改名,加上指定后缀
+
+    /// 给所有块label加入指定后缀
     pub fn suffix_bb(&mut self, suffix: &String) {
         //记录bb,遇到指令进行替换
         let mut old_new = HashMap::new();
