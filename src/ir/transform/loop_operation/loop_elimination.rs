@@ -229,7 +229,7 @@ fn loop_eliminate(
                 && if let InstKind::Call(callee) = inst.get_kind() {
                     call_op_set.contains(&callee)
                 } else {
-                    false
+                    true
                 }
                 && inst
                     .get_use_list()
