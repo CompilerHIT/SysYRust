@@ -158,6 +158,8 @@ fn dump_external_func() -> String {
     ext_fun.push("declare i32 @hitsz_thread_create()\n");
     ext_fun.push("declare void @hitsz_thread_join()\n");
     ext_fun.push("declare void @hitsz_get_thread_num()\n");
+    ext_fun.push("declare void @hitsz_memset(ptr, i32, i32)\n");
+    ext_fun.push("declare void @hitsz_memcopy(ptr,ptr,i32)\n");
 
     let mut text = String::new();
     text += "; External Functions\n";
