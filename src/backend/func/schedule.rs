@@ -18,6 +18,7 @@ impl Func {
 
     /// 块内代码调度
     pub fn list_scheduling_tech(&mut self) {
+        let size = 50;
         // 建立数据依赖图
         for b in self.blocks.iter() {
             let mut graph: Graph<ObjPtr<LIRInst>, (i32, ObjPtr<LIRInst>)> = Graph::new();

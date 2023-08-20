@@ -80,7 +80,7 @@ impl AsmModule {
         // self.print_asm("after_scehdule.log");
         config::record_event("start handle spill");
         // self.print_asm("before_spill.log");
-        if is_opt {
+        if true {
             config::record_event("start first realloc before handle spill");
             self.first_realloc();
             config::record_event("finish first realloc before handle spill");
