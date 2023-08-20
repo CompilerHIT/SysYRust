@@ -9,13 +9,13 @@ use crate::{
         regalloc::structs::RegUsedStat,
     },
     container::bitmap::Bitmap,
-    utility::ObjPtr,
+    utility::{ObjPtr, ScalarType},
 };
 
 use super::{structs::FuncAllocStat, *};
 
 // 默认按照end进行排序
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Clone)]
 struct RegInteval {
     reg: Reg,
     color: i32,
@@ -134,11 +134,18 @@ pub fn alloc(func: &Func) -> FuncAllocStat {
     regs.sort_by_cached_key(|reg| starts.get(reg).unwrap());
     let mut colors: HashMap<i32, i32> = HashMap::new();
     let mut spillings: HashSet<i32> = HashSet::new();
-    let mut windows: BiHeap<RegInteval> = BiHeap::new();
+    let mut iwindows: BiHeap<RegInteval> = BiHeap::new();
+    let mut fwindows: BiHeap<RegInteval> = BiHeap::new();
     let mut reg_use_stat = RegUsedStat::new();
     for reg in regs.iter() {
         let cur_index = starts.get(reg).unwrap();
+        let end_index = ends.get(reg).unwrap();
         // 判断当前是否有终结日期小于cur_index的寄存器,如果有,则可以释放
+        let windows = match reg.get_type() {
+            ScalarType::Int => &mut iwindows,
+            ScalarType::Float => &mut fwindows,
+            _ => unreachable!(),
+        };
         while !windows.is_empty() {
             let min = windows.peek_min().unwrap().end;
             if &min < cur_index {
@@ -156,8 +163,72 @@ pub fn alloc(func: &Func) -> FuncAllocStat {
                 break;
             }
         }
-    }
 
-    //alloc
-    todo!();
+        if reg.is_physic() {
+            // 否则把里面有该颜色的寄存器给释放
+            if reg_use_stat.is_available_reg(reg.get_color()) {
+                reg_use_stat.use_reg(reg.get_color());
+                windows.push(RegInteval {
+                    reg: *reg,
+                    color: reg.get_color(),
+                    start: *cur_index,
+                    end: *end_index,
+                });
+            } else {
+                let mut new_windows: BiHeap<RegInteval> = BiHeap::new();
+                for rt in windows.iter() {
+                    if rt.color == reg.get_color() {
+                        spillings.insert(rt.reg.get_id());
+                        continue;
+                    }
+                    new_windows.push(rt.clone());
+                }
+                *windows = new_windows;
+            }
+            continue;
+        }
+
+        // 加入新的寄存器,寻找可以着色的颜色
+        let color = reg_use_stat.get_available_reg(reg.get_type());
+        if let Some(color) = color {
+            reg_use_stat.use_reg(color);
+            windows.push(RegInteval {
+                reg: *reg,
+                color,
+                start: *cur_index,
+                end: *end_index,
+            });
+        } else {
+            // 竞争,找到当前块最大的与之颜色冲突的颜色,
+            let mut new_windows: BiHeap<RegInteval> = BiHeap::new();
+            while !windows.is_empty() {
+                let max = windows.pop_max().unwrap();
+                if max.reg.is_physic() {
+                    new_windows.push(max);
+                    continue;
+                }
+                if max.end > *end_index {
+                    new_windows.push(RegInteval {
+                        reg: *reg,
+                        color: max.color,
+                        start: *cur_index,
+                        end: *end_index,
+                    });
+                    spillings.insert(max.reg.get_id());
+                } else {
+                    new_windows.push(max);
+                    spillings.insert(reg.get_id());
+                }
+                break;
+            }
+            for ri in windows.iter() {
+                new_windows.push(ri.clone());
+            }
+            *windows = new_windows;
+        }
+    }
+    FuncAllocStat {
+        spillings: spillings,
+        dstr: colors,
+    }
 }
