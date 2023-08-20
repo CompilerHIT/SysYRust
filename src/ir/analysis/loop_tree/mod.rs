@@ -46,6 +46,11 @@ impl LoopList {
             );
         });
     }
+
+    pub fn add_loop(&mut self, new_loop: LoopInfo) {
+        let new_loop = self.pool.put(new_loop);
+        self.loops.insert(0, new_loop);
+    }
 }
 
 impl Debug for LoopList {
@@ -89,6 +94,26 @@ impl LoopInfo {
         }
     }
 
+    pub fn new_loop(
+        parent: Option<ObjPtr<LoopInfo>>,
+        pre_header: Option<ObjPtr<BasicBlock>>,
+        header: ObjPtr<BasicBlock>,
+        latchs: Option<Vec<ObjPtr<BasicBlock>>>,
+        exit_blocks: Option<Vec<ObjPtr<BasicBlock>>>,
+        blocks: Vec<ObjPtr<BasicBlock>>,
+        sub_loops: Vec<ObjPtr<LoopInfo>>,
+    ) -> LoopInfo {
+        LoopInfo {
+            parent,
+            pre_header,
+            header,
+            latchs,
+            exit_blocks,
+            blocks,
+            sub_loops,
+        }
+    }
+
     /// 判断一个循环是否是当前循环的子循环
     pub fn is_a_sub_loop(&self, loop_tree: ObjPtr<LoopInfo>) -> bool {
         self.sub_loops.contains(&loop_tree)
@@ -123,7 +148,6 @@ impl LoopInfo {
 
     /// 在第一次设置preheader的时候使用
     pub fn set_pre_header(&mut self, pre_header: ObjPtr<BasicBlock>) {
-        debug_assert_eq!(self.pre_header, None);
         self.pre_header = Some(pre_header);
         if let Some(mut parent) = self.parent {
             parent.blocks.push(pre_header);
