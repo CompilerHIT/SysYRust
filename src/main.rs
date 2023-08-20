@@ -85,10 +85,12 @@ fn run_main() {
         &mut pool_func,
     );
     drop(compunit);
-
+    
+    // let is_pa = o1_option;
+    let is_pa = false;
     // ir优化
     if o1_option {
-        sysylib::ir::add_interface(&mut module, &mut pool_func, &mut pool_inst, o1_option);
+        sysylib::ir::add_interface(&mut module, &mut pool_func, &mut pool_inst, o1_option, is_pa);
     }
     sysylib::ir::optimizer_run(&mut module, (&mut pool_bb, &mut pool_inst), o1_option);
     let output2 = "row_asm.log";
@@ -98,8 +100,6 @@ fn run_main() {
     // let is_opt = true;
     // let is_opt = false;
 
-    // let is_pa = o1_option;
-    let is_pa = false;
     generate_asm(
         filename,
         output,

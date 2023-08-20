@@ -70,40 +70,43 @@ pub fn add_interface(
     func_pool: &mut ObjPool<Function>,
     inst_pool: &mut ObjPool<Inst>,
     optimize_flag: bool,
+    pa_flag: bool,
 ) {
     if !optimize_flag {
         return;
     }
 
-    // 增加自动并行化接口
-
-    // void hitsz_thread_init();
-    // 初始化线程池，在main函数中调用一次即可
-    let thread_init = func_pool.new_function();
-    module.push_function("hitsz_thread_init".to_string(), thread_init);
-    // 将这个函数插入到main函数的开头
-    let thread_init_call = inst_pool.make_void_call("hitsz_thread_init".to_string(), vec![]);
-    module
-        .get_function("main")
-        .get_head()
-        .push_front(thread_init_call);
-
-    // int hitsz_thread_create();
-    // 创建一个新的线程，返回线程id
-    let mut thread_create = func_pool.new_function();
-    thread_create.set_return_type(super::ir_type::IrType::Int);
-    module.push_function("hitsz_thread_create".to_string(), thread_create);
-
-    // void hitsz_thread_join();
-    // 等待线程结束
-    let thread_join = func_pool.new_function();
-    module.push_function("hitsz_thread_join".to_string(), thread_join);
-
-    // int hitsz_get_thread_num();
-    // 获取当前线程id
-    let mut get_thread_num = func_pool.new_function();
-    get_thread_num.set_return_type(super::ir_type::IrType::Int);
-    module.push_function("hitsz_get_thread_num".to_string(), get_thread_num);
+    if pa_flag {
+        // 增加自动并行化接口
+    
+        // void hitsz_thread_init();
+        // 初始化线程池，在main函数中调用一次即可
+        let thread_init = func_pool.new_function();
+        module.push_function("hitsz_thread_init".to_string(), thread_init);
+        // 将这个函数插入到main函数的开头
+        let thread_init_call = inst_pool.make_void_call("hitsz_thread_init".to_string(), vec![]);
+        module
+            .get_function("main")
+            .get_head()
+            .push_front(thread_init_call);
+    
+        // int hitsz_thread_create();
+        // 创建一个新的线程，返回线程id
+        let mut thread_create = func_pool.new_function();
+        thread_create.set_return_type(super::ir_type::IrType::Int);
+        module.push_function("hitsz_thread_create".to_string(), thread_create);
+    
+        // void hitsz_thread_join();
+        // 等待线程结束
+        let thread_join = func_pool.new_function();
+        module.push_function("hitsz_thread_join".to_string(), thread_join);
+    
+        // int hitsz_get_thread_num();
+        // 获取当前线程id
+        let mut get_thread_num = func_pool.new_function();
+        get_thread_num.set_return_type(super::ir_type::IrType::Int);
+        module.push_function("hitsz_get_thread_num".to_string(), get_thread_num);
+    }
 
     // void hitsz_memset(intptr array, int value, int n);
     let mut memset = func_pool.new_function();
