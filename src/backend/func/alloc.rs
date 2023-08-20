@@ -38,41 +38,24 @@ impl Func {
                 bb.as_mut().live_out.insert(*reg);
             }
         }
-        config::record_event("start  perfect alloc");
-        let alloc_stat = perfect_alloc::alloc_with_constraints(&self, &HashMap::new());
-        if alloc_stat.is_some() {
-            let alloc_stat = alloc_stat.unwrap();
-            regalloc::check_alloc_v2(&self, &alloc_stat.dstr, &alloc_stat.spillings);
-            self.reg_alloc_info = alloc_stat;
-            self.context.as_mut().set_reg_map(&self.reg_alloc_info.dstr);
-            return;
+
+        if self.num_insts() < 10_0000 {
+            config::record_event("start  perfect alloc");
+            let alloc_stat = perfect_alloc::alloc_with_constraints(&self, &HashMap::new());
+            if alloc_stat.is_some() {
+                let alloc_stat = alloc_stat.unwrap();
+                regalloc::check_alloc_v2(&self, &alloc_stat.dstr, &alloc_stat.spillings);
+                self.reg_alloc_info = alloc_stat;
+                self.context.as_mut().set_reg_map(&self.reg_alloc_info.dstr);
+                return;
+            }
+            config::record_event("start easygc alloc");
         }
-        config::record_event("start easygc alloc");
         let alloc_stat = easy_gc_alloc::alloc(&self);
         regalloc::check_alloc_v2(&self, &alloc_stat.dstr, &alloc_stat.spillings);
         self.reg_alloc_info = alloc_stat;
         self.context.as_mut().set_reg_map(&self.reg_alloc_info.dstr);
         config::record_event("finish easygc alloc");
         return;
-    }
-
-    pub fn allocate_reg(&mut self) {
-        //分类分配
-        //不保留临时寄存器的分配方式,这个时候采用完美试探分配,
-        self.calc_live_for_alloc_reg();
-        let alloc_stat = perfect_alloc::alloc_with_constraints(self, &HashMap::new());
-        if alloc_stat.is_some() {
-            let alloc_stat = alloc_stat.unwrap();
-            regalloc::check_alloc_v2(&self, &alloc_stat.dstr, &alloc_stat.spillings);
-            self.reg_alloc_info = alloc_stat;
-            self.context.as_mut().set_reg_map(&self.reg_alloc_info.dstr);
-            return;
-        }
-        // 保留临时寄存器的分配方式
-        self.calc_live_for_alloc_reg();
-        let alloc_stat = easy_gc_alloc::alloc(&self);
-        regalloc::check_alloc_v2(&self, &alloc_stat.dstr, &alloc_stat.spillings);
-        self.reg_alloc_info = alloc_stat;
-        self.context.as_mut().set_reg_map(&self.reg_alloc_info.dstr);
     }
 }
