@@ -69,7 +69,7 @@ pub fn generate_asm(
     row_path: &str,
     module: &mut AsmModule,
     is_opt: bool,
-	is_pa: bool
+    is_pa: bool,
 ) {
     let mut file = match File::create(path) {
         Ok(f) => f,
@@ -100,14 +100,14 @@ pub fn generate_asm(
         config::record_event("finish merge reg");
     }
     if is_opt {
-		// 再次进行指令重排
+        // 再次进行指令重排
         // module.re_list_scheduling();
-        
+
         // 额外的块优化处理
         BackendPass::new(ObjPtr::new(module)).block_pass_pre_clear(&mut pool);
         BackendPass::new(ObjPtr::new(module)).block_pass(&mut pool);
     }
-	// 检查b型指令溢出，用j型指令替换
+    // 检查b型指令溢出，用j型指令替换
     module.handle_overflow_br(&mut pool);
     if is_opt {
         BackendPass::new(ObjPtr::new(module)).block_last_pass();

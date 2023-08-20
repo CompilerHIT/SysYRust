@@ -143,6 +143,7 @@ impl Func {
                         match tmp_holder {
                             TmpHolder::Reg(tmp_holder_reg) => {
                                 Func::mv_back(&reg, &tmp_holder_reg, &mut new_insts, pool);
+                                assert!(tmp_holder_regs.remove(&tmp_holder_reg).is_some());
                             }
                             TmpHolder::StackOffset(pos) => {
                                 Func::load_back_from_certain_pos(&reg, pos, &mut new_insts, pool);
@@ -170,7 +171,6 @@ impl Func {
                         _ => (),
                     }
                 }
-
                 //更新next occur
                 Func::refresh_next_occurs(&mut next_occurs, index);
 
@@ -263,18 +263,18 @@ impl Func {
                 for reg in to_saved {
                     if let Some(color) = tmp_holder_regs_choicess.get_available_reg(reg.get_type())
                     {
-                        let tmp_holder = Reg::from_color(color);
-                        tmp_holder_regs_choicess.use_reg(color);
-                        debug_assert!(!Reg::get_all_specials().contains(&tmp_holder));
-                        self.split_to_reg(
-                            &reg,
-                            &tmp_holder,
-                            &mut new_insts,
-                            pool,
-                            &mut split_maps,
-                            &mut tmp_holder_regs,
-                        );
-                        continue;
+                        // let tmp_holder = Reg::from_color(color);
+                        // tmp_holder_regs_choicess.use_reg(color);
+                        // debug_assert!(!Reg::get_all_specials().contains(&tmp_holder));
+                        // self.split_to_reg(
+                        //     &reg,
+                        //     &tmp_holder,
+                        //     &mut new_insts,
+                        //     pool,
+                        //     &mut split_maps,
+                        //     &mut tmp_holder_regs,
+                        // );
+                        // continue;
                     }
                     // 否则使用栈空间做中转,对于同一物理寄存器使用同一栈空间
                     self.split_to_stack(

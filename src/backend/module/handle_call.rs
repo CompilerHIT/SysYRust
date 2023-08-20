@@ -8,7 +8,6 @@ impl AsmModule {
         callees_used: &HashMap<String, HashSet<Reg>>,
         callees_be_saved: &HashMap<String, HashSet<Reg>>,
     ) {
-        let callees_be_saved = callees_be_saved;
         for (_, func) in self.name_func.iter() {
             if func.is_extern {
                 continue;

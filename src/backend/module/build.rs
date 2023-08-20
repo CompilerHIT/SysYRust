@@ -74,11 +74,13 @@ impl AsmModule {
             }
             // self.map_v_to_p();
         }
+
         config::record_event("finish first alloc");
         self.remove_unuse_inst_suf_alloc();
         config::record_event("finish rm inst suf first alloc");
         // self.print_asm("after_scehdule.log");
         config::record_event("start handle spill");
+
         // self.print_asm("before_spill.log");
         if true {
             config::record_event("start first realloc before handle spill");
@@ -120,7 +122,8 @@ impl AsmModule {
             AsmModule::build_used_but_not_saveds(&callers_used, &callees_used, callees_be_saved);
         config::record_event("start handle call");
         // self.print_asm("before_handle_call.txt");
-        if is_opt {
+
+        if true {
             self.handle_call(pool, &callers_used, &callees_used, callees_be_saved);
         } else {
             self.handle_call_tmp(pool);
