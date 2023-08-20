@@ -80,7 +80,7 @@ fn copy_bb(
     // 初始化bb
     bb_copy.init_head();
     let name = bb_copy.get_name().to_string();
-    let random = rand::random::<u32>();
+    let random = rand::random::<u16>();
     bb_copy.set_name(format!("L_{}_{}_{}_R", func_name, name, random));
 
     // 复制指令

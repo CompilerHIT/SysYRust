@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::{
     ir::{
@@ -25,6 +25,9 @@ use super::{bfs_inst_process, inst_process_in_bb};
 
 pub fn inline_run(module: &mut Module, pools: &mut (&mut ObjPool<BasicBlock>, &mut ObjPool<Inst>)) {
     let mut call_map = call_map_gen(module);
+
+    // 尝试不内联自动并行化之后的函数
+    delete_para_func(module, &mut call_map);
 
     // 先内联没有后继的函数
     inline_no_succ(module, &mut call_map, pools);
@@ -118,6 +121,29 @@ fn inline_no_succ(
 
         if !changed {
             break;
+        }
+    }
+}
+
+fn delete_para_func(module: &mut Module, call_map: &mut CallMap) {
+    let mut func_list = Vec::new();
+    func_process(module, |name, func| {
+        if name != "main" {
+            bfs_inst_process(func.get_head(), |inst| {
+                if let InstKind::Call(callee) = inst.get_kind() {
+                    if callee == "hitsz_thread_create" {
+                        func_list.push(name.clone());
+                        return;
+                    }
+                }
+            });
+        }
+    });
+
+    for func in func_list {
+        let predecessors = call_map.find_predecessors(&func);
+        for pred in predecessors {
+            call_map.delete_edge(&pred, &func);
         }
     }
 }

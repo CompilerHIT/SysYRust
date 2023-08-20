@@ -33,7 +33,6 @@ pub fn delete_uncalled_func(module: &mut Module, call_map: &mut CallMap) {
         }
     }
     for func_name in uncalled_funcs.iter() {
-        module.delete_function(&func_name);
         call_map.delete_func(func_name);
     }
 }
