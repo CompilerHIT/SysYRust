@@ -48,7 +48,7 @@ pub fn optimizer_run(
 
         // 指令下沉
         sink::sink(module, &mut pools);
-        sink::sink_opt(module, &mut pools, optimize_flag);
+        // sink::sink_opt(module, &mut pools, optimize_flag);
 
         // 尾递归优化
         tail_call_optimize::tail_call_optimize(module, &mut pools);
@@ -67,10 +67,10 @@ pub fn optimizer_run(
         functional_optimizer(module, &mut pools, optimize_flag);
 
         // 指令下沉
-        sink::sink(module, &mut pools);
-        sink::sink_opt(module, &mut pools, optimize_flag);
-        hoist_to_loop_head(module, &mut pools);
-        functional_optimizer(module, &mut pools, optimize_flag);
+        // sink::sink(module, &mut pools);
+        // sink::sink_opt(module, &mut pools, optimize_flag);
+        // hoist_to_loop_head(module, &mut pools);
+        // functional_optimizer(module, &mut pools, optimize_flag);
 
     }
 }
