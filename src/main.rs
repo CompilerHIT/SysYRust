@@ -97,12 +97,16 @@ fn run_main() {
     let is_opt = o1_option;
     // let is_opt = true;
     // let is_opt = false;
+
+    // let is_pa = o1_option;
+    let is_pa = false;
     generate_asm(
         filename,
         output,
         output2,
         &mut AsmModule::new(module),
         is_opt,
+        is_pa
     );
     config::record_event("finish compile");
     // 编译结束后打印记录的属性

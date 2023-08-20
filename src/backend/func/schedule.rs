@@ -296,17 +296,13 @@ fn def_use_near(inst: ObjPtr<LIRInst>, last: ObjPtr<LIRInst>) -> bool {
 fn sl_conflict(inst1: ObjPtr<LIRInst>, inst2: ObjPtr<LIRInst>) -> bool {
     // 写后写
     if inst1.get_type() == inst2.get_type() && inst1.get_type() == InstrsType::Store {
-        if inst1.operands[1] == inst2.operands[1] {
-            return true;
-        }
+        return true;
     }
     // 写后读/读后写
     if (inst1.get_type() == InstrsType::Load && inst2.get_type() == InstrsType::Store)
         || (inst1.get_type() == InstrsType::Store && inst2.get_type() == InstrsType::Load)
     {
-        if inst1.operands[1] == inst2.operands[1] {
-            return true;
-        }
+        return true;
     }
     false
 }

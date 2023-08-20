@@ -69,6 +69,7 @@ pub fn generate_asm(
     row_path: &str,
     module: &mut AsmModule,
     is_opt: bool,
+	is_pa: bool
 ) {
     let mut file = match File::create(path) {
         Ok(f) => f,
@@ -114,9 +115,7 @@ pub fn generate_asm(
 
     //生成抽象汇编
     // module.generate_row_asm(&mut file2);
-    // let thread = is_opt;
-    let thread = false;
-    if thread {
+    if is_pa {
         writeln!(
             file,
             "
