@@ -135,7 +135,9 @@ impl AsmModule {
         rs.remove(&Reg::get_s0());
         main_func.as_mut().p2v_pre_handle_call(&rs);
         main_func.as_mut().calc_live_for_alloc_reg();
-        main_func.as_mut().alloc_reg_without(&HashSet::new());
+        let mut unavailables = Reg::get_all_tmps();
+        unavailables.insert(Reg::get_s0());
+        main_func.as_mut().alloc_reg_without(&unavailables);
         let callees_used = self.build_callee_used();
         let callee_constraints: HashMap<Reg, HashSet<Reg>> =
             self.build_constraints_with_callee_used(&callees_used);

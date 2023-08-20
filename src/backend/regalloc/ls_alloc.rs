@@ -81,12 +81,13 @@ pub fn alloc(func: &Func) -> FuncAllocStat {
     }
     // 建立指令的线性序
     let orders = build_linear_order(func);
+    debug_assert!(orders.len() == func.num_insts());
     // 建立寄存器在伪拓扑中的生命周期,并按照生命起点进行排序
     let mut starts: HashMap<Reg, usize> = HashMap::new();
     let mut ends: HashMap<Reg, usize> = HashMap::new();
-    let mut regs = func.draw_all_regs();
-    let regs2 = regs.clone();
-    let regs_base = regs.clone();
+
+    let regs_base = func.draw_all_regs();
+    let mut regs = regs_base.clone();
     for (index, inst) in orders.iter().enumerate() {
         let defed: HashSet<Reg> = inst.get_reg_def().iter().cloned().collect();
         let mut to_rm: HashSet<Reg> = HashSet::new();
@@ -103,7 +104,7 @@ pub fn alloc(func: &Func) -> FuncAllocStat {
         }
         regs.retain(|reg| !to_rm.contains(reg));
     }
-    let mut regs2 = regs2;
+    let mut regs2 = regs_base.clone();
     for (index, inst) in orders.iter().enumerate().rev() {
         let used: HashSet<Reg> = inst.get_reg_use().iter().cloned().collect();
         let mut to_rm: HashSet<Reg> = HashSet::new();
@@ -121,25 +122,34 @@ pub fn alloc(func: &Func) -> FuncAllocStat {
         regs2.retain(|reg| !to_rm.contains(reg));
     }
 
-    debug_assert!({
-        let m = true;
-        let regs = func.draw_all_regs();
-        for reg in regs.iter() {
-            assert!(starts.contains_key(reg) && ends.contains_key(reg));
-        }
-        m
-    });
     // 对全部reg 按照start顺序进行排序,并维护一个表
-    let mut regs: Vec<Reg> = regs_base.iter().cloned().collect();
+
+    // sp寄存器不参与排序
+    let mut regs: Vec<Reg> = regs_base
+        .iter()
+        .filter(|reg| *reg != &Reg::get_sp())
+        .cloned()
+        .collect();
     regs.sort_by_cached_key(|reg| starts.get(reg).unwrap());
     let mut colors: HashMap<i32, i32> = HashMap::new();
     let mut spillings: HashSet<i32> = HashSet::new();
     let mut iwindows: BiHeap<RegInteval> = BiHeap::new();
     let mut fwindows: BiHeap<RegInteval> = BiHeap::new();
-    let mut reg_use_stat = RegUsedStat::new();
+    let mut reg_use_stat = RegUsedStat::init_unspecial_regs_without_s0();
+
+    // 开始的时候需要根据live in 修改reg_use_stat能够使用的寄存器
+    let first_block = func.get_first_block();
+    let phy_used = func.draw_phisic_regs();
+    first_block.live_in.iter().for_each(|reg| {
+        if reg.is_physic() && phy_used.is_available_reg(reg.get_color()) {
+            reg_use_stat.use_reg(reg.get_color());
+        }
+    });
+
     for reg in regs.iter() {
         let cur_index = starts.get(reg).unwrap();
         let end_index = ends.get(reg).unwrap();
+        println!("{}:{}-{}", reg, cur_index, end_index);
         // 判断当前是否有终结日期小于cur_index的寄存器,如果有,则可以释放
         let windows = match reg.get_type() {
             ScalarType::Int => &mut iwindows,
@@ -184,6 +194,12 @@ pub fn alloc(func: &Func) -> FuncAllocStat {
                     new_windows.push(rt.clone());
                 }
                 *windows = new_windows;
+                windows.push(RegInteval {
+                    reg: *reg,
+                    color: reg.get_color(),
+                    start: *cur_index,
+                    end: *end_index,
+                });
             }
             continue;
         }
@@ -227,8 +243,19 @@ pub fn alloc(func: &Func) -> FuncAllocStat {
             *windows = new_windows;
         }
     }
+    for rt in fwindows.iter() {
+        if !rt.reg.is_physic() {
+            colors.insert(rt.reg.get_id(), rt.color);
+        }
+    }
+    for rt in iwindows.iter() {
+        if !rt.reg.is_physic() {
+            colors.insert(rt.reg.get_id(), rt.color);
+        }
+    }
+
     FuncAllocStat {
-        spillings: spillings,
+        spillings,
         dstr: colors,
     }
 }

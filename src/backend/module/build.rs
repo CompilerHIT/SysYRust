@@ -138,7 +138,7 @@ impl AsmModule {
         }
         self.update_array_offset(pool);
         config::record_event("finish update_array_offset");
-        // self.print_asm("before_rm_inst_suf_update_array.txt");
+        self.print_asm("asm_before_rm_inst_suf_update_array.txt");
         self.rm_inst_suf_update_array_offset(pool, &used_but_not_saved);
         config::record_event("finish rm suf update array offset");
         //检查代码中是否会def sp

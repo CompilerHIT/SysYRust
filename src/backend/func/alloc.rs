@@ -39,8 +39,8 @@ impl Func {
             }
         }
 
-        // // 加入线性扫描(如果代码行数大于某个阈值,则启动线性扫描)
-        // if self.num_insts() > 1_0000 {
+        // // // 加入线性扫描(如果代码行数大于某个阈值,则启动线性扫描)
+        // if self.num_insts() > 1 {
         //     config::record_event("start ls alloc");
         //     let alloc_stat = ls_alloc::alloc(&self);
         //     regalloc::check_alloc_v2(&self, &alloc_stat.dstr, &alloc_stat.spillings);
