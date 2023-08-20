@@ -329,11 +329,11 @@ fn dump_inst(
             let ptr;
             let name;
             name_index = put_name(local_map, inst, name_index);
-            if let InstKind::Load = inst.get_ptr().get_kind() {
-                ptr = inst.get_ptr().get_ptr();
+            if let InstKind::Load = inst.get_gep_ptr().get_kind() {
+                ptr = inst.get_gep_ptr().get_ptr();
                 name = global_map.get(&ptr).unwrap().clone();
             } else {
-                ptr = inst.get_ptr();
+                ptr = inst.get_gep_ptr();
                 name = get_inst_value(ptr, local_map, global_map);
             };
             if let InstKind::Parameter = ptr.get_kind() {
@@ -443,7 +443,7 @@ fn dump_inst(
                 text += format!(
                     "  store i32 {}, i32* {}, align 4\n",
                     get_inst_value(inst.get_value(), local_map, global_map),
-                    get_inst_value(inst.get_ptr(), local_map, global_map)
+                    get_inst_value(inst.get_dest(), local_map, global_map)
                 )
                 .as_str();
             }
@@ -451,7 +451,7 @@ fn dump_inst(
                 text += format!(
                     "  store float {}, float* {}, align 4\n",
                     get_inst_value(inst.get_value(), local_map, global_map),
-                    get_inst_value(inst.get_ptr(), local_map, global_map)
+                    get_inst_value(inst.get_dest(), local_map, global_map)
                 )
                 .as_str();
             }
