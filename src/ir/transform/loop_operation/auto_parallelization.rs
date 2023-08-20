@@ -48,13 +48,15 @@ pub fn auto_paralellization(
                 // 从最外层循环开始检测是否可并行化
                 if check_parallelization(
                     current_loop,
+                    current_loop,
                     &call_op,
                     &mut op,
                     &mut unop,
                     Vec::new(),
                     Vec::new(),
                     &mut analyzer,
-                ) {
+                ) && current_loop.get_sub_loops().len() != 0
+                {
                     parallelized_insert(current_loop, &mut parallelized);
                     if let Some(new_loop) = parallelize(current_loop, pools) {
                         new_loop_list.push(new_loop);
@@ -81,25 +83,6 @@ pub fn auto_paralellization(
                 .find(|x| !op.contains(x) && !unop.contains(x))
                 .unwrap()
         );
-
-        // 将能够并行但还未加入到并行化列表的循环加入到并行化列表
-        op.iter().for_each(|x| {
-            if !parallelized.contains(x) {
-                let mut current_loop = *x;
-                while let Some(x) = current_loop.get_parent_loop() {
-                    if op.contains(&x) && !parallelized.contains(&x) {
-                        current_loop = x;
-                    } else {
-                        break;
-                    }
-                }
-                parallelized_insert(current_loop, &mut parallelized);
-                parallelize(current_loop, pools);
-                analyzer.clear();
-            }
-        });
-
-        debug_assert_eq!(op, parallelized);
     });
 }
 
@@ -114,6 +97,7 @@ fn parallelized_insert(loop_info: ObjPtr<LoopInfo>, parallelized: &mut HashSet<O
 
 fn check_parallelization(
     mut current_loop: ObjPtr<LoopInfo>,
+    parent_loop: ObjPtr<LoopInfo>,
     call_op: &HashSet<String>,
     op: &mut HashSet<ObjPtr<LoopInfo>>,
     unop: &mut HashSet<ObjPtr<LoopInfo>>,
@@ -140,7 +124,7 @@ fn check_parallelization(
             if !inst
                 .get_use_list()
                 .iter()
-                .all(|user| current_loop.is_in_current_loop(&user.get_parent_bb()))
+                .all(|user| parent_loop.is_in_loop(&user.get_parent_bb()))
             {
                 flag = false;
                 return;
@@ -158,7 +142,9 @@ fn check_parallelization(
                         if let Some(x) = read_map.get_mut(&array) {
                             x.insert(gep);
                         } else {
-                            read_map.insert(array, HashSet::new());
+                            let mut set = HashSet::new();
+                            set.insert(gep);
+                            read_map.insert(array, set);
                         }
                     }
                 }
@@ -178,7 +164,9 @@ fn check_parallelization(
                     if let Some(x) = write_map.get_mut(&array) {
                         x.insert(gep);
                     } else {
-                        write_map.insert(array, HashSet::new());
+                        let mut set = HashSet::new();
+                        set.insert(gep);
+                        write_map.insert(array, set);
                     }
                 }
                 InstKind::Call(callee) => {
@@ -209,16 +197,22 @@ fn check_parallelization(
         iv_set.insert(inst);
         inst = inst.get_next();
     }
-    if iv_set.len() != 1 {
+    if current_loop == parent_loop && iv_set.len() != 1 {
         unop.insert(current_loop);
         return false;
     }
 
-    let new_iv = analyzer.analyze(iv_set.iter().next().unwrap());
-    if !new_iv.is_scev_rec_expr() {
+    //let new_iv = analyzer.analyze(iv_set.iter().next().unwrap());
+    let mut new_iv = iv_set
+        .iter()
+        .map(|x| analyzer.analyze(x))
+        .filter(|x| x.is_scev_rec_expr())
+        .collect::<Vec<_>>();
+    if new_iv.len() != 1 {
         unop.insert(current_loop);
         return false;
     }
+    let new_iv = new_iv.pop().unwrap();
 
     iv.push(new_iv);
 
@@ -333,6 +327,7 @@ fn check_parallelization(
     for child in current_loop.get_sub_loops().iter() {
         if !check_parallelization(
             *child,
+            parent_loop,
             call_op,
             op,
             unop,

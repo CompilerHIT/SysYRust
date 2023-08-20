@@ -64,6 +64,7 @@ pub fn optimizer_run(
 
         // 循环优化
         loop_operation::loop_optimize(module, 100, &mut pools, false);
+        simplify_cfg::simplify_cfg_run(module, &mut pools);
         functional_optimizer(module, &mut pools, optimize_flag);
 
         // 指令下沉
