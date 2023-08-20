@@ -103,6 +103,7 @@ fn loop_induct(
         let inst_scev = analyzer.analyze(&inst);
         if users.len() > 0 && inst_scev.is_scev_rec() {
             let new_inst = parse_inst(
+                loop_info,
                 loop_info.get_preheader().get_tail_inst(),
                 round,
                 &inst_scev.get_operands(),
@@ -326,8 +327,8 @@ fn parse_round(
                         pools: &mut (&mut ObjPool<BasicBlock>, &mut ObjPool<Inst>)|
      -> ObjPtr<Inst> {
         let mut tail = loop_info.get_preheader().get_tail_inst();
-        let start = parse_one_inst(start, tail, pools);
-        let end = parse_one_inst(end, tail, pools);
+        let start = parse_one_inst(loop_info, start, tail, pools);
+        let end = parse_one_inst(loop_info, end, tail, pools);
 
         let mut minus = pools.1.make_sub(end, start);
         tail.insert_before(minus);
@@ -379,16 +380,17 @@ fn parse_round(
 }
 
 fn parse_inst(
+    loop_info: ObjPtr<LoopInfo>,
     mut tail: ObjPtr<Inst>,
     round: ObjPtr<Inst>,
     operands: &[ObjPtr<SCEVExp>],
     pools: &mut (&mut ObjPool<BasicBlock>, &mut ObjPool<Inst>),
 ) -> ObjPtr<Inst> {
-    let start = parse_one_inst(operands[0], tail, pools);
+    let start = parse_one_inst(loop_info, operands[0], tail, pools);
     let step = if operands.len() > 2 {
-        parse_inst(tail, round, &operands[1..], pools)
+        parse_inst(loop_info, tail, round, &operands[1..], pools)
     } else {
-        parse_one_inst(operands[1], tail, pools)
+        parse_one_inst(loop_info, operands[1], tail, pools)
     };
     let mul = pools.1.make_mul(step, round);
     let add = pools.1.make_add(start, mul);
@@ -398,11 +400,12 @@ fn parse_inst(
 }
 
 fn parse_one_inst(
+    loop_info: ObjPtr<LoopInfo>,
     op: ObjPtr<SCEVExp>,
     mut tail: ObjPtr<Inst>,
     pools: &mut (&mut ObjPool<BasicBlock>, &mut ObjPool<Inst>),
 ) -> ObjPtr<Inst> {
-    if op.is_scev_unknown() {
+    if !op.is_scev_constant() && (op.is_scev_unknown() || op.get_in_loop() != Some(loop_info)) {
         op.get_bond_inst()
     } else {
         let vec = parse_scev_exp(op, pools);
