@@ -39,8 +39,8 @@ impl Func {
 
             // 按50条指令进行局部调度防止spill
             let mut set: Vec<Vec<ObjPtr<LIRInst>>> = Vec::new();
-            for i in 0..basicblock.len() / size {
-                let a = basicblock.splice(i..i + size, vec![]).collect();
+            for _ in 0..basicblock.len() / size {
+                let a = basicblock.splice(0..size, vec![]).collect();
                 set.push(a);
             }
             set.push(basicblock);
