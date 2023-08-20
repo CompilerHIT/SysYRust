@@ -25,10 +25,6 @@ pub fn dependency_check(gep: [ObjPtr<Inst>; 2], vector: Vec<(ObjPtr<SCEVExp>, [i
         gep[0].get_gep_ptr() == gep[1].get_gep_ptr()
     });
 
-    if gep[0].get_gep_offset() == gep[1].get_gep_offset() {
-        return false;
-    }
-
     let inst_vec = vector.iter().map(|x| x.0.clone()).collect::<Vec<_>>();
 
     let matrix_1 = parse(gep[0].get_gep_offset(), &inst_vec);
@@ -39,6 +35,9 @@ pub fn dependency_check(gep: [ObjPtr<Inst>; 2], vector: Vec<(ObjPtr<SCEVExp>, [i
     let matrix_2 = parse(gep[1].get_gep_offset(), &inst_vec);
     if matrix_2.is_empty() {
         return true;
+    }
+    if gep[0].get_gep_offset() == gep[1].get_gep_offset() {
+        return false;
     }
 
     debug_assert_eq!(matrix_1.len(), matrix_2.len());
