@@ -85,13 +85,17 @@ fn run_main() {
         &mut pool_func,
     );
     drop(compunit);
-    
+
     // let is_pa = o1_option;
     let is_pa = false;
     // ir优化
-    if o1_option {
-        sysylib::ir::add_interface(&mut module, &mut pool_func, &mut pool_inst, o1_option, is_pa);
-    }
+    sysylib::ir::add_interface(
+        &mut module,
+        &mut pool_func,
+        &mut pool_inst,
+        o1_option,
+        is_pa,
+    );
     sysylib::ir::optimizer_run(&mut module, (&mut pool_bb, &mut pool_inst), o1_option);
     let output2 = "row_asm.log";
 
@@ -106,7 +110,7 @@ fn run_main() {
         output2,
         &mut AsmModule::new(module),
         is_opt,
-        is_pa
+        is_pa,
     );
     config::record_event("finish compile");
     // 编译结束后打印记录的属性
