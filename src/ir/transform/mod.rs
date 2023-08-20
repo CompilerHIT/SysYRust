@@ -38,8 +38,14 @@ pub fn optimizer_run(
         // 简化cfg
         simplify_cfg::simplify_cfg_run(module, &mut pools);
         functional_optimizer(module, &mut pools, optimize_flag);
+
         // 局部冗余消除 指令上提
         partial_redundancy_elimination::pre(module, optimize_flag, &mut pools);
+
+        // 循环尾指令上提
+        sink::sink_opt(module, &mut pools, optimize_flag);
+        hoist_to_loop_head(module, &mut pools);
+        functional_optimizer(module, &mut pools, optimize_flag);
 
         // 循环优化
         loop_operation::loop_optimize(module, 100, &mut pools, para);
@@ -48,7 +54,6 @@ pub fn optimizer_run(
 
         // 指令下沉
         sink::sink(module, &mut pools);
-        // sink::sink_opt(module, &mut pools, optimize_flag);
 
         // 尾递归优化
         tail_call_optimize::tail_call_optimize(module, &mut pools);
@@ -62,16 +67,18 @@ pub fn optimizer_run(
         // 局部冗余消除 指令上提
         partial_redundancy_elimination::pre(module, optimize_flag, &mut pools);
 
+        // 循环尾指令上提
+        sink::sink_opt(module, &mut pools, optimize_flag);
+        hoist_to_loop_head(module, &mut pools);
+        functional_optimizer(module, &mut pools, optimize_flag);
+
         // 循环优化
         loop_operation::loop_optimize(module, 100, &mut pools, false);
         simplify_cfg::simplify_cfg_run(module, &mut pools);
         functional_optimizer(module, &mut pools, optimize_flag);
 
         // 指令下沉
-        // sink::sink(module, &mut pools);
-        // sink::sink_opt(module, &mut pools, optimize_flag);
-        // hoist_to_loop_head(module, &mut pools);
-        // functional_optimizer(module, &mut pools, optimize_flag);
+        sink::sink(module, &mut pools);
 
     }
 }
