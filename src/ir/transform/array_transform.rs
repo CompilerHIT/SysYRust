@@ -273,13 +273,18 @@ fn global_inst_transform(
                 debug_assert!(
                     user.get_kind() == InstKind::Store || user.get_kind() == InstKind::Load
                 );
-                user.set_ptr(variable_get(
+                let ptr = variable_get(
                     inst,
                     pools,
                     &array_name,
                     index.get_int_bond() as usize,
                     &mut var,
-                ));
+                );
+                if user.is_store() {
+                    user.set_dest(ptr);
+                } else {
+                    user.set_ptr(ptr);
+                }
             })
         }
 
