@@ -27,6 +27,7 @@ pub fn optimizer_run(
     module: &mut Module,
     mut pools: (&mut ObjPool<BasicBlock>, &mut ObjPool<Inst>),
     optimize_flag: bool,
+    para: bool,
 ) {
     // 在功能点上对phi指令进行优化
     functional_optimizer(module, &mut pools, optimize_flag);
@@ -39,7 +40,7 @@ pub fn optimizer_run(
         partial_redundancy_elimination::pre(module, optimize_flag, &mut pools);
 
         // 循环优化
-        loop_operation::loop_optimize(module, 100, &mut pools, true);
+        loop_operation::loop_optimize(module, 100, &mut pools, para);
         simplify_cfg::simplify_cfg_run(module, &mut pools);
         functional_optimizer(module, &mut pools, optimize_flag);
 
