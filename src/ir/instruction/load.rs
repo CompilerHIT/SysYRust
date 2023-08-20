@@ -154,6 +154,12 @@ impl Inst {
     /// # Return
     /// 返回指针的引用
     pub fn get_ptr(&self) -> ObjPtr<Inst> {
+        debug_assert_eq!(
+            self.get_kind(),
+            InstKind::Load,
+            "Inst is not a Load, {:?}",
+            self
+        );
         self.user.get_operand(0)
     }
 
