@@ -164,11 +164,11 @@ fn loop_store_eliminate(
     };
 
     insts.iter_mut().for_each(|store| {
-        let gep = store.get_ptr();
+        let gep = store.get_dest();
         let value = store.get_value();
         if loop_info.is_in_current_loop(&gep.get_parent_bb()) && check_value(value) {
             if let Some(round) = round {
-                let array = if gep.get_gep_ptr().is_array() {
+                let array = if gep.get_gep_ptr().is_array() || gep.get_gep_ptr().is_param() {
                     gep.get_gep_ptr()
                 } else {
                     gep.get_gep_ptr().get_ptr()
