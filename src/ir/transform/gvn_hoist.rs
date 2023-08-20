@@ -4,7 +4,7 @@ use crate::{
         basicblock::BasicBlock,
         instruction::{Inst, InstKind},
         module::Module,
-        tools::{dfs_pre_order_bb_process, func_process, inst_process_in_bb, replace_inst},
+        tools::{dfs_pre_order_bb_process, func_process, inst_process_in_bb, replace_inst, bfs_bb_proceess},
     },
     utility::{ObjPool, ObjPtr},
 };
@@ -156,6 +156,65 @@ pub fn hoist_group(
         }
     }
     flag
+}
+
+pub fn hoist_to_loop_head(module: &mut Module, pools: &mut (&mut ObjPool<BasicBlock>, &mut ObjPool<Inst>)){
+    let mut index = 0;
+    func_process(module, |_, func| {
+        let dominator_tree = calculate_dominator(func.get_head());
+        bfs_bb_proceess(func.get_head(), |bb| {
+            let ups = bb.get_up_bb();
+            let mut vec_loop_end = vec![];
+            for up in ups{
+                if dominator_tree.is_dominate(&bb, up){
+                    vec_loop_end.push(up);
+                }
+            }
+            // 先不考虑复杂的情况，仅考虑一条回边的情况
+            if vec_loop_end.len()==1{
+                inst_process_in_bb(vec_loop_end[0].get_head_inst(), |inst| {
+                    hoist_loop_inst(pools.1,inst,bb,&dominator_tree)
+                })
+            }
+        });
+        index +=1;
+    });
+}
+
+pub fn hoist_loop_inst(
+    pool: &mut ObjPool<Inst>,
+    inst: ObjPtr<Inst>,//up中的inst
+    bb_now: ObjPtr<BasicBlock>,
+    dominator_tree: &DominatorTree,
+){
+    match inst.get_kind() {
+        InstKind::Return |InstKind::Alloca(_)|InstKind::Branch|InstKind::Call(_)|InstKind::Load|InstKind::Parameter|InstKind::Phi|InstKind::Store =>{
+            //保险起见,这些指令不移动  
+            // return;  
+        }
+        _=>{
+            // 判断指令是否可造
+            // 创建新指令替换旧指令，修改uselist
+            let oops = inst.get_operands();
+            let mut flag = true;
+            for oop in oops{
+                if oop.is_global_var_or_param(){
+                    continue;
+                }
+                if !dominator_tree.is_dominate(&oop.get_parent_bb(), &bb_now){
+                    flag = false;
+                    break;
+                }
+            }
+            if flag{
+                let inst_temp = bb_now.get_tail_inst();
+                let inst_new = make_same_inst(inst, pool);
+                inst_temp.as_mut().insert_before(inst_new);
+                replace_inst(inst, inst_new);
+                // return;
+            }
+        }
+    }
 }
 
 pub fn check_successor(

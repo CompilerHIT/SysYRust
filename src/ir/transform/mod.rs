@@ -1,3 +1,5 @@
+use self::gvn_hoist::hoist_to_loop_head;
+
 use super::function::Function;
 use super::{basicblock::BasicBlock, instruction::Inst, module::Module};
 use super::{dump_now, tools::*};
@@ -46,6 +48,7 @@ pub fn optimizer_run(
 
         // 指令下沉
         sink::sink(module, &mut pools);
+        sink::sink_opt(module, &mut pools, optimize_flag);
 
         // 尾递归优化
         tail_call_optimize::tail_call_optimize(module, &mut pools);
@@ -62,6 +65,13 @@ pub fn optimizer_run(
         // 循环优化
         loop_operation::loop_optimize(module, 100, &mut pools, false);
         functional_optimizer(module, &mut pools, optimize_flag);
+
+        // 指令下沉
+        sink::sink(module, &mut pools);
+        sink::sink_opt(module, &mut pools, optimize_flag);
+        hoist_to_loop_head(module, &mut pools);
+        functional_optimizer(module, &mut pools, optimize_flag);
+
     }
 }
 
