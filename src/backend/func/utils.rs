@@ -119,7 +119,7 @@ impl Func {
 // 为每个指令创建寄存器的in和 out
 impl Func {
     /// 依赖外部调用的calc live,为了加快速度,使用哈希表
-    pub fn build_live_out_for_insts(&self) -> HashMap<ObjPtr<LIRInst>, Bitmap> {
+    pub fn build_live_out_bitmap_for_insts(&self) -> HashMap<ObjPtr<LIRInst>, Bitmap> {
         let mut live_out_for_insts: HashMap<ObjPtr<LIRInst>, Bitmap> = HashMap::new();
         self.blocks.iter().for_each(|bb| {
             Func::analyse_inst_with_live_now_bitmap_backorder(*bb, &mut |inst, live_now| {
@@ -127,6 +127,15 @@ impl Func {
             })
         });
         live_out_for_insts
+    }
+    pub fn build_live_out_for_insts(&self) -> HashMap<ObjPtr<LIRInst>, HashSet<Reg>> {
+        let mut live_outs: HashMap<ObjPtr<LIRInst>, HashSet<Reg>> = HashMap::new();
+        self.blocks.iter().for_each(|bb| {
+            Func::analyse_inst_with_live_now_backorder(*bb, &mut |inst, live_now| {
+                live_outs.insert(inst, live_now.clone());
+            });
+        });
+        live_outs
     }
 }
 

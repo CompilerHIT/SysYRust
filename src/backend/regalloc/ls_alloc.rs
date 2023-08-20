@@ -8,6 +8,7 @@ use crate::{
         operand::Reg,
         regalloc::structs::RegUsedStat,
     },
+    config,
     container::bitmap::Bitmap,
     utility::{ObjPtr, ScalarType},
 };
@@ -57,99 +58,83 @@ pub fn build_linear_order(func: &Func) -> Vec<ObjPtr<LIRInst>> {
 
 /// 时间复杂度O(NMlogN)
 pub fn alloc(func: &Func) -> FuncAllocStat {
+    config::record_event("start build live out for insts for ls alloc");
     let live_out_for_inst = func.build_live_out_for_insts();
-    // 根据live out 建立live in
-    let mut live_in_for_inst: HashMap<ObjPtr<LIRInst>, Bitmap> = HashMap::new();
-    for bb in func.blocks.iter() {
-        if bb.insts.len() == 0 {
-            continue;
-        }
-        let first_inst = bb.insts.first().unwrap();
-        let mut in_bitmap = Bitmap::new();
-        bb.live_in
-            .iter()
-            .for_each(|reg| in_bitmap.insert(reg.bit_code() as usize));
-        live_in_for_inst.insert(*first_inst, in_bitmap);
-        let mut index = 1;
-        while index < bb.insts.len() {
-            let pre_inst = bb.insts.get(index - 1).unwrap();
-            let cur_inst = bb.insts.get(index).unwrap();
-            let pre_out = live_out_for_inst.get(pre_inst).unwrap();
-            live_in_for_inst.insert(*cur_inst, pre_out.clone());
-            index += 1;
-        }
-    }
+    config::record_event("finish build live out for insts for ls alloc");
     // 建立指令的线性序
+    config::record_event("start build linear order for insts");
     let orders = build_linear_order(func);
+    config::record_event("finish build linear orders for insts");
     debug_assert!(orders.len() == func.num_insts());
     // 建立寄存器在伪拓扑中的生命周期,并按照生命起点进行排序
     let mut starts: HashMap<Reg, usize> = HashMap::new();
     let mut ends: HashMap<Reg, usize> = HashMap::new();
-
-    let regs_base = func.draw_all_regs();
-    let mut regs = regs_base.clone();
+    let mut reg_starts: Vec<(Reg, usize)> = Vec::new();
+    // 建立指令区间
+    config::record_event("start build reg interval for ls alloc");
+    // 建立starts
     for (index, inst) in orders.iter().enumerate() {
-        let defed: HashSet<Reg> = inst.get_reg_def().iter().cloned().collect();
-        let mut to_rm: HashSet<Reg> = HashSet::new();
-        for reg in regs.iter() {
-            if defed.contains(reg)
-                || live_in_for_inst
-                    .get(inst)
-                    .unwrap()
-                    .contains(reg.bit_code() as usize)
-            {
+        for reg in inst.get_regs() {
+            if !starts.contains_key(&reg) {
+                starts.insert(reg, index);
+            }
+        }
+        for reg in live_out_for_inst.get(inst).unwrap() {
+            if !starts.contains_key(reg) {
                 starts.insert(*reg, index);
-                to_rm.insert(*reg);
             }
         }
-        regs.retain(|reg| !to_rm.contains(reg));
     }
-    let mut regs2 = regs_base.clone();
+    //建立 ends
     for (index, inst) in orders.iter().enumerate().rev() {
-        let used: HashSet<Reg> = inst.get_reg_use().iter().cloned().collect();
-        let mut to_rm: HashSet<Reg> = HashSet::new();
-        for reg in regs2.iter() {
-            if used.contains(reg)
-                || live_out_for_inst
-                    .get(inst)
-                    .unwrap()
-                    .contains(reg.bit_code() as usize)
-            {
-                ends.insert(*reg, index);
-                to_rm.insert(*reg);
+        for reg in inst.get_regs() {
+            if !ends.contains_key(&reg) {
+                ends.insert(reg, index);
             }
         }
-        regs2.retain(|reg| !to_rm.contains(reg));
+        for reg in live_out_for_inst.get(inst).unwrap() {
+            if !ends.contains_key(reg) {
+                ends.insert(*reg, index);
+            }
+        }
     }
 
-    // 对全部reg 按照start顺序进行排序,并维护一个表
+    config::record_event("finish build reg interval for ls alloc");
+    let regs: Vec<Reg> = func.draw_all_regs().iter().cloned().collect();
+    let mut unavailables = Reg::get_all_specials_with_s0();
+    unavailables.extend(Reg::get_all_tmps());
+    alloc_with_start_end_unavailables(&starts, &ends, &regs, &unavailables)
+}
 
-    // sp寄存器不参与排序
-    let mut regs: Vec<Reg> = regs_base
+// alloc with unavailables
+fn alloc_with_start_end_unavailables(
+    starts: &HashMap<Reg, usize>,
+    ends: &HashMap<Reg, usize>,
+    regs: &Vec<Reg>,
+    unavailables: &HashSet<Reg>,
+) -> FuncAllocStat {
+    let mut regs: Vec<Reg> = regs
         .iter()
-        .filter(|reg| *reg != &Reg::get_sp())
+        .filter(|reg| !unavailables.contains(&reg))
         .cloned()
         .collect();
+    config::record_event("start sort reg intervals by start for ls alloc");
     regs.sort_by_cached_key(|reg| starts.get(reg).unwrap());
+    config::record_event("finish sort reg intervals by start for ls alloc");
     let mut colors: HashMap<i32, i32> = HashMap::new();
     let mut spillings: HashSet<i32> = HashSet::new();
     let mut iwindows: BiHeap<RegInteval> = BiHeap::new();
     let mut fwindows: BiHeap<RegInteval> = BiHeap::new();
     let mut reg_use_stat = RegUsedStat::init_unspecial_regs_without_s0();
-
+    for reg in unavailables.iter() {
+        reg_use_stat.use_reg(reg.get_color());
+    }
     // 开始的时候需要根据live in 修改reg_use_stat能够使用的寄存器
-    let first_block = func.get_first_block();
-    let phy_used = func.draw_phisic_regs();
-    first_block.live_in.iter().for_each(|reg| {
-        if reg.is_physic() && phy_used.is_available_reg(reg.get_color()) {
-            reg_use_stat.use_reg(reg.get_color());
-        }
-    });
-
+    config::record_event("start windows slice for ls alloc");
     for reg in regs.iter() {
         let cur_index = starts.get(reg).unwrap();
         let end_index = ends.get(reg).unwrap();
-        println!("{}:{}-{}", reg, cur_index, end_index);
+        // println!("{}:{}-{}", reg, cur_index, end_index);
         // 判断当前是否有终结日期小于cur_index的寄存器,如果有,则可以释放
         let windows = match reg.get_type() {
             ScalarType::Int => &mut iwindows,
@@ -253,7 +238,7 @@ pub fn alloc(func: &Func) -> FuncAllocStat {
             colors.insert(rt.reg.get_id(), rt.color);
         }
     }
-
+    config::record_event("finish windows slice for ls alloc");
     FuncAllocStat {
         spillings,
         dstr: colors,

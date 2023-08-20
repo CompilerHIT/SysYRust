@@ -1,3 +1,5 @@
+use crate::log_file_uln;
+
 use super::*;
 
 static spill_actions_path: &str = "spill_actions.txt";
@@ -191,6 +193,13 @@ impl Func {
     fn handle_spill_for_inst(
         index: usize,
         inst: &ObjPtr<LIRInst>,
+        choose_borrow: &dyn Fn(
+            &Reg,
+            &HashMap<Reg, LinkedList<(usize, bool)>>,
+            &HashMap<Reg, Reg>,
+            &HashMap<Reg, Reg>,
+            RegUsedStat,
+        ) -> Reg,
         rentors: &mut HashMap<Reg, Reg>,
         holders: &mut HashMap<Reg, Reg>,
         spill_stack_map: &HashMap<Reg, StackSlot>,
@@ -201,7 +210,7 @@ impl Func {
     ) {
         //TODO,选择合适的启发函数选择要借用的寄存器
         // let choose_borrow = Func::choose_borrow_2;
-        let choose_borrow = Func::choose_borrow_1;
+        // let choose_borrow = Func::choose_borrow_1;
         //首先根据当前下标更新next occurs
         Func::refresh_next_occurs(next_occurs, index);
         let used = inst.get_reg_use();
@@ -302,6 +311,7 @@ impl Func {
             }
         }
 
+        // log_file_uln!("")
         //把虚拟寄存器替换为它们租借的物理寄存器
         for reg in regs.iter() {
             debug_assert!(rentors.contains_key(reg));
@@ -319,6 +329,7 @@ impl Func {
         //根据next occur更新rentor和holder
         Func::refresh_rentors_and_holders_with_next_occur(rentors, holders, &next_occurs);
         new_insts.push(*inst);
+        log_file!(spill_actions_path, "{}", inst.to_string());
     }
 
     //不需要给物理寄存器分配空间,因为每个块中都会为物理寄存器临时分配空间
@@ -344,6 +355,7 @@ impl Func {
             Func::handle_spill_for_inst(
                 index,
                 inst,
+                &Func::choose_borrow_1,
                 &mut rentors,
                 &mut holders,
                 spill_stack_map,
@@ -382,20 +394,26 @@ impl Func {
                     &mut new_insts,
                 );
             }
-            //根据物理寄存器是否在live out 中判断是否要加载回来
-            rentors.remove(&rentor);
-            holders.insert(reg, reg);
         }
         // 对于live out中的寄存器可以先split到栈上,然后再根据需要判断是否需要归还
-
         // 加载回物理寄存器的原值(所有在live out中的值都要加载回来)
         bb.live_out
             .iter()
             .filter(|reg| reg.is_physic())
             .for_each(|reg| {
                 if holders.contains_key(reg) {
-                    debug_assert!(holders.get(reg).unwrap() == reg);
-                    return;
+                    let holder = *holders.get(reg).unwrap();
+                    if holder != *reg {
+                        Func::return_reg(
+                            &holder,
+                            reg,
+                            spill_stack_map,
+                            &mut rentors,
+                            &mut holders,
+                            pool,
+                            &mut new_insts,
+                        );
+                    }
                 }
                 Func::load_back_phy(
                     reg,
@@ -407,13 +425,12 @@ impl Func {
                 );
                 debug_assert!(holders.get(reg).unwrap() == reg);
             });
-
-        debug_assert!(rentors.is_empty());
         // 使用的不同启发函数
         let mut process_one = |index: usize, inst: &ObjPtr<LIRInst>| {
             Func::handle_spill_for_inst(
                 index,
                 inst,
+                &Func::choose_borrow_2,
                 &mut rentors,
                 &mut holders,
                 spill_stack_map,
