@@ -114,8 +114,8 @@ pub fn generate_asm(
 
     //生成抽象汇编
     // module.generate_row_asm(&mut file2);
-    let thread = is_opt;
     // let thread = is_opt;
+    let thread = false;
     if thread {
         writeln!(
             file,

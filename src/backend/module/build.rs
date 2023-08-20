@@ -88,7 +88,7 @@ impl AsmModule {
         } else {
             self.handle_spill_tmp(pool);
         }
-        self.print_asm("after_spill.log");
+        // self.print_asm("after_spill.log");
         config::record_event("finish handle spill");
 
         //加入外部函数
