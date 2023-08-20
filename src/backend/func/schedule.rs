@@ -45,6 +45,8 @@ impl Func {
             }
             set.push(basicblock);
 
+            let mut schedule_res: Vec<ObjPtr<LIRInst>> = Vec::new();
+
             for s in set.iter() {
                 // 对于清除掉控制流语句的块，建立数据依赖图
                 for (i, inst) in s.iter().rev().enumerate() {
@@ -108,119 +110,120 @@ impl Func {
                         }
                     }
                 }
-            }
-            let mut queue: VecDeque<ObjPtr<LIRInst>> = VecDeque::new();
-            let mut visited = HashSet::new();
+                let mut queue: VecDeque<ObjPtr<LIRInst>> = VecDeque::new();
+                let mut visited = HashSet::new();
 
-            let mut g = graph
-                .get_nodes()
-                .into_iter()
-                .map(|(n, e)| {
-                    (
-                        *n,
-                        e.iter()
-                            .map(|(_, inst)| *inst)
-                            .collect::<Vec<ObjPtr<LIRInst>>>(),
-                    )
-                })
-                .collect::<HashMap<ObjPtr<LIRInst>, Vec<ObjPtr<LIRInst>>>>();
+                let mut g = graph
+                    .get_nodes()
+                    .into_iter()
+                    .map(|(n, e)| {
+                        (
+                            *n,
+                            e.iter()
+                                .map(|(_, inst)| *inst)
+                                .collect::<Vec<ObjPtr<LIRInst>>>(),
+                        )
+                    })
+                    .collect::<HashMap<ObjPtr<LIRInst>, Vec<ObjPtr<LIRInst>>>>();
 
-            let mut reverse_graph: HashMap<ObjPtr<LIRInst>, Vec<ObjPtr<LIRInst>>> = HashMap::new();
-            for (from, to_nodes) in g.iter() {
-                for to_node in to_nodes {
-                    reverse_graph
-                        .entry(*to_node)
-                        .or_insert(Vec::new())
-                        .push(*from);
-                }
-            }
-
-            // 拓扑排序
-            loop {
-                if queue.len() == g.len() {
-                    break;
-                }
-                // 0出度算法，出度度为0代表不依赖于其他指令
-                let mut zero_nodes: Vec<ObjPtr<LIRInst>> = Vec::new();
-                for (node, _) in graph.get_nodes().iter() {
-                    let out_nodes = g.get(node).unwrap();
-                    if out_nodes.len() == 0 && !visited.contains(node) {
-                        visited.insert(*node);
-                        queue.push_back(*node);
-                        zero_nodes.push(*node);
+                let mut reverse_graph: HashMap<ObjPtr<LIRInst>, Vec<ObjPtr<LIRInst>>> =
+                    HashMap::new();
+                for (from, to_nodes) in g.iter() {
+                    for to_node in to_nodes {
+                        reverse_graph
+                            .entry(*to_node)
+                            .or_insert(Vec::new())
+                            .push(*from);
                     }
                 }
-                // 在反向图中查找该节点支配的节点，从而删除两点之间的边
-                for node in zero_nodes.iter() {
-                    if let Some(in_nodes) = reverse_graph.get(node) {
-                        for in_node in in_nodes {
-                            if let Some(out_nodes) = g.get_mut(&in_node) {
-                                out_nodes.retain(|&n| n != *node);
+
+                // 拓扑排序
+                loop {
+                    if queue.len() == g.len() {
+                        break;
+                    }
+                    // 0出度算法，出度度为0代表不依赖于其他指令
+                    let mut zero_nodes: Vec<ObjPtr<LIRInst>> = Vec::new();
+                    for (node, _) in graph.get_nodes().iter() {
+                        let out_nodes = g.get(node).unwrap();
+                        if out_nodes.len() == 0 && !visited.contains(node) {
+                            visited.insert(*node);
+                            queue.push_back(*node);
+                            zero_nodes.push(*node);
+                        }
+                    }
+                    // 在反向图中查找该节点支配的节点，从而删除两点之间的边
+                    for node in zero_nodes.iter() {
+                        if let Some(in_nodes) = reverse_graph.get(node) {
+                            for in_node in in_nodes {
+                                if let Some(out_nodes) = g.get_mut(&in_node) {
+                                    out_nodes.retain(|&n| n != *node);
+                                }
                             }
                         }
                     }
                 }
-            }
 
-            // 调度方案，在不考虑资源的情况下i有可能相同
-            let mut schedule_map: HashMap<ObjPtr<LIRInst>, i32> = HashMap::new();
+                // 调度方案，在不考虑资源的情况下i有可能相同
+                let mut schedule_map: HashMap<ObjPtr<LIRInst>, i32> = HashMap::new();
 
-            let mut s;
-            for inst in queue.iter() {
-                if let Some(edges) = graph.get_edges(*inst) {
-                    s = edges
+                let mut s;
+                for inst in queue.iter() {
+                    if let Some(edges) = graph.get_edges(*inst) {
+                        s = edges
+                            .iter()
+                            .map(|(w, inst)| w + *schedule_map.get(inst).unwrap_or(&0))
+                            .max()
+                            .unwrap_or(0);
+                    } else {
+                        s = 0;
+                    }
+
+                    // 指令位置相同，若两个是特殊指令则距离增加2，否则增加1
+                    while let Some((l, _)) = schedule_map.iter().find(|(_, v)| **v == s) {
+                        if dep_inst_special(inst.clone(), l.clone()) {
+                            s += 2;
+                        } else {
+                            s += 1;
+                        }
+                    }
+
+                    let mut visited: HashSet<ObjPtr<LIRInst>> = HashSet::new();
+                    while let Some((l, _)) = schedule_map
                         .iter()
-                        .map(|(w, inst)| w + *schedule_map.get(inst).unwrap_or(&0))
-                        .max()
-                        .unwrap_or(0);
-                } else {
-                    s = 0;
-                }
-
-                // 指令位置相同，若两个是特殊指令则距离增加2，否则增加1
-                while let Some((l, _)) = schedule_map.iter().find(|(_, v)| **v == s) {
-                    if dep_inst_special(inst.clone(), l.clone()) {
-                        s += 2;
-                    } else {
-                        s += 1;
+                        .find(|(inst, v)| **v == s - 1 && !visited.contains(inst))
+                    {
+                        if def_use_near(inst.clone(), l.clone()) {
+                            s += 1;
+                        } else {
+                            visited.insert(l.clone());
+                        }
                     }
-                }
 
-                let mut visited: HashSet<ObjPtr<LIRInst>> = HashSet::new();
-                while let Some((l, _)) = schedule_map
-                    .iter()
-                    .find(|(inst, v)| **v == s - 1 && !visited.contains(inst))
-                {
-                    if def_use_near(inst.clone(), l.clone()) {
-                        s += 1;
-                    } else {
-                        visited.insert(l.clone());
-                    }
+                    // // 对于相邻指令，若是特殊指令则距离增加为2
+                    // let mut visited2 = HashSet::new();
+                    // while let Some((l, _)) = schedule_map
+                    //     .iter()
+                    //     .find(|(_, v)| **v == s - 1 && !visited2.contains(inst))
+                    // {
+                    //     if dep_inst_special(inst.clone(), l.clone()) {
+                    //         s += 1;
+                    //     } else {
+                    //         visited2.insert(l.clone());
+                    //     }
+                    // }
+                    schedule_map.insert(*inst, s);
                 }
-
-                // // 对于相邻指令，若是特殊指令则距离增加为2
-                // let mut visited2 = HashSet::new();
-                // while let Some((l, _)) = schedule_map
-                //     .iter()
-                //     .find(|(_, v)| **v == s - 1 && !visited2.contains(inst))
-                // {
-                //     if dep_inst_special(inst.clone(), l.clone()) {
-                //         s += 1;
-                //     } else {
-                //         visited2.insert(l.clone());
-                //     }
-                // }
-                schedule_map.insert(*inst, s);
+                let mut res: Vec<ObjPtr<LIRInst>> =
+                    schedule_map.iter().map(|(&inst, _)| inst).collect();
+                res.sort_by(|a, b| {
+                    schedule_map
+                        .get(a)
+                        .unwrap()
+                        .cmp(schedule_map.get(b).unwrap())
+                });
+                schedule_res.append(&mut res);
             }
-
-            let mut schedule_res: Vec<ObjPtr<LIRInst>> =
-                schedule_map.iter().map(|(&inst, _)| inst).collect();
-            schedule_res.sort_by(|a, b| {
-                schedule_map
-                    .get(a)
-                    .unwrap()
-                    .cmp(schedule_map.get(b).unwrap())
-            });
 
             // 打印调度方案
             // 调度前
