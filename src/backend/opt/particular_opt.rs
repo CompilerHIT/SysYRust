@@ -108,6 +108,12 @@ impl BackendPass {
                                     inst.as_mut().replace_kind(InstrsType::OpReg(SingleOp::Mv));
                                     inst.as_mut().operands.pop();
                                 }
+                            },
+                            Operand::Reg(reg) => {
+                                if reg.get_id() == 0 {
+                                    inst.as_mut().replace_kind(InstrsType::OpReg(SingleOp::Mv));
+                                    inst.as_mut().operands.pop();
+                                }
                             }
                             _ => {}
                         },

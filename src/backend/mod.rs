@@ -106,6 +106,7 @@ pub fn generate_asm(
         // 额外的块优化处理
         BackendPass::new(ObjPtr::new(module)).block_pass_pre_clear(&mut pool);
         BackendPass::new(ObjPtr::new(module)).block_pass(&mut pool);
+		BackendPass::new(ObjPtr::new(module)).rm_useless_shift();
     }
     // 检查b型指令溢出，用j型指令替换
     module.handle_overflow_br(&mut pool);
