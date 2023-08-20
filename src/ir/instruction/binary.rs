@@ -229,7 +229,7 @@ impl Inst {
         // 正确性检查
         if let InstKind::Binary(_) = self.kind {
         } else {
-            unreachable!("Inst::get_lhs")
+            unreachable!("Inst::get_lhs: {:?}", self)
         }
 
         self.user.get_operand(0)
@@ -278,5 +278,18 @@ impl Inst {
         rhs.add_user(self);
 
         self.user.set_operand(1, rhs);
+    }
+
+    /// 判断当前函数是否为条件判断指令
+    pub fn is_cond(&self) -> bool {
+        match self.get_kind() {
+            InstKind::Binary(BinOp::Ge)
+            | InstKind::Binary(BinOp::Gt)
+            | InstKind::Binary(BinOp::Lt)
+            | InstKind::Binary(BinOp::Le)
+            | InstKind::Binary(BinOp::Ne)
+            | InstKind::Binary(BinOp::Eq) => true,
+            _ => false,
+        }
     }
 }
