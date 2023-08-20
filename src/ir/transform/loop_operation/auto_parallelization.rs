@@ -25,6 +25,7 @@ pub fn auto_paralellization(
         let mut parallelized = HashSet::new();
         let mut analyzer = SCEVAnalyzer::new();
         analyzer.set_loop_list(loop_list.get_loop_list().clone());
+        let mut new_loop_list = Vec::new();
 
         loop {
             let mut unvisited = false;
@@ -55,7 +56,9 @@ pub fn auto_paralellization(
                     &mut analyzer,
                 ) {
                     parallelized_insert(current_loop, &mut parallelized);
-                    parallelize(current_loop, pools);
+                    if let Some(new_loop) = parallelize(current_loop, pools) {
+                        new_loop_list.push(new_loop);
+                    }
                     analyzer.clear();
                 }
             }
@@ -350,7 +353,7 @@ fn check_parallelization(
 fn parallelize(
     mut current_loop: ObjPtr<LoopInfo>,
     pools: &mut (&mut ObjPool<BasicBlock>, &mut ObjPool<Inst>),
-) {
+) -> Option<LoopInfo> {
     let mut iv = current_loop.get_header().get_head_inst();
     debug_assert!(iv.is_phi() && !iv.get_next().is_phi());
     debug_assert_eq!(iv.get_operands().len(), 2);
@@ -366,7 +369,7 @@ fn parallelize(
     let step_index = update.get_operands().iter().position(|x| *x != iv).unwrap();
     let mut step = update.get_operand(step_index);
 
-    let new_start = thread_create_ir(current_loop, start, step, pools);
+    let (thread_loop, new_start) = thread_create_ir(current_loop, start, step, pools);
 
     iv.set_operand(new_start, index);
     let const_4 = pools.1.make_int_const(4);
@@ -386,6 +389,8 @@ fn parallelize(
 
         thread_exit_ir(exit_block, pools);
     }
+
+    thread_loop
 }
 
 /// 申请线程的大致结构
@@ -433,11 +438,11 @@ fn parallelize(
 ///                             │                                │
 ///                             └────────────────────────────────┘
 fn thread_create_ir(
-    current_loop: ObjPtr<LoopInfo>,
+    mut current_loop: ObjPtr<LoopInfo>,
     prestart: ObjPtr<Inst>,
     step: ObjPtr<Inst>,
     pools: &mut (&mut ObjPool<BasicBlock>, &mut ObjPool<Inst>),
-) -> ObjPtr<Inst> {
+) -> (Option<LoopInfo>, ObjPtr<Inst>) {
     let mut preheader = current_loop.get_preheader();
     let mut header = current_loop.get_header();
     // 从上往下构造ir
@@ -512,7 +517,30 @@ fn thread_create_ir(
     thread_loop_jmp.set_next_bb(vec![header]);
     thread_loop_jmp.set_up_bb(vec![thread_loop_head, thread_loop_call]);
 
-    phi_start
+    // 修改循环信息
+    // 将当前循环的preheader设置为thread_loop_jmp
+    current_loop.set_pre_header(thread_loop_jmp);
+    // 将thread_loop_jmp加入父循环
+    let mut thread_loop = None;
+    if let Some(mut p_loop) = current_loop.get_parent_loop() {
+        p_loop.add_bbs(vec![thread_loop_jmp]);
+        thread_loop = Some(LoopInfo::new_loop(
+            Some(p_loop),
+            Some(preheader),
+            thread_loop_head,
+            Some(vec![thread_loop_update]),
+            Some(vec![thread_loop_head, thread_loop_call]),
+            vec![
+                thread_loop_head,
+                thread_loop_call,
+                thread_loop_update,
+                thread_loop_jmp,
+            ],
+            vec![],
+        ));
+    }
+
+    (thread_loop, phi_start)
 }
 
 /// 线程退出的大致结构
