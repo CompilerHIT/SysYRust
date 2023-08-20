@@ -118,11 +118,11 @@ impl Func {
 
 // 为每个指令创建寄存器的in和 out
 impl Func {
-    /// 依赖外部调用的calc live
-    pub fn build_live_out_for_insts(&mut self) -> HashMap<ObjPtr<LIRInst>, HashSet<Reg>> {
-        let mut live_out_for_insts: HashMap<ObjPtr<LIRInst>, HashSet<Reg>> = HashMap::new();
+    /// 依赖外部调用的calc live,为了加快速度,使用哈希表
+    pub fn build_live_out_for_insts(&self) -> HashMap<ObjPtr<LIRInst>, Bitmap> {
+        let mut live_out_for_insts: HashMap<ObjPtr<LIRInst>, Bitmap> = HashMap::new();
         self.blocks.iter().for_each(|bb| {
-            Func::analyse_inst_with_live_now_backorder(*bb, &mut |inst, live_now| {
+            Func::analyse_inst_with_live_now_bitmap_backorder(*bb, &mut |inst, live_now| {
                 live_out_for_insts.insert(inst, live_now.clone());
             })
         });
@@ -181,6 +181,25 @@ impl Func {
             }
             for reg in inst.get_reg_use() {
                 live_now.insert(reg);
+            }
+        }
+    }
+
+    pub fn analyse_inst_with_live_now_bitmap_backorder(
+        bb: ObjPtr<BB>,
+        analyser: &mut dyn FnMut(ObjPtr<LIRInst>, &Bitmap),
+    ) {
+        let mut live_now = Bitmap::new();
+        bb.live_out.iter().for_each(|reg| {
+            live_now.insert(reg.bit_code() as usize);
+        });
+        for inst in bb.insts.iter().rev() {
+            analyser(*inst, &live_now);
+            for reg in inst.get_reg_def() {
+                live_now.remove(reg.bit_code() as usize);
+            }
+            for reg in inst.get_reg_use() {
+                live_now.insert(reg.bit_code() as usize);
             }
         }
     }

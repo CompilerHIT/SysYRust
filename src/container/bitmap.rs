@@ -1,10 +1,16 @@
-use std::hash::{Hash, Hasher};
+use std::{
+    collections::binary_heap::Iter,
+    hash::{Hash, Hasher},
+};
 
 // 一个简单的bitmap,用来统计spilling情况,用位图
+#[derive(Clone)]
 pub struct Bitmap {
     arr: Vec<u64>,
     len: usize, //记录元素数量
 }
+
+impl Bitmap {}
 
 impl Bitmap {
     pub fn and_other(&mut self, other: &Bitmap) {
