@@ -59,6 +59,7 @@ impl Func {
         }
         // Func::print_func(ObjPtr::new(&self), "mm.txt");
         //为物理寄存器相关的借还开辟空间
+
         let mut phisic_mems = HashMap::new();
         for reg in Reg::get_all_not_specials() {
             let last = self.stack_addr.back().unwrap();

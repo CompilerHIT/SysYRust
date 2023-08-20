@@ -38,17 +38,16 @@ impl Func {
                 bb.as_mut().live_out.insert(*reg);
             }
         }
-        // // // 加入线性扫描(如果代码行数大于某个阈值,则启动线性扫描)
-        // if self.num_insts() > 1 {
-        //     config::record_event("start ls alloc");
-        //     let alloc_stat = ls_alloc::alloc(&self);
-        //     regalloc::check_alloc_v2(&self, &alloc_stat.dstr, &alloc_stat.spillings);
-        //     self.reg_alloc_info = alloc_stat;
-        //     self.context.as_mut().set_reg_map(&self.reg_alloc_info.dstr);
-        //     config::record_event("finish ls alloc");
-        //     return;
-        // }
-
+        // // 加入线性扫描(如果代码行数大于某个阈值,则启动线性扫描)
+        if self.num_insts() > 10_0000 {
+            config::record_event("start ls alloc");
+            let alloc_stat = ls_alloc::alloc(&self);
+            regalloc::check_alloc_v2(&self, &alloc_stat.dstr, &alloc_stat.spillings);
+            self.reg_alloc_info = alloc_stat;
+            self.context.as_mut().set_reg_map(&self.reg_alloc_info.dstr);
+            config::record_event("finish ls alloc");
+            return;
+        }
         if self.num_insts() < 5_0000 {
             config::record_event("start  perfect alloc");
             let alloc_stat = perfect_alloc::alloc_with_constraints(&self, &HashMap::new());

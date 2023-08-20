@@ -198,6 +198,16 @@ impl Func {
                 Func::print_func(ObjPtr::new(self), "an_mem_re.txt");
                 sst.get_pos()
             });
+            //加速栈重排
+            if interef.get(sst).unwrap().len() > 5 || allocated_ssts.len() > 80 {
+                let back = self.stack_addr.back().unwrap();
+                let new_pos = back.get_pos() + back.get_size();
+                let new_p_sst = StackSlot::new(new_pos, ADDR_SIZE);
+                self.stack_addr.push_back(new_p_sst);
+                allocated_ssts.push(new_p_sst);
+                v_p_ssts.insert(*sst, new_p_sst);
+                continue;
+            }
             for inter_sst in interef.get(sst).unwrap() {
                 if let Some(p_sst) = v_p_ssts.get(inter_sst) {
                     unavailables_ssts.insert(*p_sst);
