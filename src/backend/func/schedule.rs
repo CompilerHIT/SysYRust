@@ -36,8 +36,7 @@ impl Func {
                 })
                 .map(|x| *x)
                 .collect();
-            
-            let mut special_inst_pos: HashMap<ObjPtr<LIRInst>, usize> = HashMap::new();
+
             // 对于清除掉控制流语句的块，建立数据依赖图
             for (i, inst) in basicblock.iter().rev().enumerate() {
                 let pos = basicblock.len() - i - 1;
@@ -64,12 +63,12 @@ impl Func {
                     }
                 }
 
-                // 认为load/store依赖之前的所有load/store
+                // 认为load/store依赖之前的load/store
                 if inst.get_type() == InstrsType::Load || inst.get_type() == InstrsType::Store {
                     // special_inst_pos.insert(*inst, i);
                     for index in 1..=pos {
                         let i = basicblock[pos - index];
-                        if i.get_type() == InstrsType::Load || i.get_type() == InstrsType::Store {
+                        if sl_conflict(*inst, i) {
                             graph.add_edge(*inst, (1, i));
                         } else {
                             continue;
@@ -291,5 +290,23 @@ fn def_use_near(inst: ObjPtr<LIRInst>, last: ObjPtr<LIRInst>) -> bool {
             false
         });
     };
+    false
+}
+
+fn sl_conflict(inst1: ObjPtr<LIRInst>, inst2: ObjPtr<LIRInst>) -> bool {
+    // 写后写
+    if inst1.get_type() == inst2.get_type() && inst1.get_type() == InstrsType::Store {
+        if inst1.operands[1] == inst2.operands[1] {
+            return true;
+        }
+    }
+    // 写后读/读后写
+    if (inst1.get_type() == InstrsType::Load && inst2.get_type() == InstrsType::Store)
+        || (inst1.get_type() == InstrsType::Store && inst2.get_type() == InstrsType::Load)
+    {
+        if inst1.operands[1] == inst2.operands[1] {
+            return true;
+        }
+    }
     false
 }
