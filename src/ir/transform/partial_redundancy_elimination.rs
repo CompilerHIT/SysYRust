@@ -71,15 +71,15 @@ pub fn pre_congruence(
     for index_class in 0..congruence.vec_class.len() {
         loop {
             let mut changed = false;
-            changed |= pre_group(
-                &mut pre_context,
-                head,
-                &mut dominator_tree,
-                &mut downstream_tree,
-                congruence,
-                index_class,
-                pools,
-            );
+            // changed |= pre_group(
+            //     &mut pre_context,
+            //     head,
+            //     &mut dominator_tree,
+            //     &mut downstream_tree,
+            //     congruence,
+            //     index_class,
+            //     pools,
+            // );
             changed |= hoist_group(congruence, index_class, &dominator_tree, pools.1);
             if !changed {
                 break;
