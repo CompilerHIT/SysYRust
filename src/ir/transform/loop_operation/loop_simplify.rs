@@ -28,10 +28,11 @@ fn add_preheader(
     mut loop_info: ObjPtr<LoopInfo>,
     pools: &mut (&mut ObjPool<BasicBlock>, &mut ObjPool<Inst>),
 ) {
+    let rand_num: u8 = rand::random();
     let mut header = loop_info.get_header();
     let mut preheader = pools
         .0
-        .new_basic_block(format!("preheader_{}", header.get_name()));
+        .new_basic_block(format!("preheader_{}_{rand_num}", header.get_name()));
     loop_info.set_pre_header(preheader);
 
     // 获得不在循环中的前继块
