@@ -125,10 +125,11 @@ fn check_parallelization(
     let mut flag = true;
     current_loop.get_current_loop_bb().iter().for_each(|bb| {
         inst_process_in_bb(bb.get_head_inst(), |inst| {
-            if !inst
-                .get_use_list()
-                .iter()
-                .all(|user| parent_loop.is_in_loop(&user.get_parent_bb()))
+            if inst.get_ir_type().is_float()
+                || !inst
+                    .get_use_list()
+                    .iter()
+                    .all(|user| parent_loop.is_in_loop(&user.get_parent_bb()))
             {
                 //println!("check failed: {}", line!());
                 flag = false;
