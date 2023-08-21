@@ -40,7 +40,7 @@ pub fn optimizer_run(
         functional_optimizer(module, &mut pools, optimize_flag);
 
         // 局部冗余消除 指令上提
-        partial_redundancy_elimination::pre(module, optimize_flag, &mut pools);
+        // partial_redundancy_elimination::pre(module, optimize_flag, &mut pools);
 
         // 循环优化
         loop_operation::loop_optimize(module, 100, &mut pools, para);
@@ -60,7 +60,7 @@ pub fn optimizer_run(
         functional_optimizer(module, &mut pools, optimize_flag);
 
         // 局部冗余消除 指令上提
-        partial_redundancy_elimination::pre(module, optimize_flag, &mut pools);
+        //partial_redundancy_elimination::pre(module, optimize_flag, &mut pools);
 
         // 循环优化
         loop_operation::loop_optimize(module, 100, &mut pools, false);
