@@ -138,6 +138,37 @@ fn reinit_array(mut array_inst: ObjPtr<Inst>) {
     if IrType::IntPtr == array_inst.get_ir_type() {
         let mut init = array_inst.get_int_init().1.clone();
         while !inst.is_tail() {
+            // 若是则进一步判断memset的偏移和值是否是常量
+            if inst.get_kind() == InstKind::Call("hitsz_memset".to_string()){
+                // todo:判断当前指令是否是指定数组的memset
+                let params = inst.get_operands();
+                let offset = params[0].get_gep_offset().get_int_bond() as usize;
+                let array = params[0].get_gep_ptr();
+                let value = params[1];
+                let n = params[2];
+                if array!=array_inst{// 不是该数组的memset
+                    continue;
+                }
+                if !(value.is_int_const()&&n.is_int_const()){
+                    // 不是常量则直接退出，保留后续store指令
+                    break;
+                }
+                // 是常量则吸收
+                let mut top = n.get_int_bond() as usize /4;
+                top +=offset;
+                let val = value.get_int_bond();
+                if top > init.len(){
+                    init.resize(top, (false, val));
+                }
+                for i in offset..top{
+                    init[i] = (false,val);
+                }
+                let mut old = inst;
+                inst = inst.get_next();
+                old.remove_self();
+                continue;
+            }
+
             let mut flag = false;
             if check(inst) {
                 let index = inst.get_dest().get_gep_offset().get_int_bond() as usize;
