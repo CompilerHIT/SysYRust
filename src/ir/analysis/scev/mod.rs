@@ -25,6 +25,9 @@ impl SCEVAnalyzer {
             loop_list: Vec::new(),
         }
     }
+    pub fn is_set_loop(&self) -> bool {
+        self.loop_list.len() != 0
+    }
 
     pub fn set_loop_list(&mut self, loop_list: Vec<ObjPtr<LoopInfo>>) {
         self.loop_list = loop_list;
@@ -276,7 +279,12 @@ impl SCEVAnalyzer {
 
             match op.get_kind() {
                 InstKind::Binary(BinOp::Add) => {
-                    let step = op.get_operand((index + 1) % 2);
+                    let step = op
+                        .get_operands()
+                        .iter()
+                        .find(|x| x != &inst)
+                        .unwrap()
+                        .clone();
                     if check_inst_avaliable(step) {
                         let start = inst
                             .get_operands()

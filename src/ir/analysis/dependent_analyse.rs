@@ -36,7 +36,7 @@ pub fn dependency_check(gep: [ObjPtr<Inst>; 2], vector: Vec<(ObjPtr<SCEVExp>, [i
     if matrix_2.is_empty() {
         return true;
     }
-    if gep[0].get_gep_offset() == gep[1].get_gep_offset() {
+    if gep[0].get_gep_offset() == gep[1].get_gep_offset() && matrix_1[0] != 0 && matrix_2[0] != 0 {
         return false;
     }
 

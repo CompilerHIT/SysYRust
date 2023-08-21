@@ -37,7 +37,9 @@ pub fn loop_optimize(
         loop_simplify_run(loop_map.get_mut(&name).unwrap(), pools);
     });
 
-    super::phi_optimizer::phi_run(module);
+    // 循环尾指令上提
+    super::sink::sink_opt(module, pools, true);
+    super::functional_optimizer(module, pools, false);
 
     // 循环不变量外提
     func_process(module, |name, _| {

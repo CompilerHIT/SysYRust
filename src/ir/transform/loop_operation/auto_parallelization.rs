@@ -107,6 +107,10 @@ fn check_parallelization(
 ) -> bool {
     let mut read_map: HashMap<ObjPtr<Inst>, HashSet<_>> = HashMap::new();
     let mut write_map: HashMap<ObjPtr<Inst>, HashSet<_>> = HashMap::new();
+    //println!(
+    //"check parallelization: {}",
+    //current_loop.get_header().get_name()
+    //);
 
     let get_gep_ptr = |inst: ObjPtr<Inst>| -> ObjPtr<Inst> {
         debug_assert_eq!(inst.get_kind(), InstKind::Gep);
@@ -126,6 +130,7 @@ fn check_parallelization(
                 .iter()
                 .all(|user| parent_loop.is_in_loop(&user.get_parent_bb()))
             {
+                //println!("check failed: {}", line!());
                 flag = false;
                 return;
             }
@@ -151,6 +156,7 @@ fn check_parallelization(
                 InstKind::Store => {
                     // store全局变量不可并行化
                     if inst.get_dest().is_global_var() {
+                        //println!("check failed: {}", line!());
                         flag = false;
                         return;
                     }
@@ -171,6 +177,7 @@ fn check_parallelization(
                 }
                 InstKind::Call(callee) => {
                     if !call_op.contains(&callee) {
+                        //println!("check failed: {}", line!());
                         flag = false;
                         return;
                     }
@@ -185,6 +192,7 @@ fn check_parallelization(
     });
 
     if !flag {
+        //println!("check failed: {}", line!());
         unop.insert(current_loop);
         return false;
     }
@@ -198,6 +206,7 @@ fn check_parallelization(
         inst = inst.get_next();
     }
     if current_loop == parent_loop && iv_set.len() != 1 {
+        //println!("check failed: {}", line!());
         unop.insert(current_loop);
         return false;
     }
@@ -209,6 +218,8 @@ fn check_parallelization(
         .filter(|x| x.is_scev_rec_expr())
         .collect::<Vec<_>>();
     if new_iv.len() != 1 {
+        //println!("check failed: {} new_iv: {new_iv:?}", line!());
+        //println!("{current_loop:?}");
         unop.insert(current_loop);
         return false;
     }
@@ -236,7 +247,8 @@ fn check_parallelization(
                 temp = end_cond.get_lhs();
             }
             _ => {
-                unop.insert(current_loop);
+                //println!("check failed: {}", line!());
+                unop.insert(parent_loop);
                 return false;
             }
         }
@@ -275,7 +287,8 @@ fn check_parallelization(
         }
         _ => {
             debug_assert!(true, "step is not add or sub");
-            unop.insert(current_loop);
+            //println!("check failed: {}", line!());
+            unop.insert(parent_loop);
             return false;
         }
     }
@@ -294,7 +307,8 @@ fn check_parallelization(
                             .map(|(i, x)| (x.clone(), bound[i]))
                             .collect(),
                     ) {
-                        unop.insert(current_loop);
+                        //println!("check failed: {}", line!());
+                        unop.insert(parent_loop);
                         return false;
                     }
                 }
@@ -316,7 +330,8 @@ fn check_parallelization(
                             .collect(),
                     )
                 {
-                    unop.insert(current_loop);
+                    //println!("check failed: {}", line!());
+                    unop.insert(parent_loop);
                     return false;
                 }
             }
@@ -335,11 +350,13 @@ fn check_parallelization(
             bound.clone(),
             analyzer,
         ) {
-            unop.insert(current_loop);
+            //println!("check failed: {}", line!());
+            unop.insert(parent_loop);
             return false;
         }
     }
 
+    //println!("check pass");
     op.insert(current_loop);
     true
 }
