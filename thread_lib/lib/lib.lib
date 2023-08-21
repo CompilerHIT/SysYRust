@@ -147,7 +147,7 @@ LBB_open_thread:
 	lla a1,tmp_mem 
 	la a0,num_tid
 	ld a0,0(a0)
-	slliw	a0,a0,7
+	slliw	a0,a0,8
 	add	a1,a1,a0
 	sd	ra,0(a1)
 	sd	s0,8(a1)
@@ -162,6 +162,8 @@ LBB_open_thread:
 	sd	s9,80(a1)
 	sd	s10,88(a1)
 	sd	s11,96(a1)
+    addi a0,sp,32
+    sd  a0,104(a1)
 	call get_next_pc
 	addi a2,a0,20
 	add	a0,sp,24
@@ -192,12 +194,13 @@ LBB_main_leave:
 	jr ra
 LBB_son_leave:
 	# 创建子线程后子线程的行为
+    # 首先复制之前的线程库
 	# 首先从对应栈区域恢复之前的ra(之前的ra是调用者ra)
 	# 从该位置恢复调用者ra,并且把数据保存到调用者ra上
-	call hitsz_thread_self
+    call hitsz_thread_self
 	lla	a1,tmp_mem
-	slliw	a0,a0,7
-	add	a1,a1,a0
+	slliw	a2,a0,8
+	add	a1,a1,a2
 	ld	ra,0(a1)
 	ld	s0,8(a1)
 	ld	s1,16(a1)
@@ -211,9 +214,22 @@ LBB_son_leave:
 	ld	s9,80(a1)
 	ld	s10,88(a1)
 	ld	s11,96(a1)
+    # 获取sp的原本值,作为源寄存器
+    mv  s1,a1
+    mv  s0,a0
+    ld  a1,104(a1)
+    # # 获取当前sp开启线程后的值作为目的
+    addi    sp,sp,-800
+    mv  a0,sp
+    li  a2,800
+    call memcpy
+    mv a1,s1
+    mv  a0,s0
+    ld  s0,8(a1)
+    ld  s1,16(a1)
+    ld  ra,0(a1)
 	jr	ra
 	.size	hitsz_thread_create, .-hitsz_thread_create
-	
 
 	.globl	num_tid
 	.globl	tids
@@ -234,8 +250,8 @@ tids:
 	.bss
 	.align	3
 	.type	tmp_mem, @object
-	.size	tmp_mem, 800
+	.size	tmp_mem, 1600
 tmp_mem:
-	.zero	800
+	.zero	1600
     .ident	"GCC: (Debian 11.3.0-3) 11.3.0"
 	.section	.note.GNU-stack,"",@progbits
