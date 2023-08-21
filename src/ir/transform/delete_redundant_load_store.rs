@@ -2,12 +2,12 @@ use std::collections::{HashMap, HashSet};
 
 use crate::{
     ir::{
-        analysis::store_map::get_store_map,
+        analysis::{store_map::get_store_map, dominator_tree::{self, DominatorTree, calculate_dominator}},
         instruction::{Inst, InstKind},
         module::Module,
-        tools::{bfs_bb_proceess, func_process, replace_inst},
+        tools::{bfs_bb_proceess, func_process, replace_inst, bfs_inst_process}, basicblock::BasicBlock,
     },
-    utility::ObjPtr,
+    utility::{ObjPtr, ObjPool},
 };
 
 pub fn load_store_opt(module: &mut Module) -> bool {
@@ -26,6 +26,87 @@ pub fn load_store_opt(module: &mut Module) -> bool {
     });
     changed
 }
+
+// pub fn load_store_opt_plus(module: &mut Module,pools: &mut (&mut ObjPool<BasicBlock>, &mut ObjPool<Inst>)){
+//     // todo:收集gep信息
+//     println!("load_store_opt_plus");
+//     func_process(module, |func_name, func| {
+//         let dominator_tree = calculate_dominator(func.get_head());
+//         let mut flag = true;
+//         if !(func_name=="main".to_string()){
+//             return;
+//         }
+//         bfs_inst_process(func.get_head(), |inst|
+//         { // 所有gep偏移均为常量
+//             if inst.get_kind()==InstKind::Gep{
+//                 println!("gep");
+//                 let offset = inst.get_gep_offset();
+//                 if !offset.is_int_const(){
+//                     flag &= false;
+//                 }
+//             }
+//             if inst.get_kind()==InstKind::Store{
+//                 flag &= false;
+//             }
+//         }
+//         );
+//         if flag{
+//             bfs_inst_process(func.get_head(), |inst|
+//         {
+//             if inst.get_kind()==InstKind::Store{
+//                 println!("{:?}",inst);
+//             }
+//             if inst.get_kind()==InstKind::Store||inst.get_kind()==InstKind::Load{//遍历,存储每一个地址的load,store操作
+//                 // println!("{:?}",inst);
+//                 let inst_gep = inst.get_operand(0);
+//                 if let Some(vec_tmp) = val_map.get_mut(&inst_gep){
+//                     vec_tmp.push(inst);
+//                 }else{
+//                     val_map.insert(inst_gep, vec![inst]);
+//                 }
+//             }
+//         });
+//         }
+//         // if flag {
+//         //     let mut val_map:HashMap<ObjPtr<Inst>, Vec<ObjPtr<Inst>>> = HashMap::new();
+//         //     bfs_inst_process(func.get_head(), |inst|
+//         // {
+//         //     if inst.get_kind()==InstKind::Store{
+//         //         println!("{:?}",inst);
+//         //     }
+//         //     if inst.get_kind()==InstKind::Store||inst.get_kind()==InstKind::Load{//遍历,存储每一个地址的load,store操作
+//         //         // println!("{:?}",inst);
+//         //         let inst_gep = inst.get_operand(0);
+//         //         if let Some(vec_tmp) = val_map.get_mut(&inst_gep){
+//         //             vec_tmp.push(inst);
+//         //         }else{
+//         //             val_map.insert(inst_gep, vec![inst]);
+//         //         }
+//         //     }
+//         // });
+//         //     for (_,vec_l_s) in &mut val_map{
+//         //         println!("zheli");
+//         //         if vec_l_s.len()==2&&vec_l_s[0].get_kind()==InstKind::Store&&vec_l_s[1].get_kind()==InstKind::Load{
+//         //             // println!("zheli");
+//         //             if dominator_tree.is_dominate(&vec_l_s[0].get_parent_bb(), &vec_l_s[1].get_parent_bb()){
+//         //                 println!("删除指令");
+//         //                 replace_inst(vec_l_s[1], vec_l_s[0].get_operand(1));//检查store值是不是operand1
+//         //                 vec_l_s.remove(1);
+//         //             }
+//         //         }
+//         //     }
+//         //     for (_,vec_l_s) in val_map{
+//         //         if vec_l_s.len()==1&&vec_l_s[0].get_kind()==InstKind::Store{
+//         //             if vec_l_s[0].get_use_list().len()==0{
+//         //                 vec_l_s[0].as_mut().remove_self();
+//         //             }
+//         //         }
+//         //     }
+
+
+//         // }
+//     });
+// }
 
 pub fn get_global_array_ptr(inst: ObjPtr<Inst>) -> Option<ObjPtr<Inst>> {
     match inst.get_kind() {
