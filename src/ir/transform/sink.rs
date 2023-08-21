@@ -158,12 +158,18 @@ pub fn sink_inst_opt(
         }
     }// 有不同质的则退出
     for i in 0..len{
+        if ops[i].is_global_var_or_param(){
+            return;
+        }
         if !(ops[i].get_parent_bb()==ups[i]){//有不在前继定义的退出
             return;
         }
     }
     //todo:判断uselist
     for op in ops{
+        if op.is_global_var_or_param(){
+            return;
+        }
         for user in op.get_use_list(){
             if user.get_parent_bb()==op.get_parent_bb(){
                 return;
