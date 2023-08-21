@@ -262,7 +262,7 @@ fn loop_dead_code_eliminate(loop_info: ObjPtr<LoopInfo>, call_op_set: &HashSet<S
 
     let check_call_op = |inst: ObjPtr<Inst>| -> bool {
         if let InstKind::Call(callee) = inst.get_kind() {
-            !call_op_set.contains(&callee)
+            call_op_set.contains(&callee)
         } else {
             true
         }
@@ -278,7 +278,7 @@ fn loop_dead_code_eliminate(loop_info: ObjPtr<LoopInfo>, call_op_set: &HashSet<S
                 current.insert(current_inst);
                 if !current_inst.is_store()
                     && !current_inst.is_br()
-                    && !check_call_op(*current_inst)
+                    && check_call_op(*current_inst)
                     && current_inst.get_use_list().iter().all(|user| {
                         (user.is_global_var_or_param()
                             || loop_info.is_in_current_loop(&user.get_parent_bb()))
