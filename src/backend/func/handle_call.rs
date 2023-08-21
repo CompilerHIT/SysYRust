@@ -50,7 +50,7 @@ impl Func {
         new_insts.push(pool.put_inst(ld_inst));
     }
 
-    ///把寄存器的值分裂到空余寄存器里
+    ///把寄存器的值暂存到空闲寄存器里
     fn split_to_reg(
         &mut self,
         reg_to_split: &Reg,
@@ -69,6 +69,7 @@ impl Func {
         split_maps.insert(*reg_to_split, TmpHolder::Reg(*tmp_holder_reg));
     }
 
+    /// 从临时保存寄存器返回 caller saved寄存器的值
     fn mv_back(
         reg_splited: &Reg,
         tmp_holder_reg: &Reg,
@@ -80,21 +81,13 @@ impl Func {
         new_insts.push(pool.put_inst(mv_inst));
     }
 
-    /// callers used 为函数内以及其递归调用的函数们内使用到的caller saved寄存器
-    /// callees used 为非external 函数内 以及其递归调用的非external 函数内使用到的callee saved寄存器
-    /// callees
-    pub fn handle_call(
-        &mut self,
-        pool: &mut BackendPool,
+    ///计算handle call过程中能够使用的可用中转寄存器表
+    fn build_availables_tmp_regs(
+        &self,
         callers_used: &HashMap<String, HashSet<Reg>>,
         callees_used: &HashMap<String, HashSet<Reg>>,
         callees_be_saved: &HashMap<String, HashSet<Reg>>,
-    ) {
-        self.calc_live_for_handle_call();
-
-        //来到handle call的时候代码中不存在虚拟寄存器
-        debug_assert!(self.draw_all_virtual_regs().len() == 0, "{}", self.label);
-
+    ) -> RegUsedStat {
         let mut available_tmp_regs: RegUsedStat = RegUsedStat::init_unavailable();
         if self.label != "main" {
             for reg in callees_used.get(self.label.as_str()).unwrap() {
@@ -111,11 +104,25 @@ impl Func {
         for reg in Reg::get_all_specials_with_s0() {
             available_tmp_regs.use_reg(reg.get_color());
         }
+        available_tmp_regs
+    }
 
-        let available_tmp_regs = available_tmp_regs;
-
+    /// callers used 为函数内以及其递归调用的函数们内使用到的caller saved寄存器
+    /// callees used 为非external 函数内 以及其递归调用的非external 函数内使用到的callee saved寄存器
+    /// callees
+    pub fn handle_call(
+        &mut self,
+        pool: &mut BackendPool,
+        callers_used: &HashMap<String, HashSet<Reg>>,
+        callees_used: &HashMap<String, HashSet<Reg>>,
+        callees_be_saved: &HashMap<String, HashSet<Reg>>,
+    ) {
+        self.calc_live_for_handle_call();
+        //来到handle call的时候代码中不存在虚拟寄存器
+        debug_assert!(self.draw_all_virtual_regs().len() == 0, "{}", self.label);
+        let available_tmp_regs =
+            self.build_availables_tmp_regs(callers_used, callees_used, callees_be_saved);
         let mut phisic_mems: HashMap<Reg, StackSlot> = HashMap::new();
-
         //遇到使用了的callers_used寄存器,就要保存保存到栈上或者保存到一个临时可用寄存器中
         //当遇到了临时可用寄存器的使用者,或者遇到这个值要使用的时候才把这个寄存器的值归还回来
         // 记录寄存器遇到的下一次使用情况
@@ -124,7 +131,6 @@ impl Func {
             let mut next_occurs = Func::build_next_occurs(bb);
             let mut split_maps: HashMap<Reg, TmpHolder> = HashMap::new(); // to_saved-> tmp holder
             let mut tmp_holder_regs: HashMap<Reg, Reg> = HashMap::new(); //中转使用的reg
-
             let mut index = 0;
             let mut new_insts: Vec<ObjPtr<LIRInst>> = Vec::with_capacity(bb.insts.len());
             //初始化live now
@@ -187,12 +193,16 @@ impl Func {
                         split_maps.remove(&reg_splited);
                     }
                 }
+                for reg in inst.get_reg_use() {
+                    if tmp_holder_regs.contains_key(&reg) {
+                        unreachable!();
+                    }
+                }
                 if inst.get_type() != InstrsType::Call {
                     new_insts.push(*inst);
                     index += 1;
                     continue;
                 }
-
                 // 遇到call指令, (判断该call 指令是否会影响借用的物理寄存器)
 
                 let func_name = inst.get_func_name().unwrap();
@@ -202,6 +212,7 @@ impl Func {
                 let mut callee_used_but_not_saved = callee_used.clone();
                 callee_used_but_not_saved
                     .retain(|reg| !callees_be_saved.get(&func_name).unwrap().contains(reg));
+
                 let mut used_but_not_saved = callee_used_but_not_saved;
                 used_but_not_saved.extend(caller_used.iter());
                 let used_but_not_saved = used_but_not_saved;
@@ -263,18 +274,18 @@ impl Func {
                 for reg in to_saved {
                     if let Some(color) = tmp_holder_regs_choicess.get_available_reg(reg.get_type())
                     {
-                        // let tmp_holder = Reg::from_color(color);
-                        // tmp_holder_regs_choicess.use_reg(color);
-                        // debug_assert!(!Reg::get_all_specials().contains(&tmp_holder));
-                        // self.split_to_reg(
-                        //     &reg,
-                        //     &tmp_holder,
-                        //     &mut new_insts,
-                        //     pool,
-                        //     &mut split_maps,
-                        //     &mut tmp_holder_regs,
-                        // );
-                        // continue;
+                        let tmp_holder = Reg::from_color(color);
+                        tmp_holder_regs_choicess.use_reg(color);
+                        debug_assert!(!Reg::get_all_specials().contains(&tmp_holder));
+                        self.split_to_reg(
+                            &reg,
+                            &tmp_holder,
+                            &mut new_insts,
+                            pool,
+                            &mut split_maps,
+                            &mut tmp_holder_regs,
+                        );
+                        continue;
                     }
                     // 否则使用栈空间做中转,对于同一物理寄存器使用同一栈空间
                     self.split_to_stack(
