@@ -22,7 +22,7 @@ impl AsmModule {
     /// 代码调度
     pub fn list_scheduling_tech(&mut self) {
         self.func_map.iter().for_each(|(_, func)| {
-            func.as_mut().list_scheduling_tech(50);
+            func.as_mut().list_scheduling_tech();
         });
     }
 }

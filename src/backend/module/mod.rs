@@ -121,7 +121,7 @@ impl AsmModule {
     // 再次进行指令重排
     pub fn re_list_scheduling(&mut self) {
         self.name_func.iter_mut().for_each(|(_, func)| {
-            func.list_scheduling_tech(50);
+            func.list_scheduling_tech();
         });
     }
 
