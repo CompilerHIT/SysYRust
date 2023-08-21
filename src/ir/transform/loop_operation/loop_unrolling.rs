@@ -186,7 +186,6 @@ fn one_block_loop_full_unrolling(
     pools: &mut (&mut ObjPool<BasicBlock>, &mut ObjPool<Inst>),
     round: i32,
 ) {
-    println!("loop unrolling {}", loop_info.get_header().get_name());
     let bodys = loop_info.get_current_loop_bb();
 
     let mut body = if bodys.len() == 1 {

@@ -46,7 +46,7 @@ pub fn loop_optimize(
 
     // 循环归纳和删除
     loop_elimination(module, &mut loop_map, pools);
-    super::functional_optimizer(module, pools, false);
+    super::functional_optimizer(module, pools, true);
 
     // 循环展开
     loop_unrolling(module, &mut loop_map, max_loop_unrolling, pools);
