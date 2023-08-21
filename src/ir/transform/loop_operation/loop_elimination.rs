@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::{collections::HashSet, hash::Hash};
 
 use crate::ir::{
     analysis::{
@@ -268,7 +268,7 @@ fn loop_dead_code_eliminate(loop_info: ObjPtr<LoopInfo>, call_op_set: &HashSet<S
         }
     };
 
-    let mut delete_list: Vec<ObjPtr<Inst>> = vec![];
+    let mut delete_list: HashSet<ObjPtr<Inst>> = HashSet::new();
     insts.iter().for_each(|inst| {
         if !visited.contains(&inst) {
             let mut current = HashSet::new();
@@ -304,8 +304,7 @@ fn loop_dead_code_eliminate(loop_info: ObjPtr<LoopInfo>, call_op_set: &HashSet<S
             visited.extend(current);
         }
     });
-
-    delete_list.iter_mut().for_each(|x| x.remove_self());
+    delete_list.iter().for_each(|x| x.as_mut().remove_self());
 }
 
 fn parse_round(
